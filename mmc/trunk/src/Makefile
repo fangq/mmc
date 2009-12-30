@@ -2,7 +2,7 @@ PROJLIBFILE=simpmesh.c tettracing.c
 OBJFILE =simpmesh.o tettracing.o
 GCC     =gcc
 PROJFILE =tetray
-OPT    = -g #-O3
+OPT    = -g -lm #-O3
 #OPT    = -O3
 
 .o:

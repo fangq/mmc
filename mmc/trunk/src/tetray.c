@@ -2,17 +2,16 @@
 #include "tettracing.h"
 #include <string.h>
 #include <stdlib.h>
-/*#include <math.h>*/
 #include <time.h>
 
-#define PHOTON_COUNT 100
+#define PHOTON_COUNT 1
 
 int main(int argc, char**argv){
 	tetmesh mesh;
 	tetplucker plucker;
 	int faceid,i,eid;
 	int *enb;
-	float dlen,leninit,weight;
+	float dlen,leninit,movelen,weight;
 	float3 pout,ptmp;
 	float3 p0,p1; /*{32.0967f,26.4944f,12.6675f};*/
 	float3 c0={-0.577350269189626f,-0.577350269189626f,0.577350269189626f};
@@ -46,15 +45,14 @@ int main(int argc, char**argv){
 	    vec_mult_add(&psrc,&c0,1.0f,leninit,&p1);
 
 	    while(1){  /*propagate a photon until exit*/
-		dlen=dist(&p0,&p1);
-		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid);
+		dlen=dist2(&p0,&p1);
+		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight);
+		movelen=dist2(&p0,&pout);
 
 		/*move a photon until end of the current scattering len*/
-		while(faceid>=0&&dlen>dist(&p0,&pout)){   
+		while(faceid>=0&&dlen>movelen){
 			memcpy((void *)&ptmp,(void *)&pout,sizeof(ptmp));
 			
-		        weight*=expf(-mesh.med[mesh.type[eid]-1]*leninit));
-
 			enb=(int *)(&plucker.mesh->facenb[eid-1]);
 			eid=enb[faceid];
 			if(eid==0) {
@@ -64,12 +62,10 @@ int main(int argc, char**argv){
 			if(pout.x!=QLIMIT){
 				printf("ray passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 			}
-			trackpos(&ptmp,&p1,&plucker,eid,&pout,&faceid);
+			trackpos(&ptmp,&p1,&plucker,eid,&pout,&faceid,&weight);
 		}
 		if(eid==0) break;  /*photon exits boundary*/
 		memcpy((void *)&p0,(void *)&p1,sizeof(p0));
-	        weight*=expf(-mesh.med[mesh.type[eid]-1]*leninit));
-
 		printf("ray exits at: %f %f %f %d\n",p0.x,p0.y,p0.z,eid);
 		mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1);
 	    }
