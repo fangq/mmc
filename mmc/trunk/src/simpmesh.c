@@ -90,7 +90,7 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
-	char fmed[MAX_PATH_LENGTH];
+	char felem[MAX_PATH_LENGTH];
 	sprintf(felem,"%s%celem_%s.dat",cfg->rootpath,pathsep,cfg->session);
 	
 	if((fp=fopen(felem,"rt"))==NULL){
@@ -114,7 +114,7 @@ void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
-	char fmed[MAX_PATH_LENGTH];
+	char ffacenb[MAX_PATH_LENGTH];
 	sprintf(ffacenb,"%s%cfacenb_%s.dat",cfg->rootpath,pathsep,cfg->session);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){

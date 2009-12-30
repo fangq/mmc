@@ -12,17 +12,6 @@
 #define EPS  1e-9f
 #define LOG_MT_MAX 22.1807097779182f
 
-typedef struct float_3{
-	float x,y,z;
-} float3;
-
-typedef struct float_4{
-	float x,y,z,w;
-} float4;
-
-typedef struct int_4{
-	int x,y,z,w;
-} int4;
 
 typedef struct MMCMedium{
 	float mua,musp,n,g;
@@ -60,6 +49,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg);
 
 void mesh_clear(tetmesh *mesh);
 void mesh_build(tetmesh *mesh);
+void mesh_error(char *msg);
 
 void plucker_init(tetplucker *plucker,tetmesh *mesh);
 void plucker_build(tetplucker *plucker);

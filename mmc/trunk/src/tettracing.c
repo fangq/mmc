@@ -19,7 +19,7 @@ void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/
 	float3 pvec, pcrx;
 	float3 pin;
 	int *ee;
-	int i,j,rawfaceid=-1;
+	int i,rawfaceid=-1;
 	/***************************************************************
 	
                   /|\
@@ -34,9 +34,9 @@ void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/
 	
 	****************************************************************/
 	float w[6];
-	char fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
-	char nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-	char faceorder[]={1,3,2,0};
+	int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
+	int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+	int faceorder[]={1,3,2,0};
 	
 	if(plucker->mesh==NULL || plucker->d==NULL||eid<=0||eid>plucker->mesh->ne) 
 		return;

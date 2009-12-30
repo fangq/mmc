@@ -40,7 +40,7 @@ int main(int argc, char**argv){
 
 	
 	/*launch photons*/
-	for(i=0;i<cfg->nphoton;i++){
+	for(i=0;i<cfg.nphoton;i++){
 	    eid=1;
 	    weight=1.f;
 	    /*initialize the photon position*/
