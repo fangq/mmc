@@ -4,14 +4,14 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define PHOTON_COUNT 1
+#define PHOTON_COUNT 100
 
 int main(int argc, char**argv){
 	tetmesh mesh;
 	tetplucker plucker;
 	int faceid,i,eid;
 	int *enb;
-	float dlen,leninit,movelen,weight;
+	float leninit,weight;
 	float3 pout,ptmp;
 	float3 p0,p1; /*{32.0967f,26.4944f,12.6675f};*/
 	float3 c0={-0.577350269189626f,-0.577350269189626f,0.577350269189626f};
@@ -32,7 +32,9 @@ int main(int argc, char**argv){
 	if(mesh.node==NULL||mesh.elem==NULL||mesh.facenb==NULL||mesh.med==NULL)
 		mesh_error("not all files were loaded");
 
-	srand(time(NULL));
+	/*srand(time(NULL));*/
+	srand(314159265);
+
 	
 	/*launch photons*/
 	for(i=0;i<PHOTON_COUNT;i++){
@@ -45,14 +47,13 @@ int main(int argc, char**argv){
 	    vec_mult_add(&psrc,&c0,1.0f,leninit,&p1);
 
 	    while(1){  /*propagate a photon until exit*/
-		dlen=dist2(&p0,&p1);
-		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight);
-		movelen=dist2(&p0,&pout);
+		/*possible overshoot when p0-p1 is shorter*/
+		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight); 
 
 		/*move a photon until end of the current scattering len*/
-		while(faceid>=0&&dlen>movelen){
+		while(faceid>=0 && dist2(&p0,&p1)>dist2(&p0,&pout)){
 			memcpy((void *)&ptmp,(void *)&pout,sizeof(ptmp));
-			
+
 			enb=(int *)(&plucker.mesh->facenb[eid-1]);
 			eid=enb[faceid];
 			if(eid==0) {
