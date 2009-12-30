@@ -1,14 +1,16 @@
-#include "simpmesh.h"
-#include "tettracing.h"
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include "simpmesh.h"
+#include "tettracing.h"
+#include "mcx_utils.h"
 
-#define PHOTON_COUNT 100
 
 int main(int argc, char**argv){
+	Config cfg;
 	tetmesh mesh;
 	tetplucker plucker;
+
 	int faceid,i,eid;
 	int *enb;
 	float leninit,weight;
@@ -17,15 +19,16 @@ int main(int argc, char**argv){
 	float3 c0={-0.577350269189626f,-0.577350269189626f,0.577350269189626f};
 	float3 psrc={41.5f,38.f,2.f};
 	
-	if(argc<5) {
-		mesh_error("format: tetray nodefile elemfile facenbfile propfile");
-	}
+        mcx_initcfg(&cfg);
+
+        // parse command line options to initialize the configurations
+        mcx_parsecmd(argc,argv,&cfg);
 	
 	mesh_init(&mesh);
-	mesh_loadnode(&mesh,argv[1]);
-	mesh_loadelem(&mesh,argv[2]);
-	mesh_loadfaceneighbor(&mesh,argv[3]);
-	mesh_loadmedia(&mesh,argv[4]);
+	mesh_loadnode(&mesh,&cfg);
+	mesh_loadelem(&mesh,&cfg);
+	mesh_loadfaceneighbor(&mesh,&cfg);
+	mesh_loadmedia(&mesh,&cfg);
 
 	plucker_init(&plucker,&mesh);
 	
@@ -37,7 +40,7 @@ int main(int argc, char**argv){
 
 	
 	/*launch photons*/
-	for(i=0;i<PHOTON_COUNT;i++){
+	for(i=0;i<cfg->nphoton;i++){
 	    eid=1;
 	    weight=1.f;
 	    /*initialize the photon position*/
@@ -73,6 +76,7 @@ int main(int argc, char**argv){
 	}
 	plucker_clear(&plucker);
 	mesh_clear(&mesh);
+        mcx_clearcfg(&cfg);
 
 
 	return 0;

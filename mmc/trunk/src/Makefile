@@ -1,4 +1,4 @@
-PROJLIBFILE=simpmesh.c tettracing.c
+PROJLIBFILE=simpmesh.c tettracing.c mcx_utils.c
 OBJFILE =simpmesh.o tettracing.o
 GCC     =gcc
 PROJFILE =tetray

@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <math.h>
+#include "mcx_utils.h"
+
 
 #define QLIMIT (3.40282347e+38F)
 #define R_RAND_MAX  (1.f/RAND_MAX)
@@ -22,8 +24,8 @@ typedef struct int_4{
 	int x,y,z,w;
 } int4;
 
-typedef struct Medium{
-	float mua,musp,g,n;
+typedef struct MMCMedium{
+	float mua,musp,n,g;
 } medium;
 
 typedef struct femmesh{
@@ -51,10 +53,10 @@ float vec_dot(float3 *a,float3 *b);
 float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am);
 
 void mesh_init(tetmesh *mesh);
-void mesh_loadnode(tetmesh *mesh,char *node);
-void mesh_loadelem(tetmesh *mesh,char *node);
-void mesh_loadfaceneighbor(tetmesh *mesh,char *ffacenb);
-void mesh_loadmedia(tetmesh *mesh,char *fmed);
+void mesh_loadnode(tetmesh *mesh,Config *cfg);
+void mesh_loadelem(tetmesh *mesh,Config *cfg);
+void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg);
+void mesh_loadmedia(tetmesh *mesh,Config *cfg);
 
 void mesh_clear(tetmesh *mesh);
 void mesh_build(tetmesh *mesh);

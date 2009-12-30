@@ -1,6 +1,12 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 
+#ifdef WIN32
+         char pathsep='\';
+#else
+         char pathsep='/';
+#endif
+
 void vec_diff(float3 *a,float3 *b,float3 *res){
 	res->x=b->x-a->x;
 	res->y=b->y-a->y;
@@ -38,9 +44,11 @@ void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
 	exit(1);
 }
-void mesh_loadnode(tetmesh *mesh,char *fnode){
+void mesh_loadnode(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
+	char fnode[MAX_PATH_LENGTH];
+	sprintf(fnode,"%s%cnode_%s.dat",cfg->rootpath,pathsep,cfg->session);
 	if((fp=fopen(fnode,"rt"))==NULL){
 		mesh_error("can not open node file");
 	}
@@ -58,9 +66,11 @@ void mesh_loadnode(tetmesh *mesh,char *fnode){
 	fclose(fp);
 }
 
-void mesh_loadmedia(tetmesh *mesh,char *fmed){
+void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
+	char fmed[MAX_PATH_LENGTH];
+	sprintf(fmed,"%s%cprop_%s.dat",cfg->rootpath,pathsep,cfg->session);
 	if((fp=fopen(fmed,"rt"))==NULL){
 		mesh_error("can not open media property file");
 	}
@@ -76,11 +86,13 @@ void mesh_loadmedia(tetmesh *mesh,char *fmed){
 	}
 	fclose(fp);
 }
-void mesh_loadelem(tetmesh *mesh,char *felem){
+void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
-
+	char fmed[MAX_PATH_LENGTH];
+	sprintf(felem,"%s%celem_%s.dat",cfg->rootpath,pathsep,cfg->session);
+	
 	if((fp=fopen(felem,"rt"))==NULL){
 		mesh_error("can not open element file");
 	}
@@ -98,10 +110,12 @@ void mesh_loadelem(tetmesh *mesh,char *felem){
 	}
 	fclose(fp);
 }
-void mesh_loadfaceneighbor(tetmesh *mesh,char *ffacenb){
+void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
+	char fmed[MAX_PATH_LENGTH];
+	sprintf(ffacenb,"%s%cfacenb_%s.dat",cfg->rootpath,pathsep,cfg->session);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
 		mesh_error("can not open element file");
