@@ -128,7 +128,7 @@ void mcx_clearcfg(Config *cfg){
 }
 
 void mcx_loadconfig(FILE *in, Config *cfg){
-     int i,gates,idx1d;
+     int i,gates;
      char filename[MAX_PATH_LENGTH]={0}, comment[MAX_PATH_LENGTH];
      
      if(in==stdin)
@@ -147,7 +147,7 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",
                                    cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
-     cfg->srcpos.x--;cfg->srcpos.y--;cfg->srcpos.z--; /*convert to C index, grid center*/
+     //cfg->srcpos.x--;cfg->srcpos.y--;cfg->srcpos.z--; /*convert to C index, grid center*/
      fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) );
      fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
@@ -228,12 +228,14 @@ void mcx_loadconfig(FILE *in, Config *cfg){
         if(in==stdin)
 		fprintf(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
      	fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z));
-        cfg->detpos[i].x--;cfg->detpos[i].y--;cfg->detpos[i].z--;  /*convert to C index*/
+        //cfg->detpos[i].x--;cfg->detpos[i].y--;cfg->detpos[i].z--;  /*convert to C index*/
         fgets(comment,MAX_PATH_LENGTH,in);
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }
+#ifdef MMC
      if(filename[0]){
+        int idx1d;
         mcx_loadvolume(filename,cfg);
 	idx1d=cfg->isrowmajor?(int)(floor(cfg->srcpos.x)*cfg->dim.y*cfg->dim.z+floor(cfg->srcpos.y)*cfg->dim.z+floor(cfg->srcpos.z)):\
                       (int)(floor(cfg->srcpos.z)*cfg->dim.y*cfg->dim.x+floor(cfg->srcpos.y)*cfg->dim.x+floor(cfg->srcpos.x));
@@ -255,6 +257,7 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      }else{
      	mcx_error(-4,"one must specify a binary volume file in order to run the simulation");
      }
+#endif
 }
 
 void mcx_saveconfig(FILE *out, Config *cfg){

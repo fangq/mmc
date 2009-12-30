@@ -2,7 +2,7 @@
 #define _MCEXTREME_UTILITIES_H
 
 #include <stdio.h>
-#include "vector_types.h"
+#include <vector_types.h>
 
 #define MAX_PROP            256
 #define MAX_DETECTORS       256

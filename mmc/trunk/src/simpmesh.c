@@ -2,7 +2,7 @@
 #include "simpmesh.h"
 
 #ifdef WIN32
-         char pathsep='\';
+         char pathsep='\\';
 #else
          char pathsep='/';
 #endif
@@ -44,12 +44,22 @@ void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
 	exit(1);
 }
+void mesh_filenames(char *format,char *foutput,Config *cfg){
+	char filename[MAX_PATH_LENGTH];
+	sprintf(filename,format,cfg->session);
+
+	if(cfg->rootpath[0]) 
+		sprintf(foutput,"%s%c%s",cfg->rootpath,pathsep,filename);
+	else
+		sprintf(foutput,"%s",filename);
+}
 void mesh_loadnode(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	char fnode[MAX_PATH_LENGTH];
-	sprintf(fnode,"%s%cnode_%s.dat",cfg->rootpath,pathsep,cfg->session);
+	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
+		fprintf(stdout,"nodefile=%s\n",fnode);
 		mesh_error("can not open node file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->nn));
@@ -70,7 +80,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	char fmed[MAX_PATH_LENGTH];
-	sprintf(fmed,"%s%cprop_%s.dat",cfg->rootpath,pathsep,cfg->session);
+	mesh_filenames("prop_%s.dat",fmed,cfg);
 	if((fp=fopen(fmed,"rt"))==NULL){
 		mesh_error("can not open media property file");
 	}
@@ -91,8 +101,7 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	int tmp,len,i;
 	int4 *pe;
 	char felem[MAX_PATH_LENGTH];
-	sprintf(felem,"%s%celem_%s.dat",cfg->rootpath,pathsep,cfg->session);
-	
+	mesh_filenames("elem_%s.dat",felem,cfg);
 	if((fp=fopen(felem,"rt"))==NULL){
 		mesh_error("can not open element file");
 	}
@@ -115,7 +124,7 @@ void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
 	int tmp,len,i;
 	int4 *pe;
 	char ffacenb[MAX_PATH_LENGTH];
-	sprintf(ffacenb,"%s%cfacenb_%s.dat",cfg->rootpath,pathsep,cfg->session);
+	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
 		mesh_error("can not open element file");
@@ -266,4 +275,21 @@ void mc_next_scatter(float g, float musp, float3 *pnext){
     pnext->x+=nextlen*p.x;
     pnext->y+=nextlen*p.y;
     pnext->z+=nextlen*p.z;
+}
+
+void mesh_saveweight(tetmesh *mesh,Config *cfg){
+	FILE *fp;
+	int i;
+	float3 *pn;
+	char fweight[MAX_PATH_LENGTH];
+	mesh_filenames("%s.dat",fweight,cfg);
+	if((fp=fopen(fweight,"wt"))==NULL){
+		mesh_error("can not open weight file to write");
+	}
+	for(i=0;i<mesh->nn;i++){
+		pn=mesh->node+i;
+		if(fprintf(fp,"%d %e %e %e %e\n",i+1,pn->x,pn->y,pn->z,mesh->weight[i])==0)
+			mesh_error("can not write to weight file");
+	}
+	fclose(fp);
 }

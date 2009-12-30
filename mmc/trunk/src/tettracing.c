@@ -70,9 +70,9 @@ void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/
 		}
 	    }
 	}
-	if(rawfaceid>=0&&pin.x!=QLIMIT && pout->x!=QLIMIT){
-		*weight*=exp(-plucker->mesh->med[plucker->mesh->type[eid-1]-1].mua*dist(&pin,pout));
-		plucker->mesh->weight[ee[nc[rawfaceid][0]]-1]+=*weight;			
+	if(rawfaceid>=0 && pin.x!=QLIMIT && pout->x!=QLIMIT){
+		*weight*=exp(-plucker->mesh->med[plucker->mesh->type[eid-1]-1].mua*dist(p0,pout));
+		plucker->mesh->weight[ee[nc[rawfaceid][0]]-1]+=*weight;
 		plucker->mesh->weight[ee[nc[rawfaceid][1]]-1]+=*weight;
 		plucker->mesh->weight[ee[nc[rawfaceid][2]]-1]+=*weight;
 	}
