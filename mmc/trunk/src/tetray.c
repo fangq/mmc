@@ -11,7 +11,7 @@ int main(int argc, char**argv){
 	tetmesh mesh;
 	tetplucker plucker;
 
-	int faceid,i,eid;
+	int faceid,i,eid,isend;
 	int *enb;
 	float dlen,leninit,weight;
 	float3 pout,ptmp;
@@ -40,7 +40,7 @@ int main(int argc, char**argv){
 
 	/*launch photons*/
 	for(i=0;i<cfg.nphoton;i++){
-	    eid=1;
+	    eid=cfg.dim.x;
 	    weight=1.f;
 	    /*initialize the photon position*/
 	    leninit=rand01();
@@ -52,31 +52,31 @@ int main(int argc, char**argv){
 
 	    while(1){  /*propagate a photon until exit*/
 		/*possible overshooting when p0-p1 is shorter*/
-		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight); 
+		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight,&isend);
 		if(pout.x==QLIMIT){
 			eid=0;
+			faceid=-1;
 		}
 		/*move a photon until the end of the current scattering path*/
-		while(faceid>=0 && dlen>dist2(&p0,&pout)){
+		while(faceid>=0 && !isend){
 			memcpy((void *)&ptmp,(void *)&pout,sizeof(ptmp));
 
 			enb=(int *)(&plucker.mesh->facenb[eid-1]);
 			eid=enb[faceid];
 			if(eid==0){
-		    	    //printf("hit boundary, exit %d\n",i);
+		    	    if(cfg.isrowmajor) fprintf(cfg.flog,"hit boundary, exit %d\n",i);
 		    	    break;
 			}
-			if(pout.x!=QLIMIT&&i==894){
-				printf("ray passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
+			if(pout.x!=QLIMIT&&cfg.isrowmajor){
+				fprintf(cfg.flog,"ray passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 			}
-			trackpos(&ptmp,&p1,&plucker,eid,&pout,&faceid,&weight);
+			trackpos(&ptmp,&p1,&plucker,eid,&pout,&faceid,&weight,&isend);
 		}
 		if(eid==0) break;  /*photon exits boundary*/
 		memcpy((void *)&p0,(void *)&p1,sizeof(p0));
-		if(i==894) printf("ray exits at: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
+		if(cfg.isrowmajor) fprintf(cfg.flog,"ray exits at: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
 		mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1);
 	        dlen=dist2(&p0,&p1);
-		if(i==894) printf("outside %f (%f %f %f) (%f %f %f)%d %d\n",dlen,p0.x,p0.y,p0.z,p1.x,p1.y,p1.z,eid,i);
 	    }
 	}
 	plucker_clear(&plucker);

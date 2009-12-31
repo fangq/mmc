@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 
+#define SINCOSF(theta,stheta,ctheta) {stheta=sinf(theta);ctheta=cosf(theta);}
+
 #ifdef WIN32
          char pathsep='\\';
 #else
@@ -224,11 +226,6 @@ float rand01(){
     return rand()*R_RAND_MAX;
 }
 
-void sincosf(float theta,float *stheta,float *ctheta){
-    *stheta=sin(theta);
-    *ctheta=cos(theta);
-}
-
 void mc_next_scatter(float g, float musp, float3 *pnext){
     float nextlen=rand01();
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
@@ -238,7 +235,7 @@ void mc_next_scatter(float g, float musp, float3 *pnext){
     
     //random arimuthal angle
     tmp0=TWO_PI*rand01(); //next arimuth angle
-    sincosf(tmp0,&sphi,&cphi);
+    SINCOSF(tmp0,sphi,cphi);
 
     //Henyey-Greenstein Phase Function, "Handbook of Optical Biomedical Diagnostics",2002,Chap3,p234
     //see Boas2002
@@ -256,7 +253,7 @@ void mc_next_scatter(float g, float musp, float3 *pnext){
 	ctheta=tmp0;
     }else{  //Wang1995 has acos(2*ran-1), rather than 2*pi*ran, need to check
 	theta=M_PI*rand01();
-    	sincosf(theta,&stheta,&ctheta);
+    	SINCOSF(theta,stheta,ctheta);
     }
 
     if( pnext->z>-1.f+EPS && pnext->z<1.f-EPS ) {
