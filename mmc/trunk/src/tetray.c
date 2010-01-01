@@ -48,7 +48,7 @@ int main(int argc, char**argv){
 	    memcpy(&p0,&cfg.srcpos,sizeof(p0));
 	    memcpy(&c0,&cfg.srcdir,sizeof(p0));
 	    vec_mult_add(&p0,&c0,1.0f,leninit,&p1);
-	    dlen=dist2(&p0,&p1);
+	    dlen=leninit;
 
 	    while(1){  /*propagate a photon until exit*/
 		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight,&isend);
@@ -67,19 +67,18 @@ int main(int argc, char**argv){
 		    	    break;
 			}
 			if(pout.x!=QLIMIT&&cfg.isrowmajor){
-				fprintf(cfg.flog,"ray passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
+			    fprintf(cfg.flog,"ray passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 			}
 			trackpos(&ptmp,&p1,&plucker,eid,&pout,&faceid,&weight,&isend);
 		}
 		if(eid==0) {
 			if(pout.x==QLIMIT)
-                          fprintf(cfg.flog,"%d %d %f %f %f %f %f %f\n",i,eid,p0.x,p0.y,p0.z,p1.x,p1.y,p1.z);
+                          fprintf(cfg.flog,"%d %d %e %e\n",i,eid,dist(&p0,&p1),dist2(&p0,&p1));
 			break;  /*photon exits boundary*/
 		}
 		memcpy((void *)&p0,(void *)&p1,sizeof(p0));
 		if(cfg.isrowmajor) fprintf(cfg.flog,"ray exits at: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
-		mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1,&c0);
-	        dlen=dist2(&p0,&p1);
+		dlen=mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1,&c0);
 	    }
 	}
 	plucker_clear(&plucker);

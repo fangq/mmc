@@ -58,7 +58,7 @@ void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
 float dist2(float3 *p0,float3 *p1);
 float dist(float3 *p0,float3 *p1);
-void mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir);
+float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir);
 float rand01();
 
 

@@ -226,7 +226,7 @@ float rand01(){
     return rand()*R_RAND_MAX;
 }
 
-void mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir){
+float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir){
     float nextlen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
@@ -277,6 +277,7 @@ void mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir){
     dir->x=p.x;
     dir->y=p.y;
     dir->z=p.z;
+    return nextlen;
 }
 
 void mesh_saveweight(tetmesh *mesh,Config *cfg){
