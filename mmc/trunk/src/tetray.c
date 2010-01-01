@@ -78,7 +78,7 @@ int main(int argc, char**argv){
 		}
 		memcpy((void *)&p0,(void *)&p1,sizeof(p0));
 		if(cfg.isrowmajor) fprintf(cfg.flog,"ray exits at: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
-		mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1);
+		mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1,&c0);
 	        dlen=dist2(&p0,&p1);
 	    }
 	}

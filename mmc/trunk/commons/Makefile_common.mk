@@ -30,7 +30,7 @@ BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
-CCFLAGS    := -c -Wall -g #-O3
+CCFLAGS    := -c -Wall -g
 INCLUDEDIR := $(BXDDIR)/src
 ARFLAGS    :=
 AROUTPUT   := -o
@@ -48,6 +48,8 @@ OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 
+release: CCFLAGS+= -O3
+
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
 	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1 
@@ -60,7 +62,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
+all release: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory

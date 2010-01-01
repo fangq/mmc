@@ -226,12 +226,14 @@ float rand01(){
     return rand()*R_RAND_MAX;
 }
 
-void mc_next_scatter(float g, float musp, float3 *pnext){
-    float nextlen=rand01();
+void mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir){
+    float nextlen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
-    static float3 p; /*initialized as 0 implicitly*/
-
-    nextlen=((nextlen==0.f)?LOG_MT_MAX:(-log(nextlen)))/musp;
+    float3 p;
+    do{
+       nextlen=rand01();
+       nextlen=((nextlen==0.f)?LOG_MT_MAX:(-log(nextlen)))/musp;
+    }while(nextlen<1e-5f);
 
     //random arimuthal angle
     tmp0=TWO_PI*rand01(); //next arimuth angle
@@ -256,22 +258,25 @@ void mc_next_scatter(float g, float musp, float3 *pnext){
     	SINCOSF(theta,stheta,ctheta);
     }
 
-    if( p.z>-1.f+EPS && p.z<1.f-EPS ) {
-	tmp0=1.f-pnext->z*pnext->z;   //reuse tmp to minimize registers
+    if( dir->z>-1.f+EPS && dir->z<1.f-EPS ) {
+	tmp0=1.f-dir->z*dir->z;   //reuse tmp to minimize registers
 	tmp1=1.f/sqrtf(tmp0);
 	tmp1=stheta*tmp1;
 
-	p.x=tmp1*(pnext->x*pnext->z*cphi - pnext->y*sphi) + pnext->x*ctheta;
-	p.y=tmp1*(pnext->y*pnext->z*cphi + pnext->x*sphi) + pnext->y*ctheta;
-	p.z=-tmp1*tmp0*cphi			       + pnext->z*ctheta;
+	p.x=tmp1*(dir->x*dir->z*cphi - dir->y*sphi) + dir->x*ctheta;
+	p.y=tmp1*(dir->y*dir->z*cphi + dir->x*sphi) + dir->y*ctheta;
+	p.z=-tmp1*tmp0*cphi			    + dir->z*ctheta;
     }else{
 	p.x=stheta*cphi;
 	p.y=stheta*sphi;
-	p.z=(pnext->z>0.f)?ctheta:-ctheta;
+	p.z=(dir->z>0.f)?ctheta:-ctheta;
     }
     pnext->x+=nextlen*p.x;
     pnext->y+=nextlen*p.y;
     pnext->z+=nextlen*p.z;
+    dir->x=p.x;
+    dir->y=p.y;
+    dir->z=p.z;
 }
 
 void mesh_saveweight(tetmesh *mesh,Config *cfg){
