@@ -226,7 +226,7 @@ float rand01(){
     return rand()*R_RAND_MAX;
 }
 
-float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir){
+float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir,Config *cfg){
     float nextlen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;

@@ -51,7 +51,7 @@ int main(int argc, char**argv){
 	    dlen=leninit;
 
 	    while(1){  /*propagate a photon until exit*/
-		trackpos(&p0,&p1,&plucker,eid,&pout,dlen,&faceid,&weight,&isend);
+		trackpos(&p0,&p1,&plucker,eid,&pout,dlen,&faceid,&weight,&isend,&cfg);
 		if(pout.x==QLIMIT){
 			eid=0;
 			faceid=-1;
@@ -63,22 +63,22 @@ int main(int argc, char**argv){
 			enb=(int *)(&plucker.mesh->facenb[eid-1]);
 			eid=enb[faceid];
 			if(eid==0){
-		    	    if(cfg.isrowmajor) fprintf(cfg.flog,"hit boundary, exit %d\n",i);
+		    	    if(cfg.debuglevel&dlMove) fprintf(cfg.flog,"hit boundary, exit %d\n",i);
 		    	    break;
 			}
-			if(pout.x!=QLIMIT&&cfg.isrowmajor){
+			if(pout.x!=QLIMIT&&cfg.debuglevel&dlMove){
 			    fprintf(cfg.flog,"passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 			}
-			trackpos(&ptmp,&p1,&plucker,eid,&pout,dlen,&faceid,&weight,&isend);
+			trackpos(&ptmp,&p1,&plucker,eid,&pout,dlen,&faceid,&weight,&isend,&cfg);
 		}
 		if(eid==0) {
-			if(pout.x==QLIMIT&&cfg.isrowmajor)
-                            fprintf(cfg.flog,"%d %d %e %e\n",i,eid,dist(&p0,&p1),dist2(&p0,&p1));
+			if(pout.x==QLIMIT&&cfg.debuglevel&dlMove)
+                             fprintf(cfg.flog,"hit edge or miss: %d %d %e %e\n",i,eid,dist(&p0,&p1),dist2(&p0,&p1));
 			break;  /*photon exits boundary*/
 		}
 		memcpy((void *)&p0,(void *)&p1,sizeof(p0));
-		if(cfg.isrowmajor) fprintf(cfg.flog,"moves to: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
-		dlen=mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1,&c0);
+		if(cfg.debuglevel&dlMove) fprintf(cfg.flog,"moves to: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
+		dlen=mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1,&c0,&cfg);
 	    }
 	}
 	plucker_clear(&plucker);

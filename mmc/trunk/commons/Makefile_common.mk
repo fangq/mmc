@@ -25,14 +25,14 @@ BXDSRC :=$(BXDDIR)/src
 
 CXX        := g++
 CC         := gcc
-AR         := g++
+AR         := gcc
 BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
-CCFLAGS    := -c -Wall -g
+CCFLAGS    := -c -Wall -g 
 INCLUDEDIR := $(BXDDIR)/src
-ARFLAGS    :=
+ARFLAGS    := -lm
 AROUTPUT   := -o
 MAKE       :=make
 
@@ -49,6 +49,8 @@ OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release: CCFLAGS+= -O3
+prof:    CCFLAGS+= -pg
+prof:    ARFLAGS+= -g -pg
 
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
@@ -62,7 +64,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
+all release prof: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory

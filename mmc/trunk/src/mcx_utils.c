@@ -20,11 +20,11 @@
 #include <math.h>
 #include "mcx_utils.h"
 
-char shortopt[]={'h','i','f','n','m','t','T','s','a','g','b','B',
+char shortopt[]={'h','i','f','n','m','t','T','s','a','g','b','B','D',
                  'd','r','S','p','e','U','R','l','L','I','o','\0'};
 char *fullopt[]={"--help","--interactive","--input","--photon","--move",
                  "--thread","--blocksize","--session","--array",
-                 "--gategroup","--reflect","--reflect3","--savedet",
+                 "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root",""};
@@ -114,6 +114,7 @@ void mcx_initcfg(Config *cfg){
      cfg->flog=stdout;
      cfg->sradius=0.f;
      cfg->rootpath[0]='\0';
+     cfg->debuglevel=0;
 }
 
 void mcx_clearcfg(Config *cfg){
@@ -432,6 +433,9 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     case 'o':
 		     	        i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
 		     	        break;
+                     case 'D':
+                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"char");
+                                break;
 		}
 	    }
 	    i++;

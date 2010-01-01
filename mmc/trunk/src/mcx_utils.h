@@ -9,6 +9,8 @@
 #define MAX_PATH_LENGTH     1024
 #define MAX_SESSION_LENGTH  256
 
+enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,dlTracingExit=64};
+
 typedef struct MCXMedium{
 	float mua;
 	float mus;
@@ -60,7 +62,8 @@ typedef struct MCXConfig{
 	char isgpuinfo;     /*1 to print gpu info when attach, 0 do not print*/
         float minenergy;    /*minimum energy to propagate photon*/
         FILE *flog;         /*stream handle to print log information*/
-  char rootpath[MAX_PATH_LENGTH];
+        char rootpath[MAX_PATH_LENGTH];
+        char debuglevel;
 } Config;
 
 #ifdef	__cplusplus
