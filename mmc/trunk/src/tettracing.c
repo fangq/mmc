@@ -17,7 +17,7 @@ float getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,floa
 }
 
 void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/, 
-              float3 *pout, int *faceid, float *weight, int *isend){
+              float3 *pout, float dlen, int *faceid, float *weight, int *isend){
 	float3 pvec, pcrx;
 	float3 pin;
 	int *ee;
@@ -63,15 +63,15 @@ void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/
 			else
 			    *weight*=exp(-plucker->mesh->med[plucker->mesh->type[eid-1]-1].mua*dist(p0,pout));
 
-			Rv*=(*weight);
-			plucker->mesh->weight[ee[0]-1]+=*weight*0.25f;
+			Rv*=(*weight)*dlen;
+/*			plucker->mesh->weight[ee[0]-1]+=*weight*0.25f;
 			plucker->mesh->weight[ee[1]-1]+=*weight*0.25f;
 			plucker->mesh->weight[ee[2]-1]+=*weight*0.25f;
 			plucker->mesh->weight[ee[3]-1]+=*weight*0.25f;
-
-/*			plucker->mesh->weight[ee[nc[i][0]]-1]+=Rv*w[fc[i][0]];
+*/
+			plucker->mesh->weight[ee[nc[i][0]]-1]+=Rv*w[fc[i][0]];
 			plucker->mesh->weight[ee[nc[i][1]]-1]+=Rv*w[fc[i][1]];
-			plucker->mesh->weight[ee[nc[i][2]]-1]+=-Rv*w[fc[i][2]];*/
+			plucker->mesh->weight[ee[nc[i][2]]-1]+=-Rv*w[fc[i][2]];
 		}
 	    }
 	}
