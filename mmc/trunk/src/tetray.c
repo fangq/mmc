@@ -51,7 +51,6 @@ int main(int argc, char**argv){
 	    dlen=dist2(&p0,&p1);
 
 	    while(1){  /*propagate a photon until exit*/
-		/*possible overshooting when p0-p1 is shorter*/
 		trackpos(&p0,&p1,&plucker,eid,&pout,&faceid,&weight,&isend);
 		if(pout.x==QLIMIT){
 			eid=0;
@@ -72,7 +71,11 @@ int main(int argc, char**argv){
 			}
 			trackpos(&ptmp,&p1,&plucker,eid,&pout,&faceid,&weight,&isend);
 		}
-		if(eid==0) break;  /*photon exits boundary*/
+		if(eid==0) {
+			if(pout.x==QLIMIT)
+                          fprintf(cfg.flog,"%d %d %f %f %f %f %f %f\n",i,eid,p0.x,p0.y,p0.z,p1.x,p1.y,p1.z);
+			break;  /*photon exits boundary*/
+		}
 		memcpy((void *)&p0,(void *)&p1,sizeof(p0));
 		if(cfg.isrowmajor) fprintf(cfg.flog,"ray exits at: %f %f %f %d %d\n",p0.x,p0.y,p0.z,eid,i);
 		mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].musp,&p1);

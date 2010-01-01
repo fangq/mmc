@@ -229,10 +229,10 @@ float rand01(){
 void mc_next_scatter(float g, float musp, float3 *pnext){
     float nextlen=rand01();
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
-    float3 p;
+    static float3 p; /*initialized as 0 implicitly*/
 
-    nextlen=((nextlen==0.f)?LOG_MT_MAX:(-log(nextlen)));
-    
+    nextlen=((nextlen==0.f)?LOG_MT_MAX:(-log(nextlen)))/musp;
+
     //random arimuthal angle
     tmp0=TWO_PI*rand01(); //next arimuth angle
     SINCOSF(tmp0,sphi,cphi);
@@ -256,7 +256,7 @@ void mc_next_scatter(float g, float musp, float3 *pnext){
     	SINCOSF(theta,stheta,ctheta);
     }
 
-    if( pnext->z>-1.f+EPS && pnext->z<1.f-EPS ) {
+    if( p.z>-1.f+EPS && p.z<1.f-EPS ) {
 	tmp0=1.f-pnext->z*pnext->z;   //reuse tmp to minimize registers
 	tmp1=1.f/sqrtf(tmp0);
 	tmp1=stheta*tmp1;
