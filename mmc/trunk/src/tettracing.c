@@ -17,7 +17,7 @@ void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/
 	float3 pin;
 	int *ee;
 	int i;
-	float w[6],Rv,ww;
+	float w[6],Rv,ww,oldweight=*weight;
 	int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 	int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 	int faceorder[]={1,3,2,0};
@@ -101,7 +101,8 @@ void trackpos(float3 *p0,float3 *p1,tetplucker *plucker,int eid /*start from 1*/
 	    }
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
-                ww=(*weight)*dlen*0.5f;
+                /*ww=(*weight)*dlen*0.5f;*/
+                ww=(oldweight-(*weight))*0.5f;
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
