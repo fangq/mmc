@@ -27,6 +27,7 @@ typedef struct femmesh{
 	int4 *facenb;
 	medium *med;
 	float *weight;
+	float *rnvol; /*1/veronio volume of a node*/
 } tetmesh;
 
 typedef struct tplucker{
@@ -47,8 +48,10 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg);
 void mesh_loadelem(tetmesh *mesh,Config *cfg);
 void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg);
 void mesh_loadmedia(tetmesh *mesh,Config *cfg);
+void mesh_loadnodevol(tetmesh *mesh,Config *cfg);
 
 void mesh_clear(tetmesh *mesh);
+void mesh_normalize(tetmesh *mesh);
 void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,Config *cfg);

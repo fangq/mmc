@@ -27,6 +27,7 @@ int main(int argc, char**argv){
 	mesh_loadelem(&mesh,&cfg);
 	mesh_loadfaceneighbor(&mesh,&cfg);
 	mesh_loadmedia(&mesh,&cfg);
+	mesh_loadnodevol(&mesh,&cfg);
 
 	plucker_init(&plucker,&mesh);
 	
@@ -83,6 +84,8 @@ int main(int argc, char**argv){
 		slen=mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].mus,&c0,&cfg);
 	    }
 	}
+	if(cfg.isnormalized)
+	  mesh_normalize(&mesh);
 	plucker_clear(&plucker);
 	mesh_saveweight(&mesh,&cfg);
 	mesh_clear(&mesh);

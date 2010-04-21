@@ -46,6 +46,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->type=NULL;
 	mesh->med=NULL;
 	mesh->weight=NULL;
+	mesh->rnvol=NULL;
 }
 void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
@@ -128,6 +129,30 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
+void mesh_loadnodevol(tetmesh *mesh,Config *cfg){
+	FILE *fp;
+	int tmp,len,i;
+	char fvnode[MAX_PATH_LENGTH];
+	mesh_filenames("vnode_%s.dat",fvnode,cfg);
+	if((fp=fopen(fvnode,"rt"))==NULL){
+		mesh_error("can not open element file");
+	}
+	len=fscanf(fp,"%d %d",&tmp,&(mesh->nn));
+	if(len!=2 || mesh->nn<=0){
+		mesh_error("mesh file has wrong format");
+	}
+	mesh->rnvol=(float *)malloc(sizeof(float)*mesh->nn);
+
+	for(i=0;i<mesh->nn;i++){
+		if(fscanf(fp,"%d %f",&tmp,mesh->rnvol+i)!=2)
+			mesh_error("mesh file has wrong format");
+		if(mesh->rnvol[i]>EPS)
+		  mesh->rnvol[i]=1.0f/mesh->rnvol[i]; /*run division once and for all*/
+		else
+		  mesh->rnvol[i]=0.f; /*degenerated elements will be ignored*/
+	}
+	fclose(fp);
+}
 void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
 	FILE *fp;
 	int tmp,len,i;
@@ -176,6 +201,10 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->weight){
 		free(mesh->weight);
 		mesh->weight=NULL;
+	}
+	if(mesh->rnvol){
+		free(mesh->rnvol);
+		mesh->rnvol=NULL;
 	}
 }
 
@@ -299,4 +328,9 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 			mesh_error("can not write to weight file");
 	}
 	fclose(fp);
+}
+void mesh_normalize(tetmesh *mesh){
+        int i;
+        for(i=0;i<mesh->nn;i++)
+	   mesh->weight[i]*=mesh->rnvol[i];
 }

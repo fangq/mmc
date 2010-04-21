@@ -100,7 +100,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
                 /*ww=(*weight)*dlen*0.5f;*/
-                ww=(oldweight-(*weight))*newdlen*0.5f;
+                ww=(oldweight-(*weight))*0.5f;
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
