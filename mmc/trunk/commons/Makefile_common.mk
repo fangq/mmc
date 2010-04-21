@@ -49,8 +49,10 @@ OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release: CCFLAGS+= -O3
-prof:    CCFLAGS+= -pg
-prof:    ARFLAGS+= -g -pg
+omp:     CCFLAGS+= -O3 -fopenmp
+omp:     ARFLAGS+= -fopenmp
+prof:    CCFLAGS+= -O3 -pg
+prof:    ARFLAGS+= -O3 -g -pg
 
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
@@ -64,7 +66,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release prof: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
+all release prof omp: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory

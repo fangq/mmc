@@ -9,10 +9,15 @@
          char pathsep='/';
 #endif
 
+void vec_add(float3 *a,float3 *b,float3 *res){
+	res->x=a->x+b->x;
+	res->y=a->y+b->y;
+	res->z=a->z+b->z;
+}
 void vec_diff(float3 *a,float3 *b,float3 *res){
-	res->x=b->x-a->x;
-	res->y=b->y-a->y;
-	res->z=b->z-a->z;
+        res->x=b->x-a->x;
+        res->y=b->y-a->y;
+        res->z=b->z-a->z;
 }
 void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
 	res->x=sb*b->x+sa*a->x;
@@ -92,9 +97,11 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 	}
 	mesh->med=(medium *)malloc(sizeof(medium)*mesh->prop);
 	for(i=0;i<mesh->prop;i++){
-		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].musp),
+		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
 			mesh_error("property file has wrong format");
+		/*user input musp, MMCM converts to mus
+		mesh->med[i].mus=musp/(1.f-mesh->med[i].g); */
 	}
 	fclose(fp);
 }
@@ -226,14 +233,14 @@ float rand01(){
     return rand()*R_RAND_MAX;
 }
 
-float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir,Config *cfg){
-    float nextlen;
+float mc_next_scatter(float g, float mus, float3 *dir,Config *cfg){
+    float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
-    do{
-       nextlen=rand01();
-       nextlen=((nextlen==0.f)?LOG_MT_MAX:(-log(nextlen)))/musp;
-    }while(nextlen<1e-5f);
+//    do{
+       nextslen=rand01();
+       nextslen=((nextslen==0.f)?LOG_MT_MAX:(-log(nextslen))); /*/mus;*/
+//    }while(nextslen<1e-5f);
 
     //random arimuthal angle
     tmp0=TWO_PI*rand01(); //next arimuth angle
@@ -271,13 +278,10 @@ float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir,Config *cfg
 	p.y=stheta*sphi;
 	p.z=(dir->z>0.f)?ctheta:-ctheta;
     }
-    pnext->x+=nextlen*p.x;
-    pnext->y+=nextlen*p.y;
-    pnext->z+=nextlen*p.z;
     dir->x=p.x;
     dir->y=p.y;
     dir->z=p.z;
-    return nextlen;
+    return nextslen;
 }
 
 void mesh_saveweight(tetmesh *mesh,Config *cfg){

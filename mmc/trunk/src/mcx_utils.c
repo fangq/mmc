@@ -124,7 +124,8 @@ void mcx_clearcfg(Config *cfg){
      	free(cfg->detpos);
      if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
         free(cfg->vol);
-
+     if(cfg->flog)
+        fclose(cfg->flog);
      mcx_initcfg(cfg);
 }
 

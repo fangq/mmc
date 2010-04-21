@@ -11,10 +11,10 @@
 #define TWO_PI  (M_PI*2.0)
 #define EPS  1e-9f
 #define LOG_MT_MAX 22.1807097779182f
-
+#define R_MIN_MUS 1000.f
 
 typedef struct MMCMedium{
-	float mua,musp,n,g;
+	float mua,mus,g,n;
 } medium;
 
 typedef struct femmesh{
@@ -35,6 +35,7 @@ typedef struct tplucker{
 	float3 *m;
 } tetplucker;
 
+void vec_add(float3 *a,float3 *b,float3 *res);
 void vec_diff(float3 *a,float3 *b,float3 *res);
 void vec_cross(float3 *a,float3 *b,float3 *res);
 void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res);
@@ -58,7 +59,7 @@ void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
 float dist2(float3 *p0,float3 *p1);
 float dist(float3 *p0,float3 *p1);
-float mc_next_scatter(float g, float musp, float3 *pnext,float3 *dir,Config *cfg);
+float mc_next_scatter(float g, float mus,float3 *dir,Config *cfg);
 float rand01();
 
 
