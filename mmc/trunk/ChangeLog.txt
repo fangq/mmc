@@ -1,0 +1,14 @@
+Change Log
+
+== MMCM 0.2 (Cheesecake) development branch, FangQ <fangq nmr mgh harvard edu> ==
+
+2010/04/22 added support for time-resolved imaging, use node voronoi-volume to normalize
+2010/04/21 major code cleaning up, bug fixes for scattering handling
+2010/04/18 update weight-recording scheme, only save the absorbed energy, need revisit
+2010/01/01 used gprof to optimize,add debuglevel,add weight middle pt at pin and pout
+2009/12/30 added examples: sphere-box, port mcx_utils from MCX (mcx.sf.net)
+2009/12/30 supported scattering based on mus, and accumulate packet weight
+2009/12/29 initial upload to SVN
+2009/12/28 completed mesh classes, tested with mouse-head-CT dataset
+2009/08/07 ray-tracing of randomly scattered particles and added Makefile
+2009/07/31 initial version supporting Plucker-coordinate-based ray-tracing
