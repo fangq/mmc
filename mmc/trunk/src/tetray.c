@@ -13,7 +13,7 @@ int main(int argc, char**argv){
 
 	int faceid,i,eid,isend;
 	int *enb;
-	float slen,leninit,weight;
+	float slen,weight,photontimer,rtstep;
 	float3 pout;
 	float3 p0,c0;
 	
@@ -39,21 +39,24 @@ int main(int argc, char**argv){
 	else
 		srand(cfg.seed);
 
+	rtstep=1.f/cfg.tstep;
 	/*launch photons*/
-#pragma omp parallel for schedule(static, 30) default(shared) private(i,eid,weight,slen,leninit,p0,c0,pout,faceid,isend,enb)
+#pragma omp parallel for schedule(static) default(shared) private(i,eid,weight,photontimer,slen,p0,c0,pout,faceid,isend,enb)
 	for(i=0;i<cfg.nphoton;i++){
+
+	    /*initialize the photon parameters*/
 	    eid=cfg.dim.x;
 	    weight=1.f;
-	    /*initialize the photon position*/
-	    leninit=rand01();
-	    leninit=((leninit==0.f)?LOG_MT_MAX:(-log(leninit)));
+	    photontimer=0.f;
+	    slen=rand01();
+	    slen=((slen==0.f)?LOG_MT_MAX:(-log(slen)));
 	    memcpy(&p0,&cfg.srcpos,sizeof(p0));
 	    memcpy(&c0,&cfg.srcdir,sizeof(p0));
-	    slen=leninit;
 
 	    while(1){  /*propagate a photon until exit*/
-		slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&cfg);
+		slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,&cfg);
 		if(pout.x==QLIMIT){
+		      if(faceid==-2) break; /*reaches time gate*/
                       faceid=-1;
 		}
 		/*move a photon until the end of the current scattering path*/
@@ -73,7 +76,7 @@ int main(int argc, char**argv){
                               /*possibily hit an edge or miss*/
                               break;
                         }
-			slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&cfg);
+			slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,&cfg);
 		}
 		if(eid==0) {
 			if(pout.x==QLIMIT&&cfg.debuglevel&dlMove)
@@ -85,7 +88,7 @@ int main(int argc, char**argv){
 	    }
 	}
 	if(cfg.isnormalized)
-	  mesh_normalize(&mesh);
+	  mesh_normalize(&mesh,&cfg);
 	plucker_clear(&plucker);
 	mesh_saveweight(&mesh,&cfg);
 	mesh_clear(&mesh);

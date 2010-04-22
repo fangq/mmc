@@ -164,7 +164,7 @@ void mcx_loadconfig(FILE *in, Config *cfg){
          mcx_error(-9,"incorrect time gate settings");
      }
      gates=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
-     if(cfg->maxgate>gates)
+     /*if(cfg->maxgate>gates)*/
 	 cfg->maxgate=gates;
 
      fscanf(in,"%s", filename);

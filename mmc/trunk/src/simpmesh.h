@@ -51,7 +51,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg);
 void mesh_loadnodevol(tetmesh *mesh,Config *cfg);
 
 void mesh_clear(tetmesh *mesh);
-void mesh_normalize(tetmesh *mesh);
+void mesh_normalize(tetmesh *mesh,Config *cfg);
 void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,Config *cfg);

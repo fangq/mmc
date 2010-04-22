@@ -16,7 +16,8 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
   the less round off error when computing the Plucker coordinates.
 */
 float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
-              float3 *pout, float slen, int *faceid, float *weight, int *isend,Config *cfg){
+              float3 *pout, float slen, int *faceid, float *weight, 
+	      int *isend,float *photontimer, float rtstep, Config *cfg){
 	float3 pcrx,p1;
 	float3 pin;
 	medium *prop;
@@ -87,7 +88,12 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			*faceid=faceorder[i];
 			*isend=(newdlen>dlen);
 			newdlen=((*isend) ? dlen : newdlen);
-
+			*photontimer+=newdlen*prop->n*R_C0;
+			if(*photontimer>=cfg->tend){
+			   *faceid=-2;
+	                   pout->x=QLIMIT;
+			   return 0.f;
+			}
 			*weight*=exp(-prop->mua*newdlen);
 			slen-=newdlen*prop->mus;
                         p0->x+=newdlen*pvec->x;
@@ -100,6 +106,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
                 /*ww=(*weight)*dlen*0.5f;*/
+		int tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
                 ww=(oldweight-(*weight))*0.5f;
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
@@ -108,7 +115,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                       dist(&pin,p0),dist(p0,pout),dist(&pin,pout),dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 #pragma unroll(4)
                 for(i=0;i<4;i++)
-		     plucker->mesh->weight[ee[i]-1]+=ww*(bary[0][i]+bary[1][i]);
+		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(bary[0][i]+bary[1][i]);
         }
 	return slen;
 }

@@ -75,7 +75,7 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 		mesh_error("mesh file has wrong format");
 	}
 	mesh->node=(float3 *)malloc(sizeof(float3)*mesh->nn);
-	mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,1);
+	mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
@@ -315,21 +315,22 @@ float mc_next_scatter(float g, float mus, float3 *dir,Config *cfg){
 
 void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	FILE *fp;
-	int i;
+	int i,j;
 	float3 *pn;
 	char fweight[MAX_PATH_LENGTH];
 	mesh_filenames("%s.dat",fweight,cfg);
 	if((fp=fopen(fweight,"wt"))==NULL){
 		mesh_error("can not open weight file to write");
 	}
-	for(i=0;i<mesh->nn;i++){
-		pn=mesh->node+i;
-		if(fprintf(fp,"%d %e %e %e %e\n",i+1,pn->x,pn->y,pn->z,mesh->weight[i])==0)
+	for(i=0;i<cfg->maxgate;i++)
+	   for(j=0;j<mesh->nn;j++){
+		pn=mesh->node+j;
+		if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)
 			mesh_error("can not write to weight file");
-	}
+	   }
 	fclose(fp);
 }
-void mesh_normalize(tetmesh *mesh){
+void mesh_normalize(tetmesh *mesh,Config *cfg){
         int i;
         for(i=0;i<mesh->nn;i++)
 	   mesh->weight[i]*=mesh->rnvol[i];
