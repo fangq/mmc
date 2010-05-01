@@ -13,7 +13,7 @@ int main(int argc, char**argv){
 
 	int faceid,i,eid,isend;
 	int *enb;
-	float slen,weight,photontimer,rtstep;
+	float slen,weight,photontimer,rtstep,Eescape=0.f;
 	float3 pout;
 	float3 p0,c0;
 	
@@ -41,7 +41,8 @@ int main(int argc, char**argv){
 
 	rtstep=1.f/cfg.tstep;
 	/*launch photons*/
-#pragma omp parallel for schedule(static) default(shared) private(i,eid,weight,photontimer,slen,p0,c0,pout,faceid,isend,enb)
+#pragma omp parallel for schedule(static) default(shared) \
+  private(i,eid,weight,photontimer,slen,p0,c0,pout,faceid,isend,enb) reduction(+:Eescape)
 	for(i=0;i<cfg.nphoton;i++){
 
 	    /*initialize the photon parameters*/
@@ -73,8 +74,8 @@ int main(int argc, char**argv){
 			    fprintf(cfg.flog,"passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 			}
                         if(pout.x==QLIMIT){
-                              /*possibily hit an edge or miss*/
-                              break;
+                            /*possibily hit an edge or miss*/
+                            break;
                         }
 			slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,&cfg);
 		}
@@ -86,9 +87,10 @@ int main(int argc, char**argv){
 		if(cfg.debuglevel&dlMove) fprintf(cfg.flog,"moves to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,i,slen);
 		slen=mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].mus,&c0,&cfg);
 	    }
+	    Eescape+=weight;
 	}
 	if(cfg.isnormalized)
-	  mesh_normalize(&mesh,&cfg);
+	  mesh_normalize(&mesh,&cfg,cfg.nphoton-Eescape,cfg.nphoton);
 	plucker_clear(&plucker);
 	mesh_saveweight(&mesh,&cfg);
 	mesh_clear(&mesh);

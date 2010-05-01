@@ -1,6 +1,10 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 
+#ifdef MMC_USE_SSE
+#include <smmintrin.h>
+#endif
+
 #define SINCOSF(theta,stheta,ctheta) {stheta=sinf(theta);ctheta=cosf(theta);}
 
 #ifdef WIN32
@@ -29,11 +33,41 @@ void vec_cross(float3 *a,float3 *b,float3 *res){
 	res->y=a->z*b->x-a->x*b->z;
 	res->z=a->x*b->y-a->y*b->x;
 }
-float vec_dot(float3 *a,float3 *b){
-	return a->x*b->x+a->y*b->y+a->z*b->z;
+
+#ifndef MMC_USE_SSE
+inline float vec_dot(float3 *a,float3 *b){
+        return a->x*b->x+a->y*b->y+a->z*b->z;
 }
-float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
-	return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
+#else
+
+#ifndef __SSE4_1__
+inline float vec_dot(float3 *a,float3 *b){
+        float dot;
+        __m128 na,nb,res;
+        na=_mm_loadu_ps((float*)a);
+        nb=_mm_loadu_ps((float*)b);
+        res=_mm_mul_ps(na,nb);
+        res=_mm_hadd_ps(res,res);
+        res=_mm_hadd_ps(res,res);
+        _mm_store_ss(&dot,res);
+        return dot;   
+}
+#else
+inline float vec_dot(float3 *a,float3 *b){
+        float dot;
+        __m128 na,nb,res;
+        na=_mm_loadu_ps((float*)a);
+        nb=_mm_loadu_ps((float*)b);
+        res=_mm_dp_ps(na,nb,0x7f);
+        _mm_store_ss(&dot,res);
+        return dot;
+}
+#endif
+        
+#endif
+ 
+inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
+        return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
 }
 
 void mesh_init(tetmesh *mesh){
@@ -74,7 +108,7 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 	if(len!=2 || mesh->nn<=0){
 		mesh_error("mesh file has wrong format");
 	}
-	mesh->node=(float3 *)malloc(sizeof(float3)*mesh->nn);
+	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
 	mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
 
 	for(i=0;i<mesh->nn;i++){
@@ -96,7 +130,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 	if(len!=2 || mesh->prop<=0){
 		mesh_error("property file has wrong format");
 	}
-	mesh->med=(medium *)malloc(sizeof(medium)*mesh->prop);
+	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop);
 	for(i=0;i<mesh->prop;i++){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
@@ -237,8 +271,8 @@ void plucker_build(tetplucker *plucker){
 	ne=plucker->mesh->ne;
 	nodes=plucker->mesh->node;
 	elems=(int *)(plucker->mesh->elem); // convert int4* to int*
-	plucker->d=(float3*)malloc(sizeof(float3)*ne*6); // 6 edges/elem
-	plucker->m=(float3*)malloc(sizeof(float3)*ne*6); // 6 edges/elem
+	plucker->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+	plucker->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
 	for(i=0;i<ne;i++){
 		ebase=i<<2;
 		for(j=0;j<6;j++){
@@ -330,8 +364,25 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	   }
 	fclose(fp);
 }
-void mesh_normalize(tetmesh *mesh,Config *cfg){
-        int i;
-        for(i=0;i<mesh->nn;i++)
-	   mesh->weight[i]*=mesh->rnvol[i];
+/*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
+void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
+        int i,j,k;
+	float energydeposit=0.f, energyelem,normalizor;
+	int *ee;
+
+        for(i=0;i<mesh->ne;i++){
+	   ee=(int *)(mesh->elem+i);
+	   energyelem=0.f;
+	   for(j=0;j<cfg->maxgate;j++)
+	     for(k=0;k<4;k++)
+		energyelem+=mesh->weight[j*mesh->nn+ee[k]];
+
+	   energydeposit+=energyelem*mesh->med[mesh->type[i]-1].mua*0.25f;
+	}
+	energydeposit*=cfg->tstep;
+	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
+
+        for(i=0;i<cfg->maxgate;i++)
+           for(j=0;j<mesh->nn;j++)
+	      mesh->weight[i*mesh->nn+j]*=mesh->rnvol[j]*normalizor;
 }

@@ -40,8 +40,8 @@ void vec_add(float3 *a,float3 *b,float3 *res);
 void vec_diff(float3 *a,float3 *b,float3 *res);
 void vec_cross(float3 *a,float3 *b,float3 *res);
 void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res);
-float vec_dot(float3 *a,float3 *b);
-float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am);
+inline float vec_dot(float3 *a,float3 *b);
+inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am);
 
 void mesh_init(tetmesh *mesh);
 void mesh_loadnode(tetmesh *mesh,Config *cfg);
@@ -51,7 +51,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg);
 void mesh_loadnodevol(tetmesh *mesh,Config *cfg);
 
 void mesh_clear(tetmesh *mesh);
-void mesh_normalize(tetmesh *mesh,Config *cfg);
+void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal);
 void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,Config *cfg);

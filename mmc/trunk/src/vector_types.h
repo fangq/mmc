@@ -1,13 +1,17 @@
 #ifndef _OMP_CUDA_VECTOR_H
 #define _OMP_CUDA_VECTOR_H
 
-typedef struct GPU_float3{
-    float x,y,z;
-} float3;
-
 typedef struct GPU_float4{
     float x,y,z,w;
-} float4;
+} float4 __attribute__ ((aligned(16)));
+
+#ifdef MMC_USE_SSE
+ typedef struct GPU_float4 float3;
+#else
+ typedef struct GPU_float3{
+    float x,y,z;
+ } float3;
+#endif
 
 typedef struct GPU_int2{
     int x,y;

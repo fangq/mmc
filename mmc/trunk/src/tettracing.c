@@ -18,8 +18,8 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
 float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer, float rtstep, Config *cfg){
-	float3 pcrx,p1;
-	float3 pin;
+	float3 pcrx={0.f},p1={0.f};
+	float3 pin={0.f};
 	medium *prop;
 	int *ee;
 	int i;
@@ -38,9 +38,11 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	vec_cross(p0,&p1,&pcrx);
 	ee=(int *)(plucker->mesh->elem+eid-1);
 	prop=plucker->mesh->med+(plucker->mesh->type[eid-1]-1);
+
+#pragma unroll(6)
 	for(i=0;i<6;i++){
 		w[i]=pinner(pvec,&pcrx,plucker->d+(eid-1)*6+i,plucker->m+(eid-1)*6+i);
-		if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%f ",w[i]);
+		/*if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%f ",w[i]);*/
 	}
 	if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%d \n",eid);
 
@@ -89,7 +91,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			*isend=(newdlen>dlen);
 			newdlen=((*isend) ? dlen : newdlen);
 			*photontimer+=newdlen*prop->n*R_C0;
-			if(*photontimer>=cfg->tend){
+			if(*photontimer>=cfg->tend){ /*exit time window*/
 			   *faceid=-2;
 	                   pout->x=QLIMIT;
 			   return 0.f;
@@ -105,7 +107,6 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	    }
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
-                /*ww=(*weight)*dlen*0.5f;*/
 		int tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
                 ww=(oldweight-(*weight))*0.5f;
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
