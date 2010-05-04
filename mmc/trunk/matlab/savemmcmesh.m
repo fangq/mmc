@@ -1,7 +1,15 @@
-function savemmcmesh(key,node,elem,face)
+function savemmcmesh(key,node,elem,face,vnode,facenb)
 
 if(nargin<4)
   face=volface(elem); % volface is part of iso2mesh toolbox,http://iso2mesh.sf.net
+end
+
+if(nargin<5)
+  nvol=nodevolume(elem,node);
+end
+
+if(nargin<6)
+  facenb=faceneighbors(elem);
 end
 
 if(~isempty(node))
@@ -39,3 +47,16 @@ if(~isempty(face))
   fclose(fid);
 end
 
+if(~isempty(nvol))
+  fid=fopen(['vnode_' key '.dat'],'wt');
+  fprintf(fid,'%d %d\n',1,size(node,1));
+  fprintf(fid,'%d %e\n',[(1:size(node,1))',nvol]');
+  fclose(fid);
+end
+
+if(~isempty(facenb))
+  fid=fopen(['facenb_' key '.dat'],'wt');
+  fprintf(fid,'%d %d\n',1,size(elem,1));
+  fprintf(fid,'%d\t%d\t%d\t%d\n',facenb');
+  fclose(fid);
+end

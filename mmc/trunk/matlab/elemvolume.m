@@ -1,4 +1,4 @@
-function vol=elemvolume(elem,node)
+function vol=elemvolume(elem,node,option)
 % vol=elemvolume(elem,node)
 %
 % calculate the volume for a list of simplexes
@@ -29,4 +29,8 @@ for i=1:enum
     detmat=[node(elem(i,:),:)';ones(1,dim)];
     vol(i)=det(detmat);
 end
-vol=abs(vol)/prod(1:size(node,2));
+if(nargin==3 & strcmp(option,'signed'))
+  vol=vol/prod(1:size(node,2));
+else
+  vol=abs(vol)/prod(1:size(node,2));
+end

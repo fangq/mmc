@@ -23,7 +23,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	medium *prop;
 	int *ee;
 	int i;
-	float w[6],Rv,ww,oldweight=*weight,newdlen=0.f,dlen=0.f; /*dlen is the physical distance*/
+	float w[6],Rv,ww,oldweight=*weight,ratio=0.f,newdlen=0.f,dlen=0.f; /*dlen is the physical distance*/
 	int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 	int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 	int faceorder[]={1,3,2,0};
@@ -53,7 +53,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 		if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"testing face [%d]\n",i);
 
 	        if(i>=2) w[fc[i][1]]=-w[fc[i][1]]; // can not go back
-		if(pin.x==QLIMIT&&w[fc[i][0]]<=0.f && w[fc[i][1]]<=0.f && w[fc[i][2]]>=0.f){
+		if(pin.x==QLIMIT&&w[fc[i][0]]>=0.f && w[fc[i][1]]>=0.f && w[fc[i][2]]<=0.f){
 			// f_enter
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"ray enters face %d[%d] of %d\n",i,faceorder[i],eid);
 
@@ -69,7 +69,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"entrance point %f %f %f\n",pin.x,pin.y,pin.z);
 
-		}else if(pout->x==QLIMIT&&w[fc[i][0]]>=0.f && w[fc[i][1]]>=0.f && w[fc[i][2]]<=0.f){
+		}else if(pout->x==QLIMIT&&w[fc[i][0]]<=0.f && w[fc[i][1]]<=0.f && w[fc[i][2]]>=0.f){
 			// f_leave
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
 
@@ -86,6 +86,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"exit point %f %f %f\n",pout->x,pout->y,pout->z);
 
 			newdlen=dist(p0,pout);
+			/*ratio=newdlen;*/
 			dlen=slen/prop->mus;
 			*faceid=faceorder[i];
 			*isend=(newdlen>dlen);
@@ -109,6 +110,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
 		int tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
                 ww=(oldweight-(*weight))*0.5f;
+		/*ratio/=dist(&pin,pout);*/
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
@@ -117,6 +119,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 #pragma unroll(4)
                 for(i=0;i<4;i++)
 		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(bary[0][i]+bary[1][i]);
+/*		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);*/
         }
 	return slen;
 }

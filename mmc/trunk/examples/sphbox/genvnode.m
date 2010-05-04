@@ -2,8 +2,8 @@ addpath('../../matlab');
 
 sessionid='sphbox';
 
-elem=readnmrelem(['elem_' sessionid '.dat']);
-node=readnmrnode(['node_' sessionid '.dat']);
+elem=readmmcelem(['elem_' sessionid '.dat']);
+node=readmmcnode(['node_' sessionid '.dat']);
 nvol=nodevolume(elem,node);
 
 fid=fopen(['vnode_' sessionid '.dat'],'wt');
