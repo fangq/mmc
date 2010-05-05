@@ -46,17 +46,19 @@ figure;hist(r0,100);
 % the maximum element volume is 20
 
 [node3,elem3,face3]=surf2mesh(no,el,[0 0 0],[60 60 60],1,20,[30 30 30],[],1);
-savemmcmesh('sph3',node3,elem3(:,1:4),[]);
-eid3=tsearchn(node3,elem3(:,1:4),[30 30 0]);
+elem3(:,1:4)=reorient(node3,elem3(:,1:4));
+savemmcmesh('sph3',node3,elem3,[]);
+eid3=tsearchn(node3,elem3(:,1:4),[30.1 30.2 0]);
 
 % generate a dense volumetric mesh from the sphere with an additional bounding box
 % the maximum element volume is 5
 
 [node2,elem2,face2]=surf2mesh(no,el,[0 0 0],[60 60 60],1,5,[30 30 30],[],1);
-savemmcmesh('sph2',node2,elem2(:,1:4),[]);
-eid2=tsearchn(node2,elem2(:,1:4),[30 30 0]);
+elem2(:,1:4)=reorient(node2,elem2(:,1:4));
+savemmcmesh('sph2',node2,elem2,[]);
+eid2=tsearchn(node2,elem2(:,1:4),[30.1 30.2 0]);
 
-% reduce the node numbers to 30%
+% reduce the surface node numbers to 30%
 
 [no2,el2]=meshresample(no,el,0.3);
 
@@ -64,8 +66,9 @@ eid2=tsearchn(node2,elem2(:,1:4),[30 30 0]);
 % mesh with maximum volume of 10
 
 [node1,elem1,face1]=surf2mesh(no2,el2,[0 0 0],[60 60 60],1,10,[30 30 30],[],1);
-savemmcmesh('sph1',node1,elem1(:,1:4),[]);
-eid1=tsearchn(node1,elem1(:,1:4),[30 30 0]);
+elem1(:,1:4)=reorient(node1,elem1(:,1:4));
+savemmcmesh('sph1',node1,elem1,[]);
+eid1=tsearchn(node1,elem1(:,1:4),[30.1 30.2 0]);
 
 fid=fopen('initial_elem.txt','wt');
 fprintf(fid,'sph1: %d\nsph2: %d\nsph3: %d\n',eid1,eid2,eid3);
