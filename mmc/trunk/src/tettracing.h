@@ -12,4 +12,5 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
 float trackpos(float3 *p0,float3 *pvec,tetplucker *plucker,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer,float rtstep, Config *cfg);
+float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep);
 #endif

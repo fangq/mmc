@@ -1,3 +1,5 @@
+#include <string.h>
+#include <stdlib.h>
 #include "tettracing.h"
 
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
@@ -122,4 +124,59 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 /*		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);*/
         }
 	return slen;
+}
+
+float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
+	int faceid,i,eid,isend;
+	int *enb;
+	float slen,weight,photontimer;
+	float3 pout;
+	float3 p0,c0;
+
+	/*initialize the photon parameters*/
+	eid=cfg->dim.x;
+	weight=1.f;
+	photontimer=0.f;
+	slen=rand01();
+	slen=((slen==0.f)?LOG_MT_MAX:(-log(slen)));
+	memcpy(&p0,&(cfg->srcpos),sizeof(p0));
+	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
+
+	while(1){  /*propagate a photon until exit*/
+	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
+	    if(pout.x==QLIMIT){
+	    	  if(faceid==-2) break; /*reaches time gate*/
+	    	  eid=-eid;
+        	  faceid=-1;
+	    }
+	    /*move a photon until the end of the current scattering path*/
+	    while(faceid>=0 && !isend){
+	    	    memcpy((void *)&p0,(void *)&pout,sizeof(p0));
+
+	    	    enb=(int *)(mesh->facenb+eid-1);
+	    	    eid=enb[faceid];
+	    	    if(eid==0){
+	    		if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"hit boundary, exit %d\n",i);
+	    		break;
+	    	    }
+	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove)){
+	    		fprintf(cfg->flog,"pass at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
+	    	    }
+        	    if(pout.x==QLIMIT){
+        		/*possibily hit an edge or miss*/
+        		break;
+        	    }
+	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
+	    }
+	    if(eid<=0) {
+        	    if(eid==0 && pout.x==QLIMIT && (cfg->debuglevel&dlMove))
+        		 fprintf(cfg->flog,"hit boundary: %d %d %f %f %f\n",i,eid,p0.x,p0.y,p0.z);
+	    	    else if(pout.x==QLIMIT && (cfg->debuglevel&dlEdge))
+        		 fprintf(cfg->flog,"hit edge or vertex: %d %d %f %f %f\n",i,eid,p0.x,p0.y,p0.z);
+	    	    break;  /*photon exits boundary*/
+	    }
+	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"move to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,i,slen);
+	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,mesh->med[mesh->type[eid]-1].mus,&c0,cfg);
+	}
+	return weight;
 }
