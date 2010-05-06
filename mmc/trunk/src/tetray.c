@@ -58,6 +58,7 @@ int main(int argc, char**argv){
 		slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,&cfg);
 		if(pout.x==QLIMIT){
 		      if(faceid==-2) break; /*reaches time gate*/
+		      eid=-eid;
                       faceid=-1;
 		}
 		/*move a photon until the end of the current scattering path*/
@@ -71,7 +72,7 @@ int main(int argc, char**argv){
 		    	    break;
 			}
 			if(pout.x!=QLIMIT&&cfg.debuglevel&dlMove){
-			    fprintf(cfg.flog,"passes at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
+			    fprintf(cfg.flog,"pass at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 			}
                         if(pout.x==QLIMIT){
                             /*possibily hit an edge or miss*/
@@ -79,12 +80,14 @@ int main(int argc, char**argv){
                         }
 			slen=trackpos(&p0,&c0,&plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,&cfg);
 		}
-		if(eid==0) {
-			if(pout.x==QLIMIT&&cfg.debuglevel&dlMove)
-                             fprintf(cfg.flog,"hit edge or miss: %d %d %e\n",i,eid,dist(&p0,&pout));
+		if(eid<=0) {
+                        if(eid==0 && pout.x==QLIMIT && (cfg.debuglevel&dlMove))
+                             fprintf(cfg.flog,"hit boundary: %d %d %f %f %f\n",i,eid,p0.x,p0.y,p0.z);
+			else if(pout.x==QLIMIT && (cfg.debuglevel&dlEdge))
+                             fprintf(cfg.flog,"hit edge or vertex: %d %d %f %f %f\n",i,eid,p0.x,p0.y,p0.z);
 			break;  /*photon exits boundary*/
 		}
-		if(cfg.debuglevel&dlMove) fprintf(cfg.flog,"moves to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,i,slen);
+		if(cfg.debuglevel&dlMove) fprintf(cfg.flog,"move to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,i,slen);
 		slen=mc_next_scatter(mesh.med[mesh.type[eid]-1].g,mesh.med[mesh.type[eid]-1].mus,&c0,&cfg);
 	    }
 	    Eescape+=weight;
