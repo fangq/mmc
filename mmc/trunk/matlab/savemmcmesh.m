@@ -1,15 +1,15 @@
 function savemmcmesh(key,node,elem,face,vnode,facenb)
 
 if(nargin<4)
-  face=volface(elem); % volface is part of iso2mesh toolbox,http://iso2mesh.sf.net
+  face=volface(elem(:,1:4)); % volface is part of iso2mesh toolbox,http://iso2mesh.sf.net
 end
 
 if(nargin<5)
-  nvol=nodevolume(elem,node);
+  nvol=nodevolume(node,elem(:,1:4));
 end
 
 if(nargin<6)
-  facenb=faceneighbors(elem);
+  facenb=faceneighbors(elem(:,1:4));
 end
 
 if(~isempty(node))
