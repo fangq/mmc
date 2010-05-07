@@ -45,8 +45,11 @@ r0=sqrt((v0(idx,1)-30).^2+(v0(idx,2)-30).^2+(v0(idx,3)-30).^2);
 % generate a coarse volumetric mesh from the sphere with an additional bounding box
 % the maximum element volume is 20
 
-srcpos=[30.1 30.2 0];
-[node3,elem3,face3]=surf2mesh(no,el,[0 0 0],[60 60 60],1,20,[30 30 30],[],1);
+ISO2MESH_SESSION='mmcsph3_';
+
+srcpos=[30. 30. 0];
+fixednodes=[29.8,29.8,0.01 ; 30.4,30,0.01 ; 29.8,30.2,0.01 ; 30.05 30.05 0.6];
+[node3,elem3,face3]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,20,[30 30 30],[],1);
 [node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
 elem3(:,1:4)=meshreorder(node3,elem3(:,1:4));
 savemmcmesh('sph3',node3,elem3(:,1:5),[]);
@@ -55,7 +58,9 @@ eid3=tsearchn(node3,elem3(:,1:4),srcpos);
 % generate a dense volumetric mesh from the sphere with an additional bounding box
 % the maximum element volume is 5
 
-[node2,elem2,face2]=surf2mesh(no,el,[0 0 0],[60 60 60],1,5,[30 30 30],[],1);
+ISO2MESH_SESSION='mmcsph2_';
+
+[node2,elem2,face2]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,5,[30 30 30],[],1);
 [node2,elem2]=sortmesh(srcpos,node2,elem2,1:4);
 elem2(:,1:4)=meshreorder(node2,elem2(:,1:4));
 savemmcmesh('sph2',node2,elem2(:,1:5),[]);
@@ -63,16 +68,20 @@ eid2=tsearchn(node2,elem2(:,1:4),srcpos);
 
 % reduce the surface node numbers to 30%
 
+ISO2MESH_SESSION='mmcsph1_';
+
 [no2,el2]=meshresample(no,el,0.3);
 
 % using the coarse spherical surface, we generate a coarse volumetric
 % mesh with maximum volume of 10
 
-[node1,elem1,face1]=surf2mesh(no2,el2,[0 0 0],[60 60 60],1,10,[30 30 30],[],1);
+[node1,elem1,face1]=surf2mesh([no2;fixednodes],el2,[0 0 0],[61 61 61],1,10,[30 30 30],[],1);
 [node1,elem1]=sortmesh(srcpos,node1,elem1,1:4);
 elem1(:,1:4)=meshreorder(node1,elem1(:,1:4));
 savemmcmesh('sph1',node1,elem1(:,1:5),[]);
 eid1=tsearchn(node1,elem1(:,1:4),srcpos);
+
+clear ISO2MESH_SESSION
 
 fid=fopen('initial_elem.txt','wt');
 fprintf(fid,'sph1: %d\nsph2: %d\nsph3: %d\n',eid1,eid2,eid3);
