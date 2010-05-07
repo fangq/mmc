@@ -48,7 +48,7 @@ r0=sqrt((v0(idx,1)-30).^2+(v0(idx,2)-30).^2+(v0(idx,3)-30).^2);
 ISO2MESH_SESSION='mmcsph3_';
 
 srcpos=[30. 30. 0];
-fixednodes=[29.8,29.8,0.01 ; 30.4,30,0.01 ; 29.8,30.2,0.01 ; 30.05 30.05 0.6];
+fixednodes=[29.8,29.8,0.1 ; 30.4,30,0.1 ; 29.8,30.2,0.1 ; 30.05 30.05 0.6];
 [node3,elem3,face3]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,20,[30 30 30],[],1);
 [node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
 elem3(:,1:4)=meshreorder(node3,elem3(:,1:4));

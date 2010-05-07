@@ -2,7 +2,7 @@
 27182818            # RNG seed, negative to generate
 30. 30. 0.0        # source position (mm)
 0. 0. 1.                # initial directional vector
-0.e+00 5.e-09 5e-09  # time-gates(s): start, end, step
+0.e+00 5.e-09 1e-10  # time-gates(s): start, end, step
 sph2                # volume ('uchar' format)
 1 1 10 50            # x: voxel size, dim, start/end indices
 1 60 10 50            # y: voxel size, dim, start/end indices 
