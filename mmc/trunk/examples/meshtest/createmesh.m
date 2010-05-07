@@ -30,13 +30,13 @@ sphsurf=facecell{1};
 if( sum((v0(sphsurf(1,1),:)-[30 30 30]).^2) > 25*25)
    sphsurf=facecell{2};
 end
-trisurf(sphsurf,v0(:,1),v0(:,2),v0(:,3));
-axis equal;
+%trisurf(sphsurf,v0(:,1),v0(:,2),v0(:,3));
+%axis equal;
 idx=unique(sphsurf);  % this is the index of all the nodes on the sphere
 
 % show the histogram of the displacement error for the nodes on the sphere
 r0=sqrt((v0(idx,1)-30).^2+(v0(idx,2)-30).^2+(v0(idx,3)-30).^2);
-figure;hist(r0,100);
+%figure;hist(r0,100);
 
 % we only take the nodes on the surface
 [no,el]=removeisolatednode(v0,sphsurf);
@@ -47,6 +47,7 @@ figure;hist(r0,100);
 
 srcpos=[30.1 30.2 0];
 [node3,elem3,face3]=surf2mesh(no,el,[0 0 0],[60 60 60],1,20,[30 30 30],[],1);
+[node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
 elem3(:,1:4)=meshreorder(node3,elem3(:,1:4));
 savemmcmesh('sph3',node3,elem3(:,1:5),[]);
 eid3=tsearchn(node3,elem3(:,1:4),srcpos);
@@ -55,6 +56,7 @@ eid3=tsearchn(node3,elem3(:,1:4),srcpos);
 % the maximum element volume is 5
 
 [node2,elem2,face2]=surf2mesh(no,el,[0 0 0],[60 60 60],1,5,[30 30 30],[],1);
+[node2,elem2]=sortmesh(srcpos,node2,elem2,1:4);
 elem2(:,1:4)=meshreorder(node2,elem2(:,1:4));
 savemmcmesh('sph2',node2,elem2(:,1:5),[]);
 eid2=tsearchn(node2,elem2(:,1:4),srcpos);
@@ -67,6 +69,7 @@ eid2=tsearchn(node2,elem2(:,1:4),srcpos);
 % mesh with maximum volume of 10
 
 [node1,elem1,face1]=surf2mesh(no2,el2,[0 0 0],[60 60 60],1,10,[30 30 30],[],1);
+[node1,elem1]=sortmesh(srcpos,node1,elem1,1:4);
 elem1(:,1:4)=meshreorder(node1,elem1(:,1:4));
 savemmcmesh('sph1',node1,elem1(:,1:5),[]);
 eid1=tsearchn(node1,elem1(:,1:4),srcpos);
