@@ -107,23 +107,23 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			*faceid=faceorder[i];
 			*isend=(newdlen>dlen);
 			newdlen=((*isend) ? dlen : newdlen);
-			*photontimer+=newdlen*prop->n*R_C0;
-			if(*photontimer>=cfg->tend){ /*exit time window*/
-			   *faceid=-2;
-	                   pout->x=QLIMIT;
-			   return 0.f;
-			}
-			*weight*=exp(-prop->mua*newdlen);
-			slen-=newdlen*prop->mus;
-                        p0->x+=newdlen*pvec->x;
-                        p0->y+=newdlen*pvec->y;
-                        p0->z+=newdlen*pvec->z;
-			
-                        if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"update weight to %f and path end %d \n",*weight,*isend);
 		}
 	    }
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
+		*photontimer+=newdlen*prop->n*R_C0;
+		if(*photontimer>=cfg->tend){ /*exit time window*/
+		   *faceid=-2;
+	           pout->x=QLIMIT;
+		   return 0.f;
+		}
+		*weight*=exp(-prop->mua*newdlen);
+		slen-=newdlen*prop->mus;
+                p0->x+=newdlen*pvec->x;
+                p0->y+=newdlen*pvec->y;
+                p0->z+=newdlen*pvec->z;
+                if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"update weight to %f and path end %d \n",*weight,*isend);
+
 		int tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
                 ww=(oldweight-(*weight))*0.5f;
 		/*ratio/=dist(&pin,pout);*/
@@ -140,8 +140,8 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	return slen;
 }
 
-float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
-	int faceid,i,eid,isend,fixcount=0;
+float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
+	int faceid,eid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer;
 	float3 pout;
@@ -174,30 +174,35 @@ float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
 	    	    enb=(int *)(mesh->facenb+eid-1);
 	    	    eid=enb[faceid];
 	    	    if(eid==0){
-	    		if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"hit boundary, exit %d\n",i);
+	    		if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"hit boundary, exit %d\n",id);
 	    		break;
 	    	    }
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove)){
 	    		fprintf(cfg->flog,"pass at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 	    	    }
 	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
+		    if(faceid==-2) break;
 		    fixcount=0;
-		    while(pout.x==QLIMIT && fixcount++<MAX_TRIAL)
+		    while(pout.x==QLIMIT && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
+                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
+		    }
         	    if(pout.x==QLIMIT){
         		/*possibily hit an edge or miss*/
 			eid=-eid;
         		break;
         	    }
 	    }
-	    if(eid<=0) {
-        	    if(eid==0 && pout.x==QLIMIT && (cfg->debuglevel&dlMove))
-        		 fprintf(cfg->flog,"hit boundary: %d %d %f %f %f\n",i,eid,p0.x,p0.y,p0.z);
-	    	    else if(pout.x==QLIMIT && (cfg->debuglevel&dlEdge))
-        		 fprintf(cfg->flog,"hit edge or vertex: %d %d %f %f %f\n",i,eid,p0.x,p0.y,p0.z);
+	    if(eid<=0 || pout.x==QLIMIT) {
+        	    if(eid==0 && (cfg->debuglevel&dlMove))
+        		 fprintf(cfg->flog,"hit boundary: %d %d %f %f %f\n",id,eid,p0.x,p0.y,p0.z);
+		    else if(faceid==-2 && (cfg->debuglevel&dlMove))
+                         fprintf(cfg->flog,"time window ends: %d %d %f %f %f\n",id,eid,p0.x,p0.y,p0.z);
+	    	    else if(eid && faceid!=-2  && cfg->debuglevel&dlEdge)
+        		 fprintf(cfg->flog,"hit edge or vertex: %d %d %f %f %f\n",id,eid,p0.x,p0.y,p0.z);
 	    	    break;  /*photon exits boundary*/
 	    }
-	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"move to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,i,slen);
+	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"move to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
 	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,mesh->med[mesh->type[eid]-1].mus,&c0,cfg);
 	}
 	return weight;

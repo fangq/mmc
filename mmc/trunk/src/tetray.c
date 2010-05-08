@@ -39,7 +39,7 @@ int main(int argc, char**argv){
 
 #pragma omp parallel for schedule(static) default(shared) reduction(+:Eescape)
 	for(i=0;i<cfg.nphoton;i++){
-		Eescape+=onephoton(&plucker,&mesh,&cfg,rtstep);
+		Eescape+=onephoton(i,&plucker,&mesh,&cfg,rtstep);
 	}
 	if(cfg.isnormalized)
 	  mesh_normalize(&mesh,&cfg,cfg.nphoton-Eescape,cfg.nphoton);

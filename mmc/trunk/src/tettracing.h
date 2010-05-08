@@ -14,6 +14,6 @@ void fixphoton(float3 *p,float3 *nodes, int *ee);
 float trackpos(float3 *p0,float3 *pvec,tetplucker *plucker,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer,float rtstep, Config *cfg);
-float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep);
+float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep);
 
 #endif
