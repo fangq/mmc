@@ -13,6 +13,20 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
 }
 /*
+  when a photon is crossing a vertex or edge, pull the photon
+  to the center of the element (slightly) and try again
+*/
+void fixphoton(float3 *p,float3 *nodes, int *ee){
+        float3 c0={0.f,0.f,0.f};
+	int i;
+        /*calculate element centroid*/
+	for(i=0;i<4;i++)
+		vec_add(&c0,nodes+ee[i]-1,&c0);
+	p->x+=(c0.x*0.25f-p->x)*FIX_PHOTON;
+        p->y+=(c0.y*0.25f-p->y)*FIX_PHOTON;
+        p->z+=(c0.z*0.25f-p->z)*FIX_PHOTON;
+}
+/*
   p0 and p1 ony determine the direction, slen determines the length
   so, how long is the vector p0->p1 does not matter. infact, the longer
   the less round off error when computing the Plucker coordinates.
@@ -127,7 +141,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 }
 
 float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
-	int faceid,i,eid,isend;
+	int faceid,i,eid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer;
 	float3 pout;
@@ -146,6 +160,10 @@ float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
 	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
 	    if(pout.x==QLIMIT){
 	    	  if(faceid==-2) break; /*reaches time gate*/
+		  if(fixcount++<MAX_TRIAL){
+			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
+			continue;
+                  }
 	    	  eid=-eid;
         	  faceid=-1;
 	    }
@@ -162,11 +180,15 @@ float onephoton(tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove)){
 	    		fprintf(cfg->flog,"pass at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 	    	    }
+	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
+		    fixcount=0;
+		    while(pout.x==QLIMIT && fixcount++<MAX_TRIAL)
+			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
         	    if(pout.x==QLIMIT){
         		/*possibily hit an edge or miss*/
+			eid=-eid;
         		break;
         	    }
-	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
 	    }
 	    if(eid<=0) {
         	    if(eid==0 && pout.x==QLIMIT && (cfg->debuglevel&dlMove))
