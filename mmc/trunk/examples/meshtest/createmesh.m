@@ -51,7 +51,7 @@ srcpos=[30. 30. 0];
 fixednodes=[29.8,29.8,0.1 ; 30.4,30,0.1 ; 29.8,30.2,0.1 ; 30.05 30.05 0.6];
 [node3,elem3,face3]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,20,[30 30 30],[],1);
 [node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
-elem3(:,1:4)=meshreorder(node3,elem3(:,1:4));
+elem3(:,1:4)=meshreorient(node3,elem3(:,1:4));
 savemmcmesh('sph3',node3,elem3(:,1:5),[]);
 eid3=tsearchn(node3,elem3(:,1:4),srcpos);
 
@@ -62,7 +62,7 @@ ISO2MESH_SESSION='mmcsph2_';
 
 [node2,elem2,face2]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,5,[30 30 30],[],1);
 [node2,elem2]=sortmesh(srcpos,node2,elem2,1:4);
-elem2(:,1:4)=meshreorder(node2,elem2(:,1:4));
+elem2(:,1:4)=meshreorient(node2,elem2(:,1:4));
 savemmcmesh('sph2',node2,elem2(:,1:5),[]);
 eid2=tsearchn(node2,elem2(:,1:4),srcpos);
 
@@ -77,7 +77,7 @@ ISO2MESH_SESSION='mmcsph1_';
 
 [node1,elem1,face1]=surf2mesh([no2;fixednodes],el2,[0 0 0],[61 61 61],1,10,[30 30 30],[],1);
 [node1,elem1]=sortmesh(srcpos,node1,elem1,1:4);
-elem1(:,1:4)=meshreorder(node1,elem1(:,1:4));
+elem1(:,1:4)=meshreorient(node1,elem1(:,1:4));
 savemmcmesh('sph1',node1,elem1(:,1:5),[]);
 eid1=tsearchn(node1,elem1(:,1:4),srcpos);
 

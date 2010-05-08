@@ -19,9 +19,9 @@
 #include <math.h>
 #include "mcx_utils.h"
 
-char shortopt[]={'h','i','f','n','m','t','T','s','a','g','b','B','D',
+char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','p','e','U','R','l','L','I','o','\0'};
-char *fullopt[]={"--help","--interactive","--input","--photon","--move",
+char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
@@ -375,10 +375,6 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 			indeed the photon moves per thread.
 		     */
 		     case 'n':
-				mcx_error(-2,"specifying photon number is not supported, please use -m");
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->nphoton),"int");
-		     	        break;
-		     case 'm':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->nphoton),"int");
 		     	        break;
 		     case 't':
@@ -474,8 +470,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -f config     (--input)       read config from a file\n\
  -t [1024|int] (--thread)      total thread number\n\
  -T [128|int]  (--blocksize)   thread number per block\n\
- -m [0|int]    (--move)        total photon moves\n\
- -n [0|int]    (--photon)      total photon number (not supported yet, use -m only)\n\
+ -n [0|int]    (--photon)      total photon number\n\
  -r [1|int]    (--repeat)      number of repeations\n\
  -a [1|0]      (--array)       1 for C array, 0 for Matlab array\n\
  -g [1|int]    (--gategroup)   number of time gates per run\n\
