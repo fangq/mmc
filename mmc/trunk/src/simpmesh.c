@@ -359,7 +359,8 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	for(i=0;i<cfg->maxgate;i++)
 	   for(j=0;j<mesh->nn;j++){
 		pn=mesh->node+j;
-		if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)
+		/*if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
+		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
 			mesh_error("can not write to weight file");
 	   }
 	fclose(fp);

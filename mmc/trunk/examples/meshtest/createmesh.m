@@ -47,9 +47,11 @@ r0=sqrt((v0(idx,1)-30).^2+(v0(idx,2)-30).^2+(v0(idx,3)-30).^2);
 
 ISO2MESH_SESSION='mmcsph3_';
 
-srcpos=[30. 30. 0];
-fixednodes=[29.8,29.8,0.1 ; 30.4,30,0.1 ; 29.8,30.2,0.1 ; 30.05 30.05 0.6];
-[node3,elem3,face3]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,20,[30 30 30],[],1);
+srcpos=[30. 30. 0.];
+fixednodes=[30.,30.,0.05; 30 30 30];
+nodesize=[ones(size(no,1),1) ; 0.3; 4];
+nfull=[no;fixednodes];
+[node3,elem3,face3]=surf2mesh([nfull,nodesize],el,[0 0 0],[61 61 61],1,8,[30 30 30],[],[1.5 1.5 1.5 1.5 6 6 6 6]);
 [node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
 elem3(:,1:4)=meshreorient(node3,elem3(:,1:4));
 savemmcmesh('sph3',node3,elem3(:,1:5),[]);
@@ -60,22 +62,24 @@ eid3=tsearchn(node3,elem3(:,1:4),srcpos);
 
 ISO2MESH_SESSION='mmcsph2_';
 
-[node2,elem2,face2]=surf2mesh([no;fixednodes],el,[0 0 0],[61 61 61],1,5,[30 30 30],[],1);
+nodesize=[0.7*ones(size(no,1),1) ; 0.2; 2];
+[node2,elem2,face2]=surf2mesh([nfull,nodesize],el,[0 0 0],[61 61 61],1,2,[30 30 30],[],[1 1 1 1 5 5 5 5]);
 [node2,elem2]=sortmesh(srcpos,node2,elem2,1:4);
 elem2(:,1:4)=meshreorient(node2,elem2(:,1:4));
 savemmcmesh('sph2',node2,elem2(:,1:5),[]);
 eid2=tsearchn(node2,elem2(:,1:4),srcpos);
 
-% reduce the surface node numbers to 30%
+% reduce the surface node numbers to 20%
 
 ISO2MESH_SESSION='mmcsph1_';
 
-[no2,el2]=meshresample(no,el,0.3);
+[no2,el2]=meshresample(no,el,0.2);
 
 % using the coarse spherical surface, we generate a coarse volumetric
 % mesh with maximum volume of 10
 
-[node1,elem1,face1]=surf2mesh([no2;fixednodes],el2,[0 0 0],[61 61 61],1,10,[30 30 30],[],1);
+nodesize=[2*ones(size(no2,1),1)];
+[node1,elem1,face1]=surf2mesh([no2,nodesize],el2,[0 0 0],[61 61 61],1,10,[30 30 30],[],[1 1 1 1 5 5 5 5]);
 [node1,elem1]=sortmesh(srcpos,node1,elem1,1:4);
 elem1(:,1:4)=meshreorient(node1,elem1(:,1:4));
 savemmcmesh('sph1',node1,elem1(:,1:5),[]);

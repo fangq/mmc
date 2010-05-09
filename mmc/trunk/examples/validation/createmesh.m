@@ -1,7 +1,7 @@
 sessionid='cube';
 
 addpath('../../matlab/');
-[node,elem]=genT5mesh(0:2:60,0:2:60,0:2:60);
+[node,elem]=genT5mesh(0:1:60,0:1:60,0:1:60);
 
 elem(:,1:4)=meshreorient(node,elem(:,1:4));
 
