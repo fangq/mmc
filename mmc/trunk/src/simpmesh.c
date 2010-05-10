@@ -292,28 +292,24 @@ float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
 
-float rand01(){
-    return rand()*R_RAND_MAX;
-}
-
-float mc_next_scatter(float g, float mus, float3 *dir,Config *cfg){
+float mc_next_scatter(float g, float mus, float3 *dir,RandType *ran, RandType *ran0, Config *cfg){
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
+       rand_need_more(ran,ran0);
 //    do{
-       nextslen=rand01();
-       nextslen=((nextslen==0.f)?LOG_MT_MAX:(-log(nextslen))); /*/mus;*/
+       nextslen=rand_next_scatlen(ran);
 //    }while(nextslen<1e-5f);
 
     //random arimuthal angle
-    tmp0=TWO_PI*rand01(); //next arimuth angle
+    tmp0=TWO_PI*rand_next_aangle(ran); //next arimuth angle
     SINCOSF(tmp0,sphi,cphi);
 
     //Henyey-Greenstein Phase Function, "Handbook of Optical Biomedical Diagnostics",2002,Chap3,p234
     //see Boas2002
 
     if(g>EPS){  //if g is too small, the distribution of theta is bad
-	tmp0=(1.f-g*g)/(1.f-g+2.f*g*rand01());
+	tmp0=(1.f-g*g)/(1.f-g+2.f*g*rand_next_zangle(ran));
 	tmp0*=tmp0;
 	tmp0=(1.f+g*g-tmp0)/(2.f*g);
 
@@ -324,7 +320,7 @@ float mc_next_scatter(float g, float mus, float3 *dir,Config *cfg){
 	stheta=sinf(theta);
 	ctheta=tmp0;
     }else{  //Wang1995 has acos(2*ran-1), rather than 2*pi*ran, need to check
-	theta=M_PI*rand01();
+	theta=M_PI*rand_next_zangle(ran);
     	SINCOSF(theta,stheta,ctheta);
     }
 

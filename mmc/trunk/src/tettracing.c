@@ -140,7 +140,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	return slen;
 }
 
-float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep){
+float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
 	int faceid,eid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer;
@@ -151,8 +151,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	eid=cfg->dim.x;
 	weight=1.f;
 	photontimer=0.f;
-	slen=rand01();
-	slen=((slen==0.f)?LOG_MT_MAX:(-log(slen)));
+	slen=rand_next_scatlen(ran);
 	memcpy(&p0,&(cfg->srcpos),sizeof(p0));
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
@@ -203,7 +202,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    break;  /*photon exits boundary*/
 	    }
 	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"move to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
-	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,mesh->med[mesh->type[eid]-1].mus,&c0,cfg);
+	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,mesh->med[mesh->type[eid]-1].mus,&c0,ran,ran0,cfg);
 	}
 	return weight;
 }

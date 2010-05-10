@@ -5,6 +5,11 @@
 #include <math.h>
 #include "mcx_utils.h"
 
+#ifdef MMC_LOGISTIC
+  #include "logistic_rand.h"
+#else
+  #include "posix_randr.h"
+#endif
 
 #define QLIMIT (3.40282347e+38F)
 #define R_RAND_MAX  (1.f/RAND_MAX)
@@ -62,7 +67,7 @@ void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
 float dist2(float3 *p0,float3 *p1);
 float dist(float3 *p0,float3 *p1);
-float mc_next_scatter(float g, float mus,float3 *dir,Config *cfg);
+float mc_next_scatter(float g, float mus,float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
 float rand01();
 
 

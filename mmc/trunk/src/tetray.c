@@ -4,14 +4,24 @@
 #include "tettracing.h"
 #include "mcx_utils.h"
 
+#ifdef _OPENMP
+  #include <omp.h>
+#endif
+
+#ifdef MMC_LOGISTIC
+  #include "logistic_rand.h"
+#else
+  #include "posix_randr.h"
+#endif
 
 int main(int argc, char**argv){
 	Config cfg;
 	tetmesh mesh;
 	tetplucker plucker;
 	float rtstep,Eescape=0.f;
-	int i;
-	
+	RandType ran0[RAND_BUF_LEN],ran1[RAND_BUF_LEN];
+	int i,threadid=0;
+
         mcx_initcfg(&cfg);
 
         // parse command line options to initialize the configurations
@@ -29,18 +39,23 @@ int main(int argc, char**argv){
 	if(mesh.node==NULL||mesh.elem==NULL||mesh.facenb==NULL||mesh.med==NULL)
 		mesh_error("not all files were loaded");
 
-	if(cfg.seed<0)
-		srand(time(NULL));
-	else
-		srand(cfg.seed);
-
 	rtstep=1.f/cfg.tstep;
 	/*launch photons*/
 
-#pragma omp parallel for schedule(static) default(shared) reduction(+:Eescape)
+	if(cfg.seed<0) cfg.seed=time(NULL);
+
+#pragma omp parallel private(ran0,ran1,threadid)
+{
+#ifdef _OPENMP
+	threadid=omp_get_thread_num();	
+#endif
+	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
+
+#pragma omp for reduction(+:Eescape)
 	for(i=0;i<cfg.nphoton;i++){
-		Eescape+=onephoton(i,&plucker,&mesh,&cfg,rtstep);
+		Eescape+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1);
 	}
+}
 	if(cfg.isnormalized)
 	  mesh_normalize(&mesh,&cfg,cfg.nphoton-Eescape,cfg.nphoton);
 	plucker_clear(&plucker);
