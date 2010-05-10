@@ -9,7 +9,8 @@
 #define MAX_PATH_LENGTH     1024
 #define MAX_SESSION_LENGTH  256
 
-enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,dlTracingExit=64,dlEdge=128};
+enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
+                  dlTracingExit=64,dlEdge=128};
 
 typedef struct MCXMedium{
 	float mua;

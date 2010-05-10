@@ -379,6 +379,8 @@ void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 	energydeposit*=cfg->tstep;
 	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 
+	fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.3f%%\tnormalizor=%f\n",Etotal,100.f*Eabsorb/Etotal,normalizor);
+
         for(i=0;i<cfg->maxgate;i++)
            for(j=0;j<mesh->nn;j++)
 	      mesh->weight[i*mesh->nn+j]*=mesh->rnvol[j]*normalizor;

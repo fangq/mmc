@@ -78,7 +78,7 @@ __device__ void logistic_init(RandType *t,RandType *tnew,uint n_seed[],uint idx)
      for(i=0;i<RAND_BUF_LEN;i++){
 	seed=(uint) ((INIT_MULT * (seed ^ (seed >> 30)) + i));
 	t[i]=seed*R_MAX_C_RAND;
-        printf("t=%d\tseed[%d]=%d %f\n",idx,i,seed,t[i]);
+        //printf("t=%d\tseed[%d]=%d %f\n",idx,i,seed,t[i]);
      }
      for(i=0;i<INIT_LOGISTIC;i++)  /*initial randomization*/
            rand_need_more(t,tnew);
