@@ -89,7 +89,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 
 		}else if(pout->x==QLIMIT&&w[fc[i][0]]<=0.f && w[fc[i][1]]<=0.f && w[fc[i][2]]>=0.f){
 			// f_leave
-                        if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
+                        if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exit face %d[%d] of %d\n",i,faceorder[i],eid);
 
                         Rv=1.f/(w[fc[i][0]]+w[fc[i][1]]-w[fc[i][2]]);
                         bary[1][nc[i][0]]=w[fc[i][0]]*Rv;
@@ -129,10 +129,10 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 		Lio=1.f/dist(&pin,pout);
 		/*ratio=(Lp0-newlen)*Lio;*/ /*dist from moved p to out vs. total*/
 
-                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
+                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f] [%f %f %f %f]\n",
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
-                if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"distances pin-p0: %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
+                if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"D %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
                       dist(&pin,p0),dist(p0,pout),dist(&pin,pout),dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
 		pweight=oldweight;
@@ -142,6 +142,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			pweight*=atte;
 			ww=(pweight>*weight)?(ww-pweight):(ww-*weight);
 			ww*=0.5;
+	                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+			   p0->x-(Lmove-dlen)*pvec->x,p0->y-(Lmove-dlen)*pvec->y,p0->z-(Lmove-dlen)*pvec->z,ww,eid,dlen);
+
 			for(i=0;i<4;i++){
 				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 			}
@@ -187,11 +190,10 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    enb=(int *)(mesh->facenb+eid-1);
 	    	    eid=enb[faceid];
 	    	    if(eid==0){
-	    		if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"hit boundary, exit %d\n",id);
 	    		break;
 	    	    }
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove)){
-	    		fprintf(cfg->flog,"pass at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
+	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 	    	    }
 	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
 		    if(faceid==-2) break;
@@ -208,14 +210,14 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    }
 	    if(eid<=0 || pout.x==QLIMIT) {
         	    if(eid==0 && (cfg->debuglevel&dlMove))
-        		 fprintf(cfg->flog,"hit boundary: %d %d %f %f %f\n",id,eid,p0.x,p0.y,p0.z);
+        		 fprintf(cfg->flog,"B %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
 		    else if(faceid==-2 && (cfg->debuglevel&dlMove))
-                         fprintf(cfg->flog,"time window ends: %d %d %f %f %f\n",id,eid,p0.x,p0.y,p0.z);
+                         fprintf(cfg->flog,"T %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
 	    	    else if(eid && faceid!=-2  && cfg->debuglevel&dlEdge)
-        		 fprintf(cfg->flog,"hit edge or vertex: %d %d %f %f %f\n",id,eid,p0.x,p0.y,p0.z);
+        		 fprintf(cfg->flog,"X %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
 	    	    break;  /*photon exits boundary*/
 	    }
-	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"move to: %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
+	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
 	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,mesh->med[mesh->type[eid]-1].mus,&c0,ran,ran0,cfg);
 	}
 	return weight;

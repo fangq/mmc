@@ -435,7 +435,7 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     	        i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
 		     	        break;
                      case 'D':
-                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"char");
+                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");
                                 break;
 		}
 	    }
