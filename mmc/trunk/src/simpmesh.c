@@ -381,7 +381,7 @@ void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 	   energyelem=0.f;
 	   for(j=0;j<cfg->maxgate;j++)
 	     for(k=0;k<4;k++)
-		energyelem+=mesh->weight[j*mesh->nn+ee[k]];
+		energyelem+=mesh->weight[j*mesh->nn+ee[k]-1];
 
 	   energydeposit+=energyelem*mesh->med[mesh->type[i]-1].mua*0.25f;
 	}

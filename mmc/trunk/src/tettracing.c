@@ -136,7 +136,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                       dist(&pin,p0),dist(p0,pout),dist(&pin,pout),dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
 		pweight=oldweight;
-		for(dlen=0.f;dlen<Lmove;dlen+=cfg->minstep){
+		if(Lio>1e-9f){
+		    Lio=1.f/Lio;
+		    for(dlen=0.f;dlen<Lmove;dlen+=cfg->minstep){
 			ratio=(Lp0-dlen)*Lio;
 			ww=pweight;
 			pweight*=atte;
@@ -145,9 +147,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
 			   p0->x-(Lmove-dlen)*pvec->x,p0->y-(Lmove-dlen)*pvec->y,p0->z-(Lmove-dlen)*pvec->z,ww,eid,dlen);
 
-			for(i=0;i<4;i++){
+			for(i=0;i<4;i++)
 				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
-			}
+		    }
 		}
 /*#pragma unroll(4)
                 for(i=0;i<4;i++)
@@ -218,7 +220,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    break;  /*photon exits boundary*/
 	    }
 	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
-	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,mesh->med[mesh->type[eid]-1].mus,&c0,ran,ran0,cfg);
+	    slen=mc_next_scatter(mesh->med[mesh->type[eid-1]-1].g,mesh->med[mesh->type[eid-1]-1].mus,&c0,ran,ran0,cfg);
 	}
 	return weight;
 }
