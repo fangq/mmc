@@ -8,6 +8,7 @@
 #define MAX_DETECTORS       256
 #define MAX_PATH_LENGTH     1024
 #define MAX_SESSION_LENGTH  256
+#define MIN(a,b)            ((a)<(b)?(a):(b))
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128};
@@ -47,6 +48,8 @@ typedef struct MCXConfig{
 
 	Medium *prop;     /*optical property mapping table*/
 	float4 *detpos;   /*detector positions and radius, overwrite detradius*/
+	float  *atte;     /*attenuation of minstep size for each property*/
+	float  minstep;   /*accumulation step size*/
 
 	int maxgate;        /*simultaneous recording gates*/
 	int respin;         /*number of repeatitions*/

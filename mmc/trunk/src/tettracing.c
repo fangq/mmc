@@ -39,11 +39,12 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	medium *prop;
 	int *ee;
 	int i;
-	float w[6],Rv,ww,oldweight=*weight,ratio=0.f,newdlen=0.f,dlen=0.f; /*dlen is the physical distance*/
+	float w[6],Rv,ww,oldweight=*weight,ratio=0.f,dlen=0.f; /*dlen is the physical distance*/
 	int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 	int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 	int faceorder[]={1,3,2,0};
         float bary[2][4]={{0.f,0.f,0.f,0.f},{0.f,0.f,0.f,0.f}};
+	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,pweight;
 
 	if(plucker->mesh==NULL || plucker->d==NULL||eid<=0||eid>plucker->mesh->ne) 
 		return -1;
@@ -54,6 +55,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	vec_cross(p0,&p1,&pcrx);
 	ee=(int *)(plucker->mesh->elem+eid-1);
 	prop=plucker->mesh->med+(plucker->mesh->type[eid-1]-1);
+	atte=cfg->atte[plucker->mesh->type[eid-1]-1];
 
 #pragma unroll(6)
 	for(i=0;i<6;i++){
@@ -101,41 +103,53 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"exit point %f %f %f\n",pout->x,pout->y,pout->z);
 
-			newdlen=dist(p0,pout);
-			/*ratio=newdlen;*/
+			Lp0=dist(p0,pout);
 			dlen=slen/prop->mus;
 			*faceid=faceorder[i];
-			*isend=(newdlen>dlen);
-			newdlen=((*isend) ? dlen : newdlen);
+			*isend=(Lp0>dlen);
+			Lmove=((*isend) ? dlen : Lp0);
 		}
 	    }
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
-		*photontimer+=newdlen*prop->n*R_C0;
+		*photontimer+=Lmove*prop->n*R_C0;
 		if(*photontimer>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
 	           pout->x=QLIMIT;
 		   return 0.f;
 		}
-		*weight*=exp(-prop->mua*newdlen);
-		slen-=newdlen*prop->mus;
-                p0->x+=newdlen*pvec->x;
-                p0->y+=newdlen*pvec->y;
-                p0->z+=newdlen*pvec->z;
+		*weight*=exp(-prop->mua*Lmove);
+		slen-=Lmove*prop->mus;
+                p0->x+=Lmove*pvec->x;
+                p0->y+=Lmove*pvec->y;
+                p0->z+=Lmove*pvec->z;
                 if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"update weight to %f and path end %d \n",*weight,*isend);
 
 		int tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
-                ww=(oldweight-(*weight))*0.5f;
-		/*ratio/=dist(&pin,pout);*/
+		Lio=1.f/dist(&pin,pout);
+		/*ratio=(Lp0-newlen)*Lio;*/ /*dist from moved p to out vs. total*/
+
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"barycentric [%f %f %f %f] [%f %f %f %f]\n",
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
                 if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"distances pin-p0: %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
                       dist(&pin,p0),dist(p0,pout),dist(&pin,pout),dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
-#pragma unroll(4)
+
+		pweight=oldweight;
+		for(dlen=0.f;dlen<Lmove;dlen+=cfg->minstep){
+			ratio=(Lp0-dlen)*Lio;
+			ww=pweight;
+			pweight*=atte;
+			ww=(pweight>*weight)?(ww-pweight):(ww-*weight);
+			ww*=0.5;
+			for(i=0;i<4;i++){
+				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
+			}
+		}
+/*#pragma unroll(4)
                 for(i=0;i<4;i++)
-		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(bary[0][i]+bary[1][i]);
-/*		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);*/
+		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);*/
+//		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(bary[0][i]+bary[1][i]);
         }
 	return slen;
 }
