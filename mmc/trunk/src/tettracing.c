@@ -40,9 +40,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	int *ee;
 	int i;
 	float w[6],Rv,ww,oldweight=*weight,ratio=0.f,dlen=0.f; /*dlen is the physical distance*/
-	int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
-	int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-	int faceorder[]={1,3,2,0};
+	const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
+	const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+	const int faceorder[]={1,3,2,0};
         float bary[2][4]={{0.f,0.f,0.f,0.f},{0.f,0.f,0.f,0.f}};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,pweight;
 
