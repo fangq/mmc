@@ -32,7 +32,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
   the less round off error when computing the Plucker coordinates.
 */
 float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
-              float3 *pout, float slen, int *faceid, float *weight, float *pweight, float *Lremain,
+              float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer, float rtstep, Config *cfg){
 	float3 pcrx={0.f},p1={0.f};
 	float3 pin={0.f};
@@ -44,7 +44,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 	const int faceorder[]={1,3,2,0};
         float bary[2][4]={{0.f,0.f,0.f,0.f},{0.f,0.f,0.f,0.f}};
-	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte;
+	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,pweight;
 
 	if(plucker->mesh==NULL || plucker->d==NULL||eid<=0||eid>plucker->mesh->ne) 
 		return -1;
@@ -135,17 +135,17 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                 if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"distances pin-p0: %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
                       dist(&pin,p0),dist(p0,pout),dist(&pin,pout),dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
-		for(dlen=cfg->minstep;dlen<Lmove+*Lremain;dlen+=cfg->minstep){
+		pweight=oldweight;
+		for(dlen=0.f;dlen<Lmove;dlen+=cfg->minstep){
 			ratio=(Lp0-dlen)*Lio;
-			ww=*pweight;
-			*pweight*=atte;
-			/*ww=(*pweight>*weight)?(ww-*pweight):(ww-*weight);
-			ww*=*0.5;*/
+			ww=pweight;
+			pweight*=atte;
+			ww=(pweight>*weight)?(ww-pweight):(ww-*weight);
+			ww*=0.5;
 			for(i=0;i<4;i++){
 				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 			}
 		}
-		*Lremain=(Lmove+*Lremain)-dlen+cfg->minstep;
 /*#pragma unroll(4)
                 for(i=0;i<4;i++)
 		     plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);*/
@@ -157,22 +157,20 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
 	int faceid,eid,isend,fixcount=0;
 	int *enb;
-	float slen,weight,photontimer,pweight,Lremain;
+	float slen,weight,photontimer;
 	float3 pout;
 	float3 p0,c0;
 
 	/*initialize the photon parameters*/
 	eid=cfg->dim.x;
 	weight=1.f;
-	pweight=1.f;
-	Lremain=0.f;
 	photontimer=0.f;
 	slen=rand_next_scatlen(ran);
 	memcpy(&p0,&(cfg->srcpos),sizeof(p0));
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
 	while(1){  /*propagate a photon until exit*/
-	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&pweight,&Lremain,&isend,&photontimer,rtstep,cfg);
+	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
 	    if(pout.x==QLIMIT){
 	    	  if(faceid==-2) break; /*reaches time gate*/
 		  if(fixcount++<MAX_TRIAL){
@@ -195,12 +193,12 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove)){
 	    		fprintf(cfg->flog,"pass at: %f %f %f %d\n",pout.x,pout.y,pout.z,eid);
 	    	    }
-	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&pweight,&Lremain,&isend,&photontimer,rtstep,cfg);
+	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==QLIMIT && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
-                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&pweight,&Lremain,&isend,&photontimer,rtstep,cfg);
+                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,rtstep,cfg);
 		    }
         	    if(pout.x==QLIMIT){
         		/*possibily hit an edge or miss*/
