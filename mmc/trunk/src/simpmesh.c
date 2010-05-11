@@ -79,6 +79,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->facenb=NULL;
 	mesh->type=NULL;
 	mesh->med=NULL;
+	mesh->atte=NULL;
 	mesh->weight=NULL;
 	mesh->rnvol=NULL;
 }
@@ -131,10 +132,13 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 		mesh_error("property file has wrong format");
 	}
 	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop);
+        mesh->atte=(float *)calloc(sizeof(float),mesh->prop);
+
 	for(i=0;i<mesh->prop;i++){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
 			mesh_error("property file has wrong format");
+		mesh->atte[i]=exp(-cfg->minstep*mesh->med[i].mua);
 		/*user input musp, MMCM converts to mus
 		mesh->med[i].mus=musp/(1.f-mesh->med[i].g); */
 	}
@@ -232,6 +236,10 @@ void mesh_clear(tetmesh *mesh){
 		free(mesh->med);
 		mesh->med=NULL;
 	}
+        if(mesh->atte){
+                free(mesh->atte);
+                mesh->atte=NULL;
+        }
 	if(mesh->weight){
 		free(mesh->weight);
 		mesh->weight=NULL;
@@ -314,7 +322,8 @@ float mc_next_scatter(float g, float mus, float3 *dir,RandType *ran, RandType *r
 	tmp0=(1.f+g*g-tmp0)/(2.f*g);
 
     	// when ran=1, CUDA will give me 1.000002 for tmp0 which produces nan later
-    	if(tmp0>1.f) tmp0=1.f;
+    	if(tmp0> 1.f) tmp0=1.f;
+        if(tmp0<-1.f) tmp0=-1.f;
 
 	theta=acosf(tmp0);
 	stheta=sinf(theta);

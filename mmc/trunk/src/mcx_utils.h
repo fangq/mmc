@@ -48,7 +48,6 @@ typedef struct MCXConfig{
 
 	Medium *prop;     /*optical property mapping table*/
 	float4 *detpos;   /*detector positions and radius, overwrite detradius*/
-	float  *atte;     /*attenuation of minstep size for each property*/
 	float  minstep;   /*accumulation step size*/
 
 	int maxgate;        /*simultaneous recording gates*/

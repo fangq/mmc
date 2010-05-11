@@ -55,7 +55,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	vec_cross(p0,&p1,&pcrx);
 	ee=(int *)(plucker->mesh->elem+eid-1);
 	prop=plucker->mesh->med+(plucker->mesh->type[eid-1]-1);
-	atte=cfg->atte[plucker->mesh->type[eid-1]-1];
+	atte=plucker->mesh->atte[plucker->mesh->type[eid-1]-1];
 
 #pragma unroll(6)
 	for(i=0;i<6;i++){

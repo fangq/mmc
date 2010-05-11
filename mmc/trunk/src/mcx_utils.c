@@ -106,7 +106,6 @@ void mcx_initcfg(Config *cfg){
 
      cfg->prop=NULL;
      cfg->detpos=NULL;
-     cfg->atte=NULL;
      cfg->vol=NULL;
      cfg->session[0]='\0';
      cfg->printnum=0;
@@ -119,10 +118,8 @@ void mcx_initcfg(Config *cfg){
 }
 
 void mcx_clearcfg(Config *cfg){
-     if(cfg->medianum){
+     if(cfg->medianum)
      	free(cfg->prop);
-        free(cfg->atte);
-     }
      if(cfg->detnum)
      	free(cfg->detpos);
      if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
@@ -212,7 +209,6 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      if(in==stdin)
      	fprintf(stdout,"%d\n",cfg->medianum);
      cfg->prop=(Medium*)malloc(sizeof(Medium)*cfg->medianum);
-     cfg->atte=(float*)calloc(sizeof(float),cfg->medianum);
 
      cfg->prop[0].mua=0.f; /*property 0 is already air*/
      cfg->prop[0].mus=0.f;
@@ -222,7 +218,6 @@ void mcx_loadconfig(FILE *in, Config *cfg){
         if(in==stdin)
 		fprintf(stdout,"Please define medium #%d: mus(1/mm), anisotropy, mua(1/mm) and refractive index: [1.01 0.01 0.04 1.37]\n\t",i);
      	fscanf(in, "%f %f %f %f", &(cfg->prop[i].mus),&(cfg->prop[i].g),&(cfg->prop[i].mua),&(cfg->prop[i].n));
-	cfg->atte[i]=exp(-cfg->minstep*cfg->prop[i].mua);
         fgets(comment,MAX_PATH_LENGTH,in);
         if(in==stdin)
 		fprintf(stdout,"%f %f %f %f\n",cfg->prop[i].mus,cfg->prop[i].g,cfg->prop[i].mua,cfg->prop[i].n);

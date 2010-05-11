@@ -31,6 +31,7 @@ typedef struct femmesh{
 	int  *type;
 	int4 *facenb;
 	medium *med;
+	float *atte;
 	float *weight;
 	float *rnvol; /*1/veronio volume of a node*/
 } tetmesh;
