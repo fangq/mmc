@@ -23,7 +23,7 @@
 #define RAND_SEED_LEN      1
 
 typedef unsigned int uint;
-typedef unsigned int RandType;
+typedef struct drand48_data RandType;
 
 // transform into [0,1] random number
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]);
