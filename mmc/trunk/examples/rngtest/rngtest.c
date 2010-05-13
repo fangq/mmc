@@ -28,8 +28,9 @@ int main(int argc, char**argv){
         if(argc>=3) 
                 seed=atoi(argv[2]);
 
-	if(count==0 || seed==0){ /*when atoi returned error*/
+	if(count==0 || seed==0 || argc==1){ /*when atoi returned error*/
 		usage(argv[0]);
+		exit(0);
 	}
 
 	if(seed<0) seed=time(NULL);
