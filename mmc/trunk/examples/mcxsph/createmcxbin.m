@@ -1,6 +1,6 @@
-dim=61;
+dim=60;
 [xi,yi,zi]=meshgrid(1:dim,1:dim,1:dim);
-dist=(xi-31).^2+(yi-31).^2+(zi-31).^2;
+dist=(xi-30).^2+(yi-30).^2+(zi-30).^2;
 
 v=zeros(size(xi));
 v(dist<400)=1;

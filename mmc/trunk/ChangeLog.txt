@@ -2,6 +2,15 @@ Change Log
 
 == MMCM 0.2 (Cheesecake) development branch, FangQ <fangq nmr mgh harvard edu> ==
 
+2010/05/13 updated POSIX MT RNG to the 48bit version (drand48_r)
+2010/05/10 added POSIX MT and logistic RNGs, use MCX interface, improved OpenMP efficiency
+2010/05/09 debugged meshtest case, flexible mesh generation using improved iso2mesh toolbox
+2010/05/07 isolated photon simulation commands into a function
+2010/05/07 created sortmesh.m in iso2mesh to increase memory consistency and reduce cache miss
+2010/05/06 added meshreorient.m in iso2mesh to ensure the correct tetrahedron node orientation
+2010/05/05 added validation and mesh test cases
+2010/05/04 added matlab utilities for mesh generation and result processing
+2010/05/01 fluence normalization and SSE4 support
 2010/04/22 added support for time-resolved imaging, use node voronoi-volume to normalize
 2010/04/21 major code cleaning up, bug fixes for scattering handling
 2010/04/18 update weight-recording scheme, only save the absorbed energy, need revisit
