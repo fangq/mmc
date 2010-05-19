@@ -32,7 +32,7 @@ int main(int argc, char**argv){
 	mesh_loadelem(&mesh,&cfg);
 	mesh_loadfaceneighbor(&mesh,&cfg);
 	mesh_loadmedia(&mesh,&cfg);
-	mesh_loadnodevol(&mesh,&cfg);
+	mesh_loadelemvol(&mesh,&cfg);
 
 	plucker_init(&plucker,&mesh);
 	

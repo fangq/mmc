@@ -81,7 +81,8 @@ void mesh_init(tetmesh *mesh){
 	mesh->med=NULL;
 	mesh->atte=NULL;
 	mesh->weight=NULL;
-	mesh->rnvol=NULL;
+	mesh->evol=NULL;
+	mesh->nvol=NULL;
 }
 void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
@@ -167,27 +168,27 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadnodevol(tetmesh *mesh,Config *cfg){
+void mesh_loadelemvol(tetmesh *mesh,Config *cfg){
 	FILE *fp;
-	int tmp,len,i;
-	char fvnode[MAX_PATH_LENGTH];
-	mesh_filenames("vnode_%s.dat",fvnode,cfg);
-	if((fp=fopen(fvnode,"rt"))==NULL){
+	int tmp,len,i,j,*ee;
+	char fvelem[MAX_PATH_LENGTH];
+	mesh_filenames("velem_%s.dat",fvelem,cfg);
+	if((fp=fopen(fvelem,"rt"))==NULL){
 		mesh_error("can not open element file");
 	}
-	len=fscanf(fp,"%d %d",&tmp,&(mesh->nn));
-	if(len!=2 || mesh->nn<=0){
+	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
+	if(len!=2 || mesh->ne<=0){
 		mesh_error("mesh file has wrong format");
 	}
-	mesh->rnvol=(float *)malloc(sizeof(float)*mesh->nn);
+        mesh->evol=(float *)malloc(sizeof(float)*mesh->ne);
+	mesh->nvol=(float *)calloc(sizeof(float),mesh->nn);
 
-	for(i=0;i<mesh->nn;i++){
-		if(fscanf(fp,"%d %f",&tmp,mesh->rnvol+i)!=2)
+	for(i=0;i<mesh->ne;i++){
+		if(fscanf(fp,"%d %f",&tmp,mesh->evol+i)!=2)
 			mesh_error("mesh file has wrong format");
-		if(mesh->rnvol[i]>EPS)
-		  mesh->rnvol[i]=1.0f/mesh->rnvol[i]; /*run division once and for all*/
-		else
-		  mesh->rnvol[i]=0.f; /*degenerated elements will be ignored*/
+		ee=(int *)(mesh->elem+i);
+		for(j=0;j<4;j++)
+			mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
 	}
 	fclose(fp);
 }
@@ -244,9 +245,13 @@ void mesh_clear(tetmesh *mesh){
 		free(mesh->weight);
 		mesh->weight=NULL;
 	}
-	if(mesh->rnvol){
-		free(mesh->rnvol);
-		mesh->rnvol=NULL;
+        if(mesh->evol){
+                free(mesh->evol);
+                mesh->evol=NULL;
+        }
+	if(mesh->nvol){
+		free(mesh->nvol);
+		mesh->nvol=NULL;
 	}
 }
 
@@ -300,14 +305,15 @@ float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
 
-float mc_next_scatter(float g, float mus, float3 *dir,RandType *ran, RandType *ran0, Config *cfg){
+float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config *cfg){
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
-       rand_need_more(ran,ran0);
-//    do{
-       nextslen=rand_next_scatlen(ran);
-//    }while(nextslen<1e-5f);
+
+    rand_need_more(ran,ran0);
+
+    //random scattering length (normalized)
+    nextslen=rand_next_scatlen(ran);
 
     //random arimuthal angle
     tmp0=TWO_PI*rand_next_aangle(ran); //next arimuth angle
@@ -370,27 +376,32 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	   }
 	fclose(fp);
 }
+
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
 void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
+        for(i=0;i<cfg->maxgate;i++)
+           for(j=0;j<mesh->nn;j++)
+              mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
+
         for(i=0;i<mesh->ne;i++){
 	   ee=(int *)(mesh->elem+i);
 	   energyelem=0.f;
 	   for(j=0;j<cfg->maxgate;j++)
 	     for(k=0;k<4;k++)
-		energyelem+=mesh->weight[j*mesh->nn+ee[k]-1];
+		energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
 
-	   energydeposit+=energyelem*mesh->med[mesh->type[i]-1].mua*0.25f;
+	   energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
 	}
-	energydeposit*=cfg->tstep;
+	energydeposit*=0.25f*1e-10f; /* unit conversions */
 	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 
 	fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.3f%%\tnormalizor=%f\n",Etotal,100.f*Eabsorb/Etotal,normalizor);
 
         for(i=0;i<cfg->maxgate;i++)
            for(j=0;j<mesh->nn;j++)
-	      mesh->weight[i*mesh->nn+j]*=mesh->rnvol[j]*normalizor;
+	      mesh->weight[i*mesh->nn+j]*=normalizor;
 }

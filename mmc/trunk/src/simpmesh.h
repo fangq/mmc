@@ -17,6 +17,7 @@
 #define EPS  1e-9f
 #define LOG_MT_MAX 22.1807097779182f
 #define R_MIN_MUS 1000.f
+#define R_C0               3.335640951981520e-12f  //1/C0 in s/mm
 
 typedef struct MMCMedium{
 	float mua,mus,g,n;
@@ -33,7 +34,8 @@ typedef struct femmesh{
 	medium *med;
 	float *atte;
 	float *weight;
-	float *rnvol; /*1/veronio volume of a node*/
+	float *evol; /*volume of an element*/
+	float *nvol; /*veronio volume of a node*/
 } tetmesh;
 
 typedef struct tplucker{
@@ -54,7 +56,7 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg);
 void mesh_loadelem(tetmesh *mesh,Config *cfg);
 void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg);
 void mesh_loadmedia(tetmesh *mesh,Config *cfg);
-void mesh_loadnodevol(tetmesh *mesh,Config *cfg);
+void mesh_loadelemvol(tetmesh *mesh,Config *cfg);
 
 void mesh_clear(tetmesh *mesh);
 void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal);
@@ -68,8 +70,7 @@ void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
 float dist2(float3 *p0,float3 *p1);
 float dist(float3 *p0,float3 *p1);
-float mc_next_scatter(float g, float mus,float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
-float rand01();
+float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
 
 
 #endif
