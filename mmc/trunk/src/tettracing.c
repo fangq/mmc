@@ -131,12 +131,12 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                       bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
                 if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"D %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
-                      dist(&pin,p0),dist(p0,pout),dist(&pin,pout),dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
+                      dist(&pin,p0),Lp0,Lio,dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
 		if(Lio>EPS){
 		    Lio=1.f/Lio;
 		    for(dlen=cfg->minstep;dlen<Lmove+*Lremain;dlen+=cfg->minstep){
-			ratio=(Lp0-dlen)*Lio;
+			ratio=(Lp0-dlen+*Lremain)*Lio;
 			ww=*pweight;
 			*pweight*=atte;
 			*photontimer+=dt;
@@ -145,7 +145,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			/*ww will have the volume effect. volume of each nodes will be divided in the end*/
 
 	                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
-			   p0->x-(Lmove-dlen)*pvec->x,p0->y-(Lmove-dlen)*pvec->y,p0->z-(Lmove-dlen)*pvec->z,ww,eid,dlen);
+			   p0->x-(Lmove-dlen+*Lremain)*pvec->x,p0->y-(Lmove-dlen+*Lremain)*pvec->y,p0->z-(Lmove-dlen+*Lremain)*pvec->z,ww,eid,dlen);
 
 			for(i=0;i<4;i++)
 				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);

@@ -21,9 +21,9 @@ clear xi yi zi;
 % the maximum element size of the surface triangles is 2
 
 [v0,f0]=vol2restrictedtri(dist,20,[60 60 60],60*60*20,30,2,2,40000);
+v0=(v0-0.5)*0.5;
 
 % iso2mesh will also produce a surface for the bounding box, remove it
-v0=(v0-0.5)*0.5;
 facecell=finddisconnsurf(f0);
 sphsurf=facecell{1};
 
