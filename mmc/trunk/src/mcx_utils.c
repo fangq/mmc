@@ -55,14 +55,17 @@ void mcx_error(int id,char *msg){
      exit(id);
 }
 
+void mcx_assert(int ret){
+     if(!ret) mcx_error(ret,"assert error");
+}
+
 void mcx_readconfig(char *fname, Config *cfg){
      if(fname[0]==0){
      	mcx_loadconfig(stdin,cfg);
         if(cfg->session[0]=='\0'){
 		strcpy(cfg->session,"default");
 	}
-     }
-     else{
+     }else{
      	FILE *fp=fopen(fname,"rt");
 	if(fp==NULL) mcx_error(-2,"can not load the specified config file");
 	mcx_loadconfig(fp,cfg); 
@@ -131,32 +134,32 @@ void mcx_clearcfg(Config *cfg){
 
 void mcx_loadconfig(FILE *in, Config *cfg){
      int i,gates;
-     char filename[MAX_PATH_LENGTH]={0}, comment[MAX_PATH_LENGTH];
+     char filename[MAX_PATH_LENGTH]={0}, comment[MAX_PATH_LENGTH],*comm;
      
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of photons: [1000000]\n\t");
-     fscanf(in,"%d", &(i) ); 
+     mcx_assert(fscanf(in,"%d", &(i) )==1); 
      if(cfg->nphoton==0) cfg->nphoton=i;
-     fgets(comment,MAX_PATH_LENGTH,in);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the random number generator seed: [1234567]\n\t",cfg->nphoton);
-     fscanf(in,"%d", &(cfg->seed) );
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%d", &(cfg->seed) )==1);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
-     fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) );
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",
                                    cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
      //cfg->srcpos.x--;cfg->srcpos.y--;cfg->srcpos.z--; /*convert to C index, grid center*/
-     fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) );
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) )==3);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the time gates in seconds (start end and step) [0.0 1e-9 1e-10]\n\t",
                                    cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z);
-     fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) );
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the path to the volume binary file:\n\t",
@@ -168,7 +171,7 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      /*if(cfg->maxgate>gates)*/
 	 cfg->maxgate=gates;
 
-     fscanf(in,"%s", filename);
+     mcx_assert(fscanf(in,"%s", filename)==1);
      if(cfg->rootpath[0]){
 #ifdef WIN32
          sprintf(comment,"%s\\%s",cfg->rootpath,filename);
@@ -177,24 +180,24 @@ void mcx_loadconfig(FILE *in, Config *cfg){
 #endif
          strncpy(filename,comment,MAX_PATH_LENGTH);
      }
-     fgets(comment,MAX_PATH_LENGTH,in);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
      	fprintf(stdout,"%s\nPlease specify the x voxel size (in mm), x dimension, min and max x-index [1.0 100 1 100]:\n\t",filename);
-     fscanf(in,"%f %d %d %d", &(cfg->steps.x),&(cfg->dim.x),&(cfg->crop0.x),&(cfg->crop1.x));
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.x),&(cfg->dim.x),&(cfg->crop0.x),&(cfg->crop1.x))==4);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
      	fprintf(stdout,"%f %d %d %d\nPlease specify the y voxel size (in mm), y dimension, min and max y-index [1.0 100 1 100]:\n\t",
                                   cfg->steps.x,cfg->dim.x,cfg->crop0.x,cfg->crop1.x);
-     fscanf(in,"%f %d %d %d", &(cfg->steps.y),&(cfg->dim.y),&(cfg->crop0.y),&(cfg->crop1.y));
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.y),&(cfg->dim.y),&(cfg->crop0.y),&(cfg->crop1.y))==4);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
      	fprintf(stdout,"%f %d %d %d\nPlease specify the z voxel size (in mm), z dimension, min and max z-index [1.0 100 1 100]:\n\t",
                                   cfg->steps.y,cfg->dim.y,cfg->crop0.y,cfg->crop1.y);
-     fscanf(in,"%f %d %d %d", &(cfg->steps.z),&(cfg->dim.z),&(cfg->crop0.z),&(cfg->crop1.z));
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.z),&(cfg->dim.z),&(cfg->crop0.z),&(cfg->crop1.z))==4);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      cfg->minstep=MIN(cfg->steps.x,cfg->steps.y);
      cfg->minstep=MIN(cfg->minstep,cfg->steps.z);
@@ -202,9 +205,9 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      if(in==stdin)
      	fprintf(stdout,"%f %d %d %d\nPlease specify the total types of media:\n\t",
                                   cfg->steps.z,cfg->dim.z,cfg->crop0.z,cfg->crop1.z);
-     fscanf(in,"%d", &(cfg->medianum));
+     mcx_assert(fscanf(in,"%d", &(cfg->medianum))==1);
      cfg->medianum++;
-     fgets(comment,MAX_PATH_LENGTH,in);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
      	fprintf(stdout,"%d\n",cfg->medianum);
@@ -217,15 +220,15 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      for(i=1;i<cfg->medianum;i++){
         if(in==stdin)
 		fprintf(stdout,"Please define medium #%d: mus(1/mm), anisotropy, mua(1/mm) and refractive index: [1.01 0.01 0.04 1.37]\n\t",i);
-     	fscanf(in, "%f %f %f %f", &(cfg->prop[i].mus),&(cfg->prop[i].g),&(cfg->prop[i].mua),&(cfg->prop[i].n));
-        fgets(comment,MAX_PATH_LENGTH,in);
+     	mcx_assert(fscanf(in, "%f %f %f %f", &(cfg->prop[i].mus),&(cfg->prop[i].g),&(cfg->prop[i].mua),&(cfg->prop[i].n))==4);
+        comm=fgets(comment,MAX_PATH_LENGTH,in);
         if(in==stdin)
 		fprintf(stdout,"%f %f %f %f\n",cfg->prop[i].mus,cfg->prop[i].g,cfg->prop[i].mua,cfg->prop[i].n);
      }
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of detectors and fiber diameter (in mm):\n\t");
-     fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius));
-     fgets(comment,MAX_PATH_LENGTH,in);
+     mcx_assert(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d %f\n",cfg->detnum,cfg->detradius);
      cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
@@ -233,9 +236,9 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      for(i=0;i<cfg->detnum;i++){
         if(in==stdin)
 		fprintf(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
-     	fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z));
+     	mcx_assert(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
         //cfg->detpos[i].x--;cfg->detpos[i].y--;cfg->detpos[i].z--;  /*convert to C index*/
-        fgets(comment,MAX_PATH_LENGTH,in);
+        comm=fgets(comment,MAX_PATH_LENGTH,in);
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }
@@ -371,14 +374,6 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     		isinteractive=0;
 		     	        i=mcx_readarg(argc,argv,i,filename,"string");
 				break;
-                     /* 
-		        ideally we may support -n option to specify photon numbers,
-		        however, we found using while-loop for -n will cause some 
-			troubles for MT RNG, and timed-out error for some other cases.
-			right now, -n is only an alias for -m and both are specifying
-			the photon moves per thread. Here, variable cfg->nphoton is 
-			indeed the photon moves per thread.
-		     */
 		     case 'n':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->nphoton),"int");
 		     	        break;
@@ -427,9 +422,11 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
                      case 'l':
                                 issavelog=1;
                                 break;
-		     case 'L':  cfg->isgpuinfo=2;
+		     case 'L':
+                                cfg->isgpuinfo=2;
 		                break;
-		     case 'I':  cfg->isgpuinfo=1;
+		     case 'I':
+                                cfg->isgpuinfo=1;
 		                break;
 		     case 'o':
 		     	        i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");

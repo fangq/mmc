@@ -11,7 +11,7 @@
 #endif
 
 #define MAX_TRIAL          3
-#define FIX_PHOTON         1e-4f
+#define FIX_PHOTON         1e-3f
 
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
