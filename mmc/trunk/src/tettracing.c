@@ -32,14 +32,14 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
   the less round off error when computing the Plucker coordinates.
 */
 float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
-              float3 *pout, float slen, int *faceid, float *weight, float *pweight, float *Lremain,
+              float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
 	float3 pcrx={0.f},p1={0.f};
 	float3 pin={0.f};
 	medium *prop;
 	int *ee;
 	int i,tshift;
-	float w[6],Rv,ww,ratio=0.f,dlen=0.f,dt; /*dlen is the physical distance*/
+	float w[6],Rv,ww,currweight,ratio=0.f,dlen=0.f,rc; /*dlen is the physical distance*/
 	const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 	const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 	const int faceorder[]={1,3,2,0};
@@ -55,12 +55,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	vec_cross(p0,&p1,&pcrx);
 	ee=(int *)(plucker->mesh->elem+eid-1);
 	prop=plucker->mesh->med+(plucker->mesh->type[eid-1]-1);
-#ifndef SIMPLE_TRACING
 	atte=plucker->mesh->atte[plucker->mesh->type[eid-1]-1];
-#else
-	atte=*weight;
-#endif
-	dt=cfg->minstep*prop->n*R_C0;
+	rc=prop->n*R_C0;
+        currweight=*weight;
 
 #pragma unroll(6)
 	for(i=0;i<6;i++){
@@ -119,10 +116,10 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	    }
 	}
         if(pin.x!=QLIMIT && pout->x!=QLIMIT){
-		if(*photontimer+(Lmove+*Lremain)*prop->n*R_C0>=cfg->tend){ /*exit time window*/
+		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
 	           pout->x=QLIMIT;
-		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-*Lremain-EPS;
+		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
 		*weight*=exp(-prop->mua*Lmove);
 		slen-=Lmove*prop->mus;
@@ -142,12 +139,12 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 #ifndef SIMPLE_TRACING
 		if(Lio>EPS){
 		    Lio=1.f/Lio;
-		    for(dlen=cfg->minstep;dlen<Lmove+*Lremain;dlen+=cfg->minstep){
-			ratio=(Lp0-dlen+*Lremain)*Lio;
-			ww=*pweight;
-			*pweight*=atte;
-			*photontimer+=dt;
-			ww-=*pweight;
+		    for(dlen=0;dlen<Lmove;dlen+=cfg->minstep){
+			ratio=(Lp0-dlen)*Lio;
+			ww=currweight;
+			currweight*=atte;
+			ww-=(currweight>*weight)?currweight:*weight;
+			*photontimer+=((currweight>*weight)?cfg->minstep:Lmove-dlen)*rc;
 			*Eabsorb+=ww;
 			ww/=prop->mua; /*accumulate fluence*volume, not energy deposit*/
 
@@ -156,23 +153,16 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			/*ww will have the volume effect. volume of each nodes will be divided in the end*/
 
 	                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
-			   p0->x-(Lmove-dlen+*Lremain)*pvec->x,p0->y-(Lmove-dlen+*Lremain)*pvec->y,p0->z-(Lmove-dlen+*Lremain)*pvec->z,ww,eid,dlen);
+			   p0->x-(Lmove-dlen)*pvec->x,p0->y-(Lmove-dlen)*pvec->y,p0->z-(Lmove-dlen)*pvec->z,ww,eid,dlen);
 
 			for(i=0;i<4;i++)
 				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 		    }
-		    *Lremain=(Lmove+*Lremain)-dlen+cfg->minstep;
 		}
-/*		if(!*isend && ((int *)(plucker->mesh->facenb+eid-1))[*faceid]==0){
-			ww=*pweight;
-                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
-                        for(i=0;i<4;i++)
-                                plucker->mesh->weight[ee[i]-1+tshift]+=ww*bary[1][i];
-		}*/
 #else
                 if(Lio>EPS){
 	                ratio=(Lp0-Lmove)/Lio;
-        	        ww=atte-*weight;
+        	        ww=currweight-*weight;
 			*Eabsorb+=ww;
 			ww/=prop->mua;
 #pragma unroll(4)
@@ -189,15 +179,13 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
 	int faceid,eid,isend,fixcount=0;
 	int *enb;
-	float slen,weight,photontimer,pweight,Lremain,Eabsorb;
+	float slen,weight,photontimer,Eabsorb;
 	float3 pout;
 	float3 p0,c0;
 
 	/*initialize the photon parameters*/
 	eid=cfg->dim.x;
 	weight=1.f;
-	pweight=1.f;
-	Lremain=0.f;
 	photontimer=0.f;
 	Eabsorb=0.f;
 	slen=rand_next_scatlen(ran);
@@ -205,7 +193,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
 	while(1){  /*propagate a photon until exit*/
-	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&pweight,&Lremain,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 	    if(pout.x==QLIMIT){
 	    	  if(faceid==-2) break; /*reaches time gate*/
 		  if(fixcount++<MAX_TRIAL){
@@ -225,12 +213,12 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
-	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&pweight,&Lremain,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==QLIMIT && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
-                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&pweight,&Lremain,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    }
         	    if(pout.x==QLIMIT){
         		/*possibily hit an edge or miss*/
