@@ -68,8 +68,8 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg);
 void plucker_init(tetplucker *plucker,tetmesh *mesh);
 void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
-float dist2(float3 *p0,float3 *p1);
-float dist(float3 *p0,float3 *p1);
+inline float dist2(float3 *p0,float3 *p1);
+inline float dist(float3 *p0,float3 *p1);
 float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
 
 

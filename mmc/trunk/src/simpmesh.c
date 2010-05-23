@@ -297,11 +297,11 @@ void plucker_build(tetplucker *plucker){
 	}
 }
 
-float dist2(float3 *p0,float3 *p1){
+inline float dist2(float3 *p0,float3 *p1){
     return (p1->x-p0->x)*(p1->x-p0->x)+(p1->y-p0->y)*(p1->y-p0->y)+(p1->z-p0->z)*(p1->z-p0->z);
 }
 
-float dist(float3 *p0,float3 *p1){
+inline float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
 
@@ -384,7 +384,7 @@ void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 	int *ee;
 
         for(i=0;i<cfg->maxgate;i++)
-           for(j=0;j<mesh->nn;j++)
+            for(j=0;j<mesh->nn;j++)
               mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
 
         for(i=0;i<mesh->ne;i++){
@@ -396,6 +396,7 @@ void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 
 	   energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
 	}
+
 	energydeposit*=0.25f*1e-10f; /* unit conversions */
 	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 
