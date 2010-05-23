@@ -8,7 +8,7 @@
 % addpath('/path/to/iso2mesh/toolbox/');
 
 % 2. you have to add the path to MMC matlab folder
-% addpath('../../matlab')
+addpath('../../matlab')
 
 
 % create a gray-scale field
@@ -20,7 +20,7 @@ clear xi yi zi;
 % extract a level-set at v=20, being a sphere with R=20
 % the maximum element size of the surface triangles is 2
 
-[v0,f0]=vol2restrictedtri(dist,20,[60 60 60],60*60*20,30,2,2,40000);
+[v0,f0]=vol2restrictedtri(dist,10,[60 60 60],100*20,30,2,2,40000);
 v0=(v0-0.5)*0.5;
 
 % iso2mesh will also produce a surface for the bounding box, remove it
@@ -49,9 +49,9 @@ ISO2MESH_SESSION='mmcsph3_';
 
 srcpos=[30. 30. 0.];
 fixednodes=[30.,30.,0.05; 30 30 30];
-nodesize=[ones(size(no,1),1) ; 0.3; 4];
+nodesize=[ones(size(no,1),1) ; 0.3; 3];
 nfull=[no;fixednodes];
-[node3,elem3,face3]=surf2mesh([nfull,nodesize],el,[0 0 0],[61 61 61],1,8,[30 30 30],[],[1.5 1.5 1.5 1.5 6 6 6 6]);
+[node3,elem3,face3]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,8,[30 30 30],[],[1.5 1.5 1.5 1.5 6 6 6 6]);
 [node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
 elem3(:,1:4)=meshreorient(node3,elem3(:,1:4));
 savemmcmesh('sph3',node3,elem3(:,1:5),[]);
@@ -63,7 +63,7 @@ eid3=tsearchn(node3,elem3(:,1:4),srcpos);
 ISO2MESH_SESSION='mmcsph2_';
 
 nodesize=[0.7*ones(size(no,1),1) ; 0.2; 2];
-[node2,elem2,face2]=surf2mesh([nfull,nodesize],el,[0 0 0],[61 61 61],1,2,[30 30 30],[],[1 1 1 1 5 5 5 5]);
+[node2,elem2,face2]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,2,[30 30 30],[],[1 1 1 1 5 5 5 5]);
 [node2,elem2]=sortmesh(srcpos,node2,elem2,1:4);
 elem2(:,1:4)=meshreorient(node2,elem2(:,1:4));
 savemmcmesh('sph2',node2,elem2(:,1:5),[]);
@@ -79,7 +79,7 @@ ISO2MESH_SESSION='mmcsph1_';
 % mesh with maximum volume of 10
 
 nodesize=[2*ones(size(no2,1),1)];
-[node1,elem1,face1]=surf2mesh([no2,nodesize],el2,[0 0 0],[61 61 61],1,10,[30 30 30],[],[1 1 1 1 5 5 5 5]);
+[node1,elem1,face1]=surf2mesh([no2,nodesize],el2,[0 0 0],[60.1 60.1 60.1],1,10,[30 30 30],[],[1 1 1 1 5 5 5 5]);
 [node1,elem1]=sortmesh(srcpos,node1,elem1,1:4);
 elem1(:,1:4)=meshreorient(node1,elem1(:,1:4));
 savemmcmesh('sph1',node1,elem1(:,1:5),[]);

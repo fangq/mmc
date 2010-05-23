@@ -20,7 +20,6 @@ cwmcx=sum(mcx,4);
 %%-----------------------------------------------------------------
 %% plot sphere 1
 %%-----------------------------------------------------------------
-
 node1=readmmcnode('node_sph1.dat');  
 elem1=readmmcelem('elem_sph1.dat');
 load sph1.dat
@@ -65,7 +64,7 @@ elem3=readmmcelem('elem_sph3.dat');
 load sph3.dat
 sph3=reshape(sph3(:,end),[size(node3,1),length(sph3)/size(node3,1)]);
 s3=sum(sph3,2);
-[cutpos,cutvalue,facedata]=qmeshcut(elem3(:,1:4),node3,s3,[0 30 0; 0 30 1; 1 30 0]);
+[cutpos,cutvalue,facedata]=qmeshcut(elem3(:,1:4),node3,s3,[0 29 0; 0 29 1; 1 29 0]);
 
 vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 

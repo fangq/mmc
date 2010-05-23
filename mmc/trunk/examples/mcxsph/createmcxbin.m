@@ -3,7 +3,7 @@ dim=60;
 dist=(xi-30).^2+(yi-30).^2+(zi-30).^2;
 
 v=zeros(size(xi));
-v(dist<400)=1;
+v(dist<100)=1;
 v=v+1;
 
 fid=fopen('spherebox.bin','wb');

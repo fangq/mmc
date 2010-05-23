@@ -35,13 +35,13 @@ vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 
 figure
 
-srcpos=[31 31 1];
-detpos=[31 15 11];
+srcpos=[30 30 0];
+detpos=[30 14 10];
 
 hold on
 semilogy((1:50)/10,tddiffusion(0.005, 1, c0, 0, srcpos, detpos,twin),'r');
-semilogy((1:50)/10,squeeze(mcx(30,14,10,:)),'o');
-semilogy((1:50)/10,squeeze(cube(5038,:)),'+');
+semilogy((1:50)/10,squeeze(mcx(detpos(1),detpos(2),detpos(3),:)),'o');
+semilogy((1:50)/10,squeeze(cube(find(node(:,1)==detpos(1) & node(:,2)==detpos(2) & node(:,3)==detpos(3)),:)),'+');
 
 set(gca,'fontsize',18)
 xlabel('t (ns)')
@@ -59,14 +59,14 @@ saveas(gcf,'box_td.fig');
 figure
 
 hold on
-contour(log10(squeeze(abs(cwmcx(:,31,:)))'),[-1:0.5:8],'b--')
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b-')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
 
 axis equal  
 set(gca,'xlim',[1 60])
 set(gca,'fontsize',18)
 xlabel('x (mm)')
-ylabel('y (mm)')
+ylabel('z (mm)')
 legend('MCX','MMC')
 box on;
 
