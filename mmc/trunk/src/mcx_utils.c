@@ -1,5 +1,5 @@
 /*******************************************************************************
-**  Mesh-based Monte Carlo Method (MMCM) -- this unit was ported from MCX
+**  Mesh-based Monte Carlo (MMC) -- this unit was ported from MCX
 **
 **  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
 **  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
@@ -458,12 +458,12 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 void mcx_usage(char *exename){
      printf("\
 ######################################################################################\n\
-#                     Mesh-based Monte Carlo Method (MMCM)                           #\n\
+#                          Mesh-based Monte Carlo (MMC)                              #\n\
 #              Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>                  #\n\
 #                                                                                    #\n\
 #      Martinos Center for Biomedical Imaging, Massachusetts General Hospital        #\n\
 ######################################################################################\n\
-$MMCM $Rev:: 155$, Last Commit: $Date:: 2009-12-19 18:57:32 -05#$ by $Author:: fangq $\n\
+$MMC  $Rev::    $, Last Commit: $Date:: 2009-12-19 18:57:32 -05#$ by $Author::       $\n\
 ######################################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\

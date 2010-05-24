@@ -36,6 +36,14 @@ hold on
 contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
 
+axis equal
+set(gca,'xlim',[1 60])
+set(gca,'fontsize',18)
+xlabel('x (mm)')
+ylabel('z (mm)')
+legend('MCX','MMC')
+box on;
+
 %%-----------------------------------------------------------------
 %% plot sphere 2
 %%-----------------------------------------------------------------
@@ -54,6 +62,14 @@ figure
 hold on
 contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
+
+axis equal
+set(gca,'xlim',[1 60])
+set(gca,'fontsize',18)
+xlabel('x (mm)')
+ylabel('z (mm)')
+legend('MCX','MMC')
+box on;
 
 %%-----------------------------------------------------------------
 %% plot sphere 3
@@ -74,3 +90,12 @@ figure
 hold on
 contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
+
+axis equal
+set(gca,'xlim',[1 60])
+set(gca,'fontsize',18)
+xlabel('x (mm)')
+ylabel('z (mm)')
+legend('MCX','MMC')
+box on;
+

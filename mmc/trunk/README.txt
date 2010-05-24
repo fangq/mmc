@@ -33,11 +33,11 @@ additional accuracy. This implementation also supports multi-threaded
 parallel computing and can give a nearly propotional acceleration when
 running on multi-core processors.
 
-MMC requires an FE mesh to represent complex domains. To generate
-an accurate FE mesh for arbitrary object has been a difficult task
+MMC uses FE meshes to represent complex domains. To generate
+an accurate FE mesh for arbitrary object had been a difficult task
 in the past. Fortunately, Qianqian along with other developers had 
 made great progress to develop a simple-to-use-yet-powerful mesh 
-generation tool, iso2mesh [1], and made this task dramatically 
+generation tool, iso2mesh [1], which made this task dramatically 
 easier. One should also download and install iso2mesh when running 
 all the examples from MMC.
 

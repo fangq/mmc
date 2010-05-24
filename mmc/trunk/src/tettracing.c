@@ -136,7 +136,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                 if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"D %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
                       dist(&pin,p0),Lp0,Lio,dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
-#ifndef SIMPLE_TRACING
+#ifdef MINSTEP_ADDITION
 		if(Lio>EPS){
 		    Lio=1.f/Lio;
 		    for(dlen=0;dlen<Lmove;dlen+=cfg->minstep){
@@ -150,7 +150,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 
 			tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
 
-			/*ww will have the volume effect. volume of each nodes will be divided in the end*/
+			/*ww has the volume effect. volume of each nodes will be divided in the end*/
 
 	                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
 			   p0->x-(Lmove-dlen)*pvec->x,p0->y-(Lmove-dlen)*pvec->y,p0->z-(Lmove-dlen)*pvec->z,ww,eid,dlen);
@@ -161,10 +161,12 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 		}
 #else
                 if(Lio>EPS){
-	                ratio=(Lp0-Lmove)/Lio;
+	                ratio=(Lp0-Lmove*0.5f)/Lio; /*add the weight to the middle-point*/
         	        ww=currweight-*weight;
 			*Eabsorb+=ww;
 			ww/=prop->mua;
+                        *photontimer+=Lmove*rc;
+                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
 #pragma unroll(4)
                 	for(i=0;i<4;i++)
                      		plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);

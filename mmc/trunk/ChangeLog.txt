@@ -1,7 +1,13 @@
 Change Log
 
-== MMCM 0.2 (Cheesecake) development branch, FangQ <fangq nmr mgh harvard edu> ==
+== MMC 0.2 (Cheesecake) development branch, FangQ <fangq nmr mgh harvard edu> ==
 
+2010/05/23 use simple fluence addition approach by default, add MINSTEP_ADDITION macro
+2010/05/22 reduce roundoff-error by explicit counting energy loss
+2010/05/20 add README document
+2010/05/20 add functions to compute the analytical solution of a sphere inside infinite medium
+2010/05/19 use elem-volume, update tests, twig parameters
+2010/05/19 use MCX approach for fluence accumulation, debugged normalization, tested with benchmarks
 2010/05/13 updated POSIX MT RNG to the 48bit version (drand48_r)
 2010/05/10 added POSIX MT and logistic RNGs, use MCX interface, improved OpenMP efficiency
 2010/05/09 debugged meshtest case, flexible mesh generation using improved iso2mesh toolbox
