@@ -1,7 +1,7 @@
 function [res,xi,yi,zi] = sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %  [res,xi,yi,zi]= sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %
-%  semi-infinite medium 1-order analytical solution to diffusion model
+%  sphere in semi-infinite medium 1-order analytical solution to diffusion model
 %
 %    author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
 %
@@ -9,6 +9,8 @@ function [res,xi,yi,zi] = sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %        Reff:  the effective reflection coeff.
 %        xrange,yrange,zrange: a vector from where a grid will be created
 %                              and the phi values will be calculated
+%        cfg: domain structure for internal/external parameters
+%             see below for the meaning of each field
 %
 %    output:
 %        res:  the output fluence for both the interior and exterior
