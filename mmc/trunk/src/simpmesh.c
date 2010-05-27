@@ -139,7 +139,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
 			mesh_error("property file has wrong format");
-		mesh->atte[i]=exp(-cfg->minstep*mesh->med[i].mua);
+		mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);
 		/*user input musp, MMCM converts to mus
 		mesh->med[i].mus=musp/(1.f-mesh->med[i].g); */
 	}

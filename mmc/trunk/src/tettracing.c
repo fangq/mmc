@@ -121,7 +121,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	           pout->x=QLIMIT;
 		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-		*weight*=exp(-prop->mua*Lmove);
+		*weight*=expf(-prop->mua*Lmove);
 		slen-=Lmove*prop->mus;
                 p0->x+=Lmove*pvec->x;
                 p0->y+=Lmove*pvec->y;
@@ -238,7 +238,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    break;  /*photon exits boundary*/
 	    }
 	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
-	    slen=mc_next_scatter(mesh->med[mesh->type[eid]-1].g,&c0,ran,ran0,cfg);
+	    slen=mc_next_scatter(mesh->med[mesh->type[eid-1]-1].g,&c0,ran,ran0,cfg);
 	}
 	return Eabsorb;
 }

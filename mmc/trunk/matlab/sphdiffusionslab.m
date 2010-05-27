@@ -62,22 +62,38 @@ cfg.src=[2*h-src0(1)+2*zb-z0+2*(z0+zb), pi-src0(2), src0(3)];
 
 res=res+res2;
 
+
 [P,T,R]=cart2sph(xi(:),yi(:),zi(:));
 T=pi/2-T;  % matlab's theta and phi are defined differently
 idx=find(R>cfg.a);
+
+
+cfg.src=[2*h-src0(1)-z0, src0(2), src0(3)];
+% real source scattered field for the imaged sphere outside the real sphere
+res2=sphdiffusionscatteronly(xrange,yrange,zrange-2*(h-src0(1)+zb),cfg); % S1,O2
+
+res(idx)=res(idx)+res2(idx);
+
+cfg.src=[2*h-src0(1)+2*zb+z0, src0(2), src0(3)]; 
+% image source scattered field for the imaged sphere outside the real
+% sphere
+res2=sphdiffusionscatteronly(xrange,yrange,zrange-2*(h-src0(1)+zb),cfg); % S2,O2
+
+res(idx)=res(idx)-res2(idx);
+
 
 % this translate the grid to the origin of the mirrored sphere
 
 cfg.src=[src0(1)-z0, pi-src0(2), src0(3)];
 % real source scattered field for the imaged sphere outside the real sphere
-[res2,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange-2*(h-src0(1)+zb),cfg); % S1,O2
+res2=sphdiffusionscatteronly(xrange,yrange,zrange-2*(h-src0(1)+zb),cfg); % S1,O2
 
 res(idx)=res(idx)-res2(idx);
 
 cfg.src=[src0(1)+2*zb+z0, pi-src0(2), src0(3)];
 % image source scattered field for the imaged sphere outside the real
 % sphere
-[res2,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange-2*(h-src0(1)+zb),cfg); % S2,O2
+res2=sphdiffusionscatteronly(xrange,yrange,zrange-2*(h-src0(1)+zb),cfg); % S2,O2
 
 res(idx)=res(idx)+res2(idx);
 

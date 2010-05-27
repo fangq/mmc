@@ -17,6 +17,8 @@ gates=50;
 mcx=loadmc2('../mcxsph/spherebox.mc2', [60 60 60 gates]);
 cwmcx=sum(mcx,4);
 
+load sphdiffsemiinf.mat
+
 %%-----------------------------------------------------------------
 %% plot sphere 1
 %%-----------------------------------------------------------------
@@ -33,6 +35,7 @@ vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 
 figure
 hold on
+contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'g')
 contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
 
@@ -90,6 +93,7 @@ figure
 hold on
 contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
+contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'g')
 
 axis equal
 set(gca,'xlim',[1 60])
@@ -98,4 +102,5 @@ xlabel('x (mm)')
 ylabel('z (mm)')
 legend('MCX','MMC')
 box on;
+
 
