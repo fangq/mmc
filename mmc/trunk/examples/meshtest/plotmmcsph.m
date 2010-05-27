@@ -17,7 +17,22 @@ gates=50;
 mcx=loadmc2('../mcxsph/spherebox.mc2', [60 60 60 gates]);
 cwmcx=sum(mcx,4);
 
+%%-----------------------------------------------------------------
+%% generate/load analytical solution for sphere inside infinite slab
+%%-----------------------------------------------------------------
+
+%[phi_ana,xa,ya,za]=sphdiffusionslab(0,0,60,-22:0.8:22,0,-30:0.8:10);
+%save sphdiffsemiinf.mat phi_ana xa ya za
+
 load sphdiffsemiinf.mat
+
+%%-----------------------------------------------------------------
+%% generate the contour of the inclusion
+%%-----------------------------------------------------------------
+
+[xcirc,ycirc] = cylinder(10,200);
+xcirc=xcirc(1,:)+30;
+ycirc=ycirc(1,:)+30;
 
 %%-----------------------------------------------------------------
 %% plot sphere 1
@@ -35,16 +50,19 @@ vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 
 figure
 hold on
-contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'g')
-contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
+[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'color',[0.7 0.7 0.7],'linewidth',3);
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b--')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
+plot(xcirc,ycirc,'k--','linewidth',2);
 
 axis equal
-set(gca,'xlim',[1 60])
-set(gca,'fontsize',18)
+set(gca,'xlim',[1 60]);
+set(gca,'ylim',[1 60]);
+set(gca,'fontsize',16)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('MCX','MMC')
+legend('Diffusion','MCX','MMC')
+legend boxoff;
 box on;
 
 %%-----------------------------------------------------------------
@@ -63,15 +81,19 @@ vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 
 figure
 hold on
-contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
+[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'color',[0.7 0.7 0.7],'linewidth',3);
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b--')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
+plot(xcirc,ycirc,'k--','linewidth',2);
 
 axis equal
-set(gca,'xlim',[1 60])
-set(gca,'fontsize',18)
+set(gca,'xlim',[1 60]);
+set(gca,'ylim',[1 60]);
+set(gca,'fontsize',16)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('MCX','MMC')
+legend('Diffusion','MCX','MMC')
+legend boxoff;
 box on;
 
 %%-----------------------------------------------------------------
@@ -91,16 +113,19 @@ figure
 %patch('Vertices',cutpos,'Faces',facedata,'FaceVertexCData',log10(cutvalue),'FaceColor','interp','linestyle','none');
 %view([0 1 0])
 hold on
-contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'k')
+[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'color',[0.7 0.7 0.7],'linewidth',3);
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b--')
 contour(log10(abs(vi)),[-1:0.5:8],'r:')
-contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'g')
+plot(xcirc,ycirc,'k--','linewidth',2);
 
 axis equal
-set(gca,'xlim',[1 60])
-set(gca,'fontsize',18)
+set(gca,'xlim',[1 60]);
+set(gca,'ylim',[1 60]);
+set(gca,'fontsize',16)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('MCX','MMC')
+legend('Diffusion','MCX','MMC')
+legend boxoff;
 box on;
 
 

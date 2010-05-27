@@ -16,8 +16,8 @@ function [res,xi,yi,zi] = sphdiffusionslab(Reff1,Reff2,h,xrange,yrange,zrange,cf
 %        regions
 %
 %    example:
-%      [phi,xi,yi,zi]=sphdiffusionslab(0,0,60,-30:0.8:30,0,-30:0.8:30);
-%      contourf(xi,zi,log10(abs(phi)),40)
+%      [phi_ana,xa,ya,za]=sphdiffusionslab(0,0,60,-30:0.8:30,0,-30:0.8:30);
+%      contourf(xa,za,log10(abs(phi_ana)),40)
 %
 %    this file is part of Mesh-based Monte Carlo (MMC)
 %    License: GPLv3, see http://mcx.sf.net/?MMC for details
