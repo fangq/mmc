@@ -1,4 +1,8 @@
 function C=sphdiffCcoeff(m,l,cfg)
+if((cfg.src(2)==pi | cfg.src(2)==0) & m~=0)
+    C=0;
+    return;
+end
 x=cfg.kout*cfg.a;
 y=cfg.kin*cfg.a;
 Dout=cfg.Dout;

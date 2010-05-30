@@ -2,7 +2,7 @@ function [res,xi,yi,zi]=sphdiffusioninfinite(xrange,yrange,zrange,cfg)
 
 if(nargin<4)
 	cfg.v=299792458000;
-	cfg.a=20;
+	cfg.a=10;
 	cfg.omua=0.002;
 	cfg.omusp=0.990;
 	cfg.imua=0.050;

@@ -57,7 +57,7 @@ cfg.src=src0;
 cfg.src(2)=pi;
 cfg.src(1)=src0(1)+z0+2*zb;
 % image source full field for the real sphere
-[res2,xi,yi,zi]=sphdiffusioninfinite(xrange,yrange,zrange,cfg); % S2,O1
+res2=sphdiffusioninfinite(xrange,yrange,zrange,cfg); % S2,O1
 
 res=res-res2;
 
@@ -71,7 +71,7 @@ cfg.src=src0;
 cfg.src(2)=0;
 cfg.src(1)=src0(1)+z0+2*zb;
 % real source scattered field for the imaged sphere outside the real sphere
-[res2,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange,cfg); % S1,O2
+res2=sphdiffusionscatteronly(xrange,yrange,zrange,cfg); % S1,O2
 
 res(idx)=res(idx)+res2(idx);
 
@@ -80,7 +80,7 @@ cfg.src(2)=0;
 cfg.src(1)=src0(1)-z0;
 % image source scattered field for the imaged sphere outside the real
 % sphere
-[res2,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange,cfg); % S2,O2
+res2=sphdiffusionscatteronly(xrange,yrange,zrange,cfg); % S2,O2
 
 res(idx)=res(idx)-res2(idx);
 
