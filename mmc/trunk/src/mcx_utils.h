@@ -10,8 +10,15 @@
 #define MAX_SESSION_LENGTH  256
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 
+#define MMCDEBUG(cfg,debugflag,outputstr)  {\
+				if((cfg)->debuglevel & (debugflag)) {\
+					fprintf outputstr ;\
+					fflush((cfg)->flog);\
+				}\
+                            }
+
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
-                  dlTracingExit=64,dlEdge=128,dlAccum=256};
+                  dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlProgress=1024};
 
 typedef struct MCXMedium{
 	float mua;

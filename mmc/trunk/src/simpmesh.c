@@ -378,7 +378,7 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
-void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
+float mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
@@ -400,9 +400,9 @@ void mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 	energydeposit*=0.25f*1e-10f; /* unit conversions */
 	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 
-	fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.3f%%\tnormalizor=%f\n",Etotal,100.f*Eabsorb/Etotal,normalizor);
-
         for(i=0;i<cfg->maxgate;i++)
            for(j=0;j<mesh->nn;j++)
 	      mesh->weight[i*mesh->nn+j]*=normalizor;
+
+	return normalizor;
 }
