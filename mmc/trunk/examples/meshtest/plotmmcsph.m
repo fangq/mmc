@@ -8,6 +8,7 @@ addpath('../../matlab')
 c0=299792458000;
 twin=[5e-11:1e-10:5e-9];
 gates=50;
+clines=[-1:0.5:8];
 
 [xi,yi]=meshgrid(1:60,0:60);
 
@@ -25,6 +26,10 @@ cwmcx=sum(mcx,4);
 %save sphdiffsemiinf.mat phi_ana xa ya za
 
 load sphdiffsemiinf.mat
+idx=find((xa(:)<-12 | xa(:)>12) & za(:)>-5);
+phi_ana(idx)=nan;
+idx=find((xa(:)<-10 | xa(:)>10) & za(:)>0);
+phi_ana(idx)=nan;
 
 %%-----------------------------------------------------------------
 %% generate the contour of the inclusion
@@ -33,6 +38,17 @@ load sphdiffsemiinf.mat
 [xcirc,ycirc] = cylinder(10,200);
 xcirc=xcirc(1,:)+30;
 ycirc=ycirc(1,:)+30;
+
+% create the voxel-contour of the sphere for MCX
+%dim=60;
+%[xv,yv,zv]=meshgrid(1:dim,1:dim,1:dim);
+%dist=(xv-30).^2+(yv-30).^2+(zv-30).^2;
+
+%vv=zeros(size(xv));
+%vv(dist<100)=1;
+
+%c=contourc(squeeze(vv(:,30,:)),1);
+%plot(c(1,2:end),c(2,2:end),'c--')
 
 %%-----------------------------------------------------------------
 %% plot sphere 1
@@ -50,20 +66,22 @@ vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 
 figure
 hold on
-[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'color',[0.7 0.7 0.7],'linewidth',3);
-contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b--')
-contour(log10(abs(vi)),[-1:0.5:8],'r:')
+[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,clines,'color',[0.7 0.7 0.7],'linewidth',2);
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),clines,'b-')
+contour(log10(abs(vi)),clines,'r:')
 plot(xcirc,ycirc,'k--','linewidth',2);
 
 axis equal
 set(gca,'xlim',[1 60]);
 set(gca,'ylim',[1 60]);
-set(gca,'fontsize',16)
+set(gca,'fontsize',18)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('Diffusion','MCX','MMC')
+legend('Diffusion','MCX','MMCM')
 legend boxoff;
 box on;
+set(gcf,'PaperPositionMode','auto');
+print -depsc2 sph1.eps
 
 %%-----------------------------------------------------------------
 %% plot sphere 2
@@ -81,20 +99,22 @@ vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
 
 figure
 hold on
-[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'color',[0.7 0.7 0.7],'linewidth',3);
-contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b--')
-contour(log10(abs(vi)),[-1:0.5:8],'r:')
+[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,clines,'color',[0.7 0.7 0.7],'linewidth',2);
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),clines,'b-')
+contour(log10(abs(vi)),clines,'r:')
 plot(xcirc,ycirc,'k--','linewidth',2);
 
 axis equal
 set(gca,'xlim',[1 60]);
 set(gca,'ylim',[1 60]);
-set(gca,'fontsize',16)
+set(gca,'fontsize',18)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('Diffusion','MCX','MMC')
+legend('Diffusion','MCX','MMCM')
 legend boxoff;
 box on;
+set(gcf,'PaperPositionMode','auto');
+print -depsc2 sph2.eps
 
 %%-----------------------------------------------------------------
 %% plot sphere 3
@@ -113,19 +133,21 @@ figure
 %patch('Vertices',cutpos,'Faces',facedata,'FaceVertexCData',log10(cutvalue),'FaceColor','interp','linestyle','none');
 %view([0 1 0])
 hold on
-[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,[-1:0.5:8],'color',[0.7 0.7 0.7],'linewidth',3);
-contour(log10(squeeze(abs(cwmcx(:,30,:)))'),[-1:0.5:8],'b--')
-contour(log10(abs(vi)),[-1:0.5:8],'r:')
+[cc,hc]=contour(xa+30,za+31,log10(abs(phi_ana))+10,clines,'color',[0.7 0.7 0.7],'linewidth',2);
+contour(log10(squeeze(abs(cwmcx(:,30,:)))'),clines,'b-')
+contour(log10(abs(vi)),clines,'r:')
 plot(xcirc,ycirc,'k--','linewidth',2);
 
 axis equal
 set(gca,'xlim',[1 60]);
 set(gca,'ylim',[1 60]);
-set(gca,'fontsize',16)
+set(gca,'fontsize',18)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('Diffusion','MCX','MMC')
+legend('Diffusion','MCX','MMCM')
 legend boxoff;
 box on;
 
+set(gcf,'PaperPositionMode','auto');
+print -depsc2 sph3.eps
 

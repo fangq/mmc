@@ -43,13 +43,15 @@ semilogy((1:50)/10,tddiffusion(0.005, 1, c0, 0, srcpos, detpos,twin),'r');
 semilogy((1:50)/10,squeeze(mcx(detpos(1),detpos(2),detpos(3),:)),'o');
 semilogy((1:50)/10,squeeze(cube(find(node(:,1)==detpos(1) & node(:,2)==detpos(2) & node(:,3)==detpos(3)),:)),'+');
 
-set(gca,'fontsize',18)
+set(gca,'fontsize',20)
 xlabel('t (ns)')
 ylabel('Fluence TPSF (1/mm^2)')
 set(gca,'yscale','log')
-legend('Diffusion','MCX','MMC')
+legend('Diffusion','MCX','MMCM')
+legend boxoff;
 box on;
 
+set(gcf,'PaperPositionMode','auto');
 saveas(gcf,'box_td.fig');
 
 
@@ -64,11 +66,13 @@ contour(log10(abs(vi)),[-1:0.5:8],'r:')
 
 axis equal  
 set(gca,'xlim',[1 60])
-set(gca,'fontsize',18)
+set(gca,'fontsize',20)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('MCX','MMC')
+legend('MCX','MMCM')
+legend boxoff;
 box on;
 
+set(gcf,'PaperPositionMode','auto');
 saveas(gcf,'box.fig');
 

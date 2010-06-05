@@ -2,12 +2,18 @@ Change Log
 
 == MMC 0.2 (Cheesecake) development branch, FangQ <fangq nmr mgh harvard edu> ==
 
-2010/05/23 use simple fluence addition approach by default, add MINSTEP_ADDITION macro
-2010/05/22 reduce roundoff-error by explicit counting energy loss
-2010/05/20 add README document
-2010/05/20 add functions to compute the analytical solution of a sphere inside infinite medium
-2010/05/19 use elem-volume, update tests, twig parameters
-2010/05/19 use MCX approach for fluence accumulation, debugged normalization, tested with benchmarks
+2010/06/04 finished paper, added timing unit from mcxcl project, added MMCDEBUG macro
+2010/06/03 generated complex mesh from a brain atlas, run simulation and make figures
+2010/05/30 announced sphere-diffusion toolbox, tested for Windows, compatible with Octave
+2010/05/27 fixed a regression (once fixed in rev161), results are good, regenerated figures
+2010/05/26 added scripts for analytical solutions for sphere in infinite-slab geometry
+2010/05/25 added scripts for analytical solutions for sphere in semi-infinite medium
+2010/05/23 used simple fluence addition approach by default, add MINSTEP_ADDITION macro
+2010/05/22 reduced roundoff-error by explicit counting energy loss
+2010/05/20 added README document
+2010/05/20 added functions to compute the analytical solution of a sphere inside infinite medium
+2010/05/19 used elem-volume, update tests, twig parameters
+2010/05/19 used MCX approach for fluence accumulation, debugged normalization, tested with benchmarks
 2010/05/13 updated POSIX MT RNG to the 48bit version (drand48_r)
 2010/05/10 added POSIX MT and logistic RNGs, use MCX interface, improved OpenMP efficiency
 2010/05/09 debugged meshtest case, flexible mesh generation using improved iso2mesh toolbox
