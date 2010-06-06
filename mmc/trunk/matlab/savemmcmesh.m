@@ -20,6 +20,8 @@ if(~isempty(node))
 end
 
 if(~isempty(elem))
+  elem(:,1:4)=meshreorient(node,elem(:,1:4));
+
   fid=fopen(['elem_',key,'.dat'],'wt');
   fprintf(fid,'%d\t%d\n',1,size(elem,1));
   if(size(elem,2)==4)

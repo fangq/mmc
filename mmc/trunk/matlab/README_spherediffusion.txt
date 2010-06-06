@@ -99,4 +99,5 @@ sphdiffscatter.m	Sphere exterior scattered field
  figure;contourf(xa,za,log10(abs(phi_ana)),40);axis equal;
 
 6. Acknowledgement
-Qianqian would like to thank David for the helpful discussions on the semi-infinite solutions. 
+Qianqian Fang would like to thank David Boas for the helpful 
+discussions on the semi-infinite solutions. 
