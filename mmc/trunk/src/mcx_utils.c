@@ -489,6 +489,18 @@ where possible parameters include (the first item in [] is the default value)\n\
  -l            (--log)         print messages to a log file instead\n\
  -L            (--listgpu)     print GPU information only\n\
  -I            (--printgpu)    print GPU information and run program\n\
+ -D [0|int]    (--debug)       print debug information:\n\
+                               1   photon movement info\n\
+                               2   print ray-polygon testing details\n\
+                               4   print Bary centric coordinates\n\
+                               8   print photon weight changes\n\
+                               16  print distances\n\
+                               32  entering a triangle\n\
+                               64  exiting a triangle\n\
+                               128 hiting an edge\n\
+                               256 accumulating weights to the mesh\n\
+                               512 timing information\n\
+                               add the numbers together to print mulitple items\n\
 example:\n\
        %s -t 1024 -T 256 -m 1000000 -f input.inp -s test -r 2 -a 0 -g 10 -U 0\n",exename,exename);
 }

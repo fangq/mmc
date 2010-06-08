@@ -167,6 +167,10 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			ww/=prop->mua;
                         *photontimer+=Lmove*rc;
                         tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
+
+                        if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+                           p0->x-(Lmove*0.5f)*pvec->x,p0->y-(Lmove*0.5f)*pvec->y,p0->z-(Lmove*0.5f)*pvec->z,ww,eid,dlen);
+
 #pragma unroll(4)
                 	for(i=0;i<4;i++)
                      		plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
