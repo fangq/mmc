@@ -470,25 +470,15 @@ usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
  -i 	       (--interactive) interactive mode\n\
  -f config     (--input)       read config from a file\n\
- -t [1024|int] (--thread)      total thread number\n\
- -T [128|int]  (--blocksize)   thread number per block\n\
  -n [0|int]    (--photon)      total photon number\n\
- -r [1|int]    (--repeat)      number of repeations\n\
- -a [1|0]      (--array)       1 for C array, 0 for Matlab array\n\
- -g [1|int]    (--gategroup)   number of time gates per run\n\
- -b [1|0]      (--reflect)     1 to reflect the photons at the boundary, 0 to exit\n\
- -B [0|1]      (--reflect3)    1 to consider maximum 3 reflections, 0 consider only 2\n\
  -e [0.|float] (--minenergy)   minimum energy level to propagate a photon\n\
  -R [0.|float] (--skipradius)  minimum distance to source to start accumulation\n\
  -U [1|0]      (--normalize)   1 to normailze the fluence to unitary, 0 to save raw fluence\n\
  -d [1|0]      (--savedet)     1 to save photon info at detectors, 0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -s sessionid  (--session)     a string to identify this specific simulation (and output files)\n\
- -p [0|int]    (--printlen)    number of threads to print (debug)\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
- -L            (--listgpu)     print GPU information only\n\
- -I            (--printgpu)    print GPU information and run program\n\
  -D [0|int]    (--debug)       print debug information:\n\
                                1   photon movement info\n\
                                2   print ray-polygon testing details\n\
@@ -502,5 +492,5 @@ where possible parameters include (the first item in [] is the default value)\n\
                                512 timing information\n\
                                add the numbers together to print mulitple items\n\
 example:\n\
-       %s -t 1024 -T 256 -m 1000000 -f input.inp -s test -r 2 -a 0 -g 10 -U 0\n",exename,exename);
+       %s -n 1000000 -f input.inp -s test\n",exename,exename);
 }

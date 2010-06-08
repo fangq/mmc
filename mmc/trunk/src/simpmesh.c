@@ -108,14 +108,14 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->nn));
 	if(len!=2 || mesh->nn<=0){
-		mesh_error("mesh file has wrong format");
+		mesh_error("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
 	mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
-			mesh_error("mesh file has wrong format");
+			mesh_error("node file has wrong format");
 	}
 	fclose(fp);
 }
@@ -156,7 +156,7 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
-		mesh_error("mesh file has wrong format");
+		mesh_error("element file has wrong format");
 	}
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
@@ -164,7 +164,7 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
 		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
-			mesh_error("mesh file has wrong format");
+			mesh_error("element file has wrong format");
 	}
 	fclose(fp);
 }
@@ -174,7 +174,7 @@ void mesh_loadelemvol(tetmesh *mesh,Config *cfg){
 	char fvelem[MAX_PATH_LENGTH];
 	mesh_filenames("velem_%s.dat",fvelem,cfg);
 	if((fp=fopen(fvelem,"rt"))==NULL){
-		mesh_error("can not open element file");
+		mesh_error("can not open element volume file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
@@ -200,7 +200,7 @@ void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
 	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
-		mesh_error("can not open element file");
+		mesh_error("can not open face-neighbor list file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
@@ -210,7 +210,7 @@ void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->facenb+i;
 		if(fscanf(fp,"%d %d %d %d",&(pe->x),&(pe->y),&(pe->z),&(pe->w))!=4)
-			mesh_error("mesh file has wrong format");
+			mesh_error("face-neighbor list file has wrong format");
 	}
 	fclose(fp);
 }

@@ -43,7 +43,7 @@ int main(int argc, char**argv){
 	plucker_init(&plucker,&mesh);
 	
 	if(mesh.node==NULL||mesh.elem==NULL||mesh.facenb==NULL||mesh.med==NULL)
-		mesh_error("not all files were loaded");
+		mesh_error("encountered error while loading mesh files");
 
 	rtstep=1.f/cfg.tstep;
 
@@ -66,15 +66,16 @@ int main(int argc, char**argv){
 }
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
+	plucker_clear(&plucker);
+
 	if(cfg.isnormalized){
           fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.3f%%\tnormalizor=%f\n",
 		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
-
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving data ..."));
-
-	plucker_clear(&plucker);
-	mesh_saveweight(&mesh,&cfg);
+	if(cfg.issave2pt){
+		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving data ..."));
+		mesh_saveweight(&mesh,&cfg);
+	}
 
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
