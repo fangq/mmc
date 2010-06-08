@@ -1,6 +1,6 @@
-function [vertices,tess]=tess_lat(varargin)
+function [vertices,tess]=genT6mesh(varargin)
 % tess_lat: simplicial tessellation of a rectangular lattice
-% usage: [tessellation,vertices]=tess_lat(v1,v2,v3,...)
+% usage: [tessellation,vertices]=genT6mesh(v1,v2,v3,...)
 %
 % arguments: input
 % v1,v2,v3,... - numeric vectors defining the lattice in
@@ -24,7 +24,7 @@ p=perms(1:n);
 nt=factorial(n);
 thc=zeros(nt,n+1);
 for i=1:nt
-thc(i,:)=find(all(diff(vhc(:,p(i,:)),[],2)>=0,2))';
+  thc(i,:)=find(all(diff(vhc(:,p(i,:)),[],2)>=0,2))';
 end
 
 % build the complete lattice
@@ -48,7 +48,7 @@ offset=vhc*k';
 tess=zeros(nt*nind,n+1);
 L=(1:nind)';
 for i=1:nt
-tess(L,:)=repmat(ind,1,n+1)+repmat(offset(thc(i,:))',nind,1);
+  tess(L,:)=repmat(ind,1,n+1)+repmat(offset(thc(i,:))',nind,1);
 L=L+nind;
 end
 

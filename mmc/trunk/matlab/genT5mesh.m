@@ -1,6 +1,6 @@
-function [vertices,tess]=tessT5_lat(varargin)
+function [vertices,tess]=genT5mesh(varargin)
 % tess_lat: simplicial tessellation of a rectangular lattice
-% usage: [tessellation,vertices]=tess_lat(v1,v2,v3,...)
+% usage: [tessellation,vertices]=genT5mesh(v1,v2,v3,...)
 %
 % arguments: input
 % v1,v2,v3,... - numeric vectors defining the lattice in
