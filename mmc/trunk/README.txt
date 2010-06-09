@@ -63,11 +63,11 @@ anonymously check out the entire source code tree.
 To compile the software, you need to install GNU gcc compiler toolchain
 on your system. For Debian/Ubuntu based GNU/Linux systems, you can type
 
- sudo apt-get install build-essential
+ sudo apt-get install gcc
 
 and for Fedora/Redhat based GNU/Linux systems, you can type
 
- sudo yum groupinstall "Development Tools"
+ su -c 'yum install gcc'
  
 to install the necessary compilers. To compile the binary supporting
 OpenMP multi-threaded computing, your gcc version should be at least 4.2.
