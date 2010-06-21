@@ -104,3 +104,8 @@ __device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]){
 __device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]){
     return rand_uniform01(t[4]);
 }
+// generate random number for the next zenith angle
+__device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]){
+    return rand_uniform01(t[3]);
+}
+

@@ -42,4 +42,8 @@ __device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]){
 __device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]){
     return rand_uniform01(t);
 }
+// generate random number for reflection test
+__device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]){
+    return rand_uniform01(t);
+}
 #endif

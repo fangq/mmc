@@ -30,7 +30,7 @@ end
 % build the complete lattice
 nodecount = cellfun('length',varargin);
 if any(nodecount<2)
-error 'Each dimension must be of size 2 or more.'
+  error 'Each dimension must be of size 2 or more.'
 end
 vertices = lattice(varargin{:});
 

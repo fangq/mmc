@@ -2,6 +2,15 @@
 #include <stdlib.h>
 #include "tettracing.h"
 
+#ifdef MMC_USE_SSE
+#include <smmintrin.h>
+#endif
+
+const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
+const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+const int faceorder[]={1,3,2,0};
+const int ifaceorder[]={3,0,2,1};
+
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
 	pout->x=w->x*p1->x+w->y*p2->x+w->z*p3->x;
 	pout->y=w->x*p1->y+w->y*p2->y+w->z*p3->y;
@@ -40,9 +49,6 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	int *ee;
 	int i,tshift;
 	float w[6],Rv,ww,currweight,ratio=0.f,dlen=0.f,rc; /*dlen is the physical distance*/
-	const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
-	const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-	const int faceorder[]={1,3,2,0};
         float bary[2][4]={{0.f,0.f,0.f,0.f},{0.f,0.f,0.f,0.f}};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte;
 
@@ -77,10 +83,10 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			// f_enter
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"ray enters face %d[%d] of %d\n",i,faceorder[i],eid);
 
-                        Rv=1.f/(-w[fc[i][0]]-w[fc[i][1]]+w[fc[i][2]]);
-                        bary[0][nc[i][0]]=-w[fc[i][0]]*Rv;
-                        bary[0][nc[i][1]]=-w[fc[i][1]]*Rv;
-                        bary[0][nc[i][2]]=w[fc[i][2]]*Rv;
+                        Rv=1.f/(w[fc[i][0]]+w[fc[i][1]]-w[fc[i][2]]);
+                        bary[0][nc[i][0]]=w[fc[i][0]]*Rv;
+                        bary[0][nc[i][1]]=w[fc[i][1]]*Rv;
+                        bary[0][nc[i][2]]=-w[fc[i][2]]*Rv;
 
 			getinterp(bary[0][nc[i][0]],bary[0][nc[i][1]],bary[0][nc[i][2]],
 				plucker->mesh->node+ee[nc[i][0]]-1,
@@ -94,10 +100,10 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			// f_leave
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
 
-                        Rv=1.f/(w[fc[i][0]]+w[fc[i][1]]-w[fc[i][2]]);
-                        bary[1][nc[i][0]]=w[fc[i][0]]*Rv;
-                        bary[1][nc[i][1]]=w[fc[i][1]]*Rv;
-                        bary[1][nc[i][2]]=-w[fc[i][2]]*Rv;
+                        Rv=1.f/(-w[fc[i][0]]-w[fc[i][1]]+w[fc[i][2]]);
+                        bary[1][nc[i][0]]=-w[fc[i][0]]*Rv;
+                        bary[1][nc[i][1]]=-w[fc[i][1]]*Rv;
+                        bary[1][nc[i][2]]=w[fc[i][2]]*Rv;
 
 			getinterp(bary[1][nc[i][0]],bary[1][nc[i][1]],bary[1][nc[i][2]],
 				plucker->mesh->node+ee[nc[i][0]]-1,
@@ -183,7 +189,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 }
 
 float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
-	int faceid,eid,isend,fixcount=0;
+	int faceid,eid,oldeid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer,Eabsorb;
 	float3 pout;
@@ -214,8 +220,14 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    memcpy((void *)&p0,(void *)&pout,sizeof(p0));
 
 	    	    enb=(int *)(mesh->facenb+eid-1);
+		    oldeid=eid;
 	    	    eid=enb[faceid];
-	    	    if(eid==0) break;
+
+		    if(cfg->isreflect && (eid==0 || mesh->med[mesh->type[eid-1]-1].n != mesh->med[mesh->type[oldeid-1]-1].n )){
+			weight*=reflectray(cfg,&c0,plucker,&oldeid,&eid,faceid,ran);
+		    }
+
+	    	    if(!cfg->isreflect && eid==0) break;
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
@@ -245,4 +257,60 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    slen=mc_next_scatter(mesh->med[mesh->type[eid-1]-1].g,&c0,ran,ran0,cfg);
 	}
 	return Eabsorb;
+}
+inline float mmc_rsqrtf(float a){
+#ifdef MMC_USE_SSE
+        return _mm_cvtss_f32( _mm_rsqrt_ss( _mm_set_ss( a ) ) );
+#else
+	return 1.f/sqrtf(a);
+#endif
+}
+float reflectray(Config *cfg,float3 *c0,tetplucker *plucker,int *oldeid,int *eid,int faceid,RandType *ran){
+	/*to handle refractive index mismatch*/
+        float3 pnorm;
+	float Icos,Tcos,Tsin,Rtotal,tmp0,tmp1,tmp2,n1,n2;
+
+	/*calculate the normal direction of the intersecting triangle*/
+        vec_cross(plucker->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][0],
+                  plucker->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][1],&pnorm);
+	tmp0=mmc_rsqrtf(vec_dot(&pnorm,&pnorm));
+	tmp0*=(ifaceorder[faceid]>=2) ? -1.f : 1.f;
+	pnorm.x*=tmp0;
+        pnorm.y*=tmp0;
+        pnorm.z*=tmp0;
+	
+	/*compute the cos of the incidence angle*/
+        Icos=fabs(vec_dot(c0,&pnorm));
+
+	n1=plucker->mesh->med[plucker->mesh->type[*oldeid-1]-1].n;
+	n2=(*eid>0) ? plucker->mesh->med[plucker->mesh->type[*eid-1]-1].n : 1.f;
+
+	tmp0=n1*n1;
+	tmp1=n2*n2;
+        tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
+
+        if(tmp2>0.f){ /*if no total internal reflection*/
+          Tcos=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
+	  tmp2=sqrt(tmp2); /*to save one sqrt*/
+          Tsin=2.f*n1*n2*Icos*tmp2;
+          Rtotal=(Tcos-Tsin)/(Tcos+Tsin);     /*Rp*/
+          Tcos=tmp1*Icos*Icos+tmp0*tmp2*tmp2;    
+          Rtotal=(Rtotal+(Tcos-Tsin)/(Tcos+Tsin))*0.5f; /*(Rp+Rs)/2*/
+	  if(*eid==0 || rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+              vec_mult_add(&pnorm,c0,2.f*Icos,1.f,c0);
+	      *eid=*oldeid;
+              if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+	      return Rtotal;
+          }else{                              /*do transmission*/
+              vec_mult_add(&pnorm,c0, Icos,1.f,c0);
+              vec_mult_add(&pnorm,c0,-tmp2,n1/n2,c0);
+              if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
+              return 1.f-Rtotal;
+	  }
+       }else{ /*total internal reflection*/
+          vec_mult_add(&pnorm,c0,2.f*Icos,1.f,c0);
+	  *eid=*oldeid;
+          if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
+          return 1.f;
+       }
 }

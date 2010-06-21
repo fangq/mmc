@@ -274,7 +274,7 @@ void plucker_clear(tetplucker *plucker){
 }
 void plucker_build(tetplucker *plucker){
 	int nn,ne,i,j;
-	int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+	const int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
 	float3 *nodes;
 	int *elems,ebase;
 	int e1,e0;

@@ -1,4 +1,4 @@
-function node=readnmrnode(filename)
+function node=readmmcnode(filename)
 
 fid=fopen(filename,'rt');
 hd=fscanf(fid,'%d',2);

@@ -18,7 +18,8 @@
                             }
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
-                  dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlProgress=1024};
+                  dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
+                  dlProgress=2048};
 
 typedef struct MCXMedium{
 	float mua;
