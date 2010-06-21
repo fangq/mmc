@@ -36,4 +36,5 @@ __device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]);
 // generate random number for the next zenith angle
 __device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]);
 __device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]);
+__device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]);
 #endif

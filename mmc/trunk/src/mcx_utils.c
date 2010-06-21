@@ -112,12 +112,13 @@ void mcx_initcfg(Config *cfg){
      cfg->vol=NULL;
      cfg->session[0]='\0';
      cfg->printnum=0;
-     cfg->minenergy=0.f;
+     cfg->minenergy=1e-6f;
      cfg->flog=stdout;
      cfg->sradius=0.f;
      cfg->rootpath[0]='\0';
      cfg->debuglevel=0;
      cfg->minstep=1.f;
+     cfg->roulettesize=10.f;
 }
 
 void mcx_clearcfg(Config *cfg){

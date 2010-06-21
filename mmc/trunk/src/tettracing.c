@@ -254,6 +254,12 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    break;  /*photon exits boundary*/
 	    }
 	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
+	    if(cfg->minenergy>0.f && weight < cfg->minenergy){ /*Russian Roulette*/
+		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f)
+			weight*=cfg->roulettesize;
+		else
+			break;
+	    }
 	    slen=mc_next_scatter(mesh->med[mesh->type[eid-1]-1].g,&c0,ran,ran0,cfg);
 	}
 	return Eabsorb;

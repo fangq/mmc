@@ -9,7 +9,7 @@ hh=tetramesh(elem,node);
 set(hh,'facealpha',0.1)
 hold on
 photonnum=max(mov(:,end-1));
-for i=0:photonnum-1
+for i=0:photonnum
      idx=find(mov(:,end-1)==i);
      plot3(mov(idx,2),mov(idx,3),mov(idx,4),'.-');
 end
