@@ -97,6 +97,8 @@ void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
 void mcx_printlog(Config *cfg, char *str);
 int  mcx_remap(char *opt);
+int  mcx_parsedebugopt(char *debugopt);
+
 #ifdef	__cplusplus
 }
 #endif

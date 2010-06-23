@@ -17,16 +17,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 #include "mcx_utils.h"
 
-char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
+const char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','p','e','U','R','l','L','I','o','\0'};
-char *fullopt[]={"--help","--interactive","--input","--photon",
+const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root",""};
+
+const char *debugflag="MCBWDIOXATRP";
 
 void mcx_savedata(float *dat,int len,Config *cfg){
      FILE *fp;
@@ -311,6 +314,19 @@ void mcx_loadvolume(char *filename,Config *cfg){
      }
 }
 
+int mcx_parsedebugopt(char *debugopt){
+    char *c=debugopt,*p;
+    int debuglevel=0;
+
+    while(*c){
+       p=strchr(debugflag, ((*c<='z' && *c>='a') ? *c-'a'+'A' : *c) );
+       if(p!=NULL)
+	  debuglevel |= (1 << (p-debugflag));
+       c++;
+    }
+    return debuglevel;
+}
+
 int mcx_readarg(int argc, char *argv[], int id, void *output,char *type){
      /*
          when a binary option is given without a following number (0~1), 
@@ -434,7 +450,10 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     	        i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
 		     	        break;
                      case 'D':
-                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");
+				if(i+1<argc && isalpha(argv[i+1][0]) )
+					cfg->debuglevel=mcx_parsedebugopt(argv[++i]);
+				else
+	                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");
                                 break;
 		}
 	    }
@@ -473,26 +492,29 @@ where possible parameters include (the first item in [] is the default value)\n\
  -i 	       (--interactive) interactive mode\n\
  -f config     (--input)       read config from a file\n\
  -n [0|int]    (--photon)      total photon number\n\
- -e [0.|float] (--minenergy)   minimum energy level to propagate a photon\n\
- -R [0.|float] (--skipradius)  minimum distance to source to start accumulation\n\
+ -b [1|0]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection\n\
+ -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normailze the fluence to unitary, 0 to save raw fluence\n\
  -d [1|0]      (--savedet)     1 to save photon info at detectors, 0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -s sessionid  (--session)     a string to identify this specific simulation (and output files)\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
- -D [0|int]    (--debug)       print debug information:\n\
-                               1   photon movement info\n\
-                               2   print ray-polygon testing details\n\
-                               4   print Bary centric coordinates\n\
-                               8   print photon weight changes\n\
-                              16   print distances\n\
-                              32   entering a triangle\n\
-                              64   exiting a triangle\n\
-                             128   hiting an edge\n\
-                             256   accumulating weights to the mesh\n\
-                             512   timing information\n\
-                            add the numbers together to print mulitple items\n\
+ -D [0|int]    (--debug)       print debug information (can use debug characters):\n\
+ -D [''|MCBWDIOXATRP]          1 M  photon movement info\n\
+                               2 C  print ray-polygon testing details\n\
+                               4 B  print Bary centric coordinates\n\
+                               8 W  print photon weight changes\n\
+                              16 D  print distances\n\
+                              32 I  entering a triangle\n\
+                              64 O  exiting a triangle\n\
+                             128 X  hiting an edge\n\
+                             256 A  accumulating weights to the mesh\n\
+                             512 T  timing information\n\
+                            1024 R  debugging reflection\n\
+                            2048 P  show progress bar\n\
+     add the numbers together to print mulitple items, or one can use a string\n\
+\n\
 example:\n\
-       %s -n 1000000 -f input.inp -s test\n",exename,exename);
+       %s -n 1000000 -f input.inp -s test -D XT -b 0\n",exename,exename);
 }
