@@ -119,6 +119,7 @@ void mcx_initcfg(Config *cfg){
      cfg->debuglevel=0;
      cfg->minstep=1.f;
      cfg->roulettesize=10.f;
+     cfg->nout=1.f;
 }
 
 void mcx_clearcfg(Config *cfg){
@@ -485,13 +486,13 @@ where possible parameters include (the first item in [] is the default value)\n\
                                2   print ray-polygon testing details\n\
                                4   print Bary centric coordinates\n\
                                8   print photon weight changes\n\
-                               16  print distances\n\
-                               32  entering a triangle\n\
-                               64  exiting a triangle\n\
-                               128 hiting an edge\n\
-                               256 accumulating weights to the mesh\n\
-                               512 timing information\n\
-                               add the numbers together to print mulitple items\n\
+                              16   print distances\n\
+                              32   entering a triangle\n\
+                              64   exiting a triangle\n\
+                             128   hiting an edge\n\
+                             256   accumulating weights to the mesh\n\
+                             512   timing information\n\
+                            add the numbers together to print mulitple items\n\
 example:\n\
        %s -n 1000000 -f input.inp -s test\n",exename,exename);
 }

@@ -73,6 +73,7 @@ typedef struct MCXConfig{
 	char isgpuinfo;     /*1 to print gpu info when attach, 0 do not print*/
 	float roulettesize; /*number of roulette for termination*/
         float minenergy;    /*minimum energy to propagate photon*/
+	float nout;         /*refractive index for the domain outside the mesh*/
         FILE *flog;         /*stream handle to print log information*/
         char rootpath[MAX_PATH_LENGTH];
         unsigned int debuglevel;

@@ -207,7 +207,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	while(1){  /*propagate a photon until exit*/
 	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 	    if(pout.x==QLIMIT){
-	    	  if(faceid==-2) break; /*reaches time gate*/
+	    	  if(faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
 			continue;
@@ -224,10 +224,12 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    eid=enb[faceid];
 
 		    if(cfg->isreflect && (eid==0 || mesh->med[mesh->type[eid-1]-1].n != mesh->med[mesh->type[oldeid-1]-1].n )){
-			weight*=reflectray(cfg,&c0,plucker,&oldeid,&eid,faceid,ran);
+			if(! (eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ))
+			    weight*=reflectray(cfg,&c0,plucker,&oldeid,&eid,faceid,ran);
 		    }
 
 	    	    if(!cfg->isreflect && eid==0) break;
+		    if(eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ) break;
 	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
@@ -274,7 +276,7 @@ inline float mmc_rsqrtf(float a){
 float reflectray(Config *cfg,float3 *c0,tetplucker *plucker,int *oldeid,int *eid,int faceid,RandType *ran){
 	/*to handle refractive index mismatch*/
         float3 pnorm;
-	float Icos,Tcos,Tsin,Rtotal,tmp0,tmp1,tmp2,n1,n2;
+	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
 
 	/*calculate the normal direction of the intersecting triangle*/
         vec_cross(plucker->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][0],
@@ -289,29 +291,28 @@ float reflectray(Config *cfg,float3 *c0,tetplucker *plucker,int *oldeid,int *eid
         Icos=fabs(vec_dot(c0,&pnorm));
 
 	n1=plucker->mesh->med[plucker->mesh->type[*oldeid-1]-1].n;
-	n2=(*eid>0) ? plucker->mesh->med[plucker->mesh->type[*eid-1]-1].n : 1.f;
+	n2=(*eid>0) ? plucker->mesh->med[plucker->mesh->type[*eid-1]-1].n : cfg->nout;
 
 	tmp0=n1*n1;
 	tmp1=n2*n2;
         tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
         if(tmp2>0.f){ /*if no total internal reflection*/
-          Tcos=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
+          Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
 	  tmp2=sqrt(tmp2); /*to save one sqrt*/
-          Tsin=2.f*n1*n2*Icos*tmp2;
-          Rtotal=(Tcos-Tsin)/(Tcos+Tsin);     /*Rp*/
-          Tcos=tmp1*Icos*Icos+tmp0*tmp2*tmp2;    
-          Rtotal=(Rtotal+(Tcos-Tsin)/(Tcos+Tsin))*0.5f; /*(Rp+Rs)/2*/
+          Im=2.f*n1*n2*Icos*tmp2;
+          Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
+          Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
+          Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  if(*eid==0 || rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
               vec_mult_add(&pnorm,c0,2.f*Icos,1.f,c0);
-	      *eid=*oldeid;
               if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
-	      return Rtotal;
+	      return (*eid==0 ? *eid=*oldeid, Rtotal : 1.f); /*if reflect at boundary, use ref coeff, otherwise, use probability*/
           }else{                              /*do transmission*/
               vec_mult_add(&pnorm,c0, Icos,1.f,c0);
               vec_mult_add(&pnorm,c0,-tmp2,n1/n2,c0);
               if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
-              return 1.f-Rtotal;
+              return 1.f;
 	  }
        }else{ /*total internal reflection*/
           vec_mult_add(&pnorm,c0,2.f*Icos,1.f,c0);
