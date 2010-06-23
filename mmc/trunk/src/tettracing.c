@@ -72,14 +72,14 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	}
 	if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%d \n",eid);
 
-	pin.x=QLIMIT;
-	pout->x=QLIMIT;
+	pin.x=MMC_UNDEFINED;
+	pout->x=MMC_UNDEFINED;
 	for(i=0;i<4;i++){
 	    if(w[fc[i][0]]||w[fc[i][1]]||w[fc[i][2]]){
 		if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"testing face [%d]\n",i);
 
 	        if(i>=2) w[fc[i][1]]=-w[fc[i][1]]; // can not go back
-		if(pin.x==QLIMIT&&w[fc[i][0]]>=0.f && w[fc[i][1]]>=0.f && w[fc[i][2]]<=0.f){
+		if(pin.x==MMC_UNDEFINED&&w[fc[i][0]]>=0.f && w[fc[i][1]]>=0.f && w[fc[i][2]]<=0.f){
 			// f_enter
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"ray enters face %d[%d] of %d\n",i,faceorder[i],eid);
 
@@ -94,9 +94,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 				plucker->mesh->node+ee[nc[i][2]]-1,&pin);
 
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"entrance point %f %f %f\n",pin.x,pin.y,pin.z);
-                        if(pout->x!=QLIMIT) break;
+                        if(pout->x!=MMC_UNDEFINED) break;
 
-		}else if(pout->x==QLIMIT&&w[fc[i][0]]<=0.f && w[fc[i][1]]<=0.f && w[fc[i][2]]>=0.f){
+		}else if(pout->x==MMC_UNDEFINED&&w[fc[i][0]]<=0.f && w[fc[i][1]]<=0.f && w[fc[i][2]]>=0.f){
 			// f_leave
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
 
@@ -113,18 +113,18 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"exit point %f %f %f\n",pout->x,pout->y,pout->z);
 
 			Lp0=dist(p0,pout);
-			dlen=slen/prop->mus;
+			dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 			*faceid=faceorder[i];
 			*isend=(Lp0>dlen);
 			Lmove=((*isend) ? dlen : Lp0);
-			if(pin.x!=QLIMIT) break;
+			if(pin.x!=MMC_UNDEFINED) break;
 		}
 	    }
 	}
-        if(pin.x!=QLIMIT && pout->x!=QLIMIT){
+        if(pin.x!=MMC_UNDEFINED && pout->x!=MMC_UNDEFINED){
 		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
-	           pout->x=QLIMIT;
+	           pout->x=MMC_UNDEFINED;
 		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
 		*weight*=expf(-prop->mua*Lmove);
@@ -206,7 +206,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 
 	while(1){  /*propagate a photon until exit*/
 	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
-	    if(pout.x==QLIMIT){
+	    if(pout.x==MMC_UNDEFINED){
 	    	  if(faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
@@ -230,23 +230,23 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 
 	    	    if(!cfg->isreflect && eid==0) break;
 		    if(eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ) break;
-	    	    if(pout.x!=QLIMIT && (cfg->debuglevel&dlMove))
+	    	    if(pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
 	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
-		    while(pout.x==QLIMIT && fixcount++<MAX_TRIAL){
+		    while(pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
                         slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    }
-        	    if(pout.x==QLIMIT){
+        	    if(pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
 			eid=-eid;
         		break;
         	    }
 	    }
-	    if(eid<=0 || pout.x==QLIMIT) {
+	    if(eid<=0 || pout.x==MMC_UNDEFINED) {
         	    if(eid==0 && (cfg->debuglevel&dlMove))
         		 fprintf(cfg->flog,"B %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
 		    else if(faceid==-2 && (cfg->debuglevel&dlMove))

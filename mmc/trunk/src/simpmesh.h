@@ -11,13 +11,13 @@
   #include "posix_randr.h"
 #endif
 
-#define QLIMIT (3.40282347e+38F)
-#define R_RAND_MAX  (1.f/RAND_MAX)
-#define TWO_PI  (M_PI*2.0)
-#define EPS  1e-9f
+#define MMC_UNDEFINED (3.40282347e+38F)
+#define R_RAND_MAX (1.f/RAND_MAX)
+#define TWO_PI     (M_PI*2.0)
+#define EPS        1e-9f
 #define LOG_MT_MAX 22.1807097779182f
-#define R_MIN_MUS 1000.f
-#define R_C0               3.335640951981520e-12f  //1/C0 in s/mm
+#define R_MIN_MUS  1e9f
+#define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 
 typedef struct MMCMedium{
 	float mua,mus,g,n;
