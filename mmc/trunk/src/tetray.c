@@ -21,7 +21,7 @@ int main(int argc, char**argv){
 	tetplucker plucker;
 	float rtstep,Eabsorb=0.f;
 	RandType ran0[RAND_BUF_LEN],ran1[RAND_BUF_LEN];
-	int i,threadid=0;
+	int i,threadid=0,ncomplete=0;
 	unsigned int t0;
 
 	t0=StartTimer();
@@ -62,8 +62,16 @@ int main(int argc, char**argv){
 #pragma omp for reduction(+:Eabsorb)
 	for(i=0;i<cfg.nphoton;i++){
 		Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1);
+		#pragma omp atomic
+		   ncomplete++;
+
+		if((cfg.debuglevel & dlProgress) && threadid==0)
+			mcx_progressbar(ncomplete,cfg.nphoton,&cfg);
 	}
 }
+	if((cfg.debuglevel & dlProgress))
+		mcx_progressbar(cfg.nphoton,cfg.nphoton,&cfg);
+	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
 	plucker_clear(&plucker);

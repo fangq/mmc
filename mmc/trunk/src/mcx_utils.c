@@ -18,6 +18,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <sys/ioctl.h>
 #include "mcx_utils.h"
 
 const char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
@@ -327,6 +328,23 @@ int mcx_parsedebugopt(char *debugopt){
     return debuglevel;
 }
 
+void mcx_progressbar(int n, int ntotal, Config *cfg){
+    struct winsize ttys;
+    int percentage, j;
+
+    ioctl(0, TIOCGWINSZ, &ttys);
+    percentage=n*(ttys.ws_col-18)/ntotal;
+    if(percentage != (n-1)*(ttys.ws_col-18)/ntotal){
+    	for(j=0;j<ttys.ws_col;j++)     fprintf(stdout,"\b");
+    	fprintf(stdout,"Progress: [");
+    	for(j=0;j<percentage;j++)      fprintf(stdout,"=");
+    	fprintf(stdout,(percentage<ttys.ws_col-18) ? ">" : "=");
+    	for(j=percentage;j<ttys.ws_col-18;j++) fprintf(stdout," ");
+    	fprintf(stdout,"] %3d%%",percentage*100/(ttys.ws_col-18));
+	fflush(stdout);
+    }
+}
+
 int mcx_readarg(int argc, char *argv[], int id, void *output,char *type){
      /*
          when a binary option is given without a following number (0~1), 
@@ -500,7 +518,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -s sessionid  (--session)     a string to identify this specific simulation (and output files)\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
- -D [0|int]    (--debug)       print debug information (can use debug characters):\n\
+ -D [0|int]    (--debug)       print debug information (you can use an integer or\n\
+  or                           a string by combining the following debugging flags)\n\
  -D [''|MCBWDIOXATRP]          1 M  photon movement info\n\
                                2 C  print ray-polygon testing details\n\
                                4 B  print Bary centric coordinates\n\
@@ -513,8 +532,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                              512 T  timing information\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
-     add the numbers together to print mulitple items, or one can use a string\n\
-\n\
+       add the numbers together to print mulitple items, or one can use a string\n\
 example:\n\
-       %s -n 1000000 -f input.inp -s test -D XT -b 0\n",exename,exename);
+       %s -n 1000000 -f input.inp -s test -D TP -b 0\n",exename,exename);
 }
