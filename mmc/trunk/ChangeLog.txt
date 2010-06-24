@@ -1,7 +1,12 @@
 Change Log
 
-== MMC 0.2 (Cheesecake) development branch, FangQ <fangq nmr mgh harvard edu> ==
+== MMC 0.2 (Cheesecake) development branch, FangQ <fangq@nmr.mgh.harvard.edu> ==
 
+2010/06/23 used meaningful strings as debug flags, added "P" flag for progress bar
+2010/06/23 made it possible to model transparent medium
+2010/06/21 Russian Roulette to terminate photon
+2010/06/20 added boundary reflection at internal or external surfaces
+2010/06/07 paper submitted, wait ... wait ... wait ...
 2010/06/04 finished paper, added timing unit from mcxcl project, added MMCDEBUG macro
 2010/06/03 generated complex mesh from a brain atlas, run simulation and make figures
 2010/05/30 announced sphere-diffusion toolbox, tested for Windows, compatible with Octave
