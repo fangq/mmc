@@ -120,7 +120,7 @@ void mcx_initcfg(Config *cfg){
      cfg->flog=stdout;
      cfg->sradius=0.f;
      cfg->rootpath[0]='\0';
-     cfg->debuglevel=0;
+     cfg->debuglevel=2560; /*TP: show time, show progress*/
      cfg->minstep=1.f;
      cfg->roulettesize=10.f;
      cfg->nout=1.f;
