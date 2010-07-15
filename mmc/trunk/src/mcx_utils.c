@@ -27,13 +27,13 @@
 #include "mcx_utils.h"
 
 const char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
-                 'd','r','S','p','e','U','R','l','L','I','o','\0'};
+                 'd','r','S','p','e','U','R','l','L','I','o','u','\0'};
 const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
-                 "--printgpu","--root",""};
+                 "--printgpu","--root","--unitinmm",""};
 
 const char *debugflag="MCBWDIOXATRP";
 
@@ -70,6 +70,7 @@ void mcx_initcfg(Config *cfg){
      cfg->minstep=1.f;
      cfg->roulettesize=10.f;
      cfg->nout=1.f;
+     cfg->unitinmm=1.f;
 }
 
 void mcx_clearcfg(Config *cfg){
@@ -460,6 +461,9 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
                      case 'R':
                                 i=mcx_readarg(argc,argv,i,&(cfg->sradius),"float");
                                 break;
+                     case 'u':
+                                i=mcx_readarg(argc,argv,i,&(cfg->unitinmm),"float");
+                                break;
                      case 'l':
                                 issavelog=1;
                                 break;
@@ -517,6 +521,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -n [0|int]    (--photon)      total photon number\n\
  -b [1|0]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
+ -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -U [1|0]      (--normalize)   1 to normailze the fluence to unitary, 0 to save raw fluence\n\
  -d [1|0]      (--savedet)     1 to save photon info at detectors, 0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\

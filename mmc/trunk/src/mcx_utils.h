@@ -97,6 +97,7 @@ typedef struct MCXConfig{
         FILE *flog;         /*stream handle to print log information*/
         char rootpath[MAX_PATH_LENGTH];
         unsigned int debuglevel;
+	float unitinmm;     /*define the length unit in mm*/
 } Config;
 
 #ifdef	__cplusplus
