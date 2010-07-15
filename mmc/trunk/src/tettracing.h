@@ -1,5 +1,24 @@
-#ifndef MCX_FEM_TRACING_H
-#define MCX_FEM_TRACING_H
+/*******************************************************************************
+**  Mesh-based Monte Carlo (MMC)
+**
+**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**
+**  Reference:
+**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates," Biomed. Opt. Express, (in press)
+**
+**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
+**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
+**          Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**
+**  tettracing.c: core unit for Plücker-coordinate-based ray-tracing
+**
+**  License: GPL v3, see LICENSE.txt for details
+**
+*******************************************************************************/
+
+#ifndef _MMC_RAY_TRACING_H
+#define _MMC_RAY_TRACING_H
 
 #include "simpmesh.h"
 #include "mcx_utils.h"

@@ -1,3 +1,22 @@
+/*******************************************************************************
+**  Mesh-based Monte Carlo (MMC)
+**
+**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**
+**  Reference:
+**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates," Biomed. Opt. Express, (in press)
+**
+**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
+**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
+**          Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**
+**  simpmesh.c: basic vector math and mesh operations
+**
+**  License: GPL v3, see LICENSE.txt for details
+**
+*******************************************************************************/
+
 #include <stdlib.h>
 #include "simpmesh.h"
 

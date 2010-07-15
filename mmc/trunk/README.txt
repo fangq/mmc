@@ -4,7 +4,7 @@
 ===============================================================================
 
 Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
-License: unpublished version
+License: GNU General Public License version 3 (GPL v3), see License.txt
 Version: 0.2 (Cheesecake)
 
 -------------------------------------------------------------------------------

@@ -4,12 +4,17 @@
 **  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
 **  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 **
-**  Reference (Fang2009):
-**        Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**        Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**        Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**  Reference:
+**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates," Biomed. Opt. Express, (in press)
+**
+**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
+**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
+**          Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
 **
 **  mcx_utils.c: configuration and command line option processing unit
+**
+**  License: GPL v3, see LICENSE.txt for details
 **
 *******************************************************************************/
 
@@ -31,6 +36,53 @@ const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--printgpu","--root",""};
 
 const char *debugflag="MCBWDIOXATRP";
+
+void mcx_initcfg(Config *cfg){
+     cfg->medianum=0;
+     cfg->detnum=0;
+     cfg->dim.x=0;
+     cfg->dim.y=0;
+     cfg->dim.z=0;
+     cfg->nblocksize=128;
+     cfg->nphoton=0;
+     cfg->nthread=0;
+     cfg->seed=0;
+     cfg->isrowmajor=1; /* default is C array*/
+     cfg->maxgate=1;
+     cfg->isreflect=1;
+     cfg->isref3=0;
+     cfg->isnormalized=1;
+     cfg->issavedet=1;
+     cfg->respin=1;
+     cfg->issave2pt=1;
+     cfg->isgpuinfo=0;
+
+     cfg->prop=NULL;
+     cfg->detpos=NULL;
+     cfg->vol=NULL;
+     cfg->session[0]='\0';
+     cfg->printnum=0;
+     cfg->minenergy=1e-6f;
+     cfg->flog=stdout;
+     cfg->sradius=0.f;
+     cfg->rootpath[0]='\0';
+     cfg->debuglevel=0;
+     cfg->minstep=1.f;
+     cfg->roulettesize=10.f;
+     cfg->nout=1.f;
+}
+
+void mcx_clearcfg(Config *cfg){
+     if(cfg->medianum)
+     	free(cfg->prop);
+     if(cfg->detnum)
+     	free(cfg->detpos);
+     if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
+        free(cfg->vol);
+     if(cfg->flog)
+        fclose(cfg->flog);
+     mcx_initcfg(cfg);
+}
 
 void mcx_savedata(float *dat,int len,Config *cfg){
      FILE *fp;
@@ -89,53 +141,6 @@ void mcx_writeconfig(char *fname, Config *cfg){
 	mcx_saveconfig(fp,cfg);     
 	fclose(fp);
      }
-}
-
-void mcx_initcfg(Config *cfg){
-     cfg->medianum=0;
-     cfg->detnum=0;
-     cfg->dim.x=0;
-     cfg->dim.y=0;
-     cfg->dim.z=0;
-     cfg->nblocksize=128;
-     cfg->nphoton=0;
-     cfg->nthread=0;
-     cfg->seed=0;
-     cfg->isrowmajor=1; /* default is C array*/
-     cfg->maxgate=1;
-     cfg->isreflect=1;
-     cfg->isref3=0;
-     cfg->isnormalized=1;
-     cfg->issavedet=1;
-     cfg->respin=1;
-     cfg->issave2pt=1;
-     cfg->isgpuinfo=0;
-
-     cfg->prop=NULL;
-     cfg->detpos=NULL;
-     cfg->vol=NULL;
-     cfg->session[0]='\0';
-     cfg->printnum=0;
-     cfg->minenergy=1e-6f;
-     cfg->flog=stdout;
-     cfg->sradius=0.f;
-     cfg->rootpath[0]='\0';
-     cfg->debuglevel=2560; /*TP: show time, show progress*/
-     cfg->minstep=1.f;
-     cfg->roulettesize=10.f;
-     cfg->nout=1.f;
-}
-
-void mcx_clearcfg(Config *cfg){
-     if(cfg->medianum)
-     	free(cfg->prop);
-     if(cfg->detnum)
-     	free(cfg->detpos);
-     if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
-        free(cfg->vol);
-     if(cfg->flog)
-        fclose(cfg->flog);
-     mcx_initcfg(cfg);
 }
 
 void mcx_loadconfig(FILE *in, Config *cfg){

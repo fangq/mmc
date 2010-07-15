@@ -1,5 +1,25 @@
-#ifndef _MCEXTREME_UTILITIES_H
-#define _MCEXTREME_UTILITIES_H
+/*******************************************************************************
+**  Mesh-based Monte Carlo (MMC) -- this unit was ported from MCX
+**
+**  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
+**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**
+**  Reference:
+**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates," Biomed. Opt. Express, (in press)
+**
+**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
+**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
+**          Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**
+**  mcx_utils.h: configuration and command line option processing unit
+**
+**  License: GPL v3, see LICENSE.txt for details
+**
+*******************************************************************************/
+
+#ifndef _MMC_UTILITIES_H
+#define _MMC_UTILITIES_H
 
 #include <stdio.h>
 #include <vector_types.h>
