@@ -335,19 +335,24 @@ int mcx_parsedebugopt(char *debugopt){
 }
 
 void mcx_progressbar(int n, int ntotal, Config *cfg){
-    struct winsize ttys;
-    int percentage, j;
+    int percentage, j,colwidth=80;
 
+#ifdef TIOCGWINSZ 
+    struct winsize ttys;
     ioctl(0, TIOCGWINSZ, &ttys);
-    percentage=n*(ttys.ws_col-18)/ntotal;
-    if(percentage != (n-1)*(ttys.ws_col-18)/ntotal){
-    	for(j=0;j<ttys.ws_col;j++)     fprintf(stdout,"\b");
+    colwidth=ttys.ws_col;
+#endif
+    
+    percentage=n*(colwidth-18)/ntotal;
+
+    if(percentage != (n-1)*(colwidth-18)/ntotal){
+    	for(j=0;j<colwidth;j++)     fprintf(stdout,"\b");
     	fprintf(stdout,"Progress: [");
     	for(j=0;j<percentage;j++)      fprintf(stdout,"=");
-    	fprintf(stdout,(percentage<ttys.ws_col-18) ? ">" : "=");
-    	for(j=percentage;j<ttys.ws_col-18;j++) fprintf(stdout," ");
-    	fprintf(stdout,"] %3d%%",percentage*100/(ttys.ws_col-18));
-	fflush(stdout);
+    	fprintf(stdout,(percentage<colwidth-18) ? ">" : "=");
+    	for(j=percentage;j<colwidth-18;j++) fprintf(stdout," ");
+    	fprintf(stdout,"] %3d%%",percentage*100/(colwidth-18));
+	    fflush(stdout);
     }
 }
 
