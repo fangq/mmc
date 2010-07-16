@@ -5,9 +5,9 @@ elem=readmmcelem('elem_onecube.dat');
 load ad.txt
 load mov.txt
 
+figure;
 hh=tetramesh(elem,node);
 set(hh,'facealpha',0.1)
-figure;
 hold on
 photonnum=max(mov(:,end-1));
 for i=0:photonnum

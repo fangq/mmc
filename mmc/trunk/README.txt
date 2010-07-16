@@ -30,7 +30,7 @@ as in FE. MMC implements a precise ray-tracing process to propagate a photon
 using a Plucker coordinate formula. Both the media and the fluence can
 be represented by piece-wise-linear basis functions, thus, providing 
 additional accuracy. This implementation also supports multi-threaded 
-parallel computing and can give a nearly propotional acceleration when
+parallel computing and can give a nearly proportional acceleration when
 running on multi-core processors.
 
 MMC uses FE meshes to represent complex domains. To generate
@@ -46,6 +46,11 @@ this code to CUDA and OpenCL. This is expected to produce a hundreds
 or even thousands fold of acceleration in speed as we had observed
 with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, or 
 MCX [2]), developed by the same author.
+
+The details of MMC are reported in the following paper:
+
+*Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing \
+in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
 
 -------------------------------------------------------------------------------
 
@@ -86,7 +91,7 @@ folder. Other make options include
 
   make omp  # this compiles an OpenMP multi-threaded binary
   make prof # this makes a binary to produce profiling info for gprof
-  make sse  # this uses SSE4 optimized subroutines for vector oprations
+  make sse  # this uses SSE4 optimized subroutines for vector operations
   make      # this produces an non-optimized binary with debugging symbols
 
 If you append "-f makefile_log" at the end of any of the above 
@@ -114,9 +119,44 @@ matlab/octave mesh generator, iso2mesh [1], developed by the same
 author. In the mmc/matlab folder, we also provide additional 
 functions to generate regular grid-shaped mesh.
 
+The full command line options of MMC include the following:
+<pre>
+usage: mmc <param1> <param2> ...
+where possible parameters include (the first item in [] is the default value)
+ -i 	       (--interactive) interactive mode
+ -f config     (--input)       read config from a file
+ -n [0|int]    (--photon)      total photon number
+ -b [0|1]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection
+ -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
+ -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
+ -U [1|0]      (--normalize)   1 to normailze the fluence to unitary, 0 to save raw fluence
+ -d [1|0]      (--savedet)     1 to save photon info at detectors, 0 not to save
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
+ -s sessionid  (--session)     a string to identify this specific simulation (and output files)
+ -h            (--help)        print this message
+ -l            (--log)         print messages to a log file instead
+ -D [0|int]    (--debug)       print debug information (you can use an integer or
+  or                           a string by combining the following debugging flags)
+ -D [''|MCBWDIOXATRP]          1 M  photon movement info
+                               2 C  print ray-polygon testing details
+                               4 B  print Bary centric coordinates
+                               8 W  print photon weight changes
+                              16 D  print distances
+                              32 I  entering a triangle
+                              64 O  exiting a triangle
+                             128 X  hiting an edge
+                             256 A  accumulating weights to the mesh
+                             512 T  timing information
+                            1024 R  debugging reflection
+                            2048 P  show progress bar
+       add the numbers together to print mulitple items, or one can use a string
+example:
+       mmc -n 1000000 -f input.inp -s test -D TP -b 0
+</pre>
+
 The simplest example can be found under the "example/onecube" 
 folder. Please run "createmesh" first from matlab/octave to 
-create all the mesh files, these include
+create all the mesh files, which include
 
   elem_onecube.dat    -- tetrahedral element file
   facenb_onecube.dat  -- element neighbors of each face
@@ -125,7 +165,7 @@ create all the mesh files, these include
   velem_onecube.dat   -- volume of each element
 
 The input file of the example is onecube.inp, where we
-specify all the simulation parameters. The mesh files are 
+specify most of the simulation parameters. The mesh files are 
 linked through the volume string (specifying the name stub).
 To run the simulation, you should run run_test.sh bash
 script. If you want to run mmc directly from the command

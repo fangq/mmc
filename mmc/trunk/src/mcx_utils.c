@@ -6,11 +6,11 @@
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, (in press)
+**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
 **
 **  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
 **  mcx_utils.c: configuration and command line option processing unit
 **
@@ -49,7 +49,7 @@ void mcx_initcfg(Config *cfg){
      cfg->seed=0;
      cfg->isrowmajor=1; /* default is C array*/
      cfg->maxgate=1;
-     cfg->isreflect=1;
+     cfg->isreflect=0;
      cfg->isref3=0;
      cfg->isnormalized=1;
      cfg->issavedet=1;
@@ -519,7 +519,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -i 	       (--interactive) interactive mode\n\
  -f config     (--input)       read config from a file\n\
  -n [0|int]    (--photon)      total photon number\n\
- -b [1|0]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection\n\
+ -b [0|1]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -U [1|0]      (--normalize)   1 to normailze the fluence to unitary, 0 to save raw fluence\n\

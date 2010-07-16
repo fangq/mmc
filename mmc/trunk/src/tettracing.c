@@ -5,11 +5,11 @@
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, (in press)
+**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
 **
 **  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
 **  tettracing.c: core unit for Plücker-coordinate-based ray-tracing
 **
@@ -41,8 +41,8 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
 }
 /*
-  when a photon is crossing a vertex or edge, pull the photon
-  to the center of the element (slightly) and try again
+  when a photon is crossing a vertex or edge, (slightly) pull the
+  photon toward the center of the element and try again
 */
 void fixphoton(float3 *p,float3 *nodes, int *ee){
         float3 c0={0.f,0.f,0.f};
@@ -84,7 +84,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	rc=prop->n*R_C0;
         currweight=*weight;
 
-#pragma unroll(6)
+//#pragma unroll(6)
 	for(i=0;i<6;i++){
 		w[i]=pinner(pvec,&pcrx,plucker->d+(eid-1)*6+i,plucker->m+(eid-1)*6+i);
 		/*if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%f ",w[i]);*/
@@ -161,7 +161,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                 if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"D %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
                       dist(&pin,p0),Lp0,Lio,dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
-#ifdef MINSTEP_ADDITION
+#ifdef MAXSTEP_ADDITION
 		if(Lio>EPS){
 		    Lio=1.f/Lio;
 		    for(dlen=0;dlen<Lmove;dlen+=cfg->minstep){
@@ -196,7 +196,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
                            p0->x-(Lmove*0.5f)*pvec->x,p0->y-(Lmove*0.5f)*pvec->y,p0->z-(Lmove*0.5f)*pvec->z,ww,eid,dlen);
 
-#pragma unroll(4)
+//#pragma unroll(4)
                 	for(i=0;i<4;i++)
                      		plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 		}
@@ -275,9 +275,10 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    break;  /*photon exits boundary*/
 	    }
 	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %d %f\n",p0.x,p0.y,p0.z,eid,id,slen);
-	    if(cfg->minenergy>0.f && weight < cfg->minenergy){ /*Russian Roulette*/
+	    if(cfg->minenergy>0.f && weight < cfg->minenergy && (cfg->tend-cfg->tstart)*rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f)
 			weight*=cfg->roulettesize;
+                        if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"Russian Roulette bumps weight to %f\n",weight);
 		else
 			break;
 	    }
