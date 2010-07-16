@@ -165,13 +165,31 @@ create all the mesh files, which include
   velem_onecube.dat   -- volume of each element
 
 The input file of the example is onecube.inp, where we
-specify most of the simulation parameters. The mesh files are 
-linked through the volume string (specifying the name stub).
+specify most of the simulation parameters. The input file reads
+
+ 100                  # total photon number
+ 17182818             # RNG seed, negative to generate
+ 2 8 0.0              # source position (mm)
+ 0. 0. 1.             # initial incident vector
+ 0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
+ onecube              # mesh id: name stub to all mesh files
+ 1 3 10 50            # no longer used
+ 1 60 10 50           #
+ 1 60 1  20           #
+ 1                    #  num of media (not used)
+ 1.010101 0.01 0.005 1.0  # scat(1/mm), g, mua (1/mm), n
+ 4       1            # detector number and radius (mm) (not used)
+ 30.0    20.0    1.0  # detector 1 position (mm)
+ 30.0    40.0    1.0  # ...
+ 20.0    30.0    1.0
+ 40.0    30.0    1.0
+
+The mesh files are linked through the mesh id (specifying the name stub).
 To run the simulation, you should run run_test.sh bash
 script. If you want to run mmc directly from the command
 line, you can do so by typing
 
-../../src/bin/mmc -n 20 -f onecube.inp -s onecube 
+ ../../src/bin/mmc -n 20 -f onecube.inp -s onecube 
 
 where -n specifies the total photon number to be simulated,
 -f specifies the input file and -s gives the output file name.
