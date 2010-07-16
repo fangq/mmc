@@ -7,7 +7,7 @@ in a homogeneous cubic background. This simulation generates the results
 shown in Fig. 3 in the paper.
 
 The cubic domain has a dimension of 60x60x60 mm with optical properties
-mua=0.001, mus=1, n=1.37 and g=0.01. A sphere is centered at [30 30 30]mm
+mua=0.002, mus=1, n=1.37 and g=0.01. A sphere is centered at [30 30 30]mm
 with a radius of 10mm. The optical properties of the sphere is 
 mua=0.05, mus=5, n=1.37 and g=0.9. The analytical solution, approximated
 by a sphere inside a infinite slab, can be computed by the

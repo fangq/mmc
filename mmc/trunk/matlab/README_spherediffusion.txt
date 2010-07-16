@@ -2,8 +2,7 @@
 
 The "Sphere-Diffusion" toolbox solves for the analytical solutions for the diffusion 
 inside and outside a sphere. This toolbox is part of an open-source software, MMC, 
-wrote by Qianqian Fang. New updates will be available when a new release of MMC is 
-announced (coming soon).
+developed by Qianqian Fang.
 
 The solutions are defined in the 3D space on a user specified grid; the sphere can 
 have different absorption/scattering/refractive index to the background media. This 
@@ -101,3 +100,8 @@ sphdiffscatter.m	Sphere exterior scattered field
 6. Acknowledgement
 Qianqian Fang would like to thank David Boas for the helpful 
 discussions on the semi-infinite solutions. 
+
+7. Reference
+
+* Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing \
+in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010) 
