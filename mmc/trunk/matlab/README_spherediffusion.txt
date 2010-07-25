@@ -1,8 +1,11 @@
 = Matlab Toolbox for the Analytical Diffusion/Helmholtz Solutions of a Sphere =
 
+* Version 1.0 (Release date: 07/25/2010)
+
 The "Sphere-Diffusion" toolbox solves for the analytical solutions for the diffusion 
 inside and outside a sphere. This toolbox is part of an open-source software, MMC, 
-developed by Qianqian Fang.
+developed by Qianqian Fang. The license of the toolbox is GNU General Public License
+version 3. Please see LICENSE.txt for details.
 
 The solutions are defined in the 3D space on a user specified grid; the sphere can 
 have different absorption/scattering/refractive index to the background media. This 
@@ -22,7 +25,15 @@ The toolbox is compatible with GNU Octave.
     6. Acknowledgement
 
 1. Download
-Coming soon
+
+Please browse the online page of this toolbox to proceed with downloading.
+
+ http://mcx.sourceforge.net/cgi-bin/index.cgi?SphereDiffusion
+
+The author of the toolbox is appreciated if you can cite the reference
+[Fang2010] listed at the end of this document if you choose to use
+this toolbox in your publication.
+
 
 2. Core functions
 

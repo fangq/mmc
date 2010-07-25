@@ -1,4 +1,27 @@
 function Y=spharmonic(l,m,theta,phi)
+%
+% Y=spharmonic(l,m,theta,phi)
+%
+% spherical harmonic function Y_{m,l}(theta,phi)
+%
+% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+%
+% input:
+%     m: angular index
+%     l: order
+%     theta,phi: spherical angular coordinates, can be vectors
+%
+% output:
+%     Y:  the values for Y_{m,l}(theta,phi)
+%
+% example:
+%     Y=spharmonic(l,m,theta,phi)
+%
+% this file is part of Mesh-based Monte Carlo (MMC)
+%
+% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+%
+
 coeff=1;
 oldm=m;
 if(m<0)

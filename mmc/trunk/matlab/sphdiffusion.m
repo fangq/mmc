@@ -1,4 +1,37 @@
 function [res,xi,yi,zi]=sphdiffusion(xrange,yrange,zrange,cfg)
+%
+% [res,xi,yi,zi]=sphdiffusion(xrange,yrange,zrange,cfg)
+%
+% diffusion solution for a sphere inside the infinite homogeneous medium 
+%
+% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+%
+% input:
+%     xrange,yrange,zrange: a vector from where a grid will be created
+%       		    and the phi values will be calculated
+%     cfg: the problem domain setup: 
+%          cfg.v: speed of light in vacuum (mm/s)
+%          cfg.a: sphere radius (mm)
+%          cfg.omua: background (outside) mua (1/mm)
+%          cfg.omusp: background (outside) mus' (1/mm)
+%          cfg.imua: sphere (inside) mua (1/mm)
+%          cfg.imusp: sphere (inside) mus' (1/mm)
+%          cfg.src: spherical source position (R,theta,phi) R in mm
+%          cfg.maxl: maximum serial expansion terms
+%          cfg.omega: DPDW modulation frequency
+%
+% output:
+%     res:  the output fluence for both interior and exterior regions
+%
+% example:
+%   [phi_ana,xa,ya,za]=sphdiffusion(-30:0.8:30,0,-30:0.8:30);
+%   contourf(xa,za,log10(abs(phi_ana)),40)
+%
+% this file is part of Mesh-based Monte Carlo (MMC)
+%
+% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+%
+
 
 if(nargin<4)
 	cfg.v=299792458000;

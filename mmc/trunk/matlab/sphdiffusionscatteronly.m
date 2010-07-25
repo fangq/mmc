@@ -1,4 +1,36 @@
 function [res,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange,cfg)
+%
+% [res,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange,cfg)
+%
+% analytical solution to the diffusion model (scattered field only)
+%
+% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+%
+% input:
+%     xrange,yrange,zrange: a vector from where a grid will be created
+%       		    and the phi values will be calculated
+%     cfg: the problem domain setup: 
+%          cfg.v: speed of light in vacuum (mm/s)
+%          cfg.a: sphere radius (mm)
+%          cfg.omua: background (outside) mua (1/mm)
+%          cfg.omusp: background (outside) mus' (1/mm)
+%          cfg.imua: sphere (inside) mua (1/mm)
+%          cfg.imusp: sphere (inside) mus' (1/mm)
+%          cfg.src: spherical source position (R,theta,phi) R in mm
+%          cfg.maxl: maximum serial expansion terms
+%          cfg.omega: DPDW modulation frequency
+%
+% output:
+%     res:  the output fluence for both exterior region
+%
+% example:
+%   [phi_ana,xa,ya,za]=sphdiffusionscatteronly(-30:0.8:30,0,-30:0.8:30);
+%   contourf(xa,za,log10(abs(phi_ana)),40)
+%
+% this file is part of Mesh-based Monte Carlo (MMC)
+%
+% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+%
 
 if(nargin<4)
 	cfg.v=299792458000;

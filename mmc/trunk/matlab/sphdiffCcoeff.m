@@ -1,4 +1,27 @@
 function C=sphdiffCcoeff(m,l,cfg)
+%
+% C=sphdiffCcoeff(m,l,cfg)
+%
+% sphere diffusion interior solution C coefficients
+%
+% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+%
+% input:
+%     m: angular index
+%     l: order
+%     cfg: the problem domain setup, see sphdiffusioninfinite.m
+%
+% output:
+%     res:  the coefficient at the specified order
+%
+% example:
+%     C=sphdiffCcoeff(0,1,cfg)
+%
+% this file is part of Mesh-based Monte Carlo (MMC)
+%
+% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+%
+
 if((cfg.src(2)==pi | cfg.src(2)==0) & m~=0)
     C=0;
     return;

@@ -1,27 +1,38 @@
 function [res,xi,yi,zi] = sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
-%  [res,xi,yi,zi]= sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %
-%  sphere in semi-infinite medium 1-order analytical solution to diffusion model
+% [res,xi,yi,zi]= sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %
-%    author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% diffusion solution for a sphere inside a semi-infinite homogeneous medium 
 %
-%    input:
-%        Reff:  the effective reflection coeff.
-%        xrange,yrange,zrange: a vector from where a grid will be created
-%                              and the phi values will be calculated
-%        cfg: domain structure for internal/external parameters
-%             see below for the meaning of each field
+% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
 %
-%    output:
-%        res:  the output fluence for both the interior and exterior
-%        regions
+% input:
+%     Reff:  the effective reflection coeff.
+%     xrange,yrange,zrange: a vector from where a grid will be created
+%       		    and the phi values will be calculated
+%     cfg: domain structure for internal/external parameters
+%          cfg.v: speed of light in vacuum (mm/s)
+%          cfg.a: sphere radius (mm)
+%          cfg.omua: background (outside) mua (1/mm)
+%          cfg.omusp: background (outside) mus' (1/mm)
+%          cfg.imua: sphere (inside) mua (1/mm)
+%          cfg.imusp: sphere (inside) mus' (1/mm)
+%          cfg.src: spherical source position (R,theta,phi) R in mm
+%          cfg.maxl: maximum serial expansion terms
+%          cfg.omega: DPDW modulation frequency
 %
-%    example:
-%      [phi,xi,yi,zi]=sphdiffusionsemi(0,-30:0.8:30,0,-30:0.8:30);
-%      contourf(xi,zi,log10(abs(phi)),40)
+% output:
+%     res:  the output fluence for both the interior and exterior
+%     regions
 %
-%    this file is part of Mesh-based Monte Carlo (MMC)
-%    License: GPLv3, see http://mcx.sf.net/?MMC for details
+% example:
+%   [phi,xi,yi,zi]=sphdiffusionsemi(0,-30:0.8:30,0,-30:0.8:30);
+%   contourf(xi,zi,log10(abs(phi)),40)
+%
+% this file is part of Mesh-based Monte Carlo (MMC)
+%
+% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+%
 
 
 if(nargin<5)
