@@ -84,6 +84,7 @@ typedef struct MCXConfig{
 
 	unsigned char *vol; /*pointer to the volume*/
 	char session[MAX_SESSION_LENGTH]; /*session id, a string*/
+        char meshtag[MAX_PATH_LENGTH];   /*a string to tag all input mesh files*/
 	char isrowmajor;    /*1 for C-styled array in vol, 0 for matlab-styled array*/
 	char isreflect;     /*1 for reflecting photons at boundary,0 for exiting*/
         char isref3;        /*1 considering maximum 3 ref. interfaces; 0 max 2 ref*/

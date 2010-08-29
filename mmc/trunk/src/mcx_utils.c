@@ -61,6 +61,7 @@ void mcx_initcfg(Config *cfg){
      cfg->detpos=NULL;
      cfg->vol=NULL;
      cfg->session[0]='\0';
+     cfg->meshtag[0]='\0';
      cfg->printnum=0;
      cfg->minenergy=1e-6f;
      cfg->flog=stdout;
@@ -146,7 +147,7 @@ void mcx_writeconfig(char *fname, Config *cfg){
 
 void mcx_loadconfig(FILE *in, Config *cfg){
      int i,gates;
-     char filename[MAX_PATH_LENGTH]={0}, comment[MAX_PATH_LENGTH],*comm;
+     char comment[MAX_PATH_LENGTH],*comm;
      
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of photons: [1000000]\n\t");
@@ -183,19 +184,19 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      /*if(cfg->maxgate>gates)*/
 	 cfg->maxgate=gates;
 
-     mcx_assert(fscanf(in,"%s", filename)==1);
+     mcx_assert(fscanf(in,"%s", cfg->meshtag)==1);
      if(cfg->rootpath[0]){
 #ifdef WIN32
-         sprintf(comment,"%s\\%s",cfg->rootpath,filename);
+         sprintf(comment,"%s\\%s",cfg->rootpath,cfg->meshtag);
 #else
-         sprintf(comment,"%s/%s",cfg->rootpath,filename);
+         sprintf(comment,"%s/%s",cfg->rootpath,cfg->meshtag);
 #endif
-         strncpy(filename,comment,MAX_PATH_LENGTH);
+         strncpy(cfg->meshtag,comment,MAX_PATH_LENGTH);
      }
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,"%s\nPlease specify the x voxel size (in mm), x dimension, min and max x-index [1.0 100 1 100]:\n\t",filename);
+     	fprintf(stdout,"%s\nPlease specify the x voxel size (in mm), x dimension, min and max x-index [1.0 100 1 100]:\n\t",cfg->meshtag);
      mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.x),&(cfg->dim.x),&(cfg->crop0.x),&(cfg->crop1.x))==4);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
@@ -254,31 +255,6 @@ void mcx_loadconfig(FILE *in, Config *cfg){
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }
-#ifdef MMC
-     if(filename[0]){
-        int idx1d;
-        mcx_loadvolume(filename,cfg);
-	idx1d=cfg->isrowmajor?(int)(floor(cfg->srcpos.x)*cfg->dim.y*cfg->dim.z+floor(cfg->srcpos.y)*cfg->dim.z+floor(cfg->srcpos.z)):\
-                      (int)(floor(cfg->srcpos.z)*cfg->dim.y*cfg->dim.x+floor(cfg->srcpos.y)*cfg->dim.x+floor(cfg->srcpos.x));
-	
-        /* if the specified source position is outside the domain, move the source
-	   along the initial vector until it hit the domain */
-	if(cfg->vol && cfg->vol[idx1d]==0){
-                printf("source (%f %f %f) is located outside the domain, vol[%d]=%d\n",
-		      cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z,idx1d,cfg->vol[idx1d]);
-		while(cfg->vol[idx1d]==0){
-			cfg->srcpos.x+=cfg->srcdir.x;
-			cfg->srcpos.y+=cfg->srcdir.y;
-			cfg->srcpos.z+=cfg->srcdir.z;
-			printf("fixing source position to (%f %f %f)\n",cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
-			idx1d=cfg->isrowmajor?(int)(floor(cfg->srcpos.x)*cfg->dim.y*cfg->dim.z+floor(cfg->srcpos.y)*cfg->dim.z+floor(cfg->srcpos.z)):\
-                		      (int)(floor(cfg->srcpos.z)*cfg->dim.y*cfg->dim.x+floor(cfg->srcpos.y)*cfg->dim.x+floor(cfg->srcpos.x));
-		}
-	}
-     }else{
-     	mcx_error(-4,"one must specify a binary volume file in order to run the simulation");
-     }
-#endif
 }
 
 void mcx_saveconfig(FILE *out, Config *cfg){
@@ -510,31 +486,31 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 
 void mcx_usage(char *exename){
      printf("\
-######################################################################################\n\
-#                          Mesh-based Monte Carlo (MMC)                              #\n\
-#              Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>                  #\n\
-#                                                                                    #\n\
-#      Martinos Center for Biomedical Imaging, Massachusetts General Hospital        #\n\
-######################################################################################\n\
-$MMC $Rev::     $, Last Commit: $Date::                         $ by $Author::       $\n\
-######################################################################################\n\
+###############################################################################\n\
+#                         Mesh-based Monte Carlo (MMC)                        #\n\
+#        Copyright (c) 2010 Qianqian Fang <fangq at nmr.mgh.harvard.edu>      #\n\
+#                                                                             #\n\
+#    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
+###############################################################################\n\
+$MCX $Rev::     $ Last Commit $Date::                     $ by $Author:: fangq$\n\
+###############################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
  -i 	       (--interactive) interactive mode\n\
+ -s sessionid  (--session)     a string to label all output file names\n\
  -f config     (--input)       read config from a file\n\
  -n [0|int]    (--photon)      total photon number\n\
- -b [0|1]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection\n\
+ -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
- -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
- -U [1|0]      (--normalize)   1 to normailze the fluence to unitary, 0 to save raw fluence\n\
- -d [1|0]      (--savedet)     1 to save photon info at detectors, 0 not to save\n\
+ -U [1|0]      (--normalize)   1 to normailze the fluence to unitary,0 save raw\n\
+ -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
- -s sessionid  (--session)     a string to identify this specific simulation (and output files)\n\
+ -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
- -D [0|int]    (--debug)       print debug information (you can use an integer or\n\
-  or                           a string by combining the following debugging flags)\n\
+ -D [0|int]    (--debug)       print debug information (you can use an integer\n\
+  or                           or a string by combining the following flags)\n\
  -D [''|MCBWDIOXATRP]          1 M  photon movement info\n\
                                2 C  print ray-polygon testing details\n\
                                4 B  print Bary centric coordinates\n\
@@ -547,7 +523,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                              512 T  timing information\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
-       add the numbers together to print mulitple items, or one can use a string\n\
+      add the numbers together to print mulitple items, or one can use a string\n\
 example:\n\
        %s -n 1000000 -f input.inp -s test -D TP -b 0\n",exename,exename);
 }

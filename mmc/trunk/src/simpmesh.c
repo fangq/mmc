@@ -109,7 +109,7 @@ void mesh_error(char *msg){
 }
 void mesh_filenames(char *format,char *foutput,Config *cfg){
 	char filename[MAX_PATH_LENGTH];
-	sprintf(filename,format,cfg->session);
+	sprintf(filename,format,cfg->meshtag);
 
 	if(cfg->rootpath[0]) 
 		sprintf(foutput,"%s%c%s",cfg->rootpath,pathsep,filename);
@@ -395,7 +395,11 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	int i,j;
 	float3 *pn;
 	char fweight[MAX_PATH_LENGTH];
-	mesh_filenames("%s.dat",fweight,cfg);
+        if(cfg->rootpath[0])
+                sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
+        else
+                sprintf(fweight,"%s.dat",cfg->session);
+
 	if((fp=fopen(fweight,"wt"))==NULL){
 		mesh_error("can not open weight file to write");
 	}
