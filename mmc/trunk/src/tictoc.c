@@ -68,7 +68,7 @@ unsigned int StartTimer () {
 #else
 
 static unsigned int timerRes;
-#ifndef _WIN32
+#ifndef MSVC
 #include <unistd.h>
 #include <sys/time.h>
 #include <string.h>

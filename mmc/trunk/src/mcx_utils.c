@@ -276,7 +276,7 @@ int mcx_parsedebugopt(char *debugopt){
 }
 
 void mcx_progressbar(int n, int ntotal, Config *cfg){
-    int percentage, j,colwidth=80;
+    int percentage, j,colwidth=79;
 
 #ifdef TIOCGWINSZ 
     struct winsize ttys;

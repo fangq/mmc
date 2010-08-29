@@ -23,6 +23,11 @@
 #define RAND_SEED_LEN      1
 
 typedef unsigned int uint;
+
+#ifdef _WIN32
+  #include "drand48_r_libgw32c.h"
+#endif
+
 typedef struct drand48_data RandType;
 
 // transform into [0,1] random number
