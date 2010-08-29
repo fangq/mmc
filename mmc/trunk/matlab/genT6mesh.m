@@ -2,6 +2,8 @@ function [vertices,tess]=genT6mesh(varargin)
 % tess_lat: simplicial tessellation of a rectangular lattice
 % usage: [tessellation,vertices]=genT6mesh(v1,v2,v3,...)
 %
+% URL: http://www.mathkb.com/Uwe/Forum.aspx/matlab/50484/Constant-surfaces
+%
 % arguments: input
 % v1,v2,v3,... - numeric vectors defining the lattice in
 % each dimension.

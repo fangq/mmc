@@ -26,10 +26,10 @@ Mesh-based Monte Carlo (MMC) is a 3D Monte Carlo (MC) simulation software
 for photon transport in complex turbid media. MMC combines the strength
 of both MC-based photon migration and finite-element (FE) method: on one 
 hand, it can handle low-scattering media as in MC, on the other hand, it 
-can use nonstructural meshes to represent curved boundaries and complex domains
-as in FE. MMC implements a precise ray-tracing technique to propagate a photon
-using a fast Plucker-coordinate-based ray-triangle intersection test. 
-Both the media and the fluence can be represented by piece-wise-linear 
+can use nonstructural meshes to represent curved boundaries and complex 
+domains as in FE. MMC implements a precise ray-tracing technique to propagate 
+a photon using a fast Plucker-coordinate-based ray-triangle intersection 
+test.  Both the media and the fluence can be represented by piece-wise-linear 
 basis functions, thus, providing additional accuracy. This implementation 
 also supports multi-threaded parallel computing and can give a nearly 
 proportional acceleration when running on multi-core processors.
@@ -50,8 +50,8 @@ MCX [2]), developed by the same author.
 
 The details of MMC can be found in the following paper:
 
-*Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing \
-in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
+  Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
+  in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
 
 The author of this paper is greatly appreciated if you cite the 
 above paper as reference if you use MMC and related software
@@ -63,13 +63,13 @@ II. Download and Compile MMC
 
 The latest release of MMC can be downloaded from the following URL:
 
- http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
+  http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
 
 The development branch (not fully tested) of the code can be accessed 
 using Subversion (SVN), however this is not encouraged. To 
 check out the SVN source code, you should use the following command:
 
- svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mmc/trunk mmc
+  svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mmc/trunk mmc
 
 then type the password as "anonymous_user". This will allow you to 
 anonymously check out the entire source code tree.
@@ -77,11 +77,11 @@ anonymously check out the entire source code tree.
 To compile the software, you need to install GNU gcc compiler toolchain
 on your system. For Debian/Ubuntu based GNU/Linux systems, you can type
 
- sudo apt-get install gcc
+  sudo apt-get install gcc
 
 and for Fedora/Redhat based GNU/Linux systems, you can type
 
- su -c 'yum install gcc'
+  su -c 'yum install gcc'
  
 to install the necessary compilers. To compile the binary supporting
 OpenMP multi-threaded computing, your gcc version should be at least 4.0.
@@ -112,14 +112,19 @@ AMD C compiler or LLVM. If you see any error message, please
 follow the instruction to fix your compiler settings or install 
 the missing libraries.
 
+After compilation, you can add the path to the "mmc" binary (typically
+mmc/src/bin) to the search path, so you don't have to type the fully 
+path to run it. To do so, you should modify your PATH environment 
+variable. Detailed instructions can be found at [5].
+
 -------------------------------------------------------------------------------
 
 III.Running Simulations
 
 Before you create/run your own MMC simulations, we suggest you
-first going through all the subfolders under the mmc/example directory
-and check out the formats of the input files and the scripts for
-pre- and post-processing.
+first going through all the subfolders under the mmc/example 
+directory and check out the formats of the input files and the 
+scripts for pre- and post-processing.
 
 Because MMC uses FE mesh in the simulation, you should create
 a mesh for your problem domain before you running the simulation.
@@ -128,27 +133,35 @@ matlab/octave mesh generator, iso2mesh [1], developed by the same
 author. In the mmc/matlab folder, we also provide additional 
 functions to generate regular grid-shaped tetrahedral mesh.
 
+It is HIGHLY recommended to use the "savemmcmesh" function under
+mmc/matlab folder to save the mesh produced by iso2mesh, as it
+performs a number of tests to ensure the consistency of element 
+orientations. If you choose not to use savemmcmesh, you 
+MUST call "meshreorient" function in iso2mesh for elem/face
+to make sure all elements are oriented in the same direction. 
+Otherwise, MMC will give incorrect results.
+
 The full command line options of MMC include the following:
 <pre>
 usage: mmc <param1> <param2> ...
 where possible parameters include (the first item in [] is the default value)
  -i 	       (--interactive) interactive mode
+ -s sessionid  (--session)     a string to label all output file names
  -f config     (--input)       read config from a file
- -n [0|int]    (--photon)      total photon number
- -b [0|1]      (--reflect)     1 do reflection at internal&external boundaries, 0 no reflection
+ -n [0.|float] (--photon)      total photon number
+ -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
- -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
- -U [1|0]      (--normalize)   1 to normalize the fluence to unitary, 0 to save raw fluence
- -d [1|0]      (--savedet)     1 to save photon info at detectors, 0 not to save
+ -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
+ -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
- -s sessionid  (--session)     a string to identify this specific simulation (and output files)
+ -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead
- -D [0|int]    (--debug)       print debug information (you can use an integer or
-  or                           a string by combining the following debugging flags)
+ -D [0|int]    (--debug)       print debug information (you can use an integer
+  or                           or a string by combining the following flags)
  -D [''|MCBWDIOXATRP]          1 M  photon movement info
                                2 C  print ray-polygon testing details
-                               4 B  print Bary centric coordinates
+                               4 B  print Bary-centric coordinates
                                8 W  print photon weight changes
                               16 D  print distances
                               32 I  entering a triangle
@@ -158,9 +171,9 @@ where possible parameters include (the first item in [] is the default value)
                              512 T  timing information
                             1024 R  debugging reflection
                             2048 P  show progress bar
-       add the numbers together to print multiple items, or one can use a string
+      add the numbers together to print mulitple items, or one can use a string
 example:
-       mmc -n 1e6 -f input.inp -s test -D TP -b 0
+       mmc -n 1000000 -f input.inp -s test -b 0 -D TP
 </pre>
 
 The simplest example can be found under the "example/onecube" 
@@ -178,7 +191,7 @@ specify most of the simulation parameters. The input file follows
 the same format as in MCX (certain fields are no-longer used).
 It looks like the following
 
- 100                  # total photon number
+ 100                  # total photon number (can be overwriten by -n)
  17182818             # RNG seed, negative to generate
  2. 8. 0.             # source position (mm)
  0. 0. 1.             # initial incident vector
@@ -191,9 +204,10 @@ It looks like the following
  20.0    30.0    1.0
  40.0    30.0    1.0
 
-The mesh files are linked through the mesh id (a name stub).
+The mesh files are linked through the mesh id (a name stub) with a 
+format of {node|elem|facenb|velem}_meshid.dat. All files must exist.
 If the index to the element that enclosing the source is not known,
-please use "tsearchn" function in matlab/octave to find out.
+please use the "tsearchn" function in matlab/octave to find out.
 Examples are provided in mmc/examples/meshtest/createmesh.m.
 
 To run the simulation, you should run run_test.sh bash
@@ -238,7 +252,7 @@ interpolation functions such as griddata3. However, it is very
 slow for large meshes. In iso2mesh toolbox, a fast mesh slicing
 & plotting function, qmeshcut, is very efficient in making 3D
 plots of mesh or cross-sections. More details can be found at 
-this webpage [5], or "help qmeshcut" in matlab. Another useful
+this webpage [6], or "help qmeshcut" in matlab. Another useful
 function is plotmesh in iso2mesh toolbox. It has very flexible
 syntax to allow users to plot surfaces, volumetric meshes and
 cross-section plots. One can use something like
@@ -272,4 +286,5 @@ VI.  Reference
 [2] http://mcx.sf.net       -- Monte Carlo eXtreme: a GPU-accelerated MC code
 [3] http://sourceforge.net/projects/mingw/files/GCC%20Version%204/
 [4] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
-[5] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut
+[5] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
+[6] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut

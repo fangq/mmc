@@ -492,5 +492,5 @@ where possible parameters include (the first item in [] is the default value)\n\
                             2048 P  show progress bar\n\
       add the numbers together to print mulitple items, or one can use a string\n\
 example:\n\
-       %s -n 1000000 -f input.inp -s test -D TP -b 0\n",exename,exename);
+       %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,exename);
 }

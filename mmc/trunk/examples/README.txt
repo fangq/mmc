@@ -4,7 +4,7 @@ In this folder, you will find a number of examples
 to validate, test, or demonstrate the functionalities 
 of MMC.
 
-Please read the README.txt file for each sub-folder
+Please read the README.txt file under each sub-folder
 to understand the purpose, procedures to run the simulation 
 and the interpretations of the results.
 
@@ -20,6 +20,11 @@ examples/
 |-misctest   - other misc. tests
 |-mouse      - legacy example
 |-sphbox     - legacy example
+
+A complex human brain atlas mesh, i.e. Fig. 4 in [Fang2010], can 
+be downloaded separately at the following URL:
+
+ http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/CollinsAtlasMesh
 
 
 Reference: 
