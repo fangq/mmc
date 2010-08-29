@@ -2,6 +2,11 @@ Change Log
 
 == MMC 0.2 (Cheesecake) development branch, FangQ <fangq@nmr.mgh.harvard.edu> ==
 
+2010/08/30 first public release of MMC - v0.2
+2010/08/29 update examples to use iso2mesh 1.0 and MCX 0.4.9 options, remove unused input file format
+2010/07/25 release Collins adult brain atlas FEM mesh version 1
+2010/07/25 add help text for all matlab/octave function, release Sphere-Diffusion toolbox v1
+2010/07/16 add README files for all examples
 2010/07/15 paper published http://www.opticsinfobase.org/boe/abstract.cfm?uri=boe-1-1-165
 2010/07/15 update license to GPL v3, mmc is officially open-source
 2010/07/04 paper accepeted, update website at http://mcx.sf.net/mmc/

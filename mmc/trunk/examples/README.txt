@@ -5,8 +5,8 @@ to validate, test, or demonstrate the functionalities
 of MMC.
 
 Please read the README.txt file for each sub-folder
-to understand the purpose, procedures to run and 
-the interpretation of the results.
+to understand the purpose, procedures to run the simulation 
+and the interpretations of the results.
 
 The examples contained in each subfolders are explained below:
 

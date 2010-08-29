@@ -196,48 +196,13 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,"%s\nPlease specify the x voxel size (in mm), x dimension, min and max x-index [1.0 100 1 100]:\n\t",cfg->meshtag);
-     mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.x),&(cfg->dim.x),&(cfg->crop0.x),&(cfg->crop1.x))==4);
-     comm=fgets(comment,MAX_PATH_LENGTH,in);
-
-     if(in==stdin)
-     	fprintf(stdout,"%f %d %d %d\nPlease specify the y voxel size (in mm), y dimension, min and max y-index [1.0 100 1 100]:\n\t",
-                                  cfg->steps.x,cfg->dim.x,cfg->crop0.x,cfg->crop1.x);
-     mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.y),&(cfg->dim.y),&(cfg->crop0.y),&(cfg->crop1.y))==4);
-     comm=fgets(comment,MAX_PATH_LENGTH,in);
-
-     if(in==stdin)
-     	fprintf(stdout,"%f %d %d %d\nPlease specify the z voxel size (in mm), z dimension, min and max z-index [1.0 100 1 100]:\n\t",
-                                  cfg->steps.y,cfg->dim.y,cfg->crop0.y,cfg->crop1.y);
-     mcx_assert(fscanf(in,"%f %d %d %d", &(cfg->steps.z),&(cfg->dim.z),&(cfg->crop0.z),&(cfg->crop1.z))==4);
+     	fprintf(stdout,"%s\nPlease specify the index to the tetrahedral element enclosing the source [start from 1]:\n\t",cfg->meshtag);
+     mcx_assert(fscanf(in,"%d", &(cfg->dim.x))==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      cfg->minstep=MIN(cfg->steps.x,cfg->steps.y);
      cfg->minstep=MIN(cfg->minstep,cfg->steps.z);
 
-     if(in==stdin)
-     	fprintf(stdout,"%f %d %d %d\nPlease specify the total types of media:\n\t",
-                                  cfg->steps.z,cfg->dim.z,cfg->crop0.z,cfg->crop1.z);
-     mcx_assert(fscanf(in,"%d", &(cfg->medianum))==1);
-     cfg->medianum++;
-     comm=fgets(comment,MAX_PATH_LENGTH,in);
-
-     if(in==stdin)
-     	fprintf(stdout,"%d\n",cfg->medianum);
-     cfg->prop=(Medium*)malloc(sizeof(Medium)*cfg->medianum);
-
-     cfg->prop[0].mua=0.f; /*property 0 is already air*/
-     cfg->prop[0].mus=0.f;
-     cfg->prop[0].g=0.f;
-     cfg->prop[0].n=1.f;
-     for(i=1;i<cfg->medianum;i++){
-        if(in==stdin)
-		fprintf(stdout,"Please define medium #%d: mus(1/mm), anisotropy, mua(1/mm) and refractive index: [1.01 0.01 0.04 1.37]\n\t",i);
-     	mcx_assert(fscanf(in, "%f %f %f %f", &(cfg->prop[i].mus),&(cfg->prop[i].g),&(cfg->prop[i].mua),&(cfg->prop[i].n))==4);
-        comm=fgets(comment,MAX_PATH_LENGTH,in);
-        if(in==stdin)
-		fprintf(stdout,"%f %f %f %f\n",cfg->prop[i].mus,cfg->prop[i].g,cfg->prop[i].mua,cfg->prop[i].n);
-     }
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of detectors and fiber diameter (in mm):\n\t");
      mcx_assert(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
@@ -502,10 +467,10 @@ where possible parameters include (the first item in [] is the default value)\n\
  -i 	       (--interactive) interactive mode\n\
  -s sessionid  (--session)     a string to label all output file names\n\
  -f config     (--input)       read config from a file\n\
- -n [0|int]    (--photon)      total photon number\n\
+ -n [0.|float] (--photon)      total photon number\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
- -U [1|0]      (--normalize)   1 to normailze the fluence to unitary,0 save raw\n\
+ -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
@@ -515,12 +480,12 @@ where possible parameters include (the first item in [] is the default value)\n\
   or                           or a string by combining the following flags)\n\
  -D [''|MCBWDIOXATRP]          1 M  photon movement info\n\
                                2 C  print ray-polygon testing details\n\
-                               4 B  print Bary centric coordinates\n\
+                               4 B  print Bary-centric coordinates\n\
                                8 W  print photon weight changes\n\
                               16 D  print distances\n\
                               32 I  entering a triangle\n\
                               64 O  exiting a triangle\n\
-                             128 X  hiting an edge\n\
+                             128 X  hitting an edge\n\
                              256 A  accumulating weights to the mesh\n\
                              512 T  timing information\n\
                             1024 R  debugging reflection\n\
