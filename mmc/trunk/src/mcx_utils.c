@@ -371,6 +371,7 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
      int i=1,isinteractive=1,issavelog=0;
      char filename[MAX_PATH_LENGTH]={0};
      char logfile[MAX_PATH_LENGTH]={0};
+     float np=0.f;
 
      if(argc<=1){
      	mcx_usage(argv[0]);
@@ -398,7 +399,8 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     	        i=mcx_readarg(argc,argv,i,filename,"string");
 				break;
 		     case 'n':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->nphoton),"int");
+		     	        i=mcx_readarg(argc,argv,i,&np,"float");
+				cfg->nphoton=(int)np;
 		     	        break;
 		     case 't':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->nthread),"int");
