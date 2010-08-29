@@ -24,10 +24,14 @@ in the paper (Table 1), respectively.
 
 == Steps ==
 
-1. First, you need to create the 3 meshes to run this example.
-You need to first download and install the svn version of iso2mesh from 
+1. First, you need to create the 3 meshes to run this example. You 
+need to first download and install iso2mesh version 1.0-beta from 
 
- svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/iso2mesh/trunk/iso2mesh iso2mesh
+  http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
+
+or, you can download the svn version of iso2mesh from 
+
+  svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/iso2mesh/trunk/iso2mesh iso2mesh
 
 the password is anonymous_user
 

@@ -15,10 +15,14 @@ package of Monte Carlo eXtreme (MCX) under the mcx/utils directory.
 
 == Steps ==
 
-1. In order to run this example, you need to first download and 
-install the svn version of iso2mesh from 
+1. First, you need to create the 3 meshes to run this example. You
+need to first download and install iso2mesh version 1.0-beta from
 
- svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/iso2mesh/trunk/iso2mesh iso2mesh
+  http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
+
+or, you can download the svn version of iso2mesh from
+
+  svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/iso2mesh/trunk/iso2mesh iso2mesh
 
 the password is anonymous_user
 
@@ -44,8 +48,9 @@ binary package from http://mcx.sf.net/cgi-bin/index.cgi?Download
 5.2 open benchbox.sh, edit the thread number (-t) and thread block size (-T)
 based on the compute capability of your card. For 8800GT/9800GT, the -T number
 can not exceed 128; for 280/285/295, -T can not be more than 256; for 470, 
--T can not be more than 576
+-T can not be more than 576 (for MCX 0.4.9 or newer, using -A option is 
+recommended)
 5.3 run benchbox.sh to generate the MCX output box.mc2
 
-6. When all simulations are down, you start matlab again, and 
+6. When all simulations are done, you start matlab again, and 
 run plotcuberes to generate the plots.
