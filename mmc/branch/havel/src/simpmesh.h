@@ -59,6 +59,7 @@ typedef struct femmesh{
 
 typedef struct tplucker{
 	tetmesh *mesh;
+	int isplucker;
 	float3 *d;
 	float3 *m;
 } tetplucker;
@@ -84,7 +85,7 @@ void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,Config *cfg);
 void mesh_saveweight(tetmesh *mesh,Config *cfg);
 
-void plucker_init(tetplucker *plucker,tetmesh *mesh);
+void plucker_init(tetplucker *plucker,tetmesh *mesh,int mode);
 void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
 inline float dist2(float3 *p0,float3 *p1);

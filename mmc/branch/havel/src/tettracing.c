@@ -206,6 +206,50 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
         }
 	return slen;
 }
+#ifdef MMC_USE_SSE
+
+inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,const __m128 d,const __m128 int_coef){
+    const __m128 n = _mm_load_ps(&vecN->x);
+    const __m128 det = _mm_dp_ps(n, d, 0x7f);
+    const __m128 dett = _mm_dp_ps(_mm_mul_ps(int_coef, n), o, 0xff);
+    const __m128 oldt = _mm_load_ss(&bary->x);
+
+    if((_mm_movemask_ps(_mm_xor_ps(dett, _mm_sub_ss(_mm_mul_ss(oldt, det), dett)))&1) == 0) {
+	const __m128 detp = _mm_add_ps(_mm_mul_ps(o, det),_mm_mul_ps(dett, d));
+	const __m128 detu = _mm_dp_ps(detp,_mm_load_ps(&((vecN+1)->x)), 0xf1);
+
+	if((_mm_movemask_ps(_mm_xor_ps(detu,_mm_sub_ss(det, detu)))&1) == 0){
+            const __m128 detv = _mm_dp_ps(detp, _mm_load_ps(&((vecN+2)->x)), 0xf1);
+
+	    if((_mm_movemask_ps(_mm_xor_ps(detv,_mm_sub_ss(det, _mm_add_ss(detu, detv))))&1) == 0){
+		const __m128 inv_det = _mm_rcp_ss(det);
+		_mm_store_ss(&bary->x, _mm_mul_ss(dett, inv_det));
+		_mm_store_ss(&bary->y, _mm_mul_ss(detu, inv_det));
+		_mm_store_ss(&bary->z, _mm_mul_ss(detv, inv_det));
+		_mm_store_ps(&pout->x, _mm_mul_ps(detp,_mm_shuffle_ps(inv_det, inv_det, 0)));
+		return 1;
+	    }
+	}
+    }
+    return 0;
+}
+#endif
+
+float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
+              float3 *pout, float slen, int *faceid, float *weight, 
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
+	pout->x=MMC_UNDEFINED;
+	float3 bary={0.f};
+	const float int_coef_arr[4] = { -1, -1, -1, 1 };
+	const __m128 int_coef = _mm_load_ps(int_coef_arr);
+	const __m128 o = _mm_load_ps(&(p0->x));
+	const __m128 d = _mm_load_ps(&(pvec->x));
+	if(havelsse4(plucker->m+eid*12,pout,&bary,o,d,int_coef)){
+		printf("hit face 1 at [%e %e %e]\n",pout->x,pout->y,pout->z);
+		exit(1);
+	}
+	return slen;
+}
 
 float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
 	int faceid,eid,oldeid,isend,fixcount=0;
@@ -224,7 +268,11 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
 	while(1){  /*propagate a photon until exit*/
-	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+            if(plucker->isplucker)
+	       slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    else
+               slen=trackhavel(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+
 	    if(pout.x==MMC_UNDEFINED){
 	    	  if(faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
@@ -252,12 +300,18 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    if(pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
-	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    	    if(plucker->isplucker)
+			slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                    else
+			slen=trackhavel(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
-                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                        if(plucker->isplucker)
+                            slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                        else
+                            slen=trackhavel(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    }
         	    if(pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/

@@ -38,5 +38,8 @@ void fixphoton(float3 *p,float3 *nodes, int *ee);
 float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran,RandType *ran0);
 float reflectray(Config *cfg,float3 *c0,tetplucker *plucker,int *oldeid,int *eid,int faceid,RandType *ran);
 inline float mmc_rsqrtf(float a);
+float tracehavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
+              float3 *pout, float slen, int *faceid, float *weight, 
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg);
 
 #endif

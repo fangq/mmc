@@ -59,7 +59,7 @@ int main(int argc, char**argv){
 	mesh_loadmedia(&mesh,&cfg);
 	mesh_loadelemvol(&mesh,&cfg);
 
-	plucker_init(&plucker,&mesh);
+	plucker_init(&plucker,&mesh,cfg.isplucker);
 	
 	if(mesh.node==NULL||mesh.elem==NULL||mesh.facenb==NULL||mesh.med==NULL)
 		mesh_error("encountered error while loading mesh files");

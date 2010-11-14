@@ -42,6 +42,11 @@ void vec_diff(float3 *a,float3 *b,float3 *res){
         res->y=b->y-a->y;
         res->z=b->z-a->z;
 }
+void vec_mult(float3 *a,float sa,float3 *res){
+        res->x=sa*a->x;
+        res->y=sa*a->y;
+        res->z=sa*a->z;
+}
 void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
 	res->x=sb*b->x+sa*a->x;
 	res->y=sb*b->y+sa*a->y;
@@ -287,10 +292,11 @@ void mesh_clear(tetmesh *mesh){
 	}
 }
 
-void plucker_init(tetplucker *plucker,tetmesh *pmesh){
+void plucker_init(tetplucker *plucker,tetmesh *pmesh,int mode){
 	plucker->d=NULL;
 	plucker->m=NULL;
 	plucker->mesh=pmesh;
+	plucker->isplucker=mode;
 	plucker_build(plucker);
 }
 void plucker_clear(tetplucker *plucker){
@@ -301,31 +307,67 @@ void plucker_clear(tetplucker *plucker){
 	if(plucker->m) {
 		free(plucker->m);
 		plucker->m=NULL;
-	}	
+	}
 	plucker->mesh=NULL;
 }
 void plucker_build(tetplucker *plucker){
 	int nn,ne,i,j;
 	const int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+
 	float3 *nodes;
 	int *elems,ebase;
 	int e1,e0;
-	
+
 	if(plucker->d || plucker->m || plucker->mesh==NULL) return;
 	nn=plucker->mesh->nn;
 	ne=plucker->mesh->ne;
 	nodes=plucker->mesh->node;
 	elems=(int *)(plucker->mesh->elem); // convert int4* to int*
-	plucker->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
-	plucker->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
-	for(i=0;i<ne;i++){
-		ebase=i<<2;
-		for(j=0;j<6;j++){
-			e1=elems[ebase+pairs[j][1]]-1;
-			e0=elems[ebase+pairs[j][0]]-1;
-			vec_diff(&nodes[e0],&nodes[e1],plucker->d+i*6+j);
-			vec_cross(&nodes[e0],&nodes[e1],plucker->m+i*6+j);
+	if(plucker->isplucker){
+		plucker->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+		plucker->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+		for(i=0;i<ne;i++){
+			ebase=i<<2;
+			for(j=0;j<6;j++){
+				e1=elems[ebase+pairs[j][1]]-1;
+				e0=elems[ebase+pairs[j][0]]-1;
+				vec_diff(&nodes[e0],&nodes[e1],plucker->d+i*6+j);
+				vec_cross(&nodes[e0],&nodes[e1],plucker->m+i*6+j);
+			}
 		}
+	}else{
+		int ea,eb,ec;
+		const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+		float3 vecAB={0.f},vecAC={0.f},*vecd;
+
+		plucker->d=(float3*)calloc(sizeof(float3),ne*4);
+		plucker->m=(float3*)calloc(sizeof(float3),ne*12);
+                for(i=0;i<ne;i++){
+                        ebase=i<<2;
+			for(j=0;j<4;j++){
+				float3 *vecN=plucker->m+3*((i<<2)+j);
+				float Rn2;
+
+                                ea=elems[ebase+nc[j][0]]-1;
+                                eb=elems[ebase+nc[j][1]]-1;
+				ec=elems[ebase+nc[j][2]]-1;
+                                vec_diff(&nodes[ea],&nodes[eb],&vecAB);
+                                vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+
+				vec_cross(&vecAB,&vecAC,vecN);
+                                vec_cross(&vecAC,vecN,vecN+1);
+                                vec_cross(vecN,&vecAB,vecN+2);
+
+				Rn2=1.f/(vecN->x*vecN->x+vecN->y*vecN->y+vecN->z*vecN->z);
+				vec_mult(vecN+1,Rn2,vecN+1);
+                                vec_mult(vecN+2,Rn2,vecN+2);
+
+				vecd=plucker->d+(i<<2);
+				vecd->x=-vec_dot(vecN,&nodes[ea]);
+				vecd->y=-vec_dot(vecN+1,&nodes[ea]);
+                                vecd->z=-vec_dot(vecN+2,&nodes[ea]);
+			}
+                }
 	}
 }
 

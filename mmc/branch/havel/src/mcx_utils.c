@@ -27,13 +27,13 @@
 #include "mcx_utils.h"
 
 const char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
-                 'd','r','S','p','e','U','R','l','L','I','o','u','\0'};
+                 'd','r','S','p','e','U','R','l','L','I','o','u','P','\0'};
 const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
-                 "--printgpu","--root","--unitinmm",""};
+                 "--printgpu","--root","--unitinmm","--plucker",""};
 
 const char *debugflag="MCBWDIOXATRP";
 
@@ -56,6 +56,7 @@ void mcx_initcfg(Config *cfg){
      cfg->respin=1;
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
+     cfg->isplucker=1;
 
      cfg->prop=NULL;
      cfg->detpos=NULL;
@@ -406,6 +407,9 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     case 'U':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isnormalized),"char");
 		     	        break;
+                     case 'P':
+                                i=mcx_readarg(argc,argv,i,&(cfg->isplucker),"char");
+                                break;
                      case 'R':
                                 i=mcx_readarg(argc,argv,i,&(cfg->sradius),"float");
                                 break;
@@ -459,7 +463,7 @@ void mcx_usage(char *exename){
 #                                                                             #\n\
 #    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
 ###############################################################################\n\
-$MCX $Rev:: 109 $ Last Commit $Date:: 2010-08-29 17:38:14#$ by $Author:: fangq$\n\
+$MMC $Rev:: 109 $ Last Commit $Date:: 2010-08-29 17:38:14#$ by $Author:: fangq$\n\
 ###############################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\
