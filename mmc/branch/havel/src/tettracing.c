@@ -152,7 +152,6 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                 p0->y+=Lmove*pvec->y;
                 p0->z+=Lmove*pvec->z;
                 if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"update weight to %f and path end %d \n",*weight,*isend);
-
 		Lio=dist(&pin,pout);
 
                 if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f] [%f %f %f %f]\n",
@@ -208,6 +207,12 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 }
 #ifdef MMC_USE_SSE
 
+
+inline __m128 rcp_nr(const __m128 a){
+    const __m128 r = _mm_rcp_ps(a);
+    return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
+}
+
 inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,const __m128 d,const __m128 int_coef){
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
@@ -222,7 +227,7 @@ inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,con
             const __m128 detv = _mm_dp_ps(detp, _mm_load_ps(&((vecN+2)->x)), 0xf1);
 
 	    if((_mm_movemask_ps(_mm_xor_ps(detv,_mm_sub_ss(det, _mm_add_ss(detu, detv))))&1) == 0){
-		const __m128 inv_det = _mm_rcp_ss(det);
+		const __m128 inv_det = rcp_nr(det);
 		_mm_store_ss(&bary->x, _mm_mul_ss(dett, inv_det));
 		_mm_store_ss(&bary->y, _mm_mul_ss(detu, inv_det));
 		_mm_store_ss(&bary->z, _mm_mul_ss(detv, inv_det));
@@ -235,12 +240,12 @@ inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,con
 }
 #endif
 
-float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
+float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 0*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
               int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
 
-	float3 bary={1e10f,0.f,0.f};
-	const float int_coef_arr[4] = { -1, -1, -1, 1 };
+	float3 bary={1e10f,0.f,0.f,0.f};
+	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww;
 	int i,tshift;
 
@@ -262,45 +267,46 @@ float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start fr
 	*faceid=-1;
 	*isend=0;
 	for(i=0;i<4;i++)
+          if(vec_dot(pvec,plucker->m+eid*12+i*3)>=0.f)
 	   if(havelsse4(plucker->m+eid*12+i*3,pout,&bary,o,d,int_coef)){
-	        if(bary.x==0.f){
-			bary.x=1e10f;
-			pout->x=MMC_UNDEFINED;
-			continue;
-		}
+
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 		Lp0=bary.x;
 		*faceid=faceorder[i];
 		*isend=(Lp0>dlen);
 		Lmove=((*isend) ? dlen : Lp0);
-		
+
 		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
 	           pout->x=MMC_UNDEFINED;
 		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-		*weight*=exp(-prop->mua*Lmove);
-		slen-=Lmove*prop->mus;
-                p0->x+=Lmove*pvec->x;
-                p0->y+=Lmove*pvec->y;
-                p0->z+=Lmove*pvec->z;
 
+		*weight*=expf(-prop->mua*Lmove);
+		slen-=Lmove*prop->mus;
+	        if(bary.x==0.f){
+			break;
+		}
 		ww=currweight-*weight;
 		*Eabsorb+=ww;
 		ww/=prop->mua;
                 *photontimer+=Lmove*rc;
 		tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
-                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
-                   pvec->x,pvec->y,pvec->z,ww,eid+1,bary.x);
+                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+                   p0->x,p0->y,p0->z,bary.x,eid+1,dlen);
 
-		/*plucker->mesh->weight[ee[nc[i][0]]-1+tshift]+=ww*bary.y;
+                p0->x+=Lmove*pvec->x;
+       	        p0->y+=Lmove*pvec->y;
+               	p0->z+=Lmove*pvec->z;
+		plucker->mesh->weight[ee[nc[i][0]]-1+tshift]+=ww*bary.y;
 		plucker->mesh->weight[ee[nc[i][1]]-1+tshift]+=ww*bary.z;
-		plucker->mesh->weight[ee[nc[i][2]]-1+tshift]+=ww*(1.f-bary.y-bary.z);*/
+		plucker->mesh->weight[ee[nc[i][2]]-1+tshift]+=ww*(1.f-bary.y-bary.z);
 		break;
 	   }
-		
+	p0->w=0.f;
 	if(*faceid==-2)
            return 0.f;
+
 	return slen;
 }
 

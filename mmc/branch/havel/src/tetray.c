@@ -80,10 +80,8 @@ int main(int argc, char**argv){
 	/*launch photons*/
 #pragma omp for reduction(+:Eabsorb)
 	for(i=0;i<cfg.nphoton;i++){
-		//if(i==167975)
-		//	cfg.debuglevel=mcx_parsedebugopt("MA");
-
-		Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1);
+		#pragma omp atomic
+		   Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1);
 		#pragma omp atomic
 		   ncomplete++;
 
