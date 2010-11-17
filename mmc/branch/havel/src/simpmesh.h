@@ -40,7 +40,7 @@
 
 typedef struct MMCMedium{
 	float mua,mus,g,n;
-} medium;
+} medium __attribute__((aligned(16)));
 
 typedef struct femmesh{
 	int nn; // number of nodes
@@ -52,17 +52,17 @@ typedef struct femmesh{
 	int4 *facenb;
 	medium *med;
 	float *atte;
-	float *weight;
+	float *weight __attribute__((aligned(16)));
 	float *evol; /*volume of an element*/
 	float *nvol; /*veronio volume of a node*/
-} tetmesh;
+} tetmesh __attribute__((aligned(16)));
 
 typedef struct tplucker{
 	tetmesh *mesh;
 	int isplucker;
 	float3 *d;
 	float3 *m;
-} tetplucker;
+} tetplucker __attribute__((aligned(16)));
 
 void vec_add(float3 *a,float3 *b,float3 *res);
 void vec_diff(float3 *a,float3 *b,float3 *res);

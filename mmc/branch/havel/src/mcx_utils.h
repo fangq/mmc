@@ -121,7 +121,7 @@ int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
 void mcx_printlog(Config *cfg, char *str);
 int  mcx_remap(char *opt);
 int  mcx_parsedebugopt(char *debugopt);
-void mcx_progressbar(int n, int ntotal, Config *cfg);
+void mcx_progressbar(int n, int ntotal, int id, Config *cfg);
 
 #ifdef	__cplusplus
 }

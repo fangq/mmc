@@ -337,10 +337,10 @@ void plucker_build(tetplucker *plucker){
 		}
 	}else{
 		int ea,eb,ec;
-		const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-		float3 vecAB={0.f},vecAC={0.f},*vecd;
+		const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+		float3 vecAB={0.f},vecAC={0.f};
 
-		plucker->d=(float3*)calloc(sizeof(float3),ne*4);
+		plucker->d=NULL;
 		plucker->m=(float3*)calloc(sizeof(float3),ne*12);
                 for(i=0;i<ne;i++){
                         ebase=i<<2;
@@ -348,24 +348,24 @@ void plucker_build(tetplucker *plucker){
 				float3 *vecN=plucker->m+3*((i<<2)+j);
 				float Rn2;
 
-                                ea=elems[ebase+nc[j][0]]-1;
-                                eb=elems[ebase+nc[j][1]]-1;
-				ec=elems[ebase+nc[j][2]]-1;
+                                ea=elems[ebase+out[j][0]]-1;
+                                eb=elems[ebase+out[j][1]]-1;
+				ec=elems[ebase+out[j][2]]-1;
                                 vec_diff(&nodes[ea],&nodes[eb],&vecAB);
                                 vec_diff(&nodes[ea],&nodes[ec],&vecAC);
 
-				vec_cross(&vecAB,&vecAC,vecN);
+				vec_cross(&vecAB,&vecAC,vecN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
                                 vec_cross(&vecAC,vecN,vecN+1);
                                 vec_cross(vecN,&vecAB,vecN+2);
 
 				Rn2=1.f/(vecN->x*vecN->x+vecN->y*vecN->y+vecN->z*vecN->z);
 				vec_mult(vecN+1,Rn2,vecN+1);
                                 vec_mult(vecN+2,Rn2,vecN+2);
-
-				vecd=plucker->d+(i<<2);
-				vecd->x=-vec_dot(vecN,&nodes[ea]);
-				vecd->y=-vec_dot(vecN+1,&nodes[ea]);
-                                vecd->z=-vec_dot(vecN+2,&nodes[ea]);
+#ifdef MMC_USE_SSE
+				vecN->w    = vec_dot(vecN,  &nodes[ea]);
+				(vecN+1)->w=-vec_dot(vecN+1,&nodes[ea]);
+                                (vecN+2)->w=-vec_dot(vecN+2,&nodes[ea]);
+#endif
 			}
                 }
 	}

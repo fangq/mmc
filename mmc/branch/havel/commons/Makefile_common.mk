@@ -49,7 +49,7 @@ OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release: CCFLAGS+= -O3
-sse:     CCFLAGS+= -O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
+sse:     CCFLAGS+= -O3 -DMMC_USE_SSE -msse4.1 #-O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
 omp:     CCFLAGS+= -O3 -fopenmp
 omp:     ARFLAGS+= -fopenmp
 prof:    CCFLAGS+= -O3 -pg
@@ -57,6 +57,12 @@ prof:    ARFLAGS+= -O3 -g -pg
 dp dpomp: CCFLAGS+= -mdouble-float -O3
 dpomp:   CCFLAGS+= -fopenmp
 dpomp:   ARFLAGS+= -fopenmp
+
+icc:     CC=icc
+icc:     AR=icc
+icc:     ARFLAGS= -O3 -openmp  
+icc:     CCFLAGS= -c -Wall -DMMC_USE_SSE -msse4.1 -openmp
+
 
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
@@ -70,7 +76,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release sse prof omp dp: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
+all release sse prof omp dp icc: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory

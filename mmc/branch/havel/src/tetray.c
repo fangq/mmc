@@ -80,16 +80,19 @@ int main(int argc, char**argv){
 	/*launch photons*/
 #pragma omp for reduction(+:Eabsorb)
 	for(i=0;i<cfg.nphoton;i++){
+		//if(i==167975)
+		//	cfg.debuglevel=mcx_parsedebugopt("MA");
+
 		Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1);
 		#pragma omp atomic
 		   ncomplete++;
 
 		if((cfg.debuglevel & dlProgress) && threadid==0)
-			mcx_progressbar(ncomplete,cfg.nphoton,&cfg);
+			mcx_progressbar(ncomplete,cfg.nphoton,i,&cfg);
 	}
 }
 	if((cfg.debuglevel & dlProgress))
-		mcx_progressbar(cfg.nphoton,cfg.nphoton,&cfg);
+		mcx_progressbar(cfg.nphoton,cfg.nphoton,i,&cfg);
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 

@@ -73,6 +73,8 @@ void mcx_initcfg(Config *cfg){
      cfg->roulettesize=10.f;
      cfg->nout=1.f;
      cfg->unitinmm=1.f;
+     memset(&cfg->srcpos,0,sizeof(float3));
+     memset(&cfg->srcdir,0,sizeof(float3));
 }
 
 void mcx_clearcfg(Config *cfg){
@@ -276,7 +278,7 @@ int mcx_parsedebugopt(char *debugopt){
     return debuglevel;
 }
 
-void mcx_progressbar(int n, int ntotal, Config *cfg){
+void mcx_progressbar(int n, int ntotal, int id, Config *cfg){
     int percentage, j,colwidth=79;
 
 #ifdef TIOCGWINSZ 
@@ -284,7 +286,6 @@ void mcx_progressbar(int n, int ntotal, Config *cfg){
     ioctl(0, TIOCGWINSZ, &ttys);
     colwidth=ttys.ws_col;
 #endif
-    
     percentage=n*(colwidth-18)/ntotal;
 
     if(percentage != (n-1)*(colwidth-18)/ntotal){
