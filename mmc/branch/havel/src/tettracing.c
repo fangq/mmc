@@ -216,6 +216,10 @@ inline __m128 rcp_nr(const __m128 a){
 inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,const __m128 d,const __m128 int_coef){
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
+    float vecalign;
+    _mm_store_ss(&vecalign,det);
+    if(vecalign<0.f)
+        return 0;
     const __m128 dett = _mm_dp_ps(_mm_mul_ps(int_coef, n), o, 0xff);
     const __m128 oldt = _mm_load_ss(&bary->x);
 
@@ -267,7 +271,6 @@ float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start fr
 	*faceid=-1;
 	*isend=0;
 	for(i=0;i<4;i++)
-          if(vec_dot(pvec,plucker->m+eid*12+i*3)>=0.f)
 	   if(havelsse4(plucker->m+eid*12+i*3,pout,&bary,o,d,int_coef)){
 
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
@@ -275,7 +278,7 @@ float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start fr
 		*faceid=faceorder[i];
 		*isend=(Lp0>dlen);
 		Lmove=((*isend) ? dlen : Lp0);
-
+		
 		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
 	           pout->x=MMC_UNDEFINED;

@@ -68,8 +68,8 @@ inline float vec_dot(float3 *a,float3 *b){
 inline float vec_dot(float3 *a,float3 *b){
         float dot;
         __m128 na,nb,res;
-        na=_mm_loadu_ps((float*)a);
-        nb=_mm_loadu_ps((float*)b);
+        na=_mm_load_ps((float*)a);
+        nb=_mm_load_ps((float*)b);
         res=_mm_mul_ps(na,nb);
         res=_mm_hadd_ps(res,res);
         res=_mm_hadd_ps(res,res);
@@ -80,8 +80,8 @@ inline float vec_dot(float3 *a,float3 *b){
 inline float vec_dot(float3 *a,float3 *b){
         float dot;
         __m128 na,nb,res;
-        na=_mm_loadu_ps((float*)a);
-        nb=_mm_loadu_ps((float*)b);
+        na=_mm_load_ps((float*)a);
+        nb=_mm_load_ps((float*)b);
         res=_mm_dp_ps(na,nb,0x7f);
         _mm_store_ss(&dot,res);
         return dot;
