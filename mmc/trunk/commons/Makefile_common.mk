@@ -58,6 +58,11 @@ dp dpomp: CCFLAGS+= -mdouble-float -O3
 dpomp:   CCFLAGS+= -fopenmp
 dpomp:   ARFLAGS+= -fopenmp
 
+icc:     CC=icc
+icc:     AR=icc
+icc:	 ARFLAGS= -O3 -openmp
+icc:	 CCFLAGS= -c -Wall -openmp -O3 #-DMMC_USE_SSE -msse4.1
+
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
 	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1 
@@ -70,7 +75,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release sse prof omp dp: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
+all release sse prof omp dp icc: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
