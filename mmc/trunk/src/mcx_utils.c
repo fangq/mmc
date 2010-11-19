@@ -276,7 +276,8 @@ int mcx_parsedebugopt(char *debugopt){
 }
 
 void mcx_progressbar(int n, int ntotal, Config *cfg){
-    int percentage, j,colwidth=79;
+    unsigned int percentage, j,colwidth=79;
+    static unsigned int oldmarker=0;
 
 #ifdef TIOCGWINSZ 
     struct winsize ttys;
@@ -286,7 +287,8 @@ void mcx_progressbar(int n, int ntotal, Config *cfg){
     
     percentage=n*(colwidth-18)/ntotal;
 
-    if(percentage != (n-1)*(colwidth-18)/ntotal){
+    if(percentage != oldmarker){
+        oldmarker=percentage;
     	for(j=0;j<colwidth;j++)     fprintf(stdout,"\b");
     	fprintf(stdout,"Progress: [");
     	for(j=0;j<percentage;j++)      fprintf(stdout,"=");
