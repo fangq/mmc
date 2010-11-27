@@ -23,6 +23,7 @@
 
 #ifdef MMC_USE_SSE
 #include <smmintrin.h>
+__m128 int_coef;
 #endif
 
 const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
@@ -213,12 +214,10 @@ inline __m128 rcp_nr(const __m128 a){
     return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
 }
 
-inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,const __m128 d,const __m128 int_coef){
+inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,const __m128 d){
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
-    float vecalign;
-    _mm_store_ss(&vecalign,det);
-    if(vecalign<0.f)
+    if(_mm_movemask_ps(det) & 1)
         return 0;
     const __m128 dett = _mm_dp_ps(_mm_mul_ps(int_coef, n), o, 0xff);
     const __m128 oldt = _mm_load_ss(&bary->x);
@@ -244,19 +243,18 @@ inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,con
 }
 #endif
 
-float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 0*/, 
+float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 0*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
               int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
-	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww;
 	int i,tshift;
+
 
 	p0->w=1.f;
 	pvec->w=0.f;
 
-	const __m128 int_coef = _mm_load_ps(int_coef_arr);
 	const __m128 o = _mm_load_ps(&(p0->x));
 	const __m128 d = _mm_load_ps(&(pvec->x));
 
@@ -271,7 +269,7 @@ float trackhavel(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start fr
 	*faceid=-1;
 	*isend=0;
 	for(i=0;i<4;i++)
-	   if(havelsse4(plucker->m+eid*12+i*3,pout,&bary,o,d,int_coef)){
+	   if(havelsse4(plucker->m+eid*12+i*3,pout,&bary,o,d)){
 
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 		Lp0=bary.x;
@@ -319,6 +317,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	float slen,weight,photontimer,Eabsorb;
 	float3 pout;
 	float3 p0,c0;
+	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 
 	/*initialize the photon parameters*/
 	eid=cfg->dim.x;
@@ -329,11 +328,13 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	memcpy(&p0,&(cfg->srcpos),sizeof(p0));
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
+	int_coef = _mm_load_ps(int_coef_arr);
+
 	while(1){  /*propagate a photon until exit*/
             if(plucker->isplucker)
 	       slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 	    else
-               slen=trackhavel(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+               slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 
 	    if(pout.x==MMC_UNDEFINED){
 	    	  if(faceid==-2) break; /*reaches the time limit*/
@@ -365,7 +366,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    if(plucker->isplucker)
 			slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
                     else
-			slen=trackhavel(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+			slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
@@ -373,7 +374,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
                         if(plucker->isplucker)
                             slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
                         else
-                            slen=trackhavel(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                            slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    }
         	    if(pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
