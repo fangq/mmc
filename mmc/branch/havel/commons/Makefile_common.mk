@@ -50,6 +50,7 @@ TARGETSUFFIX:=$(suffix $(BINARY))
 
 release: CCFLAGS+= -O3
 sse:     CCFLAGS+= -O3 -DMMC_USE_SSE -msse4.1 #-O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
+sse:     ARFLAGS+= -O3 -g -pg
 omp:     CCFLAGS+= -O3 -fopenmp
 omp:     ARFLAGS+= -fopenmp
 prof:    CCFLAGS+= -O3 -pg
@@ -60,8 +61,8 @@ dpomp:   ARFLAGS+= -fopenmp
 
 icc:     CC=icc
 icc:     AR=icc
-icc:     ARFLAGS= -O3 -openmp  
-icc:     CCFLAGS= -c -Wall -DMMC_USE_SSE -msse4.1 -openmp
+icc:     ARFLAGS=-openmp -fast # -prof_use
+icc:     CCFLAGS=-c -Wall -DMMC_USE_SSE -openmp -fast #-prof_use
 
 
 ifeq ($(TARGETSUFFIX),.so)

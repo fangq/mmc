@@ -234,7 +234,7 @@ inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,con
 		_mm_store_ss(&bary->x, _mm_mul_ss(dett, inv_det));
 		_mm_store_ss(&bary->y, _mm_mul_ss(detu, inv_det));
 		_mm_store_ss(&bary->z, _mm_mul_ss(detv, inv_det));
-		_mm_store_ps(&pout->x, _mm_mul_ps(detp,_mm_shuffle_ps(inv_det, inv_det, 0)));
+		//_mm_store_ps(&pout->x, _mm_mul_ps(detp,_mm_shuffle_ps(inv_det, inv_det, 0)));
 		return 1;
 	    }
 	}
@@ -250,7 +250,6 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 	float3 bary={1e10f,0.f,0.f,0.f};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww;
 	int i,tshift;
-
 
 	p0->w=1.f;
 	pvec->w=0.f;
@@ -276,7 +275,10 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 		*faceid=faceorder[i];
 		*isend=(Lp0>dlen);
 		Lmove=((*isend) ? dlen : Lp0);
-		
+
+		pout->x=p0->x+bary.x*pvec->x;
+		pout->y=p0->y+bary.x*pvec->y;
+		pout->z=p0->z+bary.x*pvec->z;
 		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
 	           pout->x=MMC_UNDEFINED;
