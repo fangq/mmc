@@ -6,8 +6,12 @@ addpath('/space/kwafoo/2/users/fangq/Projects/mcx/utils/')
 addpath('../../matlab')
 
 c0=299792458000;
-twin=[5e-11:1e-10:5e-9];
-gates=50;
+t0=0;
+dt=1e-10;
+t1=5e-9;
+
+twin=[t0+dt/2:dt:t1];
+gates=length(twin);
 
 %%-----------------------------------------------------------------
 %% load MCX results
@@ -39,9 +43,9 @@ srcpos=[30 30 0];
 detpos=[30 14 10];
 
 hold on
-semilogy((1:50)/10,tddiffusion(0.005, 1, c0, 0, srcpos, detpos,twin),'r');
-semilogy((1:50)/10,squeeze(mcx(detpos(1),detpos(2),detpos(3),:)),'o');
-semilogy((1:50)/10,squeeze(cube(find(node(:,1)==detpos(1) & node(:,2)==detpos(2) & node(:,3)==detpos(3)),:)),'+');
+semilogy((1:gates)/10,tddiffusion(0.005, 1, c0, 0, srcpos, detpos,twin),'r');
+semilogy((1:gates)/10,squeeze(mcx(detpos(1),detpos(2),detpos(3),:)),'o');
+semilogy((1:gates)/10,squeeze(cube(find(node(:,1)==detpos(1) & node(:,2)==detpos(2) & node(:,3)==detpos(3)),:)),'+');
 
 set(gca,'fontsize',20)
 xlabel('t (ns)')
