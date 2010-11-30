@@ -432,9 +432,7 @@ float mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 
 	   energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
 	}
-
-	energydeposit*=0.25f*1e-10f; /* unit conversions */
-	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
+	normalizor=Eabsorb/(Etotal*energydeposit*0.25f*cfg->tstep); /*scaling factor*/
 
         for(i=0;i<cfg->maxgate;i++)
            for(j=0;j<mesh->nn;j++)
