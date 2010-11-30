@@ -41,7 +41,8 @@ int main(int argc, char**argv){
 	float rtstep,Eabsorb=0.f;
 	RandType ran0[RAND_BUF_LEN],ran1[RAND_BUF_LEN];
 	int i,threadid=0,ncomplete=0;
-	unsigned int t0;
+	unsigned int t0, dt;
+	float raytri=0.f;
 
 	t0=StartTimer();
 
@@ -61,9 +62,6 @@ int main(int argc, char**argv){
 
 	plucker_init(&plucker,&mesh,cfg.isplucker);
 	
-	if(mesh.node==NULL||mesh.elem==NULL||mesh.facenb==NULL||mesh.med==NULL)
-		mesh_error("encountered error while loading mesh files");
-
 	rtstep=1.f/cfg.tstep;
 
 	if(cfg.seed<0) cfg.seed=time(NULL);
@@ -78,9 +76,11 @@ int main(int argc, char**argv){
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
 	/*launch photons*/
-#pragma omp for reduction(+:Eabsorb)
+#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
-		Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1);
+		float rtcount=0.f;
+		Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1,&rtcount);
+		raytri+=rtcount;
 		#pragma omp atomic
 		   ncomplete++;
 
@@ -91,7 +91,10 @@ int main(int argc, char**argv){
 	if((cfg.debuglevel & dlProgress))
 		mcx_progressbar(cfg.nphoton,cfg.nphoton,i,&cfg);
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
+
+	dt=GetTimeMillis()-t0;
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.3f million ray-triangle tests / second\n",raytri/(dt*1000.f)));
 
 	plucker_clear(&plucker);
 

@@ -41,6 +41,11 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
         pout->y=w1*p1->y+w2*p2->y+w3*p3->y;
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
 }
+
+inline float fast_exp(float x) {
+    return (40320+x*(40320+x*(20160+x*(6720+x*(1680+x*(336+x*(56+x*(8+x))))))))*2.4801587301e-5;
+}
+
 /*
   when a photon is crossing a vertex or edge, (slightly) pull the
   photon toward the center of the element and try again
@@ -62,7 +67,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
 */
 float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
-	      int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
+	      int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg,float *count){
 	float3 pcrx={0.f},p1={0.f};
 	float3 pin={0.f};
 	medium *prop;
@@ -141,13 +146,14 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 		}
 	    }
 	}
+	*count+=i;
         if(pin.x!=MMC_UNDEFINED && pout->x!=MMC_UNDEFINED){
 		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
 		   *faceid=-2;
 	           pout->x=MMC_UNDEFINED;
 		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-		*weight*=expf(-prop->mua*Lmove);
+		*weight*=fast_exp(-prop->mua*Lmove);
 		slen-=Lmove*prop->mus;
                 p0->x+=Lmove*pvec->x;
                 p0->y+=Lmove*pvec->y;
@@ -214,7 +220,7 @@ inline __m128 rcp_nr(const __m128 a){
     return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
 }
 
-inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,const __m128 d){
+inline int havelsse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d){
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
     if(_mm_movemask_ps(det) & 1)
@@ -245,7 +251,7 @@ inline int havelsse4(float3 *vecN, float3 *pout,float3 *bary, const __m128 o,con
 
 float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 0*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
-              int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg, float *count){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww;
@@ -268,7 +274,7 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 	*faceid=-1;
 	*isend=0;
 	for(i=0;i<4;i++)
-	   if(havelsse4(plucker->m+eid*12+i*3,pout,&bary,o,d)){
+	   if(havelsse4(plucker->m+eid*12+i*3,&bary,o,d)){
 
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 		Lp0=bary.x;
@@ -285,7 +291,7 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
 
-		*weight*=expf(-prop->mua*Lmove);
+		*weight*=fast_exp(-prop->mua*Lmove);
 		slen-=Lmove*prop->mus;
 	        if(bary.x==0.f){
 			break;
@@ -306,6 +312,7 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 		plucker->mesh->weight[ee[nc[i][2]]-1+tshift]+=ww*(1.f-bary.y-bary.z);
 		break;
 	   }
+	*count+=i;
 	p0->w=0.f;
 	if(*faceid==-2)
            return 0.f;
@@ -313,7 +320,7 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 	return slen;
 }
 
-float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
+float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0,float *raytri){
 	int faceid,eid,oldeid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer,Eabsorb;
@@ -334,9 +341,9 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 
 	while(1){  /*propagate a photon until exit*/
             if(plucker->isplucker)
-	       slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	       slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg,raytri);
 	    else
-               slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+               slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg,raytri);
 
 	    if(pout.x==MMC_UNDEFINED){
 	    	  if(faceid==-2) break; /*reaches the time limit*/
@@ -366,17 +373,17 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
 	    	    if(plucker->isplucker)
-			slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+			slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg,raytri);
                     else
-			slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+			slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg,raytri);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
                         if(plucker->isplucker)
-                            slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                            slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg,raytri);
                         else
-                            slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                            slen=trackphoton(&p0,&c0,plucker,eid-1,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg,raytri);
 		    }
         	    if(pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
