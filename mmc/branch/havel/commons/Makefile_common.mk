@@ -49,8 +49,8 @@ OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release: CCFLAGS+= -O3
-sse:     CCFLAGS+= -O3 -DMMC_USE_SSE -msse4.1 #-O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
-sse:     ARFLAGS+= -O3 -g -pg
+sse:     CCFLAGS+= -O3 -DMMC_USE_SSE -msse4.1 -fopenmp #-O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
+sse:     ARFLAGS+= -O3 -g -fopenmp
 omp:     CCFLAGS+= -O3 -fopenmp
 omp:     ARFLAGS+= -fopenmp
 prof:    CCFLAGS+= -O3 -pg

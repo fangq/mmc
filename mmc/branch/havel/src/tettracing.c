@@ -255,7 +255,7 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 
 	float3 bary={1e10f,0.f,0.f,0.f};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww;
-	int i,tshift;
+	int i,tshift,*enb,nexteid;
 
 	p0->w=1.f;
 	pvec->w=0.f;
@@ -276,9 +276,16 @@ float trackphoton(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start f
 	for(i=0;i<4;i++)
 	   if(havelsse4(plucker->m+eid*12+i*3,&bary,o,d)){
 
+		*faceid=faceorder[i];
+                enb=(int *)(plucker->mesh->facenb+eid);
+                nexteid=enb[*faceid];
+		if(nexteid){
+        		_mm_prefetch((char *)&((plucker->m+(nexteid-1)*12)->x),  _MM_HINT_T0);
+		        _mm_prefetch((char *)&((plucker->m+(nexteid-1)*12+4)->x),_MM_HINT_T0);
+        		_mm_prefetch((char *)&((plucker->m+(nexteid-1)*12+8)->x),_MM_HINT_T0);
+		}
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 		Lp0=bary.x;
-		*faceid=faceorder[i];
 		*isend=(Lp0>dlen);
 		Lmove=((*isend) ? dlen : Lp0);
 
