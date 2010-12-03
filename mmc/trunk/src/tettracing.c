@@ -163,13 +163,20 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                 p0->z+=Lmove*pvec->z;
                 if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"update weight to %f and path end %d \n",*weight,*isend);
 
-		Lio=dist(&pin,pout);
+		if(!cfg->basisorder){
+                        ww=currweight-*weight;
+                        *Eabsorb+=ww;
+                        *photontimer+=Lmove*rc;
+                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->ne;
+			plucker->mesh->weight[eid-1+tshift]+=ww;
+		}else{
+			Lio=dist(&pin,pout);
 
-                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f] [%f %f %f %f]\n",
-                      bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
+	                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f] [%f %f %f %f]\n",
+        	              bary[0][0],bary[0][1],bary[0][2],bary[0][3],bary[1][0],bary[1][1],bary[1][2],bary[1][3]);
 
-                if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"D %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
-                      dist(&pin,p0),Lp0,Lio,dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
+                	if(cfg->debuglevel&dlDist) fprintf(cfg->flog,"D %f p0-pout: %f pin-pout: %f/%f p0-p1: %f\n",
+	                      dist(&pin,p0),Lp0,Lio,dist(&pin,p0)+dist(p0,pout)-dist(&pin,pout),dlen);
 
 #ifdef MAXSTEP_ADDITION
 		if(Lio>EPS){
@@ -211,6 +218,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                      		plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 		}
 #endif
+		}
 		if(*faceid==-2)
 		   return 0.f;
         }

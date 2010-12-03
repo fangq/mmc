@@ -68,7 +68,8 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 		mesh_error("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
-	mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
+	if(cfg->basisorder) 
+	   mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
@@ -123,6 +124,8 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
+	if(!cfg->basisorder)
+	   mesh->weight=(float *)calloc(sizeof(float)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
@@ -333,11 +336,18 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	if((fp=fopen(fweight,"wt"))==NULL){
 		mesh_error("can not open weight file to write");
 	}
-	for(i=0;i<cfg->maxgate;i++)
+	if(cfg->basisorder)
+	  for(i=0;i<cfg->maxgate;i++)
 	   for(j=0;j<mesh->nn;j++){
 		pn=mesh->node+j;
 		/*if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
 		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
+			mesh_error("can not write to weight file");
+	   }
+	else
+	  for(i=0;i<cfg->maxgate;i++)
+	   for(j=0;j<mesh->ne;j++){
+		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->ne+j])==0)
 			mesh_error("can not write to weight file");
 	   }
 	fclose(fp);
@@ -349,24 +359,42 @@ float mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
-        for(i=0;i<cfg->maxgate;i++)
-            for(j=0;j<mesh->nn;j++)
-              mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
+	if(cfg->basisorder){
+            for(i=0;i<cfg->maxgate;i++)
+              for(j=0;j<mesh->nn;j++)
+        	mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
 
-        for(i=0;i<mesh->ne;i++){
-	   ee=(int *)(mesh->elem+i);
-	   energyelem=0.f;
-	   for(j=0;j<cfg->maxgate;j++)
-	     for(k=0;k<4;k++)
-		energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
+            for(i=0;i<mesh->ne;i++){
+	      ee=(int *)(mesh->elem+i);
+	      energyelem=0.f;
+	      for(j=0;j<cfg->maxgate;j++)
+		for(k=0;k<4;k++)
+		   energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
 
-	   energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
-	}
+	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
+	    }
+	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f*cfg->tstep); /*scaling factor*/
 	normalizor=Eabsorb/(Etotal*energydeposit*0.25f*cfg->tstep); /*scaling factor*/
 
-        for(i=0;i<cfg->maxgate;i++)
-           for(j=0;j<mesh->nn;j++)
-	      mesh->weight[i*mesh->nn+j]*=normalizor;
+            for(i=0;i<cfg->maxgate;i++)
+               for(j=0;j<mesh->nn;j++)
+		  mesh->weight[i*mesh->nn+j]*=normalizor;
+	}else{
+            for(i=0;i<mesh->ne;i++)
+	      for(j=0;j<cfg->maxgate;j++)
+	         energydeposit+=mesh->weight[j*mesh->ne+i];
+
+            for(i=0;i<mesh->ne;i++){
+	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]-1].mua;
+              for(j=0;j<cfg->maxgate;j++)
+        	mesh->weight[j*mesh->ne+i]/=energyelem;
+	    }
+            normalizor=Eabsorb/(Etotal*energydeposit*cfg->tstep); /*scaling factor*/
+
+            for(i=0;i<cfg->maxgate;i++)
+               for(j=0;j<mesh->ne;j++)
+                  mesh->weight[i*mesh->ne+j]*=normalizor;
+	}
 
 	return normalizor;
 }
