@@ -25,6 +25,9 @@
 #include <smmintrin.h>
 #endif
 
+#define F32N(a) ((a) & 0x80000000)
+#define F32P(a) ((a) ^ 0x80000000)
+
 const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 const int faceorder[]={1,3,2,0};
@@ -39,6 +42,10 @@ void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float
         pout->x=w1*p1->x+w2*p2->x+w3*p3->x;
         pout->y=w1*p1->y+w2*p2->y+w3*p3->y;
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
+}
+
+inline float fast_expf9(float x) {
+	return (362880.f+x*(362880.f+x*(181440.f+x*(60480.f+x*(15120.f+x*(3024.f+x*(504.f+x*(72.f+x*(9.f+x)))))))))*2.75573192e-6f;
 }
 /*
   when a photon is crossing a vertex or edge, (slightly) pull the
@@ -68,6 +75,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	int *ee;
 	int i,tshift;
 	float w[6],Rv,ww,currweight,ratio=0.f,dlen=0.f,rc; /*dlen is the physical distance*/
+	unsigned int *wi=(unsigned int*)w;
         float bary[2][4]={{0.f,0.f,0.f,0.f},{0.f,0.f,0.f,0.f}};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte;
 
@@ -94,11 +102,10 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	pin.x=MMC_UNDEFINED;
 	pout->x=MMC_UNDEFINED;
 	for(i=0;i<4;i++){
-	    if(w[fc[i][0]]||w[fc[i][1]]||w[fc[i][2]]){
 		if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"testing face [%d]\n",i);
 
 	        if(i>=2) w[fc[i][1]]=-w[fc[i][1]]; // can not go back
-		if(pin.x==MMC_UNDEFINED&&w[fc[i][0]]>=0.f && w[fc[i][1]]>=0.f && w[fc[i][2]]<=0.f){
+		if(F32P(wi[fc[i][0]]) & F32P(wi[fc[i][1]]) & F32N(wi[fc[i][2]])){
 			// f_enter
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"ray enters face %d[%d] of %d\n",i,faceorder[i],eid);
 
@@ -115,7 +122,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"entrance point %f %f %f\n",pin.x,pin.y,pin.z);
                         if(pout->x!=MMC_UNDEFINED) break;
 
-		}else if(pout->x==MMC_UNDEFINED&&w[fc[i][0]]<=0.f && w[fc[i][1]]<=0.f && w[fc[i][2]]>=0.f){
+		}else if(F32N(wi[fc[i][0]]) & F32N(wi[fc[i][1]]) & F32P(wi[fc[i][2]])){
 			// f_leave
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
 
@@ -138,7 +145,6 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			Lmove=((*isend) ? dlen : Lp0);
 			if(pin.x!=MMC_UNDEFINED) break;
 		}
-	    }
 	}
         if(pin.x!=MMC_UNDEFINED && pout->x!=MMC_UNDEFINED){
 		if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
@@ -146,7 +152,11 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	           pout->x=MMC_UNDEFINED;
 		   Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
 		}
+#ifdef __INTEL_COMPILER
 		*weight*=expf(-prop->mua*Lmove);
+#else
+		*weight*=fast_expf9(-prop->mua*Lmove);
+#endif
 		slen-=Lmove*prop->mus;
                 p0->x+=Lmove*pvec->x;
                 p0->y+=Lmove*pvec->y;

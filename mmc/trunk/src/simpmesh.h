@@ -24,6 +24,10 @@
 #include <math.h>
 #include "mcx_utils.h"
 
+#ifdef MMC_USE_SSE
+#include <smmintrin.h>
+#endif
+
 #ifdef MMC_LOGISTIC
   #include "logistic_rand.h"
 #else
@@ -62,14 +66,16 @@ typedef struct tplucker{
 	float3 *d;
 	float3 *m;
 } tetplucker;
-
-void vec_add(float3 *a,float3 *b,float3 *res);
-void vec_diff(float3 *a,float3 *b,float3 *res);
-void vec_cross(float3 *a,float3 *b,float3 *res);
-void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res);
-inline float vec_dot(float3 *a,float3 *b);
-inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am);
-
+/*
+static inline void vec_add(float3 *a,float3 *b,float3 *res);
+static inline void vec_diff(float3 *a,float3 *b,float3 *res);
+static inline void vec_cross(float3 *a,float3 *b,float3 *res);
+static inline void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res);
+static inline float vec_dot(float3 *a,float3 *b);
+static inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am);
+static inline float dist2(float3 *p0,float3 *p1);
+static inline float dist(float3 *p0,float3 *p1);
+*/
 void mesh_init(tetmesh *mesh);
 void mesh_loadnode(tetmesh *mesh,Config *cfg);
 void mesh_loadelem(tetmesh *mesh,Config *cfg);
@@ -87,9 +93,81 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg);
 void plucker_init(tetplucker *plucker,tetmesh *mesh);
 void plucker_build(tetplucker *plucker);
 void plucker_clear(tetplucker *plucker);
-inline float dist2(float3 *p0,float3 *p1);
-inline float dist(float3 *p0,float3 *p1);
 float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
 
 
+static inline void vec_add(float3 *a,float3 *b,float3 *res){
+	res->x=a->x+b->x;
+	res->y=a->y+b->y;
+	res->z=a->z+b->z;
+}
+static inline void vec_diff(float3 *a,float3 *b,float3 *res){
+        res->x=b->x-a->x;
+        res->y=b->y-a->y;
+        res->z=b->z-a->z;
+}
+static inline void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
+	res->x=sb*b->x+sa*a->x;
+	res->y=sb*b->y+sa*a->y;
+	res->z=sb*b->z+sa*a->z;
+}
+static inline void vec_cross(float3 *a,float3 *b,float3 *res){
+	res->x=a->y*b->z-a->z*b->y;
+	res->y=a->z*b->x-a->x*b->z;
+	res->z=a->x*b->y-a->y*b->x;
+}
+
+static inline void mmc_sincosf(float x, float * sine, float * cosine){
+#if defined(__GNUC__) && defined(__linux__)
+    __builtin_sincosf(x, sine, cosine);
+#else
+    *sine = sinf(x);
+    *cosine = cosf(x);
+#endif
+} 
+
+#ifndef MMC_USE_SSE
+static inline float vec_dot(float3 *a,float3 *b){
+        return a->x*b->x+a->y*b->y+a->z*b->z;
+}
+#else
+
+#ifndef __SSE4_1__
+static inline float vec_dot(float3 *a,float3 *b){
+        float dot;
+        __m128 na,nb,res;
+        na=_mm_load_ps(&a->x);
+        nb=_mm_load_ps(&b->x);
+        res=_mm_mul_ps(na,nb);
+        res=_mm_hadd_ps(res,res);
+        res=_mm_hadd_ps(res,res);
+        _mm_store_ss(&dot,res);
+        return dot;   
+}
+#else
+static inline float vec_dot(float3 *a,float3 *b){
+        float dot;
+        __m128 na,nb,res;
+        na=_mm_load_ps(&a->x);
+        nb=_mm_load_ps(&b->x);
+        res=_mm_dp_ps(na,nb,0x7f);
+        _mm_store_ss(&dot,res);
+        return dot;
+}
+#endif
+        
+#endif
+ 
+static inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
+        return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
+}
+
+
+static inline float dist2(float3 *p0,float3 *p1){
+    return (p1->x-p0->x)*(p1->x-p0->x)+(p1->y-p0->y)*(p1->y-p0->y)+(p1->z-p0->z)*(p1->z-p0->z);
+}
+
+static inline float dist(float3 *p0,float3 *p1){
+    return sqrt(dist2(p0,p1));
+}
 #endif

@@ -20,74 +20,12 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 
-#ifdef MMC_USE_SSE
-#include <smmintrin.h>
-#endif
-
-#define SINCOSF(theta,stheta,ctheta) {stheta=sinf(theta);ctheta=cosf(theta);}
-
 #ifdef WIN32
          char pathsep='\\';
 #else
          char pathsep='/';
 #endif
 
-void vec_add(float3 *a,float3 *b,float3 *res){
-	res->x=a->x+b->x;
-	res->y=a->y+b->y;
-	res->z=a->z+b->z;
-}
-void vec_diff(float3 *a,float3 *b,float3 *res){
-        res->x=b->x-a->x;
-        res->y=b->y-a->y;
-        res->z=b->z-a->z;
-}
-void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
-	res->x=sb*b->x+sa*a->x;
-	res->y=sb*b->y+sa*a->y;
-	res->z=sb*b->z+sa*a->z;
-}
-void vec_cross(float3 *a,float3 *b,float3 *res){
-	res->x=a->y*b->z-a->z*b->y;
-	res->y=a->z*b->x-a->x*b->z;
-	res->z=a->x*b->y-a->y*b->x;
-}
-
-#ifndef MMC_USE_SSE
-inline float vec_dot(float3 *a,float3 *b){
-        return a->x*b->x+a->y*b->y+a->z*b->z;
-}
-#else
-
-#ifndef __SSE4_1__
-inline float vec_dot(float3 *a,float3 *b){
-        float dot;
-        __m128 na,nb,res;
-        na=_mm_loadu_ps((float*)a);
-        nb=_mm_loadu_ps((float*)b);
-        res=_mm_mul_ps(na,nb);
-        res=_mm_hadd_ps(res,res);
-        res=_mm_hadd_ps(res,res);
-        _mm_store_ss(&dot,res);
-        return dot;   
-}
-#else
-inline float vec_dot(float3 *a,float3 *b){
-        float dot;
-        __m128 na,nb,res;
-        na=_mm_loadu_ps((float*)a);
-        nb=_mm_loadu_ps((float*)b);
-        res=_mm_dp_ps(na,nb,0x7f);
-        _mm_store_ss(&dot,res);
-        return dot;
-}
-#endif
-        
-#endif
- 
-inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
-        return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
-}
 
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
@@ -329,14 +267,6 @@ void plucker_build(tetplucker *plucker){
 	}
 }
 
-inline float dist2(float3 *p0,float3 *p1){
-    return (p1->x-p0->x)*(p1->x-p0->x)+(p1->y-p0->y)*(p1->y-p0->y)+(p1->z-p0->z)*(p1->z-p0->z);
-}
-
-inline float dist(float3 *p0,float3 *p1){
-    return sqrt(dist2(p0,p1));
-}
-
 float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config *cfg){
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
@@ -349,7 +279,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config
 
     //random arimuthal angle
     tmp0=TWO_PI*rand_next_aangle(ran); //next arimuth angle
-    SINCOSF(tmp0,sphi,cphi);
+    mmc_sincosf(tmp0,&sphi,&cphi);
 
     //Henyey-Greenstein Phase Function, "Handbook of Optical Biomedical Diagnostics",2002,Chap3,p234
     //see Boas2002
@@ -368,7 +298,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config
 	ctheta=tmp0;
     }else{  //Wang1995 has acos(2*ran-1), rather than 2*pi*ran, need to check
 	theta=M_PI*rand_next_zangle(ran);
-    	SINCOSF(theta,stheta,ctheta);
+    	mmc_sincosf(theta,&stheta,&ctheta);
     }
 
     if( dir->z>-1.f+EPS && dir->z<1.f-EPS ) {

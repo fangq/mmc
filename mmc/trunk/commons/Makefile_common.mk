@@ -49,9 +49,9 @@ OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release: CCFLAGS+= -O3
-sse:     CCFLAGS+= -O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
-omp:     CCFLAGS+= -O3 -fopenmp
-omp:     ARFLAGS+= -fopenmp
+sse:     CCFLAGS+= -O3 -DMMC_USE_SSE -msse4.1 
+omp:     CCFLAGS+= -O3 -fopenmp -ffast-math
+omp:     ARFLAGS+= -fopenmp -ffast-math
 prof:    CCFLAGS+= -O3 -pg
 prof:    ARFLAGS+= -O3 -g -pg
 dp dpomp: CCFLAGS+= -mdouble-float -O3
@@ -60,8 +60,8 @@ dpomp:   ARFLAGS+= -fopenmp
 
 icc:     CC=icc
 icc:     AR=icc
-icc:	 ARFLAGS= -O3 -openmp
-icc:	 CCFLAGS= -c -Wall -openmp -O3 #-DMMC_USE_SSE -msse4.1
+icc:	 ARFLAGS= -O3 -openmp -fast
+icc:	 CCFLAGS= -c -Wall -openmp -O3 -fast -DMMC_USE_SSE -msse4.1
 
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
