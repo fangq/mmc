@@ -23,9 +23,12 @@ endif
 
 BXDSRC :=$(BXDDIR)/src
 
-CXX        := g++
+ifndef CC
 CC         := gcc
-AR         := gcc
+endif
+
+CXX        := g++
+AR         := $(CC)
 BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
