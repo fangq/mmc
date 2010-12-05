@@ -5,6 +5,12 @@
 *                                                                    *
 *********************************************************************/
 
+/***************************************************************************//**
+\file    posix_randr.c
+
+\brief   A POSIX Random Number Generator for multi-threaded applications
+*******************************************************************************/
+
 #ifndef _MCEXTREME_POSIX_RAND_H
 #define _MCEXTREME_POSIX_RAND_H
 

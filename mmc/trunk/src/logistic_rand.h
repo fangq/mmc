@@ -1,14 +1,20 @@
-/*********************************************************************
+/*****************************************************************//**
 *A Random Number Generator based on coupled chaotic Logistic lattice *
 *                                                                    *
 *  (both double and single precision random numbers are supported)   *
 *                                                                    *
-*  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>              *
+*  \author Qianqian Fang <fangq at nmr.mgh.harvard.edu>              *
 *                                                                    *
 *  History: 2009/03/02  CUDA version based on Neal Wagner 1993       *
 *         http://www.cs.utsa.edu/~wagner/pubs/logistic/logistic.pdf  *
 *                                                                    *
 *********************************************************************/
+
+/***************************************************************************//**
+\file    logistic_rand.h
+
+\brief   An interface to use a coupled chaotic Logistic lattice RNG
+*******************************************************************************/
 
 #ifndef _MCEXTREME_LOGISTIC_RAND_H
 #define _MCEXTREME_LOGISTIC_RAND_H

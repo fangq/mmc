@@ -8,6 +8,8 @@ else
   FILES=posix_randr simpmesh tettracing mcx_utils tictoc tetray
 endif
 
+DOXYCFG=mmcdoxy.cfg
+
 USERCCFLAGS=-DUSE_OS_TIMER
 
 include $(ROOTDIR)/commons/Makefile_common.mk

@@ -12,10 +12,14 @@
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
-**  mcx_utils.c: configuration and command line option processing unit
-**
 **  License: GPL v3, see LICENSE.txt for details
 **
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    mcx_utils.c
+
+\brief   Configuration and command line option processing unit
 *******************************************************************************/
 
 #include <stdio.h>
@@ -465,7 +469,7 @@ void mcx_usage(char *exename){
 #                                                                             #\n\
 #    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
 ###############################################################################\n\
-$MCX $Rev::     $ Last Commit $Date::                     $ by $Author:: fangq$\n\
+$MMC $Rev::     $ Last Commit $Date::                     $ by $Author:: fangq$\n\
 ###############################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\

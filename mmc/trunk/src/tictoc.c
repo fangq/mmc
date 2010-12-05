@@ -8,10 +8,14 @@
 **        Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **        Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
 **
-**  tictoc.c: timing functions
-**
 **  License: GNU General Public License v3, see LICENSE.txt for details
 **
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    tictoc.c
+
+\brief   Timing functions for different platforms with libc, CUDA and OpenCL
 *******************************************************************************/
 
 #include "tictoc.h"

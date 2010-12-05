@@ -17,6 +17,12 @@
 **
 *******************************************************************************/
 
+/***************************************************************************//**
+\file    simpmesh.h
+
+\brief   Definition of basic mesh data structures and inline vector operations
+*******************************************************************************/
+
 #ifndef _MMC_MESH_UNIT_H
 #define _MMC_MESH_UNIT_H
 
@@ -42,11 +48,7 @@
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 
-typedef struct MMCMedium{
-	float mua,mus,g,n;
-} medium;
-
-typedef struct femmesh{
+typedef struct MMC_mesh{
 	int nn; // number of nodes
 	int ne; // number of elems
 	int prop;
@@ -61,11 +63,11 @@ typedef struct femmesh{
 	float *nvol; /*veronio volume of a node*/
 } tetmesh;
 
-typedef struct tplucker{
+typedef struct MMC_raytracer{
 	tetmesh *mesh;
 	float3 *d;
 	float3 *m;
-} tetplucker;
+} raytracer;
 /*
 static inline void vec_add(float3 *a,float3 *b,float3 *res);
 static inline void vec_diff(float3 *a,float3 *b,float3 *res);
@@ -90,9 +92,9 @@ void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,Config *cfg);
 void mesh_saveweight(tetmesh *mesh,Config *cfg);
 
-void plucker_init(tetplucker *plucker,tetmesh *mesh);
-void plucker_build(tetplucker *plucker);
-void plucker_clear(tetplucker *plucker);
+void tracer_init(raytracer *tracer,tetmesh *mesh);
+void tracer_build(raytracer *tracer);
+void tracer_clear(raytracer *tracer);
 float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
 
 

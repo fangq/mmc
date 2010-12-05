@@ -11,10 +11,14 @@
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
-**  simpmesh.c: basic vector math and mesh operations
-**
 **  License: GPL v3, see LICENSE.txt for details
 **
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    simpmesh.c
+
+\brief   Basic vector math and mesh operations
 *******************************************************************************/
 
 #include <stdlib.h>
@@ -228,44 +232,44 @@ void mesh_clear(tetmesh *mesh){
 	}
 }
 
-void plucker_init(tetplucker *plucker,tetmesh *pmesh){
-	plucker->d=NULL;
-	plucker->m=NULL;
-	plucker->mesh=pmesh;
-	plucker_build(plucker);
+void tracer_init(raytracer *tracer,tetmesh *pmesh){
+	tracer->d=NULL;
+	tracer->m=NULL;
+	tracer->mesh=pmesh;
+	tracer_build(tracer);
 }
-void plucker_clear(tetplucker *plucker){
-	if(plucker->d) {
-		free(plucker->d);
-		plucker->d=NULL;
+void tracer_clear(raytracer *tracer){
+	if(tracer->d) {
+		free(tracer->d);
+		tracer->d=NULL;
 	}
-	if(plucker->m) {
-		free(plucker->m);
-		plucker->m=NULL;
+	if(tracer->m) {
+		free(tracer->m);
+		tracer->m=NULL;
 	}	
-	plucker->mesh=NULL;
+	tracer->mesh=NULL;
 }
-void plucker_build(tetplucker *plucker){
+void tracer_build(raytracer *tracer){
 	int nn,ne,i,j;
 	const int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
 	float3 *nodes;
 	int *elems,ebase;
 	int e1,e0;
 	
-	if(plucker->d || plucker->m || plucker->mesh==NULL) return;
-	nn=plucker->mesh->nn;
-	ne=plucker->mesh->ne;
-	nodes=plucker->mesh->node;
-	elems=(int *)(plucker->mesh->elem); // convert int4* to int*
-	plucker->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
-	plucker->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+	if(tracer->d || tracer->m || tracer->mesh==NULL) return;
+	nn=tracer->mesh->nn;
+	ne=tracer->mesh->ne;
+	nodes=tracer->mesh->node;
+	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
+	tracer->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+	tracer->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
 	for(i=0;i<ne;i++){
 		ebase=i<<2;
 		for(j=0;j<6;j++){
 			e1=elems[ebase+pairs[j][1]]-1;
 			e0=elems[ebase+pairs[j][0]]-1;
-			vec_diff(&nodes[e0],&nodes[e1],plucker->d+i*6+j);
-			vec_cross(&nodes[e0],&nodes[e1],plucker->m+i*6+j);
+			vec_diff(&nodes[e0],&nodes[e1],tracer->d+i*6+j);
+			vec_cross(&nodes[e0],&nodes[e1],tracer->m+i*6+j);
 		}
 	}
 }

@@ -41,6 +41,9 @@ FASTMATH   := -ffast-math
 ECHO	   := echo
 MKDIR      := mkdir
 
+DOXY       := doxygen
+DOCDIR     := $(MMCDIR)/doc
+
 ifeq ($(CC),icc)
 	OPENMP   := -openmp
 	FASTMATH :=
@@ -89,6 +92,9 @@ makedirs:
 	@if test ! -d $(OBJDIR); then $(MKDIR) $(OBJDIR); fi
 	@if test ! -d $(BINDIR); then $(MKDIR) $(BINDIR); fi
 
+makedocdir:
+	@if test ! -d $(DOCDIR); then $(MKDIR) $(DOCDIR); fi
+
 .SUFFIXES : $(OBJSUFFIX) .cpp
 
 ##  Compile .cpp files ##
@@ -111,9 +117,13 @@ $(BINDIR)/$(BINARY): makedirs $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS)
 
+##  Documentation  ##
+doc: makedocdir
+	$(DOXY) $(DOXYCFG)
+
 ## Clean
 clean:
-	rm -rf $(OBJS) $(OBJDIR) $(BINDIR)
+	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
 endif

@@ -11,10 +11,14 @@
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
-**  tettracing.c: core unit for Plücker-coordinate-based ray-tracing
-**
 **  License: GPL v3, see LICENSE.txt for details
 **
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    tettracing.c
+
+\brief   Core unit for Plücker-coordinate-based ray-tracing
 *******************************************************************************/
 
 #include <string.h>
@@ -33,12 +37,12 @@ const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 const int faceorder[]={1,3,2,0};
 const int ifaceorder[]={3,0,2,1};
 
-void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
+inline void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
 	pout->x=w->x*p1->x+w->y*p2->x+w->z*p3->x;
 	pout->y=w->x*p1->y+w->y*p2->y+w->z*p3->y;
 	pout->z=w->x*p1->z+w->y*p2->z+w->z*p3->z;
 }
-void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
+inline void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
         pout->x=w1*p1->x+w2*p2->x+w3*p3->x;
         pout->y=w1*p1->y+w2*p2->y+w3*p3->y;
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
@@ -66,7 +70,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
   so, how long is the vector p0->p1 does not matter. infact, the longer
   the less round off error when computing the Plucker coordinates.
 */
-float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from 1*/, 
+float trackpos(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
 	float3 pcrx={0.f},p1={0.f};
@@ -79,22 +83,22 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
         float bary[2][4]={{0.f,0.f,0.f,0.f},{0.f,0.f,0.f,0.f}};
 	float Lp0=0.f,Lio=0.f,Lmove=0.f,atte;
 
-	if(plucker->mesh==NULL || plucker->d==NULL||eid<=0||eid>plucker->mesh->ne) 
+	if(tracer->mesh==NULL || tracer->d==NULL||eid<=0||eid>tracer->mesh->ne) 
 		return -1;
 
 	*faceid=-1;
 	*isend=0;
 	vec_add(p0,pvec,&p1);
 	vec_cross(p0,&p1,&pcrx);
-	ee=(int *)(plucker->mesh->elem+eid-1);
-	prop=plucker->mesh->med+(plucker->mesh->type[eid-1]-1);
-	atte=plucker->mesh->atte[plucker->mesh->type[eid-1]-1];
+	ee=(int *)(tracer->mesh->elem+eid-1);
+	prop=tracer->mesh->med+(tracer->mesh->type[eid-1]-1);
+	atte=tracer->mesh->atte[tracer->mesh->type[eid-1]-1];
 	rc=prop->n*R_C0;
         currweight=*weight;
 
 //#pragma unroll(6)
 	for(i=0;i<6;i++){
-		w[i]=pinner(pvec,&pcrx,plucker->d+(eid-1)*6+i,plucker->m+(eid-1)*6+i);
+		w[i]=pinner(pvec,&pcrx,tracer->d+(eid-1)*6+i,tracer->m+(eid-1)*6+i);
 		/*if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%f ",w[i]);*/
 	}
 	if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%d \n",eid);
@@ -115,9 +119,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         bary[0][nc[i][2]]=-w[fc[i][2]]*Rv;
 
 			getinterp(bary[0][nc[i][0]],bary[0][nc[i][1]],bary[0][nc[i][2]],
-				plucker->mesh->node+ee[nc[i][0]]-1,
-				plucker->mesh->node+ee[nc[i][1]]-1,
-				plucker->mesh->node+ee[nc[i][2]]-1,&pin);
+				tracer->mesh->node+ee[nc[i][0]]-1,
+				tracer->mesh->node+ee[nc[i][1]]-1,
+				tracer->mesh->node+ee[nc[i][2]]-1,&pin);
 
                         if(cfg->debuglevel&dlTracingEnter) fprintf(cfg->flog,"entrance point %f %f %f\n",pin.x,pin.y,pin.z);
                         if(pout->x!=MMC_UNDEFINED) break;
@@ -132,9 +136,9 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         bary[1][nc[i][2]]=w[fc[i][2]]*Rv;
 
 			getinterp(bary[1][nc[i][0]],bary[1][nc[i][1]],bary[1][nc[i][2]],
-				plucker->mesh->node+ee[nc[i][0]]-1,
-				plucker->mesh->node+ee[nc[i][1]]-1,
-				plucker->mesh->node+ee[nc[i][2]]-1,pout);
+				tracer->mesh->node+ee[nc[i][0]]-1,
+				tracer->mesh->node+ee[nc[i][1]]-1,
+				tracer->mesh->node+ee[nc[i][2]]-1,pout);
 
                         if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"exit point %f %f %f\n",pout->x,pout->y,pout->z);
 
@@ -167,8 +171,8 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
                         ww=currweight-*weight;
                         *Eabsorb+=ww;
                         *photontimer+=Lmove*rc;
-                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->ne;
-			plucker->mesh->weight[eid-1+tshift]+=ww;
+                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*tracer->mesh->ne;
+			tracer->mesh->weight[eid-1+tshift]+=ww;
 		}else{
 			Lio=dist(&pin,pout);
 
@@ -190,7 +194,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			*Eabsorb+=ww;
 			ww/=prop->mua; /*accumulate fluence*volume, not energy deposit*/
 
-			tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
+			tshift=(int)((*photontimer-cfg->tstart)*rtstep)*tracer->mesh->nn;
 
 			/*ww has the volume effect. volume of each nodes will be divided in the end*/
 
@@ -198,7 +202,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			   p0->x-(Lmove-dlen)*pvec->x,p0->y-(Lmove-dlen)*pvec->y,p0->z-(Lmove-dlen)*pvec->z,ww,eid,dlen);
 
 			for(i=0;i<4;i++)
-				plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
+				tracer->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 		    }
 		}
 #else
@@ -208,14 +212,14 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 			*Eabsorb+=ww;
 			ww/=prop->mua;
                         *photontimer+=Lmove*rc;
-                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*plucker->mesh->nn;
+                        tshift=(int)((*photontimer-cfg->tstart)*rtstep)*tracer->mesh->nn;
 
                         if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
                            p0->x-(Lmove*0.5f)*pvec->x,p0->y-(Lmove*0.5f)*pvec->y,p0->z-(Lmove*0.5f)*pvec->z,ww,eid,dlen);
 
 //#pragma unroll(4)
                 	for(i=0;i<4;i++)
-                     		plucker->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
+                     		tracer->mesh->weight[ee[i]-1+tshift]+=ww*(ratio*bary[0][i]+(1.f-ratio)*bary[1][i]);
 		}
 #endif
 		}
@@ -225,7 +229,7 @@ float trackpos(float3 *p0,float3 *pvec, tetplucker *plucker,int eid /*start from
 	return slen;
 }
 
-float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
+float onephoton(int id,raytracer *tracer,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
 	int faceid,eid,oldeid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer,Eabsorb;
@@ -242,7 +246,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
 	while(1){  /*propagate a photon until exit*/
-	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    slen=trackpos(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 	    if(pout.x==MMC_UNDEFINED){
 	    	  if(faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
@@ -262,7 +266,7 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 
 		    if(cfg->isreflect && (eid==0 || mesh->med[mesh->type[eid-1]-1].n != mesh->med[mesh->type[oldeid-1]-1].n )){
 			if(! (eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ))
-			    weight*=reflectray(cfg,&c0,plucker,&oldeid,&eid,faceid,ran);
+			    weight*=reflectray(cfg,&c0,tracer,&oldeid,&eid,faceid,ran);
 		    }
 
 	    	    if(!cfg->isreflect && eid==0) break;
@@ -270,12 +274,12 @@ float onephoton(int id,tetplucker *plucker,tetmesh *mesh,Config *cfg,float rtste
 	    	    if(pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
-	    	    slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    	    slen=trackpos(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
-                        slen=trackpos(&p0,&c0,plucker,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                        slen=trackpos(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    }
         	    if(pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
@@ -311,14 +315,14 @@ inline float mmc_rsqrtf(float a){
 	return 1.f/sqrtf(a);
 #endif
 }
-float reflectray(Config *cfg,float3 *c0,tetplucker *plucker,int *oldeid,int *eid,int faceid,RandType *ran){
+float reflectray(Config *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
 	/*to handle refractive index mismatch*/
         float3 pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
 
 	/*calculate the normal direction of the intersecting triangle*/
-        vec_cross(plucker->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][0],
-                  plucker->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][1],&pnorm);
+        vec_cross(tracer->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][0],
+                  tracer->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][1],&pnorm);
 	tmp0=mmc_rsqrtf(vec_dot(&pnorm,&pnorm));
 	tmp0*=(ifaceorder[faceid]>=2) ? -1.f : 1.f;
 	pnorm.x*=tmp0;
@@ -328,8 +332,8 @@ float reflectray(Config *cfg,float3 *c0,tetplucker *plucker,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,&pnorm));
 
-	n1=plucker->mesh->med[plucker->mesh->type[*oldeid-1]-1].n;
-	n2=(*eid>0) ? plucker->mesh->med[plucker->mesh->type[*eid-1]-1].n : cfg->nout;
+	n1=tracer->mesh->med[tracer->mesh->type[*oldeid-1]-1].n;
+	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]-1].n : cfg->nout;
 
 	tmp0=n1*n1;
 	tmp1=n2*n2;

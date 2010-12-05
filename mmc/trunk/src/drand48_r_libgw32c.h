@@ -16,7 +16,13 @@
    License along with the GNU C Library; if not, write to the Free
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
-   
+
+/***************************************************************************//**
+\file    drand48_r_libgw32c.h
+
+\brief   Windows 32 port of drand48_r random number generator from libgw2c
+*******************************************************************************/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
