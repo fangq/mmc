@@ -1,5 +1,14 @@
 Change Log
 
+== MMC 0.5 (Unfinished) development branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+
+2010/12/04 initial doxygen support for automatic documentation
+2010/12/04 support llvm-gcc, icc and tcc via "make target CC=compiler"
+2010/12/03 speed up gcc-compiled binary by 2x with fast exponential
+2010/11/30 fix normalization using the correct time unit
+2010/08/29 initial Windows support using MinGW and Libgw32c
+
+
 == MMC 0.2 (Cheesecake) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2010/08/29 first public release of MMC - v0.2
