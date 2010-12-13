@@ -1,0 +1,8 @@
+ROOTDIR = ../..
+BINARY=rngtest_sfmt
+
+FILES=$(ROOTDIR)/src/sfmt_rand rngtest
+USERCCFLAGS=-DMMC_SFMT -I$(ROOTDIR)/src -O3
+
+include $(ROOTDIR)/commons/Makefile_common.mk
+

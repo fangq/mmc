@@ -35,9 +35,11 @@
 #endif
 
 #ifdef MMC_LOGISTIC
-  #include "logistic_rand.h"
+  #include "logistic_rand.c"
+#elif defined MMC_SFMT    
+  #include "sfmt_rand.c"
 #else
-  #include "posix_randr.h"
+  #include "posix_randr.c"
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
@@ -79,6 +81,7 @@ static inline float dist2(float3 *p0,float3 *p1);
 static inline float dist(float3 *p0,float3 *p1);
 */
 void mesh_init(tetmesh *mesh);
+void mesh_init_from_cfg(tetmesh *mesh,Config *cfg);
 void mesh_loadnode(tetmesh *mesh,Config *cfg);
 void mesh_loadelem(tetmesh *mesh,Config *cfg);
 void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg);
@@ -126,7 +129,7 @@ static inline void mmc_sincosf(float x, float * sine, float * cosine){
     *sine = sinf(x);
     *cosine = cosf(x);
 #endif
-} 
+}
 
 #ifndef MMC_USE_SSE
 static inline float vec_dot(float3 *a,float3 *b){

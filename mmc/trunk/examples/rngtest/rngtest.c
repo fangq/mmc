@@ -8,6 +8,8 @@
 
 #ifdef MMC_LOGISTIC
   #include "logistic_rand.h"
+#elif defined MMC_SFMT
+  #include "sfmt_rand.h"
 #else
   #include "posix_randr.h"
 #endif

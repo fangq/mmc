@@ -27,12 +27,6 @@
 #include "simpmesh.h"
 #include "mcx_utils.h"
 
-#ifdef MMC_LOGISTIC
-  #include "logistic_rand.h"
-#else
-  #include "posix_randr.h"
-#endif
-
 #define MAX_TRIAL          3
 #define FIX_PHOTON         1e-3f
 

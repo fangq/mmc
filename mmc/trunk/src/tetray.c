@@ -32,12 +32,6 @@
   #include <omp.h>
 #endif
 
-#ifdef MMC_LOGISTIC
-  #include "logistic_rand.h"
-#else
-  #include "posix_randr.h"
-#endif
-
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the 
 necessary data structures. This include the command line options (cfg),
@@ -48,10 +42,12 @@ int main(int argc, char**argv){
 	Config cfg;
 	tetmesh mesh;
 	raytracer tracer;
-	float rtstep,Eabsorb=0.f;
-	RandType ran0[RAND_BUF_LEN],ran1[RAND_BUF_LEN];
-	int i,threadid=0,ncomplete=0;
-	unsigned int t0;
+	float rtstep;
+	double Eabsorb=0.0;
+	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
+        RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
+	int i;
+	unsigned int threadid=0,ncomplete=0,t0;
 
 	t0=StartTimer();
 
@@ -63,18 +59,9 @@ int main(int argc, char**argv){
 	
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initizing ... "));
 
-	mesh_init(&mesh);
-	mesh_loadnode(&mesh,&cfg);
-	mesh_loadelem(&mesh,&cfg);
-	mesh_loadfaceneighbor(&mesh,&cfg);
-	mesh_loadmedia(&mesh,&cfg);
-	mesh_loadelemvol(&mesh,&cfg);
-
+	mesh_init_from_cfg(&mesh,&cfg);
 	tracer_init(&tracer,&mesh);
 	
-	if(mesh.node==NULL||mesh.elem==NULL||mesh.facenb==NULL||mesh.med==NULL)
-		mesh_error("encountered error while loading mesh files");
-
 	rtstep=1.f/cfg.tstep;
 
 	if(cfg.seed<0) cfg.seed=time(NULL);
@@ -123,7 +110,7 @@ int main(int argc, char**argv){
 
 	if(cfg.isnormalized){
           fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.3f%%\tnormalizor=%f\n",
-		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
+		cfg.nphoton,100.*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
 	if(cfg.issave2pt){
 		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving data ..."));

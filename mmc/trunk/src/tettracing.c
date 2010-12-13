@@ -48,13 +48,11 @@ inline void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
 }
 
-inline float fast_expf9(float x) {
-	return (362880.f+x*(362880.f+x*(181440.f+x*(60480.f+x*(15120.f+x*(3024.f+x*(504.f+x*(72.f+x*(9.f+x)))))))))*2.75573192e-6f;
-}
 /*
   when a photon is crossing a vertex or edge, (slightly) pull the
   photon toward the center of the element and try again
 */
+
 void fixphoton(float3 *p,float3 *nodes, int *ee){
         float3 c0={0.f,0.f,0.f};
 	int i;
@@ -65,12 +63,14 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
         p->y+=(c0.y*0.25f-p->y)*FIX_PHOTON;
         p->z+=(c0.z*0.25f-p->z)*FIX_PHOTON;
 }
+
 /*
   p0 and p1 ony determine the direction, slen determines the length
   so, how long is the vector p0->p1 does not matter. infact, the longer
   the less round off error when computing the Plucker coordinates.
 */
-float trackpos(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 1*/, 
+
+float plucker_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
 	      int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
 	float3 pcrx={0.f},p1={0.f};
@@ -96,11 +96,9 @@ float trackpos(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 1
 	rc=prop->n*R_C0;
         currweight=*weight;
 
-//#pragma unroll(6)
-	for(i=0;i<6;i++){
+	for(i=0;i<6;i++)
 		w[i]=pinner(pvec,&pcrx,tracer->d+(eid-1)*6+i,tracer->m+(eid-1)*6+i);
-		/*if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%f ",w[i]);*/
-	}
+
 	if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%d \n",eid);
 
 	pin.x=MMC_UNDEFINED;
@@ -145,6 +143,18 @@ float trackpos(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 1
 			Lp0=dist(p0,pout);
 			dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 			*faceid=faceorder[i];
+#ifdef MMC_USE_SSE
+		{
+			int *enb=(int *)(tracer->mesh->facenb+eid-1);
+			int nexteid=(enb[*faceid]-1)*6;
+	                if(nexteid){
+        	                _mm_prefetch((char *)&((tracer->m+nexteid)->x),_MM_HINT_T0);
+                	        _mm_prefetch((char *)&((tracer->m+(nexteid)*6+4)->x),_MM_HINT_T0);
+                        	_mm_prefetch((char *)&((tracer->d+(nexteid)*6)->x),_MM_HINT_T0);
+                                _mm_prefetch((char *)&((tracer->d+(nexteid)*6+4)->x),_MM_HINT_T0);
+	                }
+		}
+#endif
 			*isend=(Lp0>dlen);
 			Lmove=((*isend) ? dlen : Lp0);
 			if(pin.x!=MMC_UNDEFINED) break;
@@ -246,7 +256,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,Config *cfg,float rtstep,
 	memcpy(&c0,&(cfg->srcdir),sizeof(p0));
 
 	while(1){  /*propagate a photon until exit*/
-	    slen=trackpos(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    slen=plucker_raytet(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 	    if(pout.x==MMC_UNDEFINED){
 	    	  if(faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
@@ -274,12 +284,12 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,Config *cfg,float rtstep,
 	    	    if(pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",pout.x,pout.y,pout.z,eid,id,slen);
 
-	    	    slen=trackpos(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+	    	    slen=plucker_raytet(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    if(faceid==-2) break;
 		    fixcount=0;
 		    while(pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 			fixphoton(&p0,mesh->node,(int *)(mesh->elem+eid-1));
-                        slen=trackpos(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
+                        slen=plucker_raytet(&p0,&c0,tracer,eid,&pout,slen,&faceid,&weight,&isend,&photontimer,&Eabsorb,rtstep,cfg);
 		    }
         	    if(pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/

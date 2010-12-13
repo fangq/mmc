@@ -45,6 +45,16 @@ void mesh_init(tetmesh *mesh){
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
 }
+
+void mesh_init_from_cfg(tetmesh *mesh,Config *cfg){
+        mesh_init(mesh);
+        mesh_loadnode(mesh,cfg);
+        mesh_loadelem(mesh,cfg);
+        mesh_loadfaceneighbor(mesh,cfg);
+        mesh_loadmedia(mesh,cfg);
+        mesh_loadelemvol(mesh,cfg);
+}
+
 void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
 	exit(1);
@@ -257,6 +267,9 @@ void tracer_build(raytracer *tracer){
 	int e1,e0;
 	
 	if(tracer->d || tracer->m || tracer->mesh==NULL) return;
+        if(tracer->mesh->node==NULL||tracer->mesh->elem==NULL||tracer->mesh->facenb==NULL||tracer->mesh->med==NULL)
+                mesh_error("mesh is missing");
+
 	nn=tracer->mesh->nn;
 	ne=tracer->mesh->ne;
 	nodes=tracer->mesh->node;
