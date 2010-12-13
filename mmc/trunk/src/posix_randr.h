@@ -21,7 +21,7 @@
 
 #include <stdlib.h>
 
-#define __device__  inline
+#define __device__  static inline
 
 #define MCX_RNG_NAME       "POSIX Multi-threaded RNG"
 

@@ -17,10 +17,9 @@
 #include <math.h>
 #include <stdio.h>
 #include "posix_randr.h"
+#include "fastmath.h"
 
-#define POSIX_R_RAND_MAX    (1.f/RAND_MAX)
 #define LOG_MT_MAX          22.1807097779182f
-#define INIT_MULT           1812433253u      /* See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. */
 
 // transform into [0,1] random number
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){

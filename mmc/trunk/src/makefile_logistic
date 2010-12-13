@@ -1,7 +1,15 @@
 ROOTDIR = ..
 BINARY=mmc_log
 
-FILES=logistic_rand simpmesh tettracing mcx_utils tictoc tetray
+PLATFORM = $(shell uname -s)
+ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
+  FILES=logistic_rand simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c tetray
+else
+  FILES=logistic_rand simpmesh tettracing mcx_utils tictoc tetray
+endif
+
+DOXYCFG=mmcdoxy.cfg
+
 USERCCFLAGS=-DMMC_LOGISTIC -DUSE_OS_TIMER
 
 include $(ROOTDIR)/commons/Makefile_common.mk

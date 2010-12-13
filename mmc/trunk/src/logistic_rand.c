@@ -17,6 +17,7 @@
 *******************************************************************************/
 
 #include "logistic_rand.h"
+#include "fastmath.h"
 
 #define R_PI               0.318309886183791f
 #define INIT_LOGISTIC      100

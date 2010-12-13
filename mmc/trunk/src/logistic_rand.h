@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define __device__ inline
+#define __device__ static inline
 
 #ifndef DOUBLE_PREC_LOGISTIC
   typedef float RandType;
