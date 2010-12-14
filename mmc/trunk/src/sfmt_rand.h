@@ -26,6 +26,7 @@
 #define __device__ static inline
 
 typedef unsigned int RandType;
+typedef unsigned int uint;
 
 #define MCX_RNG_NAME       "SFMT19937 RNG"
 
