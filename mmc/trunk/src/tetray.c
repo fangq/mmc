@@ -109,8 +109,8 @@ int main(int argc, char**argv){
 	tracer_clear(&tracer);
 
 	if(cfg.isnormalized){
-          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.3f%%\tnormalizor=%f\n",
-		cfg.nphoton,100.*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
+          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%f\n",
+		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
 	if(cfg.issave2pt){
 		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving data ..."));
