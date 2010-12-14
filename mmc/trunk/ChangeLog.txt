@@ -1,7 +1,8 @@
 Change Log
 
-== MMC 0.4 (Pecan Pie) development branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+== MMC 0.4.0 (Pecan Pie) development branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
+2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C
 2010/12/13 fixed negative time difference by promoting time counter from int to long
 2010/12/13 fixed diminishing absorption fraction by using a double accumulator
 2010/12/12 added initial support for SFMT RNG, speed and accuracy need further optimization
@@ -13,7 +14,7 @@ Change Log
 2010/08/29 initial Windows support using MinGW and Libgw32c
 
 
-== MMC 0.2 (Cheesecake) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+== MMC 0.2.0 (Cheesecake) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2010/08/29 first public release of MMC - v0.2
 2010/08/28 update examples to use iso2mesh 1.0 and MCX 0.4.9 options, remove unused input file format

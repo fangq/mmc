@@ -5,7 +5,7 @@
 
 Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.2 (Cheesecake)
+Version: 0.4.0 (Pecan Pie)
 
 -------------------------------------------------------------------------------
 
@@ -87,8 +87,12 @@ to install the necessary compilers. To compile the binary supporting
 OpenMP multi-threaded computing, your gcc version should be at least 4.0.
 To compile the binary supporting SSE4 instructions, gcc version should
 be at least 4.3.4. For windows users, you should install MinGW
-with a later version of gcc [3]. For Mac OS X users, you can install
-Xcode 3 and find gcc or llvm-gcc [4] from the installation.
+with a later version of gcc [3]. You should also install LibGW32C
+library [4] and copy the missing header files from GnuWin32\include\glibc
+to MinGW\include when you compile the code (these files typically include
+ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
+and sys/ttydefaults.h). For Mac OS X users, you need to install Xcode 3 
+and find gcc or llvm-gcc [5] from the installation.
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
@@ -101,21 +105,30 @@ folder. Other make options include
   make omp  # this compiles an OpenMP multi-threaded binary
   make prof # this makes a binary to produce profiling info for gprof
   make sse  # this uses SSE4 optimized subroutines for vector operations
+  make doc  # generate automatic source code documentation with doxygen
   make      # this produces an non-optimized binary with debugging symbols
 
-If you append "-f makefile_log" at the end of any of the above 
+If you append "-f makefile_logistic" at the end of any of the above 
 make commands, you will create an executable named mmc_log, which uses a 
-Logistic-Lattice RNG instead of the 48bit POSIX RNG.
+Logistic-Lattice RNG instead of the 48bit POSIX RNG. Similarly,
+if you append "-f makefile_sfmt", mmc will use an SIMD-oriented Fast 
+Mersenne Twister (SFMT19937) RNG with a binary name mmc_sfmt.
 
 You should be able to compile the code with Intel C++ compiler,
-AMD C compiler or LLVM. If you see any error message, please 
-follow the instruction to fix your compiler settings or install 
-the missing libraries.
+AMD C compiler or LLVM. To use other compilers, simply follow
+the following command line format
+
+  make target CC=compiler <-f makefilename>
+
+where target is one of "release/omp/prof/sse/doc", and 
+compiler can be "gcc/cc/icc/llvm-gcc/tcc" etc, and the
+optional makefilename can be either makefile_logistic or
+makefile_sfmt.
 
 After compilation, you can add the path to the "mmc" binary (typically
 mmc/src/bin) to the search path, so you don't have to type the fully 
 path to run it. To do so, you should modify your PATH environment 
-variable. Detailed instructions can be found at [5].
+variable. Detailed instructions can be found at [6].
 
 -------------------------------------------------------------------------------
 
@@ -252,7 +265,7 @@ interpolation functions such as griddata3. However, it is very
 slow for large meshes. In iso2mesh toolbox, a fast mesh slicing
 & plotting function, qmeshcut, is very efficient in making 3D
 plots of mesh or cross-sections. More details can be found at 
-this webpage [6], or "help qmeshcut" in matlab. Another useful
+this webpage [7], or "help qmeshcut" in matlab. Another useful
 function is plotmesh in iso2mesh toolbox. It has very flexible
 syntax to allow users to plot surfaces, volumetric meshes and
 cross-section plots. One can use something like
@@ -284,7 +297,8 @@ VI.  Reference
 
 [1] http://iso2mesh.sf.net  -- an image-based surface/volumetric mesh generator
 [2] http://mcx.sf.net       -- Monte Carlo eXtreme: a GPU-accelerated MC code
-[3] http://sourceforge.net/projects/mingw/files/GCC%20Version%204/
-[4] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
-[5] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
-[6] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut
+[3] http://sourceforge.net/projects/mingw/files/Automated%20MinGW%20Installer/
+[4] http://sourceforge.net/projects/gnuwin32/files/libgw32c/0.4/libgw32c-0.4.exe/download
+[5] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
+[6] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
+[7] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut
