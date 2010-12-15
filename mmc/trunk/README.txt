@@ -34,13 +34,13 @@ basis functions, thus, providing additional accuracy. This implementation
 also supports multi-threaded parallel computing and can give a nearly 
 proportional acceleration when running on multi-core processors.
 
-MMC uses FE meshes to represent a complex domain. To generate
+MMC uses FE meshes to represent a complex domain. To generate 
 an accurate FE mesh for arbitrary object had been a difficult task
 in the past. Fortunately, this had been greatly simplified
 with the development of a simple-to-use-yet-powerful mesh 
-generation tool, iso2mesh [1]. One should download and 
-install the latest iso2mesh toolbox when running all the 
-build-in examples in MMC.
+generation tool, iso2mesh [1]. One should download and install 
+the latest iso2mesh toolbox when running all the build-in examples 
+in MMC.
 
 We will soon develop a massively-parallel version of MMC by porting
 this code to CUDA and OpenCL. This is expected to produce a hundreds
@@ -48,7 +48,10 @@ or even thousands fold of acceleration in speed as we had observed
 with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, or 
 MCX [2]), developed by the same author.
 
-The details of MMC can be found in the following paper:
+MMC is a partial but evolving implementation of the mesh-based
+Monte Carlo method (MMCM). MMCM describes simulating photon transport
+using ray-tracing in a general mesh structure. The details of MMCM 
+can be found in the following paper:
 
   Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
   in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
@@ -66,8 +69,8 @@ The latest release of MMC can be downloaded from the following URL:
   http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
 
 The development branch (not fully tested) of the code can be accessed 
-using Subversion (SVN), however this is not encouraged. To 
-check out the SVN source code, you should use the following command:
+using Subversion (SVN), however this is not encouraged. To check out 
+the SVN source code, you should use the following command:
 
   svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mmc/trunk mmc
 
@@ -167,6 +170,7 @@ where possible parameters include (the first item in [] is the default value)
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
  -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead

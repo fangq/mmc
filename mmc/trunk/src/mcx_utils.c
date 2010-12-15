@@ -392,8 +392,13 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     case 'b':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isreflect),"char");
 				if(cfg->isreflect) 
-                                    fprintf(stderr,"\n\e[0;31mWARNING! the reflection code was \
+#ifdef _WIN32
+                                    fprintf(stderr,"\nWARNING!! the reflection code was \
+not fully debugged, please do not use it for publications!\n");
+#else
+				    fprintf(stderr,"\n\e[0;31mWARNING!! the reflection code was \
 not fully debugged, please do not use it for publications!\e[0m\n");
+#endif
 		     	        break;
                      case 'B':
                                 i=mcx_readarg(argc,argv,i,&(cfg->isref3),"char");
@@ -486,7 +491,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
- -C [1|0]      (--basisorder)  0 piece-wise-constant basis for fluence,1 linear\n\
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
