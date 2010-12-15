@@ -391,6 +391,9 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     	        break;
 		     case 'b':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isreflect),"char");
+				if(cfg->isreflect) 
+                                    fprintf(stderr,"\n\e[0;31mWARNING! the reflection code was \
+not fully debugged, please do not use it for publications!\e[0m\n");
 		     	        break;
                      case 'B':
                                 i=mcx_readarg(argc,argv,i,&(cfg->isref3),"char");
