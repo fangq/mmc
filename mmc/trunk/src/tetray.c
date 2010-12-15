@@ -7,9 +7,10 @@
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
 **          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
-**  \li \c (\b Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, 17(22) 20178-20190 (2009).
+**  \li \c (\b Fang2009) Qianqian Fang and David A. Boas, 
+**          <a href="http://www.opticsinfobase.org/abstract.cfm?uri=oe-17-22-20178">
+**          "Monte Carlo Simulation of Photon Migration in 3D Turbid Media Accelerated 
+**          by Graphics Processing Units,"</a> Optics Express, 17(22) 20178-20190 (2009).
 **
 **  \section slicense License
 **          GPL v3, see LICENSE.txt for details
@@ -18,7 +19,7 @@
 /***************************************************************************//**
 \file    tetray.c
 
-\brief   Main program of MMC
+\brief   << Main program of MMC >>
 *******************************************************************************/
 
 #include <stdlib.h>

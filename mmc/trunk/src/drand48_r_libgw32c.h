@@ -42,9 +42,13 @@ typedef signed __int64 sint64;
 typedef unsigned __int64 uint64;
 
 
-/* Data structure for communication with thread safe versions. This
-type is to be regarded as opaque. It's only exported because users
-have to allocate objects of this type. */
+/** 
+\struct drand48_data drand48_r_libgw32c.h
+\brief Data structure for communication with thread safe versions.
+
+This type is to be regarded as opaque. It's only exported because users
+have to allocate objects of this type.
+*/
 struct drand48_data
 {
   unsigned short int __x[3]; /* Current state. */

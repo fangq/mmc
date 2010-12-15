@@ -50,36 +50,47 @@
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 
+                                                                                                                                                                                    
+/***************************************************************************//**
+\struct MMC_mesh simpmesh.h
+\brief  Basic FEM mesh data structrure
+
+We define nodes, elements, optical property indices, and other related data
+related to an FEM mesh.
+
+*******************************************************************************/   
+
 typedef struct MMC_mesh{
-	int nn; // number of nodes
-	int ne; // number of elems
-	int prop;
-	float3 *node;
-	int4 *elem;
-	int  *type;
-	int4 *facenb;
-	medium *med;
-	float *atte;
-	float *weight;
-	float *evol; /*volume of an element*/
-	float *nvol; /*veronio volume of a node*/
+	int nn;      /**< number of nodes */
+	int ne;      /**< number of elements */
+	int prop;    /**< number of media */
+	float3 *node;/**< node coordinates */
+	int4 *elem;  /**< element indices */
+	int  *type;  /**< element-based media index */
+	int4 *facenb;/**< face neighbors, idx of the element sharing a face */
+	medium *med; /**< optical property of different media */
+	float *atte; /**< precomputed attenuation for each media */
+	float *weight;/**< volumetric fluence for all nodes at all time-gates */
+	float *evol; /**< volume of an element */
+	float *nvol; /**< veronio volume of a node */
 } tetmesh;
 
+/***************************************************************************//**
+\struct MMC_raytracer simpmesh.h
+\brief  Ray-tracer data structrure for pre-computed data
+
+We define the precomputed data in a ray-tracer structure. For the case of
+Plucker-based ray-tracing, this structure contains the displacement and 
+moment vectors for each edge in a tetrahedron.
+
+*******************************************************************************/   
+
 typedef struct MMC_raytracer{
-	tetmesh *mesh;
-	float3 *d;
-	float3 *m;
+	tetmesh *mesh;/**< link to the mesh structure */
+	float3 *d;    /**< precomputed data: for Pluckers, this is displacement */
+	float3 *m;    /**< precomputed data: for Pluckers, this is moment */
 } raytracer;
-/*
-static inline void vec_add(float3 *a,float3 *b,float3 *res);
-static inline void vec_diff(float3 *a,float3 *b,float3 *res);
-static inline void vec_cross(float3 *a,float3 *b,float3 *res);
-static inline void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res);
-static inline float vec_dot(float3 *a,float3 *b);
-static inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am);
-static inline float dist2(float3 *p0,float3 *p1);
-static inline float dist(float3 *p0,float3 *p1);
-*/
+
 void mesh_init(tetmesh *mesh);
 void mesh_init_from_cfg(tetmesh *mesh,Config *cfg);
 void mesh_loadnode(tetmesh *mesh,Config *cfg);

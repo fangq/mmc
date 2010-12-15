@@ -2,7 +2,7 @@ Change Log
 
 == MMC 0.4.0 (Pecan Pie) development branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
-2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C
+2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C, add documentation
 2010/12/13 fixed negative time difference by promoting time counter from int to long
 2010/12/13 fixed diminishing absorption fraction by using a double accumulator
 2010/12/12 added initial support for SFMT RNG, speed and accuracy need further optimization

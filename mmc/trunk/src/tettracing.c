@@ -18,7 +18,7 @@
 /***************************************************************************//**
 \file    tettracing.c
 
-\brief   Core unit for Plücker-coordinate-based ray-tracing
+\brief   Core unit for Plucker-coordinate-based ray-tracing
 *******************************************************************************/
 
 #include <string.h>

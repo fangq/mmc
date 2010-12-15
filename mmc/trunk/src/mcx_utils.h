@@ -45,12 +45,30 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048};
 
+/***************************************************************************//**
+\struct MMC_medium mcx_utils.h
+
+\brief  This structure defines the optical properties for each medium
+
+For each optical medium, we use a 4-element structure to identify its optical
+properties, i.e, the absorption coeff (mu_a)in 1/mm, the scattering coeff (mu_s) 
+in 1/mm, the reflective index (n) and anisotropy (g).
+*******************************************************************************/  
+
 typedef struct MMC_medium{
-	float mua;
-	float mus;
-	float n;
-	float g;
-} medium;  /*this order shall match prop.{xyzw} in mcx_main_loop*/
+	float mua;        /**<absorption coeff in 1/mm unit*/
+	float mus;        /**<scattering coeff in 1/mm unit*/
+	float n;          /**<reflective index*/
+	float g;          /**<anisotropy*/
+} medium;
+
+
+/***************************************************************************//**
+\struct MMC_config mcx_utils.h
+                                                                                                                                                                                    
+\brief  This structure defines the problem settings (domain, filenames, session)
+                                                                                                                                                                                    
+*******************************************************************************/  
 
 typedef struct MMC_config{
 	int nphoton;      /**<(total simulated photon number) we now use this to 
@@ -101,8 +119,8 @@ typedef struct MMC_config{
         float minenergy;    /**<minimum energy to propagate photon*/
 	float nout;         /**<refractive index for the domain outside the mesh*/
         FILE *flog;         /**<stream handle to print log information*/
-        char rootpath[MAX_PATH_LENGTH];
-        unsigned int debuglevel;
+        char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
+        unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
 	float unitinmm;     /**<define the length unit in mm*/
 } Config;
 

@@ -1,3 +1,16 @@
+/*****************************************************************//**
+*            A library for approximated math functions               *
+*                                                                    *
+*  \author Qianqian Fang <fangq at nmr.mgh.harvard.edu>              *
+*                                                                    *
+*********************************************************************/
+
+/***************************************************************************//**
+\file    fastmath.h
+
+\brief   A library for approximated math functions
+*******************************************************************************/
+
 #ifndef _MMC_FAST_MATH_FUNCTIONS_H
 #define _MMC_FAST_MATH_FUNCTIONS_H
 
