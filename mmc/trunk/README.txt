@@ -42,11 +42,11 @@ generation tool, iso2mesh [1]. One should download and install
 the latest iso2mesh toolbox when running all the build-in examples 
 in MMC.
 
-We will soon develop a massively-parallel version of MMC by porting
+We are currently working on a massively-parallel version of MMC by porting
 this code to CUDA and OpenCL. This is expected to produce a hundreds
-or even thousands fold of acceleration in speed as we had observed
-with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, or 
-MCX [2]), developed by the same author.
+or even a thousand fold of acceleration in speed, similar to what we had 
+observed with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, 
+or MCX [2]).
 
 MMC is a partial but evolving implementation of the mesh-based
 Monte Carlo method (MMCM). MMCM describes simulating photon transport

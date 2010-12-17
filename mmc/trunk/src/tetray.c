@@ -40,7 +40,7 @@ tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 *******************************************************************************/
 
 int main(int argc, char**argv){
-	Config cfg;
+	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
 	float rtstep;
@@ -58,7 +58,7 @@ int main(int argc, char**argv){
         /** parse command line options to initialize the configurations */
         mcx_parsecmd(argc,argv,&cfg);
 	
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initizing ... "));
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 
 	mesh_init_from_cfg(&mesh,&cfg);
 	tracer_init(&tracer,&mesh);

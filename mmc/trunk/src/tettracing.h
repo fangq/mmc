@@ -33,8 +33,8 @@
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
-float onephoton(int id,raytracer *tracer,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran,RandType *ran0);
-float reflectray(Config *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
+float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,float rtstep,RandType *ran,RandType *ran0);
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 inline float mmc_rsqrtf(float a);
 
 #endif

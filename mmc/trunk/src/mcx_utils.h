@@ -52,13 +52,13 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 For each optical medium, we use a 4-element structure to identify its optical
 properties, i.e, the absorption coeff (mu_a)in 1/mm, the scattering coeff (mu_s) 
-in 1/mm, the reflective index (n) and anisotropy (g).
+in 1/mm, the refractive index (n) and anisotropy (g).
 *******************************************************************************/  
 
 typedef struct MMC_medium{
 	float mua;        /**<absorption coeff in 1/mm unit*/
 	float mus;        /**<scattering coeff in 1/mm unit*/
-	float n;          /**<reflective index*/
+	float n;          /**<refractive index*/
 	float g;          /**<anisotropy*/
 } medium;
 
@@ -122,28 +122,28 @@ typedef struct MMC_config{
         char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
 	float unitinmm;     /**<define the length unit in mm*/
-} Config;
+} mcconfig;
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void mcx_savedata(float *dat,int len,Config *cfg);
+void mcx_savedata(float *dat,int len,mcconfig *cfg);
 void mcx_error(int id,char *msg);
-void mcx_loadconfig(FILE *in, Config *cfg);
-void mcx_saveconfig(FILE *in, Config *cfg);
-void mcx_readconfig(char *fname, Config *cfg);
-void mcx_writeconfig(char *fname, Config *cfg);
-void mcx_initcfg(Config *cfg);
-void mcx_clearcfg(Config *cfg);
-void mcx_parsecmd(int argc, char* argv[], Config *cfg);
+void mcx_loadconfig(FILE *in, mcconfig *cfg);
+void mcx_saveconfig(FILE *in, mcconfig *cfg);
+void mcx_readconfig(char *fname, mcconfig *cfg);
+void mcx_writeconfig(char *fname, mcconfig *cfg);
+void mcx_initcfg(mcconfig *cfg);
+void mcx_clearcfg(mcconfig *cfg);
+void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
 void mcx_usage(char *exename);
-void mcx_loadvolume(char *filename,Config *cfg);
+void mcx_loadvolume(char *filename,mcconfig *cfg);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
-void mcx_printlog(Config *cfg, char *str);
+void mcx_printlog(mcconfig *cfg, char *str);
 int  mcx_remap(char *opt);
 int  mcx_parsedebugopt(char *debugopt);
-void mcx_progressbar(unsigned int n, unsigned int ntotal, Config *cfg);
+void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg);
 
 #ifdef	__cplusplus
 }

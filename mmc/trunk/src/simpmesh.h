@@ -92,24 +92,24 @@ typedef struct MMC_raytracer{
 } raytracer;
 
 void mesh_init(tetmesh *mesh);
-void mesh_init_from_cfg(tetmesh *mesh,Config *cfg);
-void mesh_loadnode(tetmesh *mesh,Config *cfg);
-void mesh_loadelem(tetmesh *mesh,Config *cfg);
-void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg);
-void mesh_loadmedia(tetmesh *mesh,Config *cfg);
-void mesh_loadelemvol(tetmesh *mesh,Config *cfg);
+void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadnode(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadelem(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg);
 
 void mesh_clear(tetmesh *mesh);
-float mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal);
+float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);
 void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
-void mesh_filenames(char *format,char *foutput,Config *cfg);
-void mesh_saveweight(tetmesh *mesh,Config *cfg);
+void mesh_filenames(char *format,char *foutput,mcconfig *cfg);
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh);
 void tracer_build(raytracer *tracer);
 void tracer_clear(raytracer *tracer);
-float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,Config *cfg);
+float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,mcconfig *cfg);
 
 
 static inline void vec_add(float3 *a,float3 *b,float3 *res){

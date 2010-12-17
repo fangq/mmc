@@ -72,7 +72,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
 
 float plucker_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 1*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
-	      int *isend,float *photontimer, float *Eabsorb, float rtstep, Config *cfg){
+	      int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg){
 	float3 pcrx={0.f},p1={0.f};
 	float3 pin={0.f};
 	medium *prop;
@@ -239,7 +239,7 @@ float plucker_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start 
 	return slen;
 }
 
-float onephoton(int id,raytracer *tracer,tetmesh *mesh,Config *cfg,float rtstep,RandType *ran, RandType *ran0){
+float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,float rtstep,RandType *ran, RandType *ran0){
 	int faceid,eid,oldeid,isend,fixcount=0;
 	int *enb;
 	float slen,weight,photontimer,Eabsorb;
@@ -325,7 +325,7 @@ inline float mmc_rsqrtf(float a){
 	return 1.f/sqrtf(a);
 #endif
 }
-float reflectray(Config *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
 	/*to handle refractive index mismatch*/
         float3 pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;

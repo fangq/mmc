@@ -46,7 +46,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->nvol=NULL;
 }
 
-void mesh_init_from_cfg(tetmesh *mesh,Config *cfg){
+void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_init(mesh);
         mesh_loadnode(mesh,cfg);
         mesh_loadelem(mesh,cfg);
@@ -59,7 +59,7 @@ void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
 	exit(1);
 }
-void mesh_filenames(char *format,char *foutput,Config *cfg){
+void mesh_filenames(char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
 
@@ -68,7 +68,7 @@ void mesh_filenames(char *format,char *foutput,Config *cfg){
 	else
 		sprintf(foutput,"%s",filename);
 }
-void mesh_loadnode(tetmesh *mesh,Config *cfg){
+void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	char fnode[MAX_PATH_LENGTH];
@@ -98,7 +98,7 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 	fclose(fp);
 }
 
-void mesh_loadmedia(tetmesh *mesh,Config *cfg){
+void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	char fmed[MAX_PATH_LENGTH];
@@ -123,7 +123,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadelem(tetmesh *mesh,Config *cfg){
+void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
@@ -148,7 +148,7 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadelemvol(tetmesh *mesh,Config *cfg){
+void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,*ee;
 	char fvelem[MAX_PATH_LENGTH];
@@ -179,7 +179,7 @@ void mesh_loadelemvol(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
+void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
@@ -287,7 +287,7 @@ void tracer_build(raytracer *tracer){
 	}
 }
 
-float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config *cfg){
+float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg){
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
@@ -340,7 +340,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config
     return nextslen;
 }
 
-void mesh_saveweight(tetmesh *mesh,Config *cfg){
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int i,j;
 	float3 *pn;
@@ -371,7 +371,7 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
-float mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
+float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;

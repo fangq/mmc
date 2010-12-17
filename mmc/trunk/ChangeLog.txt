@@ -1,6 +1,9 @@
 Change Log
 
-== MMC 0.4.0 (Pecan Pie) development branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+== MMC 0.5.pre (unfinished) development branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+
+
+== MMC 0.4.0 (Pecan Pie) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C, add documentation
 2010/12/13 fixed negative time difference by promoting time counter from int to long

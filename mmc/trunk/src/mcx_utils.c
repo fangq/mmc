@@ -19,7 +19,7 @@
 /***************************************************************************//**
 \file    mcx_utils.c
 
-\brief   Configuration and command line option processing unit
+\brief   mcconfiguration and command line option processing unit
 *******************************************************************************/
 
 #include <stdio.h>
@@ -41,7 +41,7 @@ const char *fullopt[]={"--help","--interactive","--input","--photon",
 
 const char *debugflag="MCBWDIOXATRP";
 
-void mcx_initcfg(Config *cfg){
+void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
      cfg->detnum=0;
      cfg->dim.x=0;
@@ -79,7 +79,7 @@ void mcx_initcfg(Config *cfg){
      cfg->unitinmm=1.f;
 }
 
-void mcx_clearcfg(Config *cfg){
+void mcx_clearcfg(mcconfig *cfg){
      if(cfg->medianum)
      	free(cfg->prop);
      if(cfg->detnum)
@@ -91,7 +91,7 @@ void mcx_clearcfg(Config *cfg){
      mcx_initcfg(cfg);
 }
 
-void mcx_savedata(float *dat,int len,Config *cfg){
+void mcx_savedata(float *dat,int len,mcconfig *cfg){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
      sprintf(name,"%s.mc2",cfg->session);
@@ -100,7 +100,7 @@ void mcx_savedata(float *dat,int len,Config *cfg){
      fclose(fp);
 }
 
-void mcx_printlog(Config *cfg, char *str){
+void mcx_printlog(mcconfig *cfg, char *str){
      if(cfg->flog>0){ /*stdout is 1*/
          fprintf(cfg->flog,"%s\n",str);
      }
@@ -122,7 +122,7 @@ void mcx_assert(int ret){
      if(!ret) mcx_error(ret,"assert error");
 }
 
-void mcx_readconfig(char *fname, Config *cfg){
+void mcx_readconfig(char *fname, mcconfig *cfg){
      if(fname[0]==0){
      	mcx_loadconfig(stdin,cfg);
         if(cfg->session[0]=='\0'){
@@ -139,7 +139,7 @@ void mcx_readconfig(char *fname, Config *cfg){
      }
 }
 
-void mcx_writeconfig(char *fname, Config *cfg){
+void mcx_writeconfig(char *fname, mcconfig *cfg){
      if(fname[0]==0)
      	mcx_saveconfig(stdout,cfg);
      else{
@@ -150,7 +150,7 @@ void mcx_writeconfig(char *fname, Config *cfg){
      }
 }
 
-void mcx_loadconfig(FILE *in, Config *cfg){
+void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates;
      char comment[MAX_PATH_LENGTH],*comm;
      
@@ -227,7 +227,7 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      }
 }
 
-void mcx_saveconfig(FILE *out, Config *cfg){
+void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
      fprintf(out,"%d\n", (cfg->nphoton) ); 
@@ -248,7 +248,7 @@ void mcx_saveconfig(FILE *out, Config *cfg){
      }
 }
 
-void mcx_loadvolume(char *filename,Config *cfg){
+void mcx_loadvolume(char *filename,mcconfig *cfg){
      int datalen,res;
      FILE *fp=fopen(filename,"rb");
      if(fp==NULL){
@@ -280,7 +280,7 @@ int mcx_parsedebugopt(char *debugopt){
     return debuglevel;
 }
 
-void mcx_progressbar(unsigned int n, unsigned int ntotal, Config *cfg){
+void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg){
     unsigned int percentage, j,colwidth=79;
     static unsigned int oldmarker=0;
 
@@ -339,7 +339,7 @@ int mcx_remap(char *opt){
     }
     return 1;
 }
-void mcx_parsecmd(int argc, char* argv[], Config *cfg){
+void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      int i=1,isinteractive=1,issavelog=0;
      char filename[MAX_PATH_LENGTH]={0};
      char logfile[MAX_PATH_LENGTH]={0};
