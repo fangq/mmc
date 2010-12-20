@@ -1,20 +1,25 @@
-/*******************************************************************************
-**  Mesh-based Monte Carlo (MMC)
+/***************************************************************************//**
+**  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**  \author Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 **
-**  Reference:
-**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
+**  \section sref Reference:
+**  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2009) Qianqian Fang and David A. Boas, 
+**          <a href="http://www.opticsinfobase.org/abstract.cfm?uri=oe-17-22-20178">
+**          "Monte Carlo Simulation of Photon Migration in 3D Turbid Media Accelerated 
+**          by Graphics Processing Units,"</a> Optics Express, 17(22) 20178-20190 (2009).
 **
-**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, 17(22) 20178-20190 (2009)
-**
-**  tetray.c: main program of MMC
-**
-**  License: GPL v3, see LICENSE.txt for details
-**
+**  \section slicense License
+**          GPL v3, see LICENSE.txt for details
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    tetray.c
+
+\brief   << Main program of MMC >>
 *******************************************************************************/
 
 #include <stdlib.h>
@@ -28,45 +33,54 @@
   #include <omp.h>
 #endif
 
-#ifdef MMC_LOGISTIC
-  #include "logistic_rand.h"
-#else
-  #include "posix_randr.h"
-#endif
+/***************************************************************************//**
+In this unit, we first launch a master thread and initialize the 
+necessary data structures. This include the command line options (cfg),
+tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
+*******************************************************************************/
 
 int main(int argc, char**argv){
-	Config cfg;
+	mcconfig cfg;
 	tetmesh mesh;
-	tetplucker plucker;
-	float rtstep,Eabsorb=0.f;
-	RandType ran0[RAND_BUF_LEN],ran1[RAND_BUF_LEN];
-	int i,threadid=0,ncomplete=0;
-	unsigned int t0, dt;
+	raytracer tracer;
+	float rtstep;
+	double Eabsorb=0.0;
+	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
+        RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
+	int i;
 	float raytri=0.f;
+	unsigned int threadid=0,ncomplete=0,t0,dt;
 
 	t0=StartTimer();
 
+        /** \subsection sinit Initialization */
         mcx_initcfg(&cfg);
 
-        /* parse command line options to initialize the configurations */
+        /** parse command line options to initialize the configurations */
         mcx_parsecmd(argc,argv,&cfg);
 	
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initizing ... "));
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 
-	mesh_init(&mesh);
-	mesh_loadnode(&mesh,&cfg);
-	mesh_loadelem(&mesh,&cfg);
-	mesh_loadfaceneighbor(&mesh,&cfg);
-	mesh_loadmedia(&mesh,&cfg);
-	mesh_loadelemvol(&mesh,&cfg);
-
-	plucker_init(&plucker,&mesh,cfg.isplucker);
+	mesh_init_from_cfg(&mesh,&cfg);
+	tracer_init(&tracer,&mesh,cfg.isplucker);
 	
 	rtstep=1.f/cfg.tstep;
 
 	if(cfg.seed<0) cfg.seed=time(NULL);
 
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
+
+	/***************************************************************************//**
+	The master thread then spawn multiple work-threads depending on your
+	OpenMP settings. By default, the total thread number (master + work) is 
+	your total CPU core number. For example, if you have a dual-core CPU, 
+	the total thread number is 2; if you have two quad-core CPUs, the total 
+	thread number is 8. If you want to set the total thread number manually, 
+	you need to set the OMP_NUM_THREADS environment variable. For example, 
+	\c OMP_NUM_THREADS=3 sets the total thread number to 3.
+	*******************************************************************************/
+
+/** \subsection ssimu Parallel photon transport simulation */
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
@@ -79,27 +93,30 @@ int main(int argc, char**argv){
 #pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
 		float rtcount=0.f;
-		Eabsorb+=onephoton(i,&plucker,&mesh,&cfg,rtstep,ran0,ran1,&rtcount);
+		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,rtstep,ran0,ran1,&rtcount);
 		raytri+=rtcount;
 		#pragma omp atomic
 		   ncomplete++;
 
 		if((cfg.debuglevel & dlProgress) && threadid==0)
-			mcx_progressbar(ncomplete,cfg.nphoton,i,&cfg);
+			mcx_progressbar(ncomplete,cfg.nphoton,&cfg);
 	}
 }
+
+        /** \subsection sreport Post simulation */
+
 	if((cfg.debuglevel & dlProgress))
-		mcx_progressbar(cfg.nphoton,cfg.nphoton,i,&cfg);
-	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
+		mcx_progressbar(cfg.nphoton,cfg.nphoton,&cfg);
 
 	dt=GetTimeMillis()-t0;
+	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.3f million ray-triangle tests / second\n",raytri/(dt*1000.f)));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests\n",raytri));
 
-	plucker_clear(&plucker);
+	tracer_clear(&tracer);
 
 	if(cfg.isnormalized){
-          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.3f%%\tnormalizor=%f\n",
+          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%f\n",
 		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
 	if(cfg.issave2pt){
@@ -108,6 +125,8 @@ int main(int argc, char**argv){
 	}
 
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
+
+        /** \subsection sclean End the simulation */
 
 	mesh_clear(&mesh);
         mcx_clearcfg(&cfg);

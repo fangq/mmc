@@ -8,10 +8,14 @@
 **        Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **        Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
 **
-**  tictoc.c: timing functions
-**
 **  License: GNU General Public License v3, see LICENSE.txt for details
 **
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    tictoc.c
+
+\brief   Timing functions for different platforms with libc, CUDA and OpenCL
 *******************************************************************************/
 
 #include "tictoc.h"
@@ -74,11 +78,11 @@ static unsigned int timerRes;
 #include <string.h>
 void SetupMillisTimer(void) {}
 void CleanupMillisTimer(void) {}
-int GetTime (void) {
+unsigned long GetTime (void) {
   struct timeval tv;
   timerRes = 1000;
   gettimeofday(&tv,NULL);
-  int temp = tv.tv_usec;
+  unsigned long temp = tv.tv_usec;
   temp+=tv.tv_sec*1000000;
   return temp;
 }
@@ -99,7 +103,7 @@ unsigned int StartTimer () {
  *      based on the performance counters.
  */
 
-int GetTime(void)
+unsigned long GetTime(void)
 {
    static double cycles_per_usec;
    LARGE_INTEGER counter;
@@ -119,7 +123,7 @@ int GetTime(void)
       return 0;
    }
 
-   return ((int) (((double) counter.QuadPart) * cycles_per_usec));
+   return ((unsigned long) (((double) counter.QuadPart) * cycles_per_usec));
 }
 
 #pragma comment(lib,"winmm.lib")

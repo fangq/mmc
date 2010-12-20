@@ -11,20 +11,18 @@
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
-**  simpmesh.c: basic vector math and mesh operations
-**
 **  License: GPL v3, see LICENSE.txt for details
 **
 *******************************************************************************/
 
+/***************************************************************************//**
+\file    simpmesh.c
+
+\brief   Basic vector math and mesh operations
+*******************************************************************************/
+
 #include <stdlib.h>
 #include "simpmesh.h"
-
-#ifdef MMC_USE_SSE
-#include <smmintrin.h>
-#endif
-
-#define SINCOSF(theta,stheta,ctheta) {stheta=sinf(theta);ctheta=cosf(theta);}
 
 #ifdef WIN32
          char pathsep='\\';
@@ -32,67 +30,6 @@
          char pathsep='/';
 #endif
 
-void vec_add(float3 *a,float3 *b,float3 *res){
-	res->x=a->x+b->x;
-	res->y=a->y+b->y;
-	res->z=a->z+b->z;
-}
-void vec_diff(float3 *a,float3 *b,float3 *res){
-        res->x=b->x-a->x;
-        res->y=b->y-a->y;
-        res->z=b->z-a->z;
-}
-void vec_mult(float3 *a,float sa,float3 *res){
-        res->x=sa*a->x;
-        res->y=sa*a->y;
-        res->z=sa*a->z;
-}
-void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
-	res->x=sb*b->x+sa*a->x;
-	res->y=sb*b->y+sa*a->y;
-	res->z=sb*b->z+sa*a->z;
-}
-void vec_cross(float3 *a,float3 *b,float3 *res){
-	res->x=a->y*b->z-a->z*b->y;
-	res->y=a->z*b->x-a->x*b->z;
-	res->z=a->x*b->y-a->y*b->x;
-}
-
-#ifndef MMC_USE_SSE
-inline float vec_dot(float3 *a,float3 *b){
-        return a->x*b->x+a->y*b->y+a->z*b->z;
-}
-#else
-
-#ifndef __SSE4_1__
-inline float vec_dot(float3 *a,float3 *b){
-        float dot;
-        __m128 na,nb,res;
-        na=_mm_load_ps((float*)a);
-        nb=_mm_load_ps((float*)b);
-        res=_mm_mul_ps(na,nb);
-        res=_mm_hadd_ps(res,res);
-        res=_mm_hadd_ps(res,res);
-        _mm_store_ss(&dot,res);
-        return dot;   
-}
-#else
-inline float vec_dot(float3 *a,float3 *b){
-        float dot;
-        __m128 na,nb,res;
-        na=_mm_load_ps((float*)a);
-        nb=_mm_load_ps((float*)b);
-        res=_mm_dp_ps(na,nb,0x7f);
-        _mm_store_ss(&dot,res);
-        return dot;
-}
-#endif
-        
-#endif
- 
-inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
-        return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
-}
 
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
@@ -108,11 +45,21 @@ void mesh_init(tetmesh *mesh){
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
 }
+
+void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
+        mesh_init(mesh);
+        mesh_loadnode(mesh,cfg);
+        mesh_loadelem(mesh,cfg);
+        mesh_loadfaceneighbor(mesh,cfg);
+        mesh_loadmedia(mesh,cfg);
+        mesh_loadelemvol(mesh,cfg);
+}
+
 void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
 	exit(1);
 }
-void mesh_filenames(char *format,char *foutput,Config *cfg){
+void mesh_filenames(char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
 
@@ -121,7 +68,7 @@ void mesh_filenames(char *format,char *foutput,Config *cfg){
 	else
 		sprintf(foutput,"%s",filename);
 }
-void mesh_loadnode(tetmesh *mesh,Config *cfg){
+void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	char fnode[MAX_PATH_LENGTH];
@@ -135,7 +82,8 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 		mesh_error("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
-	mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
+	if(cfg->basisorder) 
+	   mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
@@ -150,7 +98,7 @@ void mesh_loadnode(tetmesh *mesh,Config *cfg){
 	fclose(fp);
 }
 
-void mesh_loadmedia(tetmesh *mesh,Config *cfg){
+void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	char fmed[MAX_PATH_LENGTH];
@@ -175,7 +123,7 @@ void mesh_loadmedia(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadelem(tetmesh *mesh,Config *cfg){
+void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
@@ -190,6 +138,8 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
+	if(!cfg->basisorder)
+	   mesh->weight=(float *)calloc(sizeof(float)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
@@ -198,7 +148,7 @@ void mesh_loadelem(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadelemvol(tetmesh *mesh,Config *cfg){
+void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,*ee;
 	char fvelem[MAX_PATH_LENGTH];
@@ -229,7 +179,7 @@ void mesh_loadelemvol(tetmesh *mesh,Config *cfg){
 	}
 	fclose(fp);
 }
-void mesh_loadfaceneighbor(tetmesh *mesh,Config *cfg){
+void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
 	int4 *pe;
@@ -292,50 +242,51 @@ void mesh_clear(tetmesh *mesh){
 	}
 }
 
-void plucker_init(tetplucker *plucker,tetmesh *pmesh,int mode){
-	plucker->d=NULL;
-	plucker->m=NULL;
-	plucker->mesh=pmesh;
-	plucker->isplucker=mode;
-	plucker_build(plucker);
+void tracer_init(raytracer *tracer,tetmesh *pmesh,int methodid){
+	tracer->d=NULL;
+	tracer->m=NULL;
+	tracer->mesh=pmesh;
+	tracer->method=methodid;
+	tracer_build(tracer);
 }
-void plucker_clear(tetplucker *plucker){
-	if(plucker->d) {
-		free(plucker->d);
-		plucker->d=NULL;
+
+void tracer_clear(raytracer *tracer){
+	if(tracer->d) {
+		free(tracer->d);
+		tracer->d=NULL;
 	}
-	if(plucker->m) {
-		free(plucker->m);
-		plucker->m=NULL;
-	}
-	plucker->mesh=NULL;
+	if(tracer->m) {
+		free(tracer->m);
+		tracer->m=NULL;
+	}	
+	tracer->mesh=NULL;
 }
-void plucker_build(tetplucker *plucker){
+
+void tracer_build(raytracer *tracer){
 	int nn,ne,i,j;
 	const int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
-
 	float3 *nodes;
 	int *elems,ebase;
 	int e1,e0;
+	
+	if(tracer->d || tracer->m || tracer->mesh==NULL) return;
+        if(tracer->mesh->node==NULL||tracer->mesh->elem==NULL||tracer->mesh->facenb==NULL||tracer->mesh->med==NULL)
+                mesh_error("mesh is missing");
 
-	if(plucker->d || plucker->m || plucker->mesh==NULL) return;
-        if(plucker->mesh->node==NULL||plucker->mesh->elem==NULL||plucker->mesh->facenb==NULL||plucker->mesh->med==NULL)
-                mesh_error("encountered error while loading mesh files");
-
-	nn=plucker->mesh->nn;
-	ne=plucker->mesh->ne;
-	nodes=plucker->mesh->node;
-	elems=(int *)(plucker->mesh->elem); // convert int4* to int*
-	if(plucker->isplucker){
-		plucker->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
-		plucker->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+	nn=tracer->mesh->nn;
+	ne=tracer->mesh->ne;
+	nodes=tracer->mesh->node;
+	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
+	if(tracer->method){
+		tracer->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+		tracer->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
 		for(i=0;i<ne;i++){
 			ebase=i<<2;
 			for(j=0;j<6;j++){
 				e1=elems[ebase+pairs[j][1]]-1;
 				e0=elems[ebase+pairs[j][0]]-1;
-				vec_diff(&nodes[e0],&nodes[e1],plucker->d+i*6+j);
-				vec_cross(&nodes[e0],&nodes[e1],plucker->m+i*6+j);
+				vec_diff(&nodes[e0],&nodes[e1],tracer->d+i*6+j);
+				vec_cross(&nodes[e0],&nodes[e1],tracer->m+i*6+j);
 			}
 		}
 	}else{
@@ -343,12 +294,12 @@ void plucker_build(tetplucker *plucker){
 		const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
 		float3 vecAB={0.f},vecAC={0.f};
 
-		plucker->d=NULL;
-		plucker->m=(float3*)calloc(sizeof(float3),ne*12);
+		tracer->d=NULL;
+		tracer->m=(float3*)calloc(sizeof(float3),ne*12);
                 for(i=0;i<ne;i++){
                         ebase=i<<2;
 			for(j=0;j<4;j++){
-				float3 *vecN=plucker->m+3*((i<<2)+j);
+				float3 *vecN=tracer->m+3*((i<<2)+j);
 				float Rn2;
 
                                 ea=elems[ebase+out[j][0]]-1;
@@ -374,15 +325,7 @@ void plucker_build(tetplucker *plucker){
 	}
 }
 
-inline float dist2(float3 *p0,float3 *p1){
-    return (p1->x-p0->x)*(p1->x-p0->x)+(p1->y-p0->y)*(p1->y-p0->y)+(p1->z-p0->z)*(p1->z-p0->z);
-}
-
-inline float dist(float3 *p0,float3 *p1){
-    return sqrt(dist2(p0,p1));
-}
-
-float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config *cfg){
+float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg){
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
@@ -394,7 +337,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config
 
     //random arimuthal angle
     tmp0=TWO_PI*rand_next_aangle(ran); //next arimuth angle
-    SINCOSF(tmp0,sphi,cphi);
+    mmc_sincosf(tmp0,&sphi,&cphi);
 
     //Henyey-Greenstein Phase Function, "Handbook of Optical Biomedical Diagnostics",2002,Chap3,p234
     //see Boas2002
@@ -413,7 +356,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config
 	ctheta=tmp0;
     }else{  //Wang1995 has acos(2*ran-1), rather than 2*pi*ran, need to check
 	theta=M_PI*rand_next_zangle(ran);
-    	SINCOSF(theta,stheta,ctheta);
+    	mmc_sincosf(theta,&stheta,&ctheta);
     }
 
     if( dir->z>-1.f+EPS && dir->z<1.f-EPS ) {
@@ -435,7 +378,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, Config
     return nextslen;
 }
 
-void mesh_saveweight(tetmesh *mesh,Config *cfg){
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int i,j;
 	float3 *pn;
@@ -448,42 +391,64 @@ void mesh_saveweight(tetmesh *mesh,Config *cfg){
 	if((fp=fopen(fweight,"wt"))==NULL){
 		mesh_error("can not open weight file to write");
 	}
-	for(i=0;i<cfg->maxgate;i++)
+	if(cfg->basisorder)
+	  for(i=0;i<cfg->maxgate;i++)
 	   for(j=0;j<mesh->nn;j++){
 		pn=mesh->node+j;
 		/*if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
 		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
 			mesh_error("can not write to weight file");
 	   }
+	else
+	  for(i=0;i<cfg->maxgate;i++)
+	   for(j=0;j<mesh->ne;j++){
+		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->ne+j])==0)
+			mesh_error("can not write to weight file");
+	   }
 	fclose(fp);
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
-float mesh_normalize(tetmesh *mesh,Config *cfg, float Eabsorb, float Etotal){
+float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
-        for(i=0;i<cfg->maxgate;i++)
-            for(j=0;j<mesh->nn;j++)
-              mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
+	if(cfg->basisorder){
+            for(i=0;i<cfg->maxgate;i++)
+              for(j=0;j<mesh->nn;j++)
+        	mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
 
-        for(i=0;i<mesh->ne;i++){
-	   ee=(int *)(mesh->elem+i);
-	   energyelem=0.f;
-	   for(j=0;j<cfg->maxgate;j++)
-	     for(k=0;k<4;k++)
-		energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
+            for(i=0;i<mesh->ne;i++){
+	      ee=(int *)(mesh->elem+i);
+	      energyelem=0.f;
+	      for(j=0;j<cfg->maxgate;j++)
+		for(k=0;k<4;k++)
+		   energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
 
-	   energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
+	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
+	    }
+	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f*cfg->tstep); /*scaling factor*/
+
+            for(i=0;i<cfg->maxgate;i++)
+               for(j=0;j<mesh->nn;j++)
+		  mesh->weight[i*mesh->nn+j]*=normalizor;
+	}else{
+            for(i=0;i<mesh->ne;i++)
+	      for(j=0;j<cfg->maxgate;j++)
+	         energydeposit+=mesh->weight[j*mesh->ne+i];
+
+            for(i=0;i<mesh->ne;i++){
+	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]-1].mua;
+              for(j=0;j<cfg->maxgate;j++)
+        	mesh->weight[j*mesh->ne+i]/=energyelem;
+	    }
+            normalizor=Eabsorb/(Etotal*energydeposit*cfg->tstep); /*scaling factor*/
+
+            for(i=0;i<cfg->maxgate;i++)
+               for(j=0;j<mesh->ne;j++)
+                  mesh->weight[i*mesh->ne+j]*=normalizor;
 	}
-
-	energydeposit*=0.25f*cfg->tstep; /* unit conversions */
-	normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
-
-        for(i=0;i<cfg->maxgate;i++)
-           for(j=0;j<mesh->nn;j++)
-	      mesh->weight[i*mesh->nn+j]*=normalizor;
 
 	return normalizor;
 }

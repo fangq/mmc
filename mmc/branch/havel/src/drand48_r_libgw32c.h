@@ -16,7 +16,13 @@
    License along with the GNU C Library; if not, write to the Free
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
-   
+
+/***************************************************************************//**
+\file    drand48_r_libgw32c.h
+
+\brief   Windows 32 port of drand48_r random number generator from libgw2c
+*******************************************************************************/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -36,9 +42,13 @@ typedef signed __int64 sint64;
 typedef unsigned __int64 uint64;
 
 
-/* Data structure for communication with thread safe versions. This
-type is to be regarded as opaque. It's only exported because users
-have to allocate objects of this type. */
+/** 
+\struct drand48_data drand48_r_libgw32c.h
+\brief Data structure for communication with thread safe versions.
+
+This type is to be regarded as opaque. It's only exported because users
+have to allocate objects of this type.
+*/
 struct drand48_data
 {
   unsigned short int __x[3]; /* Current state. */

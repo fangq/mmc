@@ -10,12 +10,18 @@
 *                                                                    *
 *********************************************************************/
 
+/***************************************************************************//**
+\file    posix_randr.h
+
+\brief   An interface to use a 48bit multi-threaded GNU RNG
+*******************************************************************************/
+
 #ifndef _MCEXTREME_STDC_RAND_H
 #define _MCEXTREME_STDC_RAND_H
 
 #include <stdlib.h>
 
-#define __device__  inline
+#define __device__  static inline
 
 #define MCX_RNG_NAME       "POSIX Multi-threaded RNG"
 

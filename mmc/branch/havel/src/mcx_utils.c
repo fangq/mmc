@@ -12,10 +12,14 @@
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
 **          Units," Optics Express, 17(22) 20178-20190 (2009)
 **
-**  mcx_utils.c: configuration and command line option processing unit
-**
 **  License: GPL v3, see LICENSE.txt for details
 **
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    mcx_utils.c
+
+\brief   mcconfiguration and command line option processing unit
 *******************************************************************************/
 
 #include <stdio.h>
@@ -27,17 +31,18 @@
 #include "mcx_utils.h"
 
 const char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
-                 'd','r','S','p','e','U','R','l','L','I','o','u','P','\0'};
+                 'd','r','S','p','e','U','R','l','L','I','o','u','C','M','\0'};
 const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
-                 "--printgpu","--root","--unitinmm","--plucker",""};
+                 "--printgpu","--root","--unitinmm","--continuity",
+		 "--method",""};
 
 const char *debugflag="MCBWDIOXATRP";
 
-void mcx_initcfg(Config *cfg){
+void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
      cfg->detnum=0;
      cfg->dim.x=0;
@@ -56,6 +61,7 @@ void mcx_initcfg(Config *cfg){
      cfg->respin=1;
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
+     cfg->basisorder=1;
      cfg->isplucker=1;
 
      cfg->prop=NULL;
@@ -73,11 +79,9 @@ void mcx_initcfg(Config *cfg){
      cfg->roulettesize=10.f;
      cfg->nout=1.f;
      cfg->unitinmm=1.f;
-     memset(&cfg->srcpos,0,sizeof(float3));
-     memset(&cfg->srcdir,0,sizeof(float3));
 }
 
-void mcx_clearcfg(Config *cfg){
+void mcx_clearcfg(mcconfig *cfg){
      if(cfg->medianum)
      	free(cfg->prop);
      if(cfg->detnum)
@@ -89,7 +93,7 @@ void mcx_clearcfg(Config *cfg){
      mcx_initcfg(cfg);
 }
 
-void mcx_savedata(float *dat,int len,Config *cfg){
+void mcx_savedata(float *dat,int len,mcconfig *cfg){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
      sprintf(name,"%s.mc2",cfg->session);
@@ -98,7 +102,7 @@ void mcx_savedata(float *dat,int len,Config *cfg){
      fclose(fp);
 }
 
-void mcx_printlog(Config *cfg, char *str){
+void mcx_printlog(mcconfig *cfg, char *str){
      if(cfg->flog>0){ /*stdout is 1*/
          fprintf(cfg->flog,"%s\n",str);
      }
@@ -120,7 +124,7 @@ void mcx_assert(int ret){
      if(!ret) mcx_error(ret,"assert error");
 }
 
-void mcx_readconfig(char *fname, Config *cfg){
+void mcx_readconfig(char *fname, mcconfig *cfg){
      if(fname[0]==0){
      	mcx_loadconfig(stdin,cfg);
         if(cfg->session[0]=='\0'){
@@ -137,7 +141,7 @@ void mcx_readconfig(char *fname, Config *cfg){
      }
 }
 
-void mcx_writeconfig(char *fname, Config *cfg){
+void mcx_writeconfig(char *fname, mcconfig *cfg){
      if(fname[0]==0)
      	mcx_saveconfig(stdout,cfg);
      else{
@@ -148,7 +152,7 @@ void mcx_writeconfig(char *fname, Config *cfg){
      }
 }
 
-void mcx_loadconfig(FILE *in, Config *cfg){
+void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates;
      char comment[MAX_PATH_LENGTH],*comm;
      
@@ -225,7 +229,7 @@ void mcx_loadconfig(FILE *in, Config *cfg){
      }
 }
 
-void mcx_saveconfig(FILE *out, Config *cfg){
+void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
      fprintf(out,"%d\n", (cfg->nphoton) ); 
@@ -246,7 +250,7 @@ void mcx_saveconfig(FILE *out, Config *cfg){
      }
 }
 
-void mcx_loadvolume(char *filename,Config *cfg){
+void mcx_loadvolume(char *filename,mcconfig *cfg){
      int datalen,res;
      FILE *fp=fopen(filename,"rb");
      if(fp==NULL){
@@ -278,7 +282,7 @@ int mcx_parsedebugopt(char *debugopt){
     return debuglevel;
 }
 
-void mcx_progressbar(int n, int ntotal, int id, Config *cfg){
+void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg){
     unsigned int percentage, j,colwidth=79;
     static unsigned int oldmarker=0;
 
@@ -287,7 +291,8 @@ void mcx_progressbar(int n, int ntotal, int id, Config *cfg){
     ioctl(0, TIOCGWINSZ, &ttys);
     colwidth=ttys.ws_col;
 #endif
-    percentage=(float)n/ntotal*(colwidth-18);
+    
+    percentage=(float)n*(colwidth-18)/ntotal;
 
     if(percentage != oldmarker){
         oldmarker=percentage;
@@ -336,7 +341,7 @@ int mcx_remap(char *opt){
     }
     return 1;
 }
-void mcx_parsecmd(int argc, char* argv[], Config *cfg){
+void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      int i=1,isinteractive=1,issavelog=0;
      char filename[MAX_PATH_LENGTH]={0};
      char logfile[MAX_PATH_LENGTH]={0};
@@ -388,12 +393,23 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     	        break;
 		     case 'b':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isreflect),"char");
+				if(cfg->isreflect) 
+#ifdef _WIN32
+                                    fprintf(stderr,"\nWARNING!! the reflection code was \
+not fully debugged, please do not use it for publications!\n");
+#else
+				    fprintf(stderr,"\n\e[0;31mWARNING!! the reflection code was \
+not fully debugged, please do not use it for publications!\e[0m\n");
+#endif
 		     	        break;
                      case 'B':
                                 i=mcx_readarg(argc,argv,i,&(cfg->isref3),"char");
                                	break;
 		     case 'd':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->issavedet),"char");
+		     	        break;
+		     case 'C':
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"char");
 		     	        break;
 		     case 'r':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->respin),"int");
@@ -410,7 +426,7 @@ void mcx_parsecmd(int argc, char* argv[], Config *cfg){
 		     case 'U':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isnormalized),"char");
 		     	        break;
-                     case 'P':
+                     case 'M':
                                 i=mcx_readarg(argc,argv,i,&(cfg->isplucker),"char");
                                 break;
                      case 'R':
@@ -466,7 +482,7 @@ void mcx_usage(char *exename){
 #                                                                             #\n\
 #    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
 ###############################################################################\n\
-$MMC $Rev:: 109 $ Last Commit $Date:: 2010-08-29 17:38:14#$ by $Author:: fangq$\n\
+$MMC $Rev:: 131 $ Last Commit $Date:: 2010-12-17 17:29:52#$ by $Author:: fangq$\n\
 ###############################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\
@@ -480,6 +496,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\

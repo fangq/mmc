@@ -10,7 +10,14 @@
 *                                                                    *
 *********************************************************************/
 
+/***************************************************************************//**
+\file    logistic_rand.c
+
+\brief   A Random Number Generator based on coupled chaotic Logistic lattice
+*******************************************************************************/
+
 #include "logistic_rand.h"
+#include "fastmath.h"
 
 #define R_PI               0.318309886183791f
 #define INIT_LOGISTIC      100

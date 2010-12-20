@@ -16,7 +16,13 @@
    License along with the GNU C Library; if not, write to the Free
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
-   
+
+/***************************************************************************//**
+\file    drand48_r_libgw32c.c
+
+\brief   POSIX 48bit multi-threaded RNG for win32 port via LibGW32C
+*******************************************************************************/
+
 #include "drand48_r_libgw32c.h"
 
 int __drand48_iterate (unsigned short int xsubi[3], struct drand48_data *buffer )
