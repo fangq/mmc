@@ -14,56 +14,62 @@
 ########################################################
 
 ifndef ROOTDIR
-ROOTDIR := .
+	ROOTDIR  := .
 endif
 
-ifndef BXDDIR
-BXDDIR := $(ROOTDIR)
+ifndef MMCDIR
+	MMCDIR   := $(ROOTDIR)
 endif
 
-BXDSRC :=$(BXDDIR)/src
+BXDSRC :=$(MMCDIR)/src
 
 CXX        := g++
-CC         := gcc
-AR         := gcc
+AR         := $(CC)
 BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
 CCFLAGS    := -c -Wall -g
-INCLUDEDIR := $(BXDDIR)/src
-ARFLAGS    := -lm
+INCLUDEDIR := $(MMCDIR)/src
+EXTRALIB   := -lm
 AROUTPUT   := -o
-MAKE       :=make
+MAKE       := make
 
-ECHO	 := echo
-MKDIR    := mkdir
+OPENMP     := -fopenmp
+FASTMATH   := #-ffast-math
 
-OBJSUFFIX        := .o
-BINSUFFIX        := 
+ECHO	   := echo
+MKDIR      := mkdir
 
-OBJS      := $(addprefix $(OBJDIR)/, $(FILES))
-OBJS      := $(subst $(OBJDIR)/$(BXDSRC)/,$(BXDSRC)/,$(OBJS))
-OBJS      := $(addsuffix $(OBJSUFFIX), $(OBJS))
+DOXY       := doxygen
+DOCDIR     := $(MMCDIR)/doc
+
+ifeq ($(CC),icc)
+	OPENMP   := -openmp
+	FASTMATH :=
+	EXTRALIB :=
+endif
+
+ARFLAGS    := $(EXTRALIB)
+
+OBJSUFFIX  := .o
+BINSUFFIX  := 
+
+OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
+OBJS       := $(subst $(OBJDIR)/$(BXDSRC)/,$(BXDSRC)/,$(OBJS))
+OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 
-release: CCFLAGS+= -O3
-sse:     CCFLAGS+= -O3 -DMMC_USE_SSE -msse4.1 -fopenmp #-O3 -ftree-vectorizer-verbose=2 -DMMC_USE_SSE -msse4.1
-sse:     ARFLAGS+= -O3 -g -fopenmp
-omp:     CCFLAGS+= -O3 -fopenmp
-omp:     ARFLAGS+= -fopenmp
-prof:    CCFLAGS+= -O3 -pg
-prof:    ARFLAGS+= -O3 -g -pg
-dp dpomp: CCFLAGS+= -mdouble-float -O3
-dpomp:   CCFLAGS+= -fopenmp
-dpomp:   ARFLAGS+= -fopenmp
-
-icc:     CC=icc
-icc:     AR=icc
-icc:     ARFLAGS=-openmp -fast # -prof_use
-icc:     CCFLAGS=-c -Wall -DMMC_USE_SSE -openmp -fast #-prof_use
-
+release:   CCFLAGS+= -O3
+sse:       CCFLAGS+= -O3 -DMMC_USE_SSE -DHAVE_SSE2 -msse4.1 
+sse omp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+sse omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
+prof:      CCFLAGS+= -O3 -pg
+prof:      ARFLAGS+= -O3 -g -pg
+dp dpomp:  CCFLAGS+= -mdouble-float -O3
+dpomp:     CCFLAGS+= $(OPENMP)
+dpomp:     ARFLAGS+= $(OPENMP) 
 
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
@@ -77,7 +83,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release sse prof omp dp icc: $(SUBDIRS) makedirs $(BINDIR)/$(BINARY)
+all release sse prof omp dp icc: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
@@ -85,6 +91,9 @@ $(SUBDIRS):
 makedirs:
 	@if test ! -d $(OBJDIR); then $(MKDIR) $(OBJDIR); fi
 	@if test ! -d $(BINDIR); then $(MKDIR) $(BINDIR); fi
+
+makedocdir:
+	@if test ! -d $(DOCDIR); then $(MKDIR) $(DOCDIR); fi
 
 .SUFFIXES : $(OBJSUFFIX) .cpp
 
@@ -104,13 +113,17 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 ##  Link  ##
-$(BINDIR)/$(BINARY): $(OBJS)
+$(BINDIR)/$(BINARY): makedirs $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS)
 
+##  Documentation  ##
+doc: makedocdir
+	$(DOXY) $(DOXYCFG)
+
 ## Clean
 clean:
-	rm -rf $(OBJS) $(OBJDIR) $(BINDIR)
+	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
 endif

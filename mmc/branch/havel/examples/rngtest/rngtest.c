@@ -7,9 +7,11 @@
 #endif
 
 #ifdef MMC_LOGISTIC
-  #include "logistic_rand.h"
+  #include "logistic_rand.c"
+#elif defined MMC_SFMT
+  #include "sfmt_rand.c"
 #else
-  #include "posix_randr.h"
+  #include "posix_randr.c"
 #endif
 
 void usage(char *exename){
@@ -21,7 +23,8 @@ void genrand(int threadid, int id, RandType ran[],RandType ran0[]){
 }
 int main(int argc, char**argv){
 	unsigned int seed=19650218, count=100000,threadid=0,i;
-	RandType ran0[RAND_BUF_LEN],ran1[RAND_BUF_LEN];
+        RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
+        RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
 
 	if(argc>=2)
 		count=atoi(argv[1]);
