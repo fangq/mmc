@@ -277,7 +277,7 @@ void tracer_build(raytracer *tracer){
 	ne=tracer->mesh->ne;
 	nodes=tracer->mesh->node;
 	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
-	if(tracer->method){
+	if(tracer->method==1){
 		tracer->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
 		tracer->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
 		for(i=0;i<ne;i++){

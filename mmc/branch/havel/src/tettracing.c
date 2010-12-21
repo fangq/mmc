@@ -248,7 +248,7 @@ inline __m128 rcp_nr(const __m128 a){
     return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
 }
 
-inline int havelsse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d){
+inline int havel_sse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d){
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
     if(_mm_movemask_ps(det) & 1)
@@ -302,7 +302,7 @@ float havel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start fr
 	*faceid=-1;
 	*isend=0;
 	for(i=0;i<4;i++)
-	   if(havelsse4(tracer->m+eid*12+i*3,&bary,o,d)){
+	   if(havel_sse4(tracer->m+eid*12+i*3,&bary,o,d)){
 
 		*faceid=faceorder[i];
                 enb=(int *)(tracer->mesh->facenb+eid);
@@ -355,9 +355,102 @@ float havel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start fr
 	return slen;
 }
 
+float badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 0*/, 
+              float3 *pout, float slen, int *faceid, float *weight, 
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
+
+	float3 bary={1e10f,0.f,0.f,0.f};
+	float Lp0=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww,t[4]={1e10f,1e10f,1e10f,1e10f};
+	int i,tshift,faceidx=-1;
+
+	p0->w=1.f;
+	pvec->w=0.f;
+	eid--;
+
+	const __m128 o = _mm_load_ps(&(p0->x));
+	const __m128 d = _mm_load_ps(&(pvec->x));
+
+	pout->x=MMC_UNDEFINED;
+	*faceid=-1;
+	*isend=0;
+	for(i=0;i<4;i++){
+	    __m128 det,dett,n;
+	    __m128 inv_det;
+	    n=_mm_load_ps(&(tracer->m[eid*12+i*3].x));
+	    det = _mm_dp_ps(n, d, 0x7f);
+	    if(_mm_movemask_ps(det) & 1){
+	  	 continue;
+	    }
+	    dett = _mm_dp_ps(_mm_mul_ps(int_coef, n), o, 0xff);
+	    inv_det = rcp_nr(det);
+	    _mm_store_ss(t+i, _mm_mul_ss(dett, inv_det));
+	    if(t[i]<bary.x){
+	       bary.x=t[i];
+	       faceidx=i;
+	       *faceid=faceorder[i];
+	    }
+	}
+	if(*faceid>=0){
+	    medium *prop;
+	    int *ee=(int *)(tracer->mesh->elem+eid);;
+	    prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
+	    atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
+	    rc=prop->n*R_C0;
+            currweight=*weight;
+
+	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
+	    Lp0=bary.x;
+	    *isend=(Lp0>dlen);
+	    Lmove=((*isend) ? dlen : Lp0);
+
+	    pout->x=p0->x+bary.x*pvec->x;
+	    pout->y=p0->y+bary.x*pvec->y;
+	    pout->z=p0->z+bary.x*pvec->z;
+	    if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
+	       *faceid=-2;
+	       pout->x=MMC_UNDEFINED;
+	       Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
+	    }
+
+	    *weight*=fast_expf9(-prop->mua*Lmove);
+	    slen-=Lmove*prop->mus;
+	    if(bary.x>=0.f){
+		ww=currweight-*weight;
+		*Eabsorb+=ww;
+        	*photontimer+=Lmove*rc;
+		tshift=(int)((*photontimer-cfg->tstart)*rtstep)*
+	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+        	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+        	   p0->x,p0->y,p0->z,bary.x,eid+1,dlen);
+
+        	p0->x+=Lmove*pvec->x;
+       		p0->y+=Lmove*pvec->y;
+        	p0->z+=Lmove*pvec->z;
+		if(!cfg->basisorder){
+			tracer->mesh->weight[eid+tshift]+=ww;
+		}else{
+			ww/=prop->mua;
+			tracer->mesh->weight[ee[nc[faceidx][0]]-1+tshift]+=ww*(1.f/3.f);
+			tracer->mesh->weight[ee[nc[faceidx][1]]-1+tshift]+=ww*(1.f/3.f);
+			tracer->mesh->weight[ee[nc[faceidx][2]]-1+tshift]+=ww*(1.f/3.f);
+		}
+	    }
+	}
+	(*count)++;
+	p0->w=0.f;
+	if(*faceid==-2)
+           return 0.f;
+
+	return slen;
+}
 #else
 
 float havel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 0*/, 
+              float3 *pout, float slen, int *faceid, float *weight, 
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
+	mcx_error("wrong option, please recompile with SSE4 enabled");
+}
+float badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 0*/, 
               float3 *pout, float slen, int *faceid, float *weight, 
               int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
 	mcx_error("wrong option, please recompile with SSE4 enabled");
@@ -378,8 +471,10 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,float rtste
 
 	tracercore=havel_raytet;
 
-	if(cfg->isplucker)
+	if(cfg->isplucker==1)
 	    tracercore=plucker_raytet;
+	else if(cfg->isplucker==2)
+	    tracercore=badouel_raytet;
 
 	/*initialize the photon parameters*/
 	eid=cfg->dim.x;
