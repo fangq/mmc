@@ -289,7 +289,7 @@ void tracer_build(raytracer *tracer){
 				vec_cross(&nodes[e0],&nodes[e1],tracer->m+i*6+j);
 			}
 		}
-	}else{
+	}else if(tracer->method==0 || tracer->method==2){
 		int ea,eb,ec;
 		const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
 		float3 vecAB={0.f},vecAC={0.f};
@@ -299,7 +299,7 @@ void tracer_build(raytracer *tracer){
                 for(i=0;i<ne;i++){
                         ebase=i<<2;
 			for(j=0;j<4;j++){
-				float3 *vecN=tracer->m+3*((i<<2)+j);
+				float3 *vecN=tracer->m+3*(ebase+j);
 				float Rn2;
 
                                 ea=elems[ebase+out[j][0]]-1;
@@ -319,6 +319,32 @@ void tracer_build(raytracer *tracer){
 				vecN->w    = vec_dot(vecN,  &nodes[ea]);
 				(vecN+1)->w=-vec_dot(vecN+1,&nodes[ea]);
                                 (vecN+2)->w=-vec_dot(vecN+2,&nodes[ea]);
+#endif
+			}
+                }
+	}else if(tracer->method==3){
+		int ea,eb,ec;
+		const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+		float3 vecAB={0.f},vecAC={0.f},vN={0.f};
+
+		tracer->d=NULL;
+		tracer->m=(float3*)calloc(sizeof(float3),ne*4);
+                for(i=0;i<ne;i++){
+                        ebase=i<<2;
+			float *vecN=&(tracer->m[ebase].x);
+			for(j=0;j<4;j++){
+                                ea=elems[ebase+out[j][0]]-1;
+                                eb=elems[ebase+out[j][1]]-1;
+				ec=elems[ebase+out[j][2]]-1;
+                                vec_diff(&nodes[ea],&nodes[eb],&vecAB);
+                                vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+
+				vec_cross(&vecAB,&vecAC,&vN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
+				vecN[j]=vN.x;
+				vecN[j+4]=vN.y;
+				vecN[j+8]=vN.z;
+#ifdef MMC_USE_SSE
+				vecN[j+12]    = vec_dot(&vN, &nodes[ea]);
 #endif
 			}
                 }

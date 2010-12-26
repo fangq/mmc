@@ -367,16 +367,17 @@ float badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start 
 	pvec->w=0.f;
 	eid--;
 
-	const __m128 o = _mm_load_ps(&(p0->x));
-	const __m128 d = _mm_load_ps(&(pvec->x));
-
 	pout->x=MMC_UNDEFINED;
 	*faceid=-1;
 	*isend=0;
+
+	const __m128 o = _mm_load_ps(&(p0->x));
+	const __m128 d = _mm_load_ps(&(pvec->x));
+
 	for(i=0;i<4;i++){
 	    __m128 det,dett,n;
 	    __m128 inv_det;
-	    n=_mm_load_ps(&(tracer->m[eid*12+i*3].x));
+	    n=_mm_load_ps(&(tracer->m[3*((eid<<2)+i)].x));
 	    det = _mm_dp_ps(n, d, 0x7f);
 	    if(_mm_movemask_ps(det) & 1){
 	  	 continue;
@@ -389,6 +390,123 @@ float badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start 
 	       faceidx=i;
 	       *faceid=faceorder[i];
 	    }
+	}
+/*	for(i=0;i<4;i++){
+	    float det,dett;
+	    float3 *n=tracer->m+eid*12+i*3;
+	    det = vec_dot(n,pvec);
+	    if(det<0.f){
+	  	 continue;
+	    }
+	    dett =n->w-vec_dot(n,p0);
+	    t[i]=dett/det;
+	    if(t[i]<bary.x){
+	       bary.x=t[i];
+	       faceidx=i;
+	       *faceid=faceorder[i];
+	    }
+	}*/
+	if(*faceid>=0){
+	    medium *prop;
+	    int *ee=(int *)(tracer->mesh->elem+eid);;
+	    prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
+	    atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
+	    rc=prop->n*R_C0;
+            currweight=*weight;
+
+	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
+	    Lp0=bary.x;
+	    *isend=(Lp0>dlen);
+	    Lmove=((*isend) ? dlen : Lp0);
+
+	    pout->x=p0->x+bary.x*pvec->x;
+	    pout->y=p0->y+bary.x*pvec->y;
+	    pout->z=p0->z+bary.x*pvec->z;
+	    if(*photontimer+Lmove*rc>=cfg->tend){ /*exit time window*/
+	       *faceid=-2;
+	       pout->x=MMC_UNDEFINED;
+	       Lmove=(cfg->tend-*photontimer)/(prop->n*R_C0)-1e-4f;
+	    }
+
+	    *weight*=fast_expf9(-prop->mua*Lmove);
+	    slen-=Lmove*prop->mus;
+	    if(bary.x>=0.f){
+		ww=currweight-*weight;
+		*Eabsorb+=ww;
+        	*photontimer+=Lmove*rc;
+		tshift=(int)((*photontimer-cfg->tstart)*rtstep)*
+	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+        	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+        	   p0->x,p0->y,p0->z,bary.x,eid+1,dlen);
+
+        	p0->x+=Lmove*pvec->x;
+       		p0->y+=Lmove*pvec->y;
+        	p0->z+=Lmove*pvec->z;
+		if(!cfg->basisorder){
+			tracer->mesh->weight[eid+tshift]+=ww;
+		}else{
+			ww/=prop->mua;
+			tracer->mesh->weight[ee[nc[faceidx][0]]-1+tshift]+=ww*(1.f/3.f);
+			tracer->mesh->weight[ee[nc[faceidx][1]]-1+tshift]+=ww*(1.f/3.f);
+			tracer->mesh->weight[ee[nc[faceidx][2]]-1+tshift]+=ww*(1.f/3.f);
+		}
+	    }
+	}
+	(*count)++;
+	p0->w=0.f;
+	if(*faceid==-2)
+           return 0.f;
+
+	return slen;
+}
+
+float horizontal_badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 0*/, 
+              float3 *pout, float slen, int *faceid, float *weight, 
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
+
+	float3 bary={1e10f,0.f,0.f,0.f};
+	float Lp0=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww,t[4]={1e10f,1e10f,1e10f,1e10f},s[4];
+	int i,tshift,faceidx=-1,baseid;
+	__m128 O,T,S;
+
+	p0->w=1.f;
+	pvec->w=0.f;
+	eid--;
+	baseid=eid<<2;
+
+	pout->x=MMC_UNDEFINED;
+	*faceid=-1;
+	*isend=0;
+
+	const __m128 Nx=_mm_load_ps(&(tracer->m[baseid].x));
+	const __m128 Ny=_mm_load_ps(&(tracer->m[baseid+1].x));
+	const __m128 Nz=_mm_load_ps(&(tracer->m[baseid+2].x));
+	const __m128 dd=_mm_load_ps(&(tracer->m[baseid+3].x));
+
+	O = _mm_set1_ps(p0->x);
+	T = _mm_mul_ps(Nx,O);
+	O = _mm_set1_ps(p0->y);
+	T = _mm_add_ps(T, _mm_mul_ps(Ny,O));
+	O = _mm_set1_ps(p0->z);
+	T = _mm_add_ps(T, _mm_mul_ps(Nz,O));
+	T = _mm_sub_ps(dd, T);
+
+	O = _mm_set1_ps(pvec->x);
+	S = _mm_mul_ps(Nx,O);
+	O = _mm_set1_ps(pvec->y);
+	S = _mm_add_ps(S, _mm_mul_ps(Ny,O));
+	O = _mm_set1_ps(pvec->z);
+	S = _mm_add_ps(S, _mm_mul_ps(Nz,O));
+
+	T = _mm_div_ps(T, S);
+	_mm_store_ps(t,T);
+	_mm_store_ps(s,S);
+	for(i=0;i<4;i++){
+		if(s[i]>=0.f && t[i]<bary.x){
+		       bary.x=t[i];
+		       faceidx=i;
+		       *faceid=faceorder[i];
+		}
 	}
 	if(*faceid>=0){
 	    medium *prop;
@@ -455,6 +573,11 @@ float badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start 
               int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
 	mcx_error("wrong option, please recompile with SSE4 enabled");
 }
+float horizontal_badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start from 0*/, 
+              float3 *pout, float slen, int *faceid, float *weight, 
+              int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
+	mcx_error("wrong option, please recompile with SSE4 enabled");
+}
 #endif
 
 float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,float rtstep,
@@ -475,6 +598,8 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,float rtste
 	    tracercore=plucker_raytet;
 	else if(cfg->isplucker==2)
 	    tracercore=badouel_raytet;
+	else if(cfg->isplucker==3)
+	    tracercore=horizontal_badouel_raytet;
 
 	/*initialize the photon parameters*/
 	eid=cfg->dim.x;
