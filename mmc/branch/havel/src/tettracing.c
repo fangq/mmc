@@ -35,7 +35,7 @@ __m128 int_coef;
 
 const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-const int faceorder[]={1,3,2,0};
+const int faceorder[]={1,3,2,0,-1};
 const int ifaceorder[]={3,0,2,1};
 
 inline void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
@@ -307,10 +307,10 @@ float havel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int eid /*start fr
 		*faceid=faceorder[i];
                 enb=(int *)(tracer->mesh->facenb+eid);
                 nexteid=enb[*faceid];
-		if(nexteid){
-        		_mm_prefetch((char *)&((tracer->m+(nexteid-1)*12)->x),  _MM_HINT_T0);
-		        _mm_prefetch((char *)&((tracer->m+(nexteid-1)*12+4)->x),_MM_HINT_T0);
-        		_mm_prefetch((char *)&((tracer->m+(nexteid-1)*12+8)->x),_MM_HINT_T0);
+		if(nexteid--){
+        		_mm_prefetch((char *)&((tracer->m+(nexteid)*12)->x),  _MM_HINT_T0);
+		        _mm_prefetch((char *)&((tracer->m+(nexteid)*12+4)->x),_MM_HINT_T0);
+        		_mm_prefetch((char *)&((tracer->m+(nexteid)*12+8)->x),_MM_HINT_T0);
 		}
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 		Lp0=bary.x;
@@ -465,9 +465,10 @@ float horizontal_badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int e
               int *isend,float *photontimer, float *Eabsorb, float rtstep, mcconfig *cfg, float *count){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww,t[4]={1e10f,1e10f,1e10f,1e10f},s[4];
-	int i,tshift,faceidx=-1,baseid;
+	float Lp0=0.f,Lmove=0.f,atte,rc,currweight,dlen,ww;
+	int tshift,faceidx=-1,baseid;
 	__m128 O,T,S;
+	const char maskmap[16]={4,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3};
 
 	p0->w=1.f;
 	pvec->w=0.f;
@@ -498,23 +499,33 @@ float horizontal_badouel_raytet(float3 *p0,float3 *pvec, raytracer *tracer,int e
 	O = _mm_set1_ps(pvec->z);
 	S = _mm_add_ps(S, _mm_mul_ps(Nz,O));
 
+	//T = _mm_mul_ps(T, rcp_nr(S));
 	T = _mm_div_ps(T, S);
-	_mm_store_ps(t,T);
-	_mm_store_ps(s,S);
-	for(i=0;i<4;i++){
-		if(s[i]>=0.f && t[i]<bary.x){
-		       bary.x=t[i];
-		       faceidx=i;
-		       *faceid=faceorder[i];
-		}
-	}
+
+	O = _mm_cmpge_ps(S,_mm_set1_ps(0.f));
+	T = _mm_add_ps(_mm_andnot_ps(O,_mm_set1_ps(1e10f)),_mm_and_ps(O,T));
+	S = _mm_movehl_ps(T, T);
+	O = _mm_min_ps(T, S);
+	S = _mm_shuffle_ps(O, O, _MM_SHUFFLE(1,1,1,1));
+	O = _mm_min_ss(O, S);
+	
+	_mm_store_ss(&(bary.x),O);
+	faceidx=maskmap[_mm_movemask_ps(_mm_cmpeq_ps(T,_mm_set1_ps(bary.x)))];
+	*faceid=faceorder[faceidx];
+
 	if(*faceid>=0){
 	    medium *prop;
-	    int *ee=(int *)(tracer->mesh->elem+eid);;
+	    int *enb, nexteid, *ee=(int *)(tracer->mesh->elem+eid);;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
 	    atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
 	    rc=prop->n*R_C0;
             currweight=*weight;
+
+            enb=(int *)(tracer->mesh->facenb+eid);
+            nexteid=enb[*faceid]; // if I use nexteid-1, the speed got slower, strange!
+	    if(nexteid){
+            	    _mm_prefetch((char *)&(tracer->m[nexteid<<2].x),_MM_HINT_T0);
+	    }
 
 	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : slen/prop->mus;
 	    Lp0=bary.x;

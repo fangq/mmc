@@ -148,10 +148,10 @@ static inline void mmc_sincosf(float x, float * sine, float * cosine){
 #endif
 }
 
-#ifndef MMC_USE_SSE
+//#ifndef MMC_USE_SSE
 static inline float vec_dot(float3 *a,float3 *b){
         return a->x*b->x+a->y*b->y+a->z*b->z;
-}
+}/*
 #else
 
 #ifndef __SSE4_1__
@@ -177,8 +177,8 @@ static inline float vec_dot(float3 *a,float3 *b){
         return dot;
 }
 #endif
-        
 #endif
+*/        
  
 static inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
         return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
