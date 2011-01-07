@@ -43,7 +43,6 @@ int main(int argc, char**argv){
 	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
-	float rtstep;
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
@@ -63,8 +62,6 @@ int main(int argc, char**argv){
 
 	mesh_init_from_cfg(&mesh,&cfg);
 	tracer_init(&tracer,&mesh,cfg.isplucker);
-	
-	rtstep=1.f/cfg.tstep;
 
 	if(cfg.seed<0) cfg.seed=time(NULL);
 
@@ -84,6 +81,7 @@ int main(int argc, char**argv){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
+	visitor visit={0.f,1.f/cfg.tstep};
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();	
 #endif
@@ -92,9 +90,9 @@ int main(int argc, char**argv){
 	/*launch photons*/
 #pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
-		float rtcount=0.f;
-		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,rtstep,ran0,ran1,&rtcount);
-		raytri+=rtcount;
+		visit.raytet=0.f;
+		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
+		raytri+=visit.raytet;
 		#pragma omp atomic
 		   ncomplete++;
 

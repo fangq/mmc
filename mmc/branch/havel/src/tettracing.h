@@ -30,10 +30,43 @@
 #define MAX_TRIAL          3
 #define FIX_PHOTON         1e-3f
 
+
+/***************************************************************************//**
+\struct MMC_ray tettracing.h
+\brief  Data structure associated with the current photon
+
+*******************************************************************************/   
+
+typedef struct MMC_ray{
+	float3 p0;
+	float3 vec;
+	float3 pout;
+	int eid;
+	int faceid;
+	int isend;
+	int nexteid;
+	float weight;
+	float photontimer;
+	float slen;
+	float Lmove;
+	double Eabsorb;
+} ray;
+
+/***************************************************************************//**
+\struct MMC_visitor tettracing.h
+\brief  A structure that accumulates the statistics about the simulation
+
+*******************************************************************************/  
+
+typedef struct MMC_visitor{
+	float raytet;
+	float rtstep;
+} visitor;
+
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
-float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,float rtstep,RandType *ran,RandType *ran0,float *raytri);
+float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 inline float mmc_rsqrtf(float a);
 
