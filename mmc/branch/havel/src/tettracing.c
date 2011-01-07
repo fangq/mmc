@@ -37,6 +37,7 @@ const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 const int faceorder[]={1,3,2,0,-1};
 const int ifaceorder[]={3,0,2,1};
+const char maskmap[16]={4,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3};
 
 inline void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
 	pout->x=w->x*p1->x+w->y*p2->x+w->z*p3->x;
@@ -462,7 +463,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	float Lp0=0.f,atte,rc,currweight,dlen,ww;
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
-	const char maskmap[16]={4,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3};
 
 	r->p0.w=1.f;
 	r->vec.w=0.f;
@@ -526,9 +526,13 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
-	    r->pout.x=r->p0.x+bary.x*r->vec.x;
-	    r->pout.y=r->p0.y+bary.x*r->vec.y;
-	    r->pout.z=r->p0.z+bary.x*r->vec.z;
+            O = _mm_load_ps(&(r->vec.x));
+	    S = _mm_load_ps(&(r->p0.x));
+	    T = _mm_set1_ps(bary.x);
+	    T = _mm_mul_ps(O, T);
+	    T = _mm_add_ps(T, S);
+	    _mm_store_ps(&(r->pout.x),T);
+
 	    if(r->photontimer+r->Lmove*rc>=cfg->tend){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
@@ -546,9 +550,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
         	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
-        	r->p0.x+=r->Lmove*r->vec.x;
-       		r->p0.y+=r->Lmove*r->vec.y;
-        	r->p0.z+=r->Lmove*r->vec.z;
+	        T = _mm_set1_ps(r->Lmove);
+	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
+	        _mm_store_ps(&(r->p0.x),T);
+
 		if(!cfg->basisorder){
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
