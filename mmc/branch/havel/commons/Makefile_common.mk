@@ -62,7 +62,7 @@ OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release:   CCFLAGS+= -O3
-sse:       CCFLAGS+= -O3 -DMMC_USE_SSE -DHAVE_SSE2 -msse4.1 
+sse:       CCFLAGS+= -O3 -DMMC_USE_SSE -DHAVE_SSE2 -msse4
 sse omp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
 prof:      CCFLAGS+= -O3 -pg
