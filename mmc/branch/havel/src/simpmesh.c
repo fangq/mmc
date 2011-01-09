@@ -30,6 +30,8 @@
          char pathsep='/';
 #endif
 
+const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+const int facemap[]={2,0,1,3};
 
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
@@ -245,32 +247,70 @@ void mesh_clear(tetmesh *mesh){
 void tracer_init(raytracer *tracer,tetmesh *pmesh,int methodid){
 	tracer->d=NULL;
 	tracer->m=NULL;
+	tracer->n=NULL;
 	tracer->mesh=pmesh;
 	tracer->method=methodid;
 	tracer_build(tracer);
 }
 
-void tracer_clear(raytracer *tracer){
-	if(tracer->d) {
-		free(tracer->d);
-		tracer->d=NULL;
+void tracer_prep(raytracer *tracer,mcconfig *cfg){
+	if(tracer->n==NULL && tracer->m==NULL && tracer->d==NULL){
+	    if(tracer->mesh!=NULL)
+		tracer_build(tracer);
+	    else
+	    	mesh_error("tracer is not associated with a mesh");
+	}else{
+            int eid=cfg->dim.x-1;
+	    float3 vecS={0.f}, *nodes=tracer->mesh->node;
+	    int i,ea,ebase=eid<<2;
+	    float s=0.f, *bary=&(cfg->bary0.x);
+	    int *elems=(int *)(tracer->mesh->elem); // convert int4* to int*
+
+	    if(tracer->method==0 || tracer->method==2){
+	        for(i=0;i<4;i++){
+                    ea=elems[eid+out[i][0]]-1;
+		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
+		    bary[facemap[i]]=-vec_dot(&vecS,tracer->m+3*(ebase+i));
+		}
+	    }else if(tracer->method==1){
+	        for(i=0;i<4;i++){
+                    ea=elems[eid+out[i][0]]-1;
+		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
+		    bary[facemap[i]]=-vec_dot(&vecS,tracer->n+ebase+i);
+		}
+	    }else if(tracer->method==3){
+	        for(i=0;i<4;i++){
+                    ea=elems[eid+out[i][0]]-1;
+		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
+		    bary[facemap[i]]=-vecS.x*((float *)(tracer->n+ebase))[i];
+		    bary[facemap[i]]-=vecS.y*((float *)(tracer->n+ebase+1))[i];
+		    bary[facemap[i]]-=vecS.z*((float *)(tracer->n+ebase+2))[i];
+		}
+	    }
+	    for(i=0;i<4;i++){
+	        if(bary[i]<0.f)
+		    mesh_error("initial element does not enclose the source!");
+	        s+=bary[i];
+	    }
+	    for(i=0;i<4;i++){
+	        bary[i]/=s;
+	    }
+	    printf("initial element bary [%e %e %e %e]\n",bary[0],bary[1],bary[2],bary[3]);
 	}
-	if(tracer->m) {
-		free(tracer->m);
-		tracer->m=NULL;
-	}	
-	tracer->mesh=NULL;
 }
 
 void tracer_build(raytracer *tracer){
 	int nn,ne,i,j;
 	const int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+
 	float3 *nodes;
 	int *elems,ebase;
 	int e1,e0;
 	
-	if(tracer->d || tracer->m || tracer->mesh==NULL) return;
-        if(tracer->mesh->node==NULL||tracer->mesh->elem==NULL||tracer->mesh->facenb==NULL||tracer->mesh->med==NULL)
+	if(tracer->d || tracer->m || tracer->n || tracer->mesh==NULL) return;
+
+        if(tracer->mesh->node==NULL||tracer->mesh->elem==NULL||
+	   tracer->mesh->facenb==NULL||tracer->mesh->med==NULL)
                 mesh_error("mesh is missing");
 
 	nn=tracer->mesh->nn;
@@ -278,8 +318,12 @@ void tracer_build(raytracer *tracer){
 	nodes=tracer->mesh->node;
 	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
 	if(tracer->method==1){
+		int ea,eb,ec;
+		float3 vecAB={0.f},vecAC={0.f};
+
 		tracer->d=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
 		tracer->m=(float3*)calloc(sizeof(float3),ne*6); // 6 edges/elem
+		tracer->n=(float3*)calloc(sizeof(float3),ne*4); // 4 face norms
 		for(i=0;i<ne;i++){
 			ebase=i<<2;
 			for(j=0;j<6;j++){
@@ -288,10 +332,17 @@ void tracer_build(raytracer *tracer){
 				vec_diff(&nodes[e0],&nodes[e1],tracer->d+i*6+j);
 				vec_cross(&nodes[e0],&nodes[e1],tracer->m+i*6+j);
 			}
+			for(j=0;j<4;j++){
+                                ea=elems[ebase+out[j][0]]-1;
+                                eb=elems[ebase+out[j][1]]-1;
+				ec=elems[ebase+out[j][2]]-1;
+                                vec_diff(&nodes[ea],&nodes[eb],&vecAB);
+                                vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+				vec_cross(&vecAB,&vecAC,tracer->n+ebase+j);
+			}
 		}
 	}else if(tracer->method==0 || tracer->method==2){
 		int ea,eb,ec;
-		const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
 		float3 vecAB={0.f},vecAC={0.f};
 
 		tracer->d=NULL;
@@ -324,14 +375,13 @@ void tracer_build(raytracer *tracer){
                 }
 	}else if(tracer->method==3){
 		int ea,eb,ec;
-		const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
 		float3 vecAB={0.f},vecAC={0.f},vN={0.f};
 
 		tracer->d=NULL;
-		tracer->m=(float3*)calloc(sizeof(float3),ne*4);
+		tracer->n=(float3*)calloc(sizeof(float3),ne*4);
                 for(i=0;i<ne;i++){
                         ebase=i<<2;
-			float *vecN=&(tracer->m[ebase].x);
+			float *vecN=&(tracer->n[ebase].x);
 			for(j=0;j<4;j++){
                                 ea=elems[ebase+out[j][0]]-1;
                                 eb=elems[ebase+out[j][1]]-1;
@@ -349,6 +399,22 @@ void tracer_build(raytracer *tracer){
 			}
                 }
 	}
+}
+
+void tracer_clear(raytracer *tracer){
+	if(tracer->d) {
+		free(tracer->d);
+		tracer->d=NULL;
+	}
+	if(tracer->m) {
+		free(tracer->m);
+		tracer->m=NULL;
+	}
+	if(tracer->n) {
+		free(tracer->n);
+		tracer->n=NULL;
+	}	
+	tracer->mesh=NULL;
 }
 
 float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg){

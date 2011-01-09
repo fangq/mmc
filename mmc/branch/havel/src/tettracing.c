@@ -37,6 +37,7 @@ const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 const int faceorder[]={1,3,2,0,-1};
 const int ifaceorder[]={3,0,2,1};
+const int fm[]={2,0,1,3};
 const char maskmap[16]={4,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3};
 
 inline void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
@@ -280,15 +281,17 @@ inline int havel_sse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d)
 float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
+	float barypout[4] __attribute__ ((aligned(16)));;
 	float atte,rc,currweight,dlen,ww,Lp0;
-	int i,tshift,*enb,eid;
+	int i,j,k,tshift,*enb=NULL,*nextenb=NULL,eid;
+	__m128 O,T,S;
 
 	r->p0.w=1.f;
 	r->vec.w=0.f;
 	eid=r->eid-1;
 
-	const __m128 o = _mm_load_ps(&(r->p0.x));
-	const __m128 d = _mm_load_ps(&(r->vec.x));
+	O = _mm_load_ps(&(r->p0.x));
+	T = _mm_load_ps(&(r->vec.x));
 
 	medium *prop;
 	int *ee=(int *)(tracer->mesh->elem+eid);;
@@ -301,24 +304,30 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	r->faceid=-1;
 	r->isend=0;
 	for(i=0;i<4;i++)
-	   if(havel_sse4(tracer->m+eid*12+i*3,&bary,o,d)){
+	   if(havel_sse4(tracer->m+eid*12+i*3,&bary,O,T)){
 
 		r->faceid=faceorder[i];
-                enb=(int *)(tracer->mesh->facenb+eid);
-                r->nexteid=enb[r->faceid];
-		if(r->nexteid--){
-        		_mm_prefetch((char *)&((tracer->m+(r->nexteid)*12)->x),  _MM_HINT_T0);
-		        _mm_prefetch((char *)&((tracer->m+(r->nexteid)*12+4)->x),_MM_HINT_T0);
-        		_mm_prefetch((char *)&((tracer->m+(r->nexteid)*12+8)->x),_MM_HINT_T0);
-		}
 	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
 		Lp0=bary.x;
 		r->isend=(Lp0>dlen);
 		r->Lmove=((r->isend) ? dlen : Lp0);
 
-		r->pout.x=r->p0.x+bary.x*r->vec.x;
-		r->pout.y=r->p0.y+bary.x*r->vec.y;
-		r->pout.z=r->p0.z+bary.x*r->vec.z;
+                if(!r->isend){
+		    enb=(int *)(tracer->mesh->facenb+eid);
+                    r->nexteid=enb[r->faceid];
+		    if(r->nexteid){
+		        nextenb=(int *)(tracer->m+(r->nexteid-1)*12);
+        		_mm_prefetch((char *)(nextenb),_MM_HINT_T0);
+		        _mm_prefetch((char *)(nextenb+4*16),_MM_HINT_T0);
+        		_mm_prefetch((char *)(nextenb+8*16),_MM_HINT_T0);
+			nextenb=(int *)(tracer->mesh->elem+r->nexteid-1);
+		    }
+		}
+	        S = _mm_set1_ps(bary.x);
+	        S = _mm_mul_ps(S, T);
+	        S = _mm_add_ps(S, O);
+	        _mm_store_ps(&(r->pout.x),S);
+
 		if(r->photontimer+r->Lmove*rc>=cfg->tend){ /*exit time window*/
 		   r->faceid=-2;
 	           r->pout.x=MMC_UNDEFINED;
@@ -334,16 +343,63 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		r->Eabsorb+=ww;
 		ww/=prop->mua;
                 r->photontimer+=r->Lmove*rc;
-		tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
+		tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn-1;
+
                 if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
-                r->p0.x+=r->Lmove*r->vec.x;
-       	        r->p0.y+=r->Lmove*r->vec.y;
-               	r->p0.z+=r->Lmove*r->vec.z;
-		tracer->mesh->weight[ee[nc[i][0]]-1+tshift]+=ww*bary.y;
-		tracer->mesh->weight[ee[nc[i][1]]-1+tshift]+=ww*bary.z;
-		tracer->mesh->weight[ee[nc[i][2]]-1+tshift]+=ww*(1.f-bary.y-bary.z);
+	        T = _mm_mul_ps(T,_mm_set1_ps(r->Lmove));
+	        S = _mm_add_ps(O, T);
+	        _mm_store_ps(&(r->p0.x),S);
+
+		barypout[nc[i][0]]=bary.y;
+		barypout[nc[i][1]]=bary.z;
+		barypout[nc[i][2]]=1.f-bary.y-bary.z;
+		barypout[fm[i]]=0.f;
+
+		//if(cfg->debuglevel&dlBary) 
+		//    fprintf(cfg->flog,"barypout=[%f %f %f %f]\n",barypout[0],barypout[1],barypout[2],barypout[3]);
+
+		T=_mm_load_ps(barypout);        /* bary centric at pout */
+		O=_mm_load_ps(&(r->bary0.x)); /* bary centric at p0 */
+
+		dlen=r->Lmove/bary.x;           /* normalized moving vector */
+
+		//if(cfg->debuglevel&dlBary) 
+		 //   fprintf(cfg->flog,"moved Lmove=%f from %f\n",r->Lmove, bary.x);
+
+		if(r->isend)                    /* S is the bary centric for the moved photon */
+		    S=_mm_add_ps(_mm_mul_ps(T,_mm_set1_ps(dlen)),_mm_mul_ps(O,_mm_set1_ps(1.f-dlen)));
+		else
+		    S=T;
+		//if(cfg->debuglevel&dlBary) 
+		//    fprintf(cfg->flog,"old bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+
+		_mm_store_ps(barypout,S);
+		if(nextenb && enb){
+		    float *barynext=&(r->bary0.x);
+		    _mm_store_ps(barynext,_mm_set1_ps(0.f));
+		    for(j=0;j<3;j++)
+		      for(k=0;k<4;k++){
+		    	if(ee[nc[i][j]]==nextenb[k]){
+		    	    barynext[k]=barypout[nc[i][j]];
+			    break;
+		    	}
+		      }
+		    //if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"[%d %d %d %d],[%d %d %d %d] - ",
+		    //       ee[0],ee[1],ee[2],ee[3],nextenb[0],nextenb[1],nextenb[2],nextenb[3]);
+		    //if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"[%f %f %f %f],[%f %f %f %f]\n",barypout[0],barypout[1],barypout[2],barypout[3],
+		    //       barynext[0],barynext[1],barynext[2],barynext[3]);
+		}else
+		    _mm_store_ps(&(r->bary0.x),S);
+
+		if(cfg->debuglevel&dlBary)
+		    fprintf(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+		T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
+		_mm_store_ps(barypout,T);
+
+		for(j=0;j<4;j++)
+		    tracer->mesh->weight[ee[j]+tshift]+=barypout[j];
 		break;
 	   }
 	visit->raytet++;
@@ -390,7 +446,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	}
 /*	for(i=0;i<4;i++){
 	    float det,dett;
-	    float3 *n=tracer->m+eid*12+i*3;
+	    float3 *n=tracer->n+eid*12+i*3;
 	    det = vec_dot(n,r->vec);
 	    if(det<0.f){
 	  	 continue;
@@ -473,10 +529,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->faceid=-1;
 	r->isend=0;
 
-	const __m128 Nx=_mm_load_ps(&(tracer->m[baseid].x));
-	const __m128 Ny=_mm_load_ps(&(tracer->m[baseid+1].x));
-	const __m128 Nz=_mm_load_ps(&(tracer->m[baseid+2].x));
-	const __m128 dd=_mm_load_ps(&(tracer->m[baseid+3].x));
+	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
+	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
+	const __m128 Nz=_mm_load_ps(&(tracer->n[baseid+2].x));
+	const __m128 dd=_mm_load_ps(&(tracer->n[baseid+3].x));
 
 	O = _mm_set1_ps(r->p0.x);
 	T = _mm_mul_ps(Nx,O);
@@ -518,7 +574,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             enb=(int *)(tracer->mesh->facenb+eid);
             nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 	    if(nexteid){
-            	    _mm_prefetch((char *)&(tracer->m[nexteid<<2].x),_MM_HINT_T0);
+            	    _mm_prefetch((char *)&(tracer->n[nexteid<<2].x),_MM_HINT_T0);
 	    }
 
 	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
@@ -592,7 +648,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->dim.x,-1,0,0,1.f,0.f,0.f,0.f};
+	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,-1,0,0,1.f,0.f,0.f,0.f};
 	
 	tracercore=havel_raytet;
 

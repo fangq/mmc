@@ -62,6 +62,7 @@ int main(int argc, char**argv){
 
 	mesh_init_from_cfg(&mesh,&cfg);
 	tracer_init(&tracer,&mesh,cfg.isplucker);
+	tracer_prep(&tracer,&cfg);
 
 	if(cfg.seed<0) cfg.seed=time(NULL);
 

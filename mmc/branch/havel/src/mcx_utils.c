@@ -79,6 +79,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->roulettesize=10.f;
      cfg->nout=1.f;
      cfg->unitinmm=1.f;
+     memset(&(cfg->bary0),0,sizeof(float4));
 }
 
 void mcx_clearcfg(mcconfig *cfg){

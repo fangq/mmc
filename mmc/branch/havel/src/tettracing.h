@@ -41,6 +41,7 @@ typedef struct MMC_ray{
 	float3 p0;
 	float3 vec;
 	float3 pout;
+	float4 bary0;
 	int eid;
 	int faceid;
 	int isend;

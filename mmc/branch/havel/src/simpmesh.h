@@ -90,6 +90,7 @@ typedef struct MMC_raytracer{
 	int    method;/**< 1 for Plucker-based ray-tracing, 0 for Havel */
 	float3 *d;    /**< precomputed data: for Pluckers, this is displacement */
 	float3 *m;    /**< precomputed data: for Pluckers, this is moment */
+	float3 *n;    /**< precomputed data: for Pluckers, face norm */
 } raytracer;
 
 void mesh_init(tetmesh *mesh);
@@ -109,6 +110,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh,int methodid);
 void tracer_build(raytracer *tracer);
+void tracer_prep(raytracer *tracer,mcconfig *cfg);
 void tracer_clear(raytracer *tracer);
 float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,mcconfig *cfg);
 

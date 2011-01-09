@@ -74,18 +74,18 @@ typedef struct MMC_config{
 	int nphoton;      /**<(total simulated photon number) we now use this to 
 	                     temporarily alias totalmove, as to specify photon
 			     number is causing some troubles*/
-	//int totalmove;   /**< [depreciated] total move per photon*/
         int nblocksize;   /**<thread block size*/
 	int nthread;      /**<num of total threads, multiple of 128*/
 	int seed;         /**<random number generator seed*/
 	
 	float3 srcpos;    /**<src position in mm*/
 	float3 srcdir;    /**<src normal direction*/
+	float4 bary0;     /**<initial bary centric coordinates of the source*/
 	float tstart;     /**<start time in second*/
 	float tstep;      /**<time step in second*/
 	float tend;       /**<end time in second*/
 	float3 steps;     /**<voxel sizes along x/y/z in mm*/
-	
+
 	uint3 dim;        /**<domain size*/
 	uint3 crop0;      /**<sub-volume for cache*/
 	uint3 crop1;      /**<the other end of the caching box*/
