@@ -149,8 +149,9 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #ifdef MMC_USE_SSE
 		{
 			int *enb=(int *)(tracer->mesh->facenb+eid);
-			int nexteid=(enb[r->faceid]-1)*6;
-	                if(nexteid){
+			r->nexteid=enb[r->faceid];
+			int nexteid=(r->nexteid-1)*6;
+	                if(r->nexteid){
         	                _mm_prefetch((char *)&((tracer->m+nexteid)->x),_MM_HINT_T0);
                 	        _mm_prefetch((char *)&((tracer->m+(nexteid)*6+4)->x),_MM_HINT_T0);
                         	_mm_prefetch((char *)&((tracer->d+(nexteid)*6)->x),_MM_HINT_T0);
@@ -352,23 +353,23 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	        S = _mm_add_ps(O, T);
 	        _mm_store_ps(&(r->p0.x),S);
 
-		barypout[nc[i][0]]=bary.y;
-		barypout[nc[i][1]]=bary.z;
-		barypout[nc[i][2]]=1.f-bary.y-bary.z;
+		barypout[nc[i][0]]=1.f-bary.y-bary.z;
+		barypout[nc[i][1]]=bary.y;
+		barypout[nc[i][2]]=bary.z;
 		barypout[fm[i]]=0.f;
 
 		//if(cfg->debuglevel&dlBary) 
 		//    fprintf(cfg->flog,"barypout=[%f %f %f %f]\n",barypout[0],barypout[1],barypout[2],barypout[3]);
 
 		T=_mm_load_ps(barypout);        /* bary centric at pout */
-		O=_mm_load_ps(&(r->bary0.x)); /* bary centric at p0 */
+		O=_mm_load_ps(&(r->bary0.x));   /* bary centric at p0 */
 
-		dlen=r->Lmove/bary.x;           /* normalized moving vector */
+		dlen=r->Lmove/bary.x;           /* normalized moving length */
 
 		//if(cfg->debuglevel&dlBary) 
 		 //   fprintf(cfg->flog,"moved Lmove=%f from %f\n",r->Lmove, bary.x);
 
-		if(r->isend)                    /* S is the bary centric for the moved photon */
+		if(r->isend)                    /* S is the bary centric for the photon after move */
 		    S=_mm_add_ps(_mm_mul_ps(T,_mm_set1_ps(dlen)),_mm_mul_ps(O,_mm_set1_ps(1.f-dlen)));
 		else
 		    S=T;
@@ -393,8 +394,9 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		}else
 		    _mm_store_ps(&(r->bary0.x),S);
 
-		if(cfg->debuglevel&dlBary)
-		    fprintf(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+		//if(cfg->debuglevel&dlBary)
+		//    fprintf(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+
 		T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
 		_mm_store_ps(barypout,T);
 
@@ -406,7 +408,6 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	r->p0.w=0.f;
 	if(r->faceid==-2)
            return 0.f;
-
 	return r->slen;
 }
 
@@ -565,16 +566,16 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	if(r->faceid>=0){
 	    medium *prop;
-	    int *enb, nexteid, *ee=(int *)(tracer->mesh->elem+eid);;
+	    int *enb, *ee=(int *)(tracer->mesh->elem+eid);;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
 	    atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
 	    rc=prop->n*R_C0;
             currweight=r->weight;
 
             enb=(int *)(tracer->mesh->facenb+eid);
-            nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-	    if(nexteid){
-            	    _mm_prefetch((char *)&(tracer->n[nexteid<<2].x),_MM_HINT_T0);
+            r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+	    if(r->nexteid){
+            	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
 	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
@@ -661,8 +662,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*initialize the photon parameters*/
 	r.slen=rand_next_scatlen(ran);
-	memcpy(&r.p0,&(cfg->srcpos),sizeof(r.p0));
-	memcpy(&r.vec,&(cfg->srcdir),sizeof(r.p0));
+
 #ifdef MMC_USE_SSE
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
