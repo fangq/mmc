@@ -117,7 +117,7 @@ void mcx_normalize(float field[], float scale, int fieldlen){
 }
 
 void mcx_error(int id,char *msg){
-     fprintf(stdout,"MCX ERROR(%d):%s\n",id,msg);
+     fprintf(stdout,"MMC ERROR(%d):%s\n",id,msg);
      exit(id);
 }
 
