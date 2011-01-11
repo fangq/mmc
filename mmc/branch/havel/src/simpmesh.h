@@ -194,4 +194,14 @@ static inline float dist2(float3 *p0,float3 *p1){
 static inline float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
+
+
+static inline float mmc_rsqrtf(float a){
+#ifdef MMC_USE_SSE
+        return _mm_cvtss_f32( _mm_rsqrt_ss( _mm_set_ss( a ) ) );
+#else
+	return 1.f/sqrtf(a);
+#endif
+}
+
 #endif

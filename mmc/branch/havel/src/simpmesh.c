@@ -425,11 +425,19 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
     rand_need_more(ran,ran0);
 
     //random scattering length (normalized)
+#ifdef MMC_USE_SSE_MATH
+    nextslen=rand_next_scatlen_ps(ran);
+#else
     nextslen=rand_next_scatlen(ran);
+#endif
 
     //random arimuthal angle
+#ifdef MMC_USE_SSE_MATH
+    rand_next_aangle_sincos(ran,&sphi,&cphi);
+#else
     tmp0=TWO_PI*rand_next_aangle(ran); //next arimuth angle
     mmc_sincosf(tmp0,&sphi,&cphi);
+#endif
 
     //Henyey-Greenstein Phase Function, "Handbook of Optical Biomedical Diagnostics",2002,Chap3,p234
     //see Boas2002

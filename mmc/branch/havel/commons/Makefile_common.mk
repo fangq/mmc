@@ -62,9 +62,10 @@ OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release:   CCFLAGS+= -O3
-sse:       CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
-sse omp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
-sse omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
+sse ssemath:       CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
+sse ssemath omp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+sse ssemath omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
+ssemath:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
 dp dpomp:  CCFLAGS+= -mdouble-float -O3
@@ -83,7 +84,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release sse prof omp dp icc: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp dp icc: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
