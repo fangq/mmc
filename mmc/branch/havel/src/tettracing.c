@@ -632,18 +632,16 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	int oldeid,fixcount=0;
 	int *enb;
+	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,-1,0,0,1.f,0.f,0.f,0.f};
+	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
+	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,-1,0,0,1.f,0.f,0.f,0.f};
-	
-	tracercore=havel_raytet;
-
-	if(cfg->isplucker==1)
-	    tracercore=plucker_raytet;
-	else if(cfg->isplucker==2)
-	    tracercore=badouel_raytet;
-	else if(cfg->isplucker==3)
-	    tracercore=branchless_badouel_raytet;
+	tracercore=engines[0];
+	if(cfg->method>=0 && cfg->method<4)
+	    tracercore=engines[(int)(cfg->method)];
+	else
+	    mcx_error(-6,"specified ray-tracing algorithm is not defined");
 
 	/*initialize the photon parameters*/
 	r.slen=rand_next_scatlen(ran);

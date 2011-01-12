@@ -87,7 +87,7 @@ moment vectors for each edge in a tetrahedron.
 
 typedef struct MMC_raytracer{
 	tetmesh *mesh;/**< link to the mesh structure */
-	int    method;/**< 1 for Plucker-based ray-tracing, 0 for Havel */
+	char method;  /**< 1 for Plucker-based ray-tracing, 0 for Havel */
 	float3 *d;    /**< precomputed data: for Pluckers, this is displacement */
 	float3 *m;    /**< precomputed data: for Pluckers, this is moment */
 	float3 *n;    /**< precomputed data: for Pluckers, face norm */
@@ -108,7 +108,7 @@ void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
 
-void tracer_init(raytracer *tracer,tetmesh *mesh,int methodid);
+void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);
 void tracer_build(raytracer *tracer);
 void tracer_prep(raytracer *tracer,mcconfig *cfg);
 void tracer_clear(raytracer *tracer);

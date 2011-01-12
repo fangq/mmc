@@ -41,6 +41,7 @@ const char *fullopt[]={"--help","--interactive","--input","--photon",
 		 "--method",""};
 
 const char *debugflag="MCBWDIOXATRP";
+const char raytracing[]={'p','h','b','s','\0'};
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
@@ -62,7 +63,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
-     cfg->isplucker=1;
+     cfg->method=0;
 
      cfg->prop=NULL;
      cfg->detpos=NULL;
@@ -312,13 +313,15 @@ int mcx_readarg(int argc, char *argv[], int id, void *output,char *type){
          when a binary option is given without a following number (0~1), 
          we assume it is 1
      */
-     if(strcmp(type,"char")==0 && (id>=argc-1||(argv[id+1][0]<'0'||argv[id+1][0]>'9'))){
+     if(strcmp(type,"bool")==0 && (id>=argc-1||(argv[id+1][0]<'0'||argv[id+1][0]>'9'))){
 	*((char*)output)=1;
 	return id;
      }
      if(id<argc-1){
-         if(strcmp(type,"char")==0)
+         if(strcmp(type,"bool")==0)
              *((char*)output)=atoi(argv[id+1]);
+         else if(strcmp(type,"char")==0)
+             *((char*)output)=argv[id+1][0];
 	 else if(strcmp(type,"int")==0)
              *((int*)output)=atoi(argv[id+1]);
 	 else if(strcmp(type,"float")==0)
@@ -336,6 +339,17 @@ int mcx_remap(char *opt){
 	if(strcmp(opt,fullopt[i])==0){
 		opt[1]=shortopt[i];
 		opt[2]='\0';
+		return 0;
+	}
+	i++;
+    }
+    return 1;
+}
+int mcx_getmethodid(char *method){
+    int i=0;
+    while(raytracing[i]!='\0'){
+	if(tolower(*method)==raytracing[i]){
+		*method=i;
 		return 0;
 	}
 	i++;
@@ -387,13 +401,13 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     	        i=mcx_readarg(argc,argv,i,cfg->session,"string");
 		     	        break;
 		     case 'a':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->isrowmajor),"char");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->isrowmajor),"bool");
 		     	        break;
 		     case 'g':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->maxgate),"int");
 		     	        break;
 		     case 'b':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->isreflect),"char");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->isreflect),"bool");
 				if(cfg->isreflect) 
 #ifdef _WIN32
                                     fprintf(stderr,"\nWARNING!! the reflection code was \
@@ -404,19 +418,19 @@ not fully debugged, please do not use it for publications!\e[0m\n");
 #endif
 		     	        break;
                      case 'B':
-                                i=mcx_readarg(argc,argv,i,&(cfg->isref3),"char");
+                                i=mcx_readarg(argc,argv,i,&(cfg->isref3),"bool");
                                	break;
 		     case 'd':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->issavedet),"char");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->issavedet),"bool");
 		     	        break;
 		     case 'C':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"char");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"bool");
 		     	        break;
 		     case 'r':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->respin),"int");
 		     	        break;
 		     case 'S':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->issave2pt),"char");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->issave2pt),"bool");
 		     	        break;
 		     case 'p':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->printnum),"int");
@@ -425,10 +439,13 @@ not fully debugged, please do not use it for publications!\e[0m\n");
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->minenergy),"float");
                                 break;
 		     case 'U':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->isnormalized),"char");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->isnormalized),"bool");
 		     	        break;
                      case 'M':
-                                i=mcx_readarg(argc,argv,i,&(cfg->isplucker),"char");
+                                i=mcx_readarg(argc,argv,i,&(cfg->method),"char");
+				if(mcx_getmethodid(&(cfg->method))){
+					mcx_error(-2,"specified ray-tracing method is not recognized");
+				}
                                 break;
                      case 'R':
                                 i=mcx_readarg(argc,argv,i,&(cfg->sradius),"float");
@@ -483,7 +500,7 @@ void mcx_usage(char *exename){
 #                                                                             #\n\
 #    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
 ###############################################################################\n\
-$MMC $Rev:: 131 $ Last Commit $Date:: 2010-12-17 17:29:52#$ by $Author:: fangq$\n\
+$MMC $Rev::     $ Last Commit $Date::                     $ by $Author:: fangq$\n\
 ###############################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\
@@ -501,6 +518,11 @@ where possible parameters include (the first item in [] is the default value)\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
+ -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+                               P - Plucker-coordinate ray-tracing algorithm\n\
+			       H - Havel's SSE4 ray-tracing algorithm\n\
+			       B - partial Badouel's method\n\
+			       S - branch-less Badouel's method with SSE\n\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
  -D [''|MCBWDIOXATRP]          1 M  photon movement info\n\

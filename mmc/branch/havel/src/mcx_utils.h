@@ -114,7 +114,7 @@ typedef struct MMC_config{
 	char issavedet;     /**<1 to count all photons hits the detectors*/
 	char issave2pt;     /**<1 to save the 2-point distribution, 0 do not save*/
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
-	char isplucker;	    /**<1 to use Plucker ray-tracing, 0 to use Havel tracing*/
+	char method;	    /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
 	float roulettesize; /**<number of roulette for termination*/
         float minenergy;    /**<minimum energy to propagate photon*/
@@ -143,6 +143,7 @@ void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
 int  mcx_remap(char *opt);
+int  mcx_getmethodid(char *method);
 int  mcx_parsedebugopt(char *debugopt);
 void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg);
 

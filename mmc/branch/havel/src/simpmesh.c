@@ -244,7 +244,7 @@ void mesh_clear(tetmesh *mesh){
 	}
 }
 
-void tracer_init(raytracer *tracer,tetmesh *pmesh,int methodid){
+void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
 	tracer->d=NULL;
 	tracer->m=NULL;
 	tracer->n=NULL;
@@ -266,13 +266,13 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    float s=0.f, *bary=&(cfg->bary0.x);
 	    int *elems=(int *)(tracer->mesh->elem); // convert int4* to int*
 
-	    if(tracer->method==0 || tracer->method==2){
+	    if(tracer->method==1 || tracer->method==2){
 	        for(i=0;i<4;i++){
                     ea=elems[eid+out[i][0]]-1;
 		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
 		    bary[facemap[i]]=-vec_dot(&vecS,tracer->m+3*(ebase+i));
 		}
-	    }else if(tracer->method==1){
+	    }else if(tracer->method==0){
 	        for(i=0;i<4;i++){
                     ea=elems[eid+out[i][0]]-1;
 		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
@@ -287,6 +287,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		    bary[facemap[i]]-=vecS.z*((float *)(tracer->n+ebase+2))[i];
 		}
 	    }
+	    printf("initial element bary [%e %e %e %e]\n",bary[0],bary[1],bary[2],bary[3]);
 	    for(i=0;i<4;i++){
 	        if(bary[i]<0.f)
 		    mesh_error("initial element does not enclose the source!");
@@ -295,7 +296,6 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    for(i=0;i<4;i++){
 	        bary[i]/=s;
 	    }
-	    printf("initial element bary [%e %e %e %e]\n",bary[0],bary[1],bary[2],bary[3]);
 	}
 }
 
@@ -317,7 +317,7 @@ void tracer_build(raytracer *tracer){
 	ne=tracer->mesh->ne;
 	nodes=tracer->mesh->node;
 	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
-	if(tracer->method==1){
+	if(tracer->method==0){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f};
 
@@ -341,7 +341,7 @@ void tracer_build(raytracer *tracer){
 				vec_cross(&vecAB,&vecAC,tracer->n+ebase+j);
 			}
 		}
-	}else if(tracer->method==0 || tracer->method==2){
+	}else if(tracer->method==1 || tracer->method==2){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f};
 
