@@ -141,7 +141,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			faceidx=i;
 			r->faceid=faceorder[i];
 #ifdef MMC_USE_SSE
-		{
+		       {
 			int *enb=(int *)(tracer->mesh->facenb+eid);
 			r->nexteid=enb[r->faceid];
 			int nexteid=(r->nexteid-1)*6;
@@ -151,7 +151,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         	_mm_prefetch((char *)&((tracer->d+(nexteid)*6)->x),_MM_HINT_T0);
                                 _mm_prefetch((char *)&((tracer->d+(nexteid)*6+4)->x),_MM_HINT_T0);
 	                }
-		}
+		       }
 #endif
 			r->isend=(Lp0>dlen);
 			r->Lmove=((r->isend) ? dlen : Lp0);
@@ -183,43 +183,42 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->ne;
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
-
 	                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f]\n",
         	              baryout[0],baryout[1],baryout[2],baryout[3]);
 
-                if(Lp0>EPS){
-        	        ww=currweight-r->weight;
-			ratio=r->Lmove/Lp0;
-			r->Eabsorb+=ww;
-			ww/=prop->mua;
-                        r->photontimer+=r->Lmove*rc;
-                        tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
+                	if(Lp0>EPS){
+        	        	ww=currweight-r->weight;
+				ratio=r->Lmove/Lp0;
+				r->Eabsorb+=ww;
+				ww/=prop->mua;
+                        	r->photontimer+=r->Lmove*rc;
+                        	tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
 
-                        if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
-                           r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
+                        	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+                        	   r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
 
-			ww*=0.5f;
-			if(r->isend)
-                  	    for(i=0;i<4;i++)
-                     		baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                	for(i=0;i<4;i++)
-                     		tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
-			if(r->isend){
-				memcpy(baryp0,baryout,sizeof(float4));
-			}else{
-		        	if(r->nexteid && faceidx>=0){
-		        	    int j,k,*nextenb=(int *)(tracer->mesh->elem+r->nexteid-1);
-				    memset(baryp0,0,sizeof(float4));
-				    for(j=0;j<3;j++)
-				      for(k=0;k<4;k++){
-		    			if(ee[nc[faceidx][j]]==nextenb[k]){
-		    			    baryp0[k]=baryout[nc[faceidx][j]];
-					    break;
-		    			}
-				      }
+				ww*=0.5f;
+				if(r->isend)
+                  		    for(i=0;i<4;i++)
+                     			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
+                		for(i=0;i<4;i++)
+                     			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+				if(r->isend){
+					memcpy(baryp0,baryout,sizeof(float4));
+				}else{
+		        		if(r->nexteid && faceidx>=0){
+		        		    int j,k,*nextenb=(int *)(tracer->mesh->elem+r->nexteid-1);
+					    memset(baryp0,0,sizeof(float4));
+					    for(j=0;j<3;j++)
+					      for(k=0;k<4;k++){
+		    				if(ee[nc[faceidx][j]]==nextenb[k]){
+		    				    baryp0[k]=baryout[nc[faceidx][j]];
+						    break;
+		    				}
+					      }
+					}
 				}
 			}
-		}
 		}
 		if(r->faceid==-2)
 		   return 0.f;
@@ -340,17 +339,16 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		barypout[nc[i][1]]=bary.y;
 		barypout[nc[i][2]]=bary.z;
 		barypout[fm[i]]=0.f;
-
-		//if(cfg->debuglevel&dlBary) 
-		//    fprintf(cfg->flog,"barypout=[%f %f %f %f]\n",barypout[0],barypout[1],barypout[2],barypout[3]);
+	        if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f]\n",
+        	      barypout[0],barypout[1],barypout[2],barypout[3]);
 
 		T=_mm_load_ps(barypout);        /* bary centric at pout */
 		O=_mm_load_ps(&(r->bary0.x));   /* bary centric at p0 */
 
 		dlen=r->Lmove/bary.x;           /* normalized moving length */
 
-		//if(cfg->debuglevel&dlBary) 
-		 //   fprintf(cfg->flog,"moved Lmove=%f from %f\n",r->Lmove, bary.x);
+                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+                    r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
 
 		if(r->isend)                    /* S is the bary centric for the photon after move */
 		    S=_mm_add_ps(_mm_mul_ps(T,_mm_set1_ps(dlen)),_mm_mul_ps(O,_mm_set1_ps(1.f-dlen)));
