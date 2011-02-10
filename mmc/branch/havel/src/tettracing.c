@@ -693,6 +693,8 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
         		 fprintf(cfg->flog,"B %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+		    else if(r.eid==0 && (cfg->debuglevel&dlExit))
+        		 fprintf(cfg->flog,"E %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z,r.eid);
 		    else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          fprintf(cfg->flog,"T %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
@@ -714,20 +716,25 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
 	/*to handle refractive index mismatch*/
-        float3 pnorm;
+        float3 pnorm={0.f}, *pn=&pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
+	int offs=(*oldeid-1)<<2;
 
+	faceid=ifaceorder[faceid];
 	/*calculate the normal direction of the intersecting triangle*/
-        vec_cross(tracer->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][0],
-                  tracer->d+(*oldeid-1)*6+fc[ifaceorder[faceid]][1],&pnorm);
-	tmp0=mmc_rsqrtf(vec_dot(&pnorm,&pnorm));
-	tmp0*=(ifaceorder[faceid]>=2) ? -1.f : 1.f;
-	pnorm.x*=tmp0;
-        pnorm.y*=tmp0;
-        pnorm.z*=tmp0;
-	
+	if(cfg->method==rtPlucker) { //Plucker ray-tracing
+		pn=tracer->n+(offs)+faceid;
+	}else if(cfg->method<rtBLBadouel){
+		pn=tracer->m+(offs+faceid)*3;
+	}else if(cfg->method==rtBLBadouel){
+		pnorm.x=(&(tracer->n[offs].x))[faceid];
+		pnorm.y=(&(tracer->n[offs].x))[faceid+4];
+		pnorm.z=(&(tracer->n[offs].x))[faceid+8];
+	}
+	/*pn pointing outward*/
+
 	/*compute the cos of the incidence angle*/
-        Icos=fabs(vec_dot(c0,&pnorm));
+        Icos=fabs(vec_dot(c0,pn));
 
 	n1=tracer->mesh->med[tracer->mesh->type[*oldeid-1]-1].n;
 	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]-1].n : cfg->nout;
@@ -744,19 +751,19 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  if(*eid==0 || rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
-              vec_mult_add(&pnorm,c0,2.f*Icos,1.f,c0);
-              if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+              vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+              //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      return (*eid==0 ? *eid=*oldeid, Rtotal : 1.f); /*if reflect at boundary, use ref coeff, otherwise, use probability*/
           }else{                              /*do transmission*/
-              vec_mult_add(&pnorm,c0, Icos,1.f,c0);
-              vec_mult_add(&pnorm,c0,-tmp2,n1/n2,c0);
-              if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
+              vec_mult_add(pn,c0,-Icos,1.f,c0);
+              vec_mult_add(pn,c0,tmp2,n1/n2,c0);
+              //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
               return 1.f;
 	  }
        }else{ /*total internal reflection*/
-          vec_mult_add(&pnorm,c0,2.f*Icos,1.f,c0);
+          vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
 	  *eid=*oldeid;
-          if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
+          //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
           return 1.f;
        }
 }

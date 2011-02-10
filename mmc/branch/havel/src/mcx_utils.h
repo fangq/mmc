@@ -43,7 +43,9 @@
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
-                  dlProgress=2048};
+                  dlProgress=2048,dlExit=4096};
+
+enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -114,7 +116,7 @@ typedef struct MMC_config{
 	char issavedet;     /**<1 to count all photons hits the detectors*/
 	char issave2pt;     /**<1 to save the 2-point distribution, 0 do not save*/
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
-	char method;	    /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
+	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
 	float roulettesize; /**<number of roulette for termination*/
         float minenergy;    /**<minimum energy to propagate photon*/

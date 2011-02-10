@@ -261,33 +261,24 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    	mesh_error("tracer is not associated with a mesh");
 	}else{
             int eid=cfg->dim.x-1;
-	    float3 vecS={0.f}, *nodes=tracer->mesh->node;
-	    int i,ea,ebase=eid<<2;
+	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
+	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
-	    int *elems=(int *)(tracer->mesh->elem); // convert int4* to int*
+	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*
 
-	    if(tracer->method==1 || tracer->method==2){
-	        for(i=0;i<4;i++){
-                    ea=elems[eid+out[i][0]]-1;
-		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
-		    bary[facemap[i]]=-vec_dot(&vecS,tracer->m+3*(ebase+i));
-		}
-	    }else if(tracer->method==0){
-	        for(i=0;i<4;i++){
-                    ea=elems[eid+out[i][0]]-1;
-		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
-		    bary[facemap[i]]=-vec_dot(&vecS,tracer->n+ebase+i);
-		}
-	    }else if(tracer->method==3){
-	        for(i=0;i<4;i++){
-                    ea=elems[eid+out[i][0]]-1;
-		    vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
-		    bary[facemap[i]]=-vecS.x*((float *)(tracer->n+ebase))[i];
-		    bary[facemap[i]]-=vecS.y*((float *)(tracer->n+ebase+1))[i];
-		    bary[facemap[i]]-=vecS.z*((float *)(tracer->n+ebase+2))[i];
-		}
+	    for(i=0;i<4;i++){
+            	ea=elems[out[i][0]]-1;
+            	eb=elems[out[i][1]]-1;
+	    	ec=elems[out[i][2]]-1;
+            	vec_diff(&nodes[ea],&nodes[eb],&vecAB);
+            	vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+	    	vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
+            	vec_cross(&vecAB,&vecAC,&vecN);
+	    	bary[facemap[i]]=-vec_dot(&vecS,&vecN);
 	    }
-	    printf("initial element bary [%e %e %e %e]\n",bary[0],bary[1],bary[2],bary[3]);
+	    if(cfg->debuglevel&dlWeight)
+	       fprintf(cfg->flog,"initial bary-centric volumes [%e %e %e %e]\n",
+	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
 	    for(i=0;i<4;i++){
 	        if(bary[i]<0.f)
 		    mesh_error("initial element does not enclose the source!");
@@ -306,7 +297,8 @@ void tracer_build(raytracer *tracer){
 	float3 *nodes;
 	int *elems,ebase;
 	int e1,e0;
-	
+	float Rn2;
+
 	if(tracer->d || tracer->m || tracer->n || tracer->mesh==NULL) return;
 
         if(tracer->mesh->node==NULL||tracer->mesh->elem==NULL||
@@ -317,7 +309,7 @@ void tracer_build(raytracer *tracer){
 	ne=tracer->mesh->ne;
 	nodes=tracer->mesh->node;
 	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
-	if(tracer->method==0){
+	if(tracer->method==rtPlucker){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f};
 
@@ -339,9 +331,12 @@ void tracer_build(raytracer *tracer){
                                 vec_diff(&nodes[ea],&nodes[eb],&vecAB);
                                 vec_diff(&nodes[ea],&nodes[ec],&vecAC);
 				vec_cross(&vecAB,&vecAC,tracer->n+ebase+j);
+
+				Rn2=1.f/sqrt(vec_dot(tracer->n+ebase+j,tracer->n+ebase+j));
+				vec_mult(tracer->n+ebase+j,Rn2,tracer->n+ebase+j);
 			}
 		}
-	}else if(tracer->method==1 || tracer->method==2){
+	}else if(tracer->method==rtHavel || tracer->method==rtBadouel){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f};
 
@@ -351,7 +346,6 @@ void tracer_build(raytracer *tracer){
                         ebase=i<<2;
 			for(j=0;j<4;j++){
 				float3 *vecN=tracer->m+3*(ebase+j);
-				float Rn2;
 
                                 ea=elems[ebase+out[j][0]]-1;
                                 eb=elems[ebase+out[j][1]]-1;
@@ -363,7 +357,11 @@ void tracer_build(raytracer *tracer){
                                 vec_cross(&vecAC,vecN,vecN+1);
                                 vec_cross(vecN,&vecAB,vecN+2);
 
-				Rn2=1.f/(vecN->x*vecN->x+vecN->y*vecN->y+vecN->z*vecN->z);
+				Rn2=1.f/sqrt(vec_dot(vecN,vecN));
+
+				vec_mult(vecN,Rn2,vecN);
+				
+				Rn2*=Rn2;
 				vec_mult(vecN+1,Rn2,vecN+1);
                                 vec_mult(vecN+2,Rn2,vecN+2);
 #ifdef MMC_USE_SSE
@@ -373,7 +371,7 @@ void tracer_build(raytracer *tracer){
 #endif
 			}
                 }
-	}else if(tracer->method==3){
+	}else if(tracer->method==rtBLBadouel){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f},vN={0.f};
 
@@ -390,6 +388,10 @@ void tracer_build(raytracer *tracer){
                                 vec_diff(&nodes[ea],&nodes[ec],&vecAC);
 
 				vec_cross(&vecAB,&vecAC,&vN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
+
+				Rn2=1.f/sqrt(vec_dot(&vN,&vN));
+				vec_mult(&vN,Rn2,&vN);
+
 				vecN[j]=vN.x;
 				vecN[j+4]=vN.y;
 				vecN[j+8]=vN.z;

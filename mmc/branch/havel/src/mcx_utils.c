@@ -40,7 +40,7 @@ const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--printgpu","--root","--unitinmm","--continuity",
 		 "--method",""};
 
-const char *debugflag="MCBWDIOXATRP";
+const char *debugflag="MCBWDIOXATRPE";
 const char raytracing[]={'p','h','b','s','\0'};
 
 void mcx_initcfg(mcconfig *cfg){
