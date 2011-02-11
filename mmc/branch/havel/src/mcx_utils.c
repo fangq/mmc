@@ -30,15 +30,15 @@
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
 
-const char shortopt[]={'h','i','f','n','t','T','s','a','g','b','B','D',
-                 'd','r','S','p','e','U','R','l','L','I','o','u','C','M','\0'};
-const char *fullopt[]={"--help","--interactive","--input","--photon",
+const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
+                 'd','r','S','p','e','U','R','l','L','I','o','u','C','M','i','\0'};
+const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--printlen","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
-		 "--method",""};
+		 "--method","--interactive",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -158,7 +158,7 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 }
 
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
-     int i,gates,srctype;
+     int i,gates,srctype,itmp;
      char comment[MAX_PATH_LENGTH],*comm, strtypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
@@ -167,8 +167,11 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      if(cfg->nphoton==0) cfg->nphoton=i;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
-     	fprintf(stdout,"%d\nPlease specify the random number generator seed: [1234567]\n\t",cfg->nphoton);
-     mcx_assert(fscanf(in,"%d", &(cfg->seed) )==1);
+     	fprintf(stdout,"%d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
+     if(cfg->seed<=0)
+        mcx_assert(fscanf(in,"%d", &(cfg->seed) )==1);
+     else
+        mcx_assert(fscanf(in,"%d", &itmp )==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
@@ -474,6 +477,9 @@ not fully debugged, please do not use it for publications!\e[0m\n");
 		     case 'U':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isnormalized),"bool");
 		     	        break;
+		     case 'E':
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->seed),"int");
+		     	        break;
                      case 'M':
                                 i=mcx_readarg(argc,argv,i,&(cfg->method),"char");
 				if(mcx_getmethodid(&(cfg->method))){
@@ -551,6 +557,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
+ -E [0|int]    (--seed)        set random-number-generator seed\n\
  -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\

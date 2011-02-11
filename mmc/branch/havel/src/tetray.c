@@ -89,7 +89,7 @@ int main(int argc, char**argv){
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
 	/*launch photons*/
-#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
+#pragma omp for schedule(static,64) reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
 		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
