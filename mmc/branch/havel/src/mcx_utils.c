@@ -40,8 +40,9 @@ const char *fullopt[]={"--help","--interactive","--input","--photon",
                  "--printgpu","--root","--unitinmm","--continuity",
 		 "--method",""};
 
-const char *debugflag="MCBWDIOXATRPE";
+const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
+const char *srctypeid[]={"pencil","cone","gaussian",""};
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
@@ -64,7 +65,6 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
      cfg->method=0;
-
      cfg->prop=NULL;
      cfg->detpos=NULL;
      cfg->vol=NULL;
@@ -80,7 +80,10 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->roulettesize=10.f;
      cfg->nout=1.f;
      cfg->unitinmm=1.f;
+     cfg->srctype=0;
+
      memset(&(cfg->bary0),0,sizeof(float4));
+     memset(&(cfg->srcparam),0,sizeof(float4));
 }
 
 void mcx_clearcfg(mcconfig *cfg){
@@ -155,8 +158,8 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 }
 
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
-     int i,gates;
-     char comment[MAX_PATH_LENGTH],*comm;
+     int i,gates,srctype;
+     char comment[MAX_PATH_LENGTH],*comm, strtypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of photons: [1000000]\n\t");
@@ -229,6 +232,23 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }
+     if(in==stdin)
+     	fprintf(stdout,"Please specify the source type[pencil|cone|gaussian]:\n\t");
+     if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
+        srctype=mcx_getsrcid(strtypestr);
+	if(srctype==-1)
+	   mcx_error(-6,"The specified source type is not supported. Please double-check your input file");
+        if(srctype>0){
+           comm=fgets(comment,MAX_PATH_LENGTH,in);
+	   cfg->srctype=srctype;
+	   if(in==stdin)
+     	      fprintf(stdout,"Please specify the source parameters (4 floating-points):\n\t");
+           mcx_assert(fscanf(in, "%f %f %f %f", &(cfg->srcparam.x),
+	          &(cfg->srcparam.y),&(cfg->srcparam.z),&(cfg->srcparam.w))==4);
+	}else
+	   return;
+     }else
+        return;
 }
 
 void mcx_saveconfig(FILE *out, mcconfig *cfg){
@@ -355,6 +375,19 @@ int mcx_getmethodid(char *method){
 	i++;
     }
     return 1;
+}
+int mcx_getsrcid(char *srctype){
+    int i=0;
+    while(srctype[i])
+        srctype[i++]=tolower(srctype[i]);
+    i=0;
+    while(srctypeid[i]!='\0'){
+	if(strcmp(srctype,srctypeid[i])==0){
+		return i;
+	}
+	i++;
+    }
+    return -1;
 }
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      int i=1,isinteractive=1,issavelog=0;

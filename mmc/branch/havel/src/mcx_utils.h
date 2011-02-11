@@ -46,6 +46,8 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
                   dlProgress=2048,dlExit=4096};
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
+enum TSrcType {stPencil, stCone, stGaussian};
+
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -82,6 +84,8 @@ typedef struct MMC_config{
 	
 	float3 srcpos;    /**<src position in mm*/
 	float3 srcdir;    /**<src normal direction*/
+	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
+	float4 srcparam;  /**<additional parameters for advanced sources */
 	float4 bary0;     /**<initial bary centric coordinates of the source*/
 	float tstart;     /**<start time in second*/
 	float tstep;      /**<time step in second*/
@@ -146,6 +150,7 @@ int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
 int  mcx_remap(char *opt);
 int  mcx_getmethodid(char *method);
+int  mcx_getsrcid(char *srctype);
 int  mcx_parsedebugopt(char *debugopt);
 void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg);
 

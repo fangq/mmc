@@ -140,10 +140,11 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
 			faceidx=i;
 			r->faceid=faceorder[i];
-#ifdef MMC_USE_SSE
+
 		       {
 			int *enb=(int *)(tracer->mesh->facenb+eid);
 			r->nexteid=enb[r->faceid];
+#ifdef MMC_USE_SSE
 			int nexteid=(r->nexteid-1)*6;
 	                if(r->nexteid){
         	                _mm_prefetch((char *)&((tracer->m+nexteid)->x),_MM_HINT_T0);
@@ -151,8 +152,8 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         	_mm_prefetch((char *)&((tracer->d+(nexteid)*6)->x),_MM_HINT_T0);
                                 _mm_prefetch((char *)&((tracer->d+(nexteid)*6+4)->x),_MM_HINT_T0);
 	                }
-		       }
 #endif
+		       }
 			r->isend=(Lp0>dlen);
 			r->Lmove=((r->isend) ? dlen : Lp0);
 			break;
@@ -187,22 +188,24 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
         	              baryout[0],baryout[1],baryout[2],baryout[3]);
 
                 	if(Lp0>EPS){
-        	        	ww=currweight-r->weight;
-				ratio=r->Lmove/Lp0;
-				r->Eabsorb+=ww;
-				ww/=prop->mua;
                         	r->photontimer+=r->Lmove*rc;
-                        	tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
+        	        	ww=currweight-r->weight;
+				if(prop->mua>0.f){
+				  ratio=r->Lmove/Lp0;
+				  r->Eabsorb+=ww;
+				  ww/=prop->mua;
+                        	  tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
 
-                        	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
-                        	   r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
+                        	  if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
+                        	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
 
-				ww*=0.5f;
-				if(r->isend)
+				  ww*=0.5f;
+				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                		for(i=0;i<4;i++)
+                		  for(i=0;i<4;i++)
                      			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+				}
 				if(r->isend){
 					memcpy(baryp0,baryout,sizeof(float4));
 				}else{
@@ -323,10 +326,13 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			break;
 		}
 		ww=currweight-r->weight;
-		r->Eabsorb+=ww;
-		ww/=prop->mua;
                 r->photontimer+=r->Lmove*rc;
-		tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn-1;
+
+		if(prop->mua>0.f){
+		  r->Eabsorb+=ww;
+		  ww/=prop->mua;
+		}
+                tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn-1;
 
                 if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
@@ -377,12 +383,13 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		//if(cfg->debuglevel&dlBary)
 		//    fprintf(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+		if(prop->mua>0.f){
+		  T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
+		  _mm_store_ps(barypout,T);
 
-		T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
-		_mm_store_ps(barypout,T);
-
-		for(j=0;j<4;j++)
+		  for(j=0;j<4;j++)
 		    tracer->mesh->weight[ee[j]+tshift]+=barypout[j];
+		}
 		break;
 	   }
 	visit->raytet++;
@@ -635,6 +642,16 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
+        if(cfg->srctype>0){
+		if(cfg->srctype==stCone){
+			float zangle, aangle;
+			zangle=(2.f*M_PI)*rand_next_zangle(ran);   /*this needs to rotate*/
+			aangle=cfg->srcparam.x*rand_next_aangle(ran);
+			r.vec.x=sinf(aangle)*cosf(zangle);
+			r.vec.y=sinf(aangle)*sinf(zangle);
+			r.vec.z=cosf(aangle);
+		}
+	}
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
 	    tracercore=engines[(int)(cfg->method)];
@@ -671,9 +688,8 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			if(! (r.eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ))
 			    r.weight*=reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
-
-	    	    if(!cfg->isreflect && r.eid==0) break;
-		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ) break;
+	    	    if(r.eid==0) break;
+//		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
@@ -694,7 +710,8 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
         		 fprintf(cfg->flog,"B %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    else if(r.eid==0 && (cfg->debuglevel&dlExit))
-        		 fprintf(cfg->flog,"E %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z,r.eid);
+        		 fprintf(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
 		    else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          fprintf(cfg->flog,"T %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
@@ -750,10 +767,13 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
           Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
-	  if(*eid==0 || rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
-	      return (*eid==0 ? *eid=*oldeid, Rtotal : 1.f); /*if reflect at boundary, use ref coeff, otherwise, use probability*/
+	      *eid=*oldeid; /*stay with the current element*/
+	      return Rtotal;
+	  }else if(*eid==0){   /*if do transmission, but next neighbor is 0, terminate*/
+	      return 1.f;
           }else{                              /*do transmission*/
               vec_mult_add(pn,c0,-Icos,1.f,c0);
               vec_mult_add(pn,c0,tmp2,n1/n2,c0);
