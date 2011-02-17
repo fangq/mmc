@@ -32,6 +32,7 @@
 
 const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
 const int facemap[]={2,0,1,3};
+const int ifacemap[]={1,2,0,3};
 
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
@@ -112,10 +113,15 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	if(len!=2 || mesh->prop<=0){
 		mesh_error("property file has wrong format");
 	}
-	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop);
-        mesh->atte=(float *)calloc(sizeof(float),mesh->prop);
+	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop+1);
+        mesh->atte=(float *)calloc(sizeof(float),mesh->prop+1);
+	
+	mesh->med[0].mua=0.f;
+	mesh->med[0].mus=0.f;
+	mesh->med[0].n=cfg->nout;
+	mesh->med[0].g=1.f;
 
-	for(i=0;i<mesh->prop;i++){
+	for(i=1;i<=mesh->prop;i++){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
 			mesh_error("property file has wrong format");
@@ -286,6 +292,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    }
 	    for(i=0;i<4;i++){
 	        bary[i]/=s;
+		if(bary[i]<1e-5f)
+		    cfg->dim.y=ifacemap[i]+1;
 	    }
 	}
 }
@@ -529,7 +537,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 		for(k=0;k<4;k++)
 		   energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
 
-	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]-1].mua; /**mesh->med[mesh->type[i]-1].n;*/
+	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
 	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f*cfg->tstep); /*scaling factor*/
 
@@ -542,7 +550,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	         energydeposit+=mesh->weight[j*mesh->ne+i];
 
             for(i=0;i<mesh->ne;i++){
-	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]-1].mua;
+	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]].mua;
               for(j=0;j<cfg->maxgate;j++)
         	mesh->weight[j*mesh->ne+i]/=energyelem;
 	    }

@@ -120,6 +120,7 @@ typedef struct MMC_config{
 	char issavedet;     /**<1 to count all photons hits the detectors*/
 	char issave2pt;     /**<1 to save the 2-point distribution, 0 do not save*/
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
+	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
 	float roulettesize; /**<number of roulette for termination*/

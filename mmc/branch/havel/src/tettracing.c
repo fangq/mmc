@@ -84,7 +84,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
 	float Lp0=0.f,atte,ratio;
 
-	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
+	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne+1) 
 		return -1;
 
 	eid=r->eid-1;
@@ -93,8 +93,8 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	vec_add(&(r->p0),&(r->vec),&p1);
 	vec_cross(&(r->p0),&p1,&pcrx);
 	ee=(int *)(tracer->mesh->elem+eid);
-	prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
-	atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
+	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	rc=prop->n*R_C0;
         currweight=r->weight;
 
@@ -281,8 +281,8 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	medium *prop;
 	int *ee=(int *)(tracer->mesh->elem+eid);;
-	prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
-	atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
+	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	rc=prop->n*R_C0;
         currweight=r->weight;
 
@@ -451,8 +451,8 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	if(r->faceid>=0){
 	    medium *prop;
 	    int *ee=(int *)(tracer->mesh->elem+eid);;
-	    prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
-	    atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
+	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	    atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	    rc=prop->n*R_C0;
             currweight=r->weight;
 
@@ -555,8 +555,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid);;
-	    prop=tracer->mesh->med+(tracer->mesh->type[eid]-1);
-	    atte=tracer->mesh->atte[tracer->mesh->type[eid]-1];
+	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	    atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	    rc=prop->n*R_C0;
             currweight=r->weight;
 
@@ -637,7 +637,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	int oldeid,fixcount=0;
 	int *enb;
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,-1,0,0,1.f,0.f,0.f,0.f};
+	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f};
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
@@ -660,6 +660,14 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*initialize the photon parameters*/
 	r.slen=rand_next_scatlen(ran);
+	
+	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout){
+	    float Rspecular=reflectray(cfg,&r.vec,tracer,&r.eid,&r.eid,faceorder[r.faceid],ran);
+	    if(Rspecular<1.f)
+	       r.weight*=(1.f-Rspecular);
+	    else
+	       return 0.f; /*total internal reflection outside of the mesh*/
+	}
 
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
@@ -684,12 +692,12 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
 
-		    if(cfg->isreflect && (r.eid==0 || mesh->med[mesh->type[r.eid-1]-1].n != mesh->med[mesh->type[oldeid-1]-1].n )){
-			if(! (r.eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ))
-			    r.weight*=reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
+		    if(cfg->isreflect && (r.eid==0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
+			if(! (r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
+			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
 	    	    if(r.eid==0) break;
-//		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]-1].n == cfg->nout ) break;
+//		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
@@ -726,7 +734,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		else
 			break;
 	    }
-	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]-1].g,&r.vec,ran,ran0,cfg);
+	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg);
 	}
 	return r.Eabsorb;
 }
@@ -753,8 +761,8 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-	n1=tracer->mesh->med[tracer->mesh->type[*oldeid-1]-1].n;
-	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]-1].n : cfg->nout;
+	n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
+	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]].n : cfg->nout;
 
 	tmp0=n1*n1;
 	tmp1=n2*n2;
@@ -767,11 +775,12 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
           Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
+	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
-	      return Rtotal;
+	      return 1.f;
 	  }else if(*eid==0){   /*if do transmission, but next neighbor is 0, terminate*/
 	      return 1.f;
           }else{                              /*do transmission*/
