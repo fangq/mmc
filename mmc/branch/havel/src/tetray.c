@@ -105,7 +105,6 @@ int main(int argc, char**argv){
 			mcx_progressbar(ncomplete,cfg.nphoton,&cfg);
 	}
 	if(cfg.issavedet){
-	printf("[%d]visitor: %d\n",threadid,visit.bufpos);
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
