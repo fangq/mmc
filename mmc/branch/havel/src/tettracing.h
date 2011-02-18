@@ -51,6 +51,7 @@ typedef struct MMC_ray{
 	float slen;
 	float Lmove;
 	double Eabsorb;
+	float *partialpath;
 } ray;
 
 /***************************************************************************//**
@@ -62,6 +63,9 @@ typedef struct MMC_ray{
 typedef struct MMC_visitor{
 	float raytet;
 	float rtstep;
+	int   detcount;
+	int   bufpos;
+	float *partialpath;
 } visitor;
 
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);

@@ -90,6 +90,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	eid=r->eid-1;
 	r->faceid=-1;
 	r->isend=0;
+	r->Lmove=0.f;
 	vec_add(&(r->p0),&(r->vec),&p1);
 	vec_cross(&(r->p0),&p1,&pcrx);
 	ee=(int *)(tracer->mesh->elem+eid);
@@ -635,9 +636,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 RandType *ran, RandType *ran0, visitor *visit){
 
-	int oldeid,fixcount=0;
+	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f};
+	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,NULL};
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
@@ -652,6 +653,8 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			r.vec.z=cosf(aangle);
 		}
 	}
+	r.partialpath=(float*)calloc(mesh->prop+1,sizeof(float));
+
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
 	    tracercore=engines[(int)(cfg->method)];
@@ -684,6 +687,8 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	  r.eid=-r.eid;
         	  r.faceid=-1;
 	    }
+	    if(cfg->issavedet && r.Lmove>0.f)
+	            r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
@@ -702,11 +707,15 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    		fprintf(cfg->flog,"P %f %f %f %d %d %f\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+		    if(cfg->issavedet && r.Lmove>0.f)
+		            r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 		       fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+r.eid-1));
                        r.slen=(*tracercore)(&r,tracer,cfg,visit);
+		       if(cfg->issavedet && r.Lmove>0.f)
+	            		r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
@@ -724,6 +733,18 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                          fprintf(cfg->flog,"T %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 fprintf(cfg->flog,"X %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+		    if(cfg->issavedet && r.eid==0){
+		       int i;
+		       float detrad2=cfg->detradius*cfg->detradius;
+		       for(i=0;i<cfg->detnum;i++){
+        		  if((cfg->detpos[i].x-r.p0.x)*(cfg->detpos[i].x-r.p0.x)+
+        		     (cfg->detpos[i].y-r.p0.y)*(cfg->detpos[i].y-r.p0.y)+
+        		     (cfg->detpos[i].z-r.p0.z)*(cfg->detpos[i].z-r.p0.z) < detrad2){
+			          exitdet=i+1;
+                		  break;
+        		     }
+		       }
+		    }
 	    	    break;  /*photon exits boundary*/
 	    }
 	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %d %f\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
@@ -735,7 +756,20 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg);
+            r.partialpath[0]++;
 	}
+	if(cfg->issavedet && exitdet>0){
+		int offset=visit->bufpos*(mesh->prop+2);
+		if(visit->bufpos>=visit->detcount){
+		    visit->detcount+=DET_PHOTON_BUF;
+		    visit->partialpath=(float *)realloc(visit->partialpath,
+		               visit->detcount*(mesh->prop+2)*sizeof(float));
+		}
+		visit->partialpath[offset]=exitdet;
+		memcpy(visit->partialpath+offset+1,r.partialpath, (mesh->prop+1)*sizeof(float));
+		visit->bufpos++;
+	}
+	free(r.partialpath);
 	return r.Eabsorb;
 }
 

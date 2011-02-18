@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include "simpmesh.h"
 #include "tettracing.h"
 #include "mcx_utils.h"
@@ -43,6 +44,7 @@ int main(int argc, char**argv){
 	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
+	visitor master={0.f,0.f,0,0,NULL};
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
@@ -82,14 +84,16 @@ int main(int argc, char**argv){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,1.f/cfg.tstep};
+	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
+	if(cfg.issavedet) 
+	    visit.partialpath=(float*)calloc(visit.detcount*(mesh.prop+2),sizeof(float));
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();	
 #endif
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
 	/*launch photons*/
-#pragma omp for schedule(static,64) reduction(+:Eabsorb) reduction(+:raytri)
+        #pragma omp for schedule(static,64) reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
 		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
@@ -99,6 +103,23 @@ int main(int argc, char**argv){
 
 		if((cfg.debuglevel & dlProgress) && threadid==0)
 			mcx_progressbar(ncomplete,cfg.nphoton,&cfg);
+	}
+	if(cfg.issavedet){
+	printf("[%d]visitor: %d\n",threadid,visit.bufpos);
+	    #pragma omp atomic
+		master.detcount+=visit.bufpos;
+            #pragma omp barrier
+	    if(threadid==0)
+	        master.partialpath=(float*)calloc(master.detcount*(mesh.prop+2),sizeof(float));
+            #pragma omp barrier
+            #pragma omp critical
+            {
+		memcpy(master.partialpath+master.bufpos*(mesh.prop+2),
+		    visit.partialpath,visit.bufpos*(mesh.prop+2)*sizeof(float));
+		master.bufpos+=visit.bufpos;
+            }
+            #pragma omp barrier
+	    free(visit.partialpath);
 	}
 }
 
@@ -119,10 +140,14 @@ int main(int argc, char**argv){
 		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
 	if(cfg.issave2pt){
-		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving data ..."));
+		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving fluence ..."));
 		mesh_saveweight(&mesh,&cfg);
 	}
-
+	if(cfg.issavedet){
+		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving detected photons ..."));
+		mesh_savedetphoton(master.partialpath,master.bufpos,&cfg);
+		free(master.partialpath);
+	}
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
         /** \subsection sclean End the simulation */

@@ -31,12 +31,12 @@
 #include "mcx_utils.h"
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
-                 'd','r','S','p','e','U','R','l','L','I','o','u','C','M',
+                 'd','r','S','e','U','R','l','L','I','o','u','C','M',
 		 'i','V','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
-                 "--repeat","--save2pt","--printlen","--minenergy",
+                 "--repeat","--save2pt","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
 		 "--method","--interactive","--specular",""};
@@ -71,7 +71,6 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->vol=NULL;
      cfg->session[0]='\0';
      cfg->meshtag[0]='\0';
-     cfg->printnum=0;
      cfg->minenergy=1e-6f;
      cfg->flog=stdout;
      cfg->sradius=0.f;
@@ -83,6 +82,10 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->unitinmm=1.f;
      cfg->srctype=0;
      cfg->isspecular=0;
+
+     cfg->his.version=1;
+     cfg->his.unitinmm=1.f;
+     memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->bary0),0,sizeof(float4));
      memset(&(cfg->srcparam),0,sizeof(float4));
@@ -383,8 +386,10 @@ int mcx_getmethodid(char *method){
 }
 int mcx_getsrcid(char *srctype){
     int i=0;
-    while(srctype[i])
-        srctype[i++]=tolower(srctype[i]);
+    while(srctype[i]){
+        srctype[i]=tolower(srctype[i]);
+	i++;
+    }
     i=0;
     while(srctypeid[i]!='\0'){
 	if(strcmp(srctype,srctypeid[i])==0){
@@ -464,9 +469,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     	        break;
 		     case 'S':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->issave2pt),"bool");
-		     	        break;
-		     case 'p':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->printnum),"int");
 		     	        break;
                      case 'e':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->minenergy),"float");
@@ -561,7 +563,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
-			       B - partial Badouel's method\n\
+			       B - partial Badouel's method (similar to TIM-OS)\n\
 			       S - branch-less Badouel's method with SSE\n\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\

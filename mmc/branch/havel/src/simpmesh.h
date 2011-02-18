@@ -107,6 +107,7 @@ void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
+void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);
 void tracer_build(raytracer *tracer);

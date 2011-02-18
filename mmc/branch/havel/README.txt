@@ -282,9 +282,6 @@ V. Known issues and TODOs
 * currently, this code only support element-based optical properties; \
  nodal-based optical properties (for continuous varying media) will be \
  added in the next release
-* the current version of MMC does not support saving partial-path-length \
- data at detector sites as MCX does; this is expected to be added in the \
- next release.
 
 -------------------------------------------------------------------------------
 VI.  Reference

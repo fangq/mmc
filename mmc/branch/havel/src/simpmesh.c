@@ -130,6 +130,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 		mesh->med[i].mus=musp/(1.f-mesh->med[i].g); */
 	}
 	fclose(fp);
+	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
 }
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
@@ -516,6 +517,29 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->ne+j])==0)
 			mesh_error("can not write to weight file");
 	   }
+	fclose(fp);
+}
+
+void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg){
+	FILE *fp;
+	char fhistory[MAX_PATH_LENGTH];
+        if(cfg->rootpath[0])
+                sprintf(fhistory,"%s%c%s.mch",cfg->rootpath,pathsep,cfg->session);
+        else
+                sprintf(fhistory,"%s.mch",cfg->session);
+
+	if((fp=fopen(fhistory,"wt"))==NULL){
+		mesh_error("can not open history file to write");
+	}
+	cfg->his.totalphoton=cfg->nphoton;
+        cfg->his.unitinmm=cfg->unitinmm;
+        cfg->his.detected=count;
+	cfg->his.savedphoton=count;
+	cfg->his.detnum=cfg->detnum;
+        cfg->his.colcount=cfg->his.maxmedia+2; /*column count=maxmedia+2*/
+
+	fwrite(&(cfg->his),sizeof(history),1,fp);
+	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
 	fclose(fp);
 }
 

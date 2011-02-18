@@ -32,6 +32,7 @@
 #define MAX_DETECTORS       256
 #define MAX_PATH_LENGTH     1024
 #define MAX_SESSION_LENGTH  256
+#define DET_PHOTON_BUF      100000
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 
 #define MMCDEBUG(cfg,debugflag,outputstr)  {\
@@ -66,6 +67,18 @@ typedef struct MMC_medium{
 	float g;          /**<anisotropy*/
 } medium;
 
+typedef struct MMC_history{
+        char magic[4];
+        unsigned int  version;
+        unsigned int  maxmedia;
+        unsigned int  detnum;
+        unsigned int  colcount;
+        unsigned int  totalphoton;
+        unsigned int  detected;
+        unsigned int  savedphoton;
+        float unitinmm;
+        int reserved[7];
+} history;
 
 /***************************************************************************//**
 \struct MMC_config mcx_utils.h
@@ -130,6 +143,7 @@ typedef struct MMC_config{
         char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
 	float unitinmm;     /**<define the length unit in mm*/
+	history his;        /**<header info of the history file*/
 } mcconfig;
 
 #ifdef	__cplusplus
