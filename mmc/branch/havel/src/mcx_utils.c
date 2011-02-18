@@ -173,7 +173,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
-     if(cfg->seed<=0)
+     if(cfg->seed==0)
         mcx_assert(fscanf(in,"%d", &(cfg->seed) )==1);
      else
         mcx_assert(fscanf(in,"%d", &itmp )==1);
@@ -230,7 +230,8 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      if(in==stdin)
      	fprintf(stdout,"%d %f\n",cfg->detnum,cfg->detradius);
      cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
-     cfg->issavedet=(cfg->detpos>0);
+     if(cfg->issavedet)
+        cfg->issavedet=(cfg->detpos>0);
      for(i=0;i<cfg->detnum;i++){
         if(in==stdin)
 		fprintf(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
