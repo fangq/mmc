@@ -408,7 +408,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      	    if(argv[i][0]=='-'){
 		if(argv[i][1]=='-'){
 			if(mcx_remap(argv[i])){
-				mcx_error(-2,"unknown verbose option");
+				mcx_error(-2,"unsupported verbose option");
 			}
 		}
 	        switch(argv[i][1]){
@@ -446,14 +446,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     	        break;
 		     case 'b':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isreflect),"bool");
-				if(cfg->isreflect) 
-#ifdef _WIN32
-                                    fprintf(stderr,"\nWARNING!! the reflection code was \
-not fully debugged, please do not use it for publications!\n");
-#else
-				    fprintf(stderr,"\n\e[0;31mWARNING!! the reflection code was \
-not fully debugged, please do not use it for publications!\e[0m\n");
-#endif
 		     	        break;
                      case 'B':
                                 i=mcx_readarg(argc,argv,i,&(cfg->isref3),"bool");
@@ -515,6 +507,8 @@ not fully debugged, please do not use it for publications!\e[0m\n");
 				else
 	                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");
                                 break;
+                     default:
+				mcx_error(-1,"unsupported command line option");
 		}
 	    }
 	    i++;
@@ -540,7 +534,7 @@ void mcx_usage(char *exename){
      printf("\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
-#        Copyright (c) 2010 Qianqian Fang <fangq at nmr.mgh.harvard.edu>      #\n\
+#     Copyright (c) 2010,2011 Qianqian Fang <fangq at nmr.mgh.harvard.edu>    #\n\
 #                                                                             #\n\
 #    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
 ###############################################################################\n\
@@ -583,6 +577,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                              512 T  timing information\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
+                            4096 E  exit photon info\n\
       add the numbers together to print mulitple items, or one can use a string\n\
 example:\n\
        %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,exename);

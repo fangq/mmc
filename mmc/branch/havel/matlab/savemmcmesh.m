@@ -8,10 +8,6 @@ if(nargin<5)
   evol=elemvolume(node,elem(:,1:4));
 end
 
-if(nargin<6)
-  facenb=faceneighbors(elem(:,1:4));
-end
-
 if(~isempty(node))
   fid=fopen(['node_',key,'.dat'],'wt');
   fprintf(fid,'%d\t%d\n',1,size(node,1));
@@ -33,6 +29,10 @@ if(~isempty(elem))
     error('wrong elem input: must be 4 or 5 columns');
   end
   fclose(fid);
+end
+
+if(nargin<6)
+  facenb=faceneighbors(elem(:,1:4));
 end
 
 if(~isempty(face))

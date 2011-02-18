@@ -1,11 +1,11 @@
 ===============================================================================
 =                       Mesh-based Monte Carlo (MMC)                          =
-=                          Multi-threaded Edition                             =
+=                     Multi-threaded Edition with SSE4                        =
 ===============================================================================
 
 Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.2 (Cheesecake)
+Version: 0.8.pre (Snow cone)
 
 -------------------------------------------------------------------------------
 
@@ -154,9 +154,17 @@ where possible parameters include (the first item in [] is the default value)
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
  -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
+ -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead
+ -E [0|int]    (--seed)        set random-number-generator seed
+ -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
+                               P - Plucker-coordinate ray-tracing algorithm
+			       H - Havel's SSE4 ray-tracing algorithm
+			       B - partial Badouel's method
+			       S - branch-less Badouel's method with SSE
  -D [0|int]    (--debug)       print debug information (you can use an integer
   or                           or a string by combining the following flags)
  -D [''|MCBWDIOXATRP]          1 M  photon movement info
@@ -171,6 +179,7 @@ where possible parameters include (the first item in [] is the default value)
                              512 T  timing information
                             1024 R  debugging reflection
                             2048 P  show progress bar
+                            4096 E  exit photon info
       add the numbers together to print mulitple items, or one can use a string
 example:
        mmc -n 1000000 -f input.inp -s test -b 0 -D TP
@@ -268,8 +277,6 @@ to find more options to make plot from MMC output.
 
 V. Known issues and TODOs
 
-* the boundary-reflection code in MMC is experimental and has not been\
- validated rigorously
 * MMC only supports linear tetrahedral elements at this point. Quadratic \
  elements will be added later
 * currently, this code only support element-based optical properties; \

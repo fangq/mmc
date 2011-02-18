@@ -84,7 +84,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
 	float Lp0=0.f,atte,ratio;
 
-	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne+1) 
+	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
 		return -1;
 
 	eid=r->eid-1;
