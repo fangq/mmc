@@ -48,6 +48,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
 enum TSrcType {stPencil, stCone, stGaussian};
+enum TOutputType {otFlux, otFluence, otEnergy};
 
 
 /***************************************************************************//**
@@ -136,6 +137,7 @@ typedef struct MMC_config{
 	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
+        char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
 	float roulettesize; /**<number of roulette for termination*/
         float minenergy;    /**<minimum energy to propagate photon*/
 	float nout;         /**<refractive index for the domain outside the mesh*/
@@ -164,7 +166,7 @@ void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
 int  mcx_remap(char *opt);
-int  mcx_getmethodid(char *method);
+int  mcx_lookupindex(char *key, const char *index);
 int  mcx_getsrcid(char *srctype);
 int  mcx_parsedebugopt(char *debugopt);
 void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg);

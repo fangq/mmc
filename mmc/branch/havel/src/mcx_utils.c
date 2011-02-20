@@ -32,17 +32,18 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-		 'i','V','\0'};
+		 'i','V','O','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
-		 "--method","--interactive","--specular",""};
+		 "--method","--interactive","--specular","--outputtype",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
+const char outputtype[]={'x','f','e','\0'};
 const char *srctypeid[]={"pencil","cone","gaussian",""};
 
 void mcx_initcfg(mcconfig *cfg){
@@ -82,6 +83,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->unitinmm=1.f;
      cfg->srctype=0;
      cfg->isspecular=0;
+     cfg->outputtype=otFlux;
 
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
@@ -126,7 +128,7 @@ void mcx_normalize(float field[], float scale, int fieldlen){
 }
 
 void mcx_error(int id,char *msg){
-     fprintf(stdout,"MMC ERROR(%d):%s\n",id,msg);
+     fprintf(stdout,"MMC ERROR(%d): %s\n",id,msg);
      exit(id);
 }
 
@@ -246,7 +248,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
         srctype=mcx_getsrcid(strtypestr);
 	if(srctype==-1)
-	   mcx_error(-6,"The specified source type is not supported. Please double-check your input file");
+	   mcx_error(-6,"the specified source type is not supported");
         if(srctype>0){
            comm=fgets(comment,MAX_PATH_LENGTH,in);
 	   cfg->srctype=srctype;
@@ -374,14 +376,14 @@ int mcx_remap(char *opt){
     }
     return 1;
 }
-int mcx_getmethodid(char *method){
+int mcx_lookupindex(char *key, const char *index){
     int i=0;
-    while(raytracing[i]!='\0'){
-	if(tolower(*method)==raytracing[i]){
-		*method=i;
-		return 0;
-	}
-	i++;
+    while(index[i]!='\0'){
+        if(tolower(*key)==index[i]){
+                *key=i;
+                return 0;
+        }
+        i++;
     }
     return 1;
 }
@@ -480,10 +482,16 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'E':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->seed),"int");
 		     	        break;
+                     case 'O':
+                                i=mcx_readarg(argc,argv,i,&(cfg->outputtype),"char");
+				if(mcx_lookupindex(&(cfg->outputtype), outputtype)){
+                                        mcx_error(-2,"the specified output data type is not recognized");
+                                }
+                                break;
                      case 'M':
                                 i=mcx_readarg(argc,argv,i,&(cfg->method),"char");
-				if(mcx_getmethodid(&(cfg->method))){
-					mcx_error(-2,"specified ray-tracing method is not recognized");
+				if(mcx_lookupindex(&(cfg->method), raytracing)){
+					mcx_error(-2,"the specified ray-tracing method is not recognized");
 				}
                                 break;
                      case 'R':
@@ -557,6 +565,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
+ -O [X|XFE]    (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\

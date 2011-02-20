@@ -194,7 +194,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				if(prop->mua>0.f){
 				  ratio=r->Lmove/Lp0;
 				  r->Eabsorb+=ww;
-				  ww/=prop->mua;
+				  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
                         	  tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
 
                         	  if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %f\n",
@@ -331,7 +331,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  ww/=prop->mua;
+		  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
 		}
                 tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn-1;
 
@@ -488,7 +488,8 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		if(!cfg->basisorder){
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
-			ww/=prop->mua*3.f;
+			if(cfg->outputtype!=otEnergy) ww/=prop->mua;
+                        ww*=3.f;
 			tracer->mesh->weight[ee[nc[faceidx][0]]-1+tshift]+=ww;
 			tracer->mesh->weight[ee[nc[faceidx][1]]-1+tshift]+=ww;
 			tracer->mesh->weight[ee[nc[faceidx][2]]-1+tshift]+=ww;
@@ -603,7 +604,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		if(!cfg->basisorder){
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
-			ww/=prop->mua;
+			if(cfg->outputtype!=otEnergy) ww/=prop->mua;
 			tracer->mesh->weight[ee[nc[faceidx][0]]-1+tshift]+=ww*(1.f/3.f);
 			tracer->mesh->weight[ee[nc[faceidx][1]]-1+tshift]+=ww*(1.f/3.f);
 			tracer->mesh->weight[ee[nc[faceidx][2]]-1+tshift]+=ww*(1.f/3.f);

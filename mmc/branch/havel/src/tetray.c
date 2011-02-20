@@ -93,7 +93,7 @@ int main(int argc, char**argv){
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
 	/*launch photons*/
-        #pragma omp for schedule(static,64) reduction(+:Eabsorb) reduction(+:raytri)
+        #pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
 		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
@@ -135,11 +135,15 @@ int main(int argc, char**argv){
 	tracer_clear(&tracer);
 
 	if(cfg.isnormalized){
-          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%f\n",
+          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
 		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
 	if(cfg.issave2pt){
-		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving fluence ..."));
+		switch(cfg.outputtype){
+		    case otFlux:   MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving flux ...")); break;
+                    case otFluence:MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving fluence ...")); break;
+                    case otEnergy: MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving energy deposit ...")); break;
+		}
 		mesh_saveweight(&mesh,&cfg);
 	}
 	if(cfg.issavedet){

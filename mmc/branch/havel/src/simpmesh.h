@@ -50,7 +50,7 @@
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 
-                                                                                                                                                                                    
+
 /***************************************************************************//**
 \struct MMC_mesh simpmesh.h
 \brief  Basic FEM mesh data structrure

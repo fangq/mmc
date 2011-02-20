@@ -549,6 +549,15 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
+	if(cfg->outputtype==otEnergy){
+            int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
+            normalizor=1.f/cfg->nphoton;
+            
+            for(i=0;i<cfg->maxgate;i++)
+               for(j=0;j<datalen;j++)
+                  mesh->weight[i*datalen+j]*=normalizor;
+	    return normalizor;
+        }
 	if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
               for(j=0;j<mesh->nn;j++)
@@ -563,7 +572,9 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
-	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f*cfg->tstep); /*scaling factor*/
+	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
+	    if(cfg->outputtype==otFlux)
+               normalizor/=cfg->tstep;
 
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<mesh->nn;j++)
@@ -578,7 +589,9 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
               for(j=0;j<cfg->maxgate;j++)
         	mesh->weight[j*mesh->ne+i]/=energyelem;
 	    }
-            normalizor=Eabsorb/(Etotal*energydeposit*cfg->tstep); /*scaling factor*/
+            normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
+            if(cfg->outputtype==otFlux)
+               normalizor/=cfg->tstep;
 
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<mesh->ne;j++)
