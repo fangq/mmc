@@ -573,7 +573,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
-			       B - partial Badouel's method (similar to TIM-OS)\n\
+			       B - partial Badouel's method (used by TIM-OS)\n\
 			       S - branch-less Badouel's method with SSE\n\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\

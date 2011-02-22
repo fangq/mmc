@@ -816,7 +816,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
               //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
 	      return 1.f;
-	  }else if(*eid==0){   /*if do transmission, but next neighbor is 0, terminate*/
+	  }else if(cfg->isspecular==2 && *eid==0){   /*if do transmission, but next neighbor is 0, terminate*/
 	      return 1.f;
           }else{                              /*do transmission*/
               vec_mult_add(pn,c0,-Icos,1.f,c0);
