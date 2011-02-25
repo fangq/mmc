@@ -86,7 +86,7 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
 	if(cfg->basisorder) 
-	   mesh->weight=(float *)calloc(sizeof(float)*mesh->nn,cfg->maxgate);
+	   mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
@@ -148,7 +148,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
-	   mesh->weight=(float *)calloc(sizeof(float)*mesh->ne,cfg->maxgate);
+	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;

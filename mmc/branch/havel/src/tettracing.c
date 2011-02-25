@@ -183,6 +183,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         r->Eabsorb+=ww;
                         r->photontimer+=r->Lmove*rc;
                         tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->ne;
+#pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
 	                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f]\n",
@@ -205,6 +206,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
                 		  for(i=0;i<4;i++)
+#pragma omp atomic
                      			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
 				}
 				if(r->isend){
@@ -389,7 +391,9 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  _mm_store_ps(barypout,T);
 
 		  for(j=0;j<4;j++)
+#pragma omp atomic
 		    tracer->mesh->weight[ee[j]+tshift]+=barypout[j];
+
 		}
 		break;
 	   }
@@ -486,13 +490,14 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
        		r->p0.y+=r->Lmove*r->vec.y;
         	r->p0.z+=r->Lmove*r->vec.z;
 		if(!cfg->basisorder){
+#pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
 			if(cfg->outputtype!=otEnergy) ww/=prop->mua;
-                        ww*=3.f;
-			tracer->mesh->weight[ee[nc[faceidx][0]]-1+tshift]+=ww;
-			tracer->mesh->weight[ee[nc[faceidx][1]]-1+tshift]+=ww;
-			tracer->mesh->weight[ee[nc[faceidx][2]]-1+tshift]+=ww;
+                        ww*=1.f/3.f;
+			for(i=0;i<3;i++)
+#pragma omp atomic
+				tracer->mesh->weight[ee[nc[faceidx][i]]-1+tshift]+=ww;
 		}
 	    }
 	}
@@ -600,14 +605,16 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
-
 		if(!cfg->basisorder){
+#pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
+			int i;
 			if(cfg->outputtype!=otEnergy) ww/=prop->mua;
-			tracer->mesh->weight[ee[nc[faceidx][0]]-1+tshift]+=ww*(1.f/3.f);
-			tracer->mesh->weight[ee[nc[faceidx][1]]-1+tshift]+=ww*(1.f/3.f);
-			tracer->mesh->weight[ee[nc[faceidx][2]]-1+tshift]+=ww*(1.f/3.f);
+                        ww*=1.f/3.f;
+			for(i=0;i<3;i++)
+#pragma omp atomic
+				tracer->mesh->weight[ee[nc[faceidx][i]]-1+tshift]+=ww;
 		}
 	    }
 	}

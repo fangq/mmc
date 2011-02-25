@@ -70,7 +70,7 @@ typedef struct MMC_mesh{
 	int4 *facenb;/**< face neighbors, idx of the element sharing a face */
 	medium *med; /**< optical property of different media */
 	float *atte; /**< precomputed attenuation for each media */
-	float *weight;/**< volumetric fluence for all nodes at all time-gates */
+	double *weight;/**< volumetric fluence for all nodes at all time-gates */
 	float *evol; /**< volume of an element */
 	float *nvol; /**< veronio volume of a node */
 } tetmesh;
