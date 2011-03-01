@@ -279,9 +279,9 @@ V. Known issues and TODOs
 
 * MMC only supports linear tetrahedral elements at this point. Quadratic \
  elements will be added later
-* currently, this code only support element-based optical properties; \
- nodal-based optical properties (for continuous varying media) will be \
- added in the next release
+* Currently, this code only supports element-based optical properties; \
+ nodal-based optical properties (for continuously varying media) will be \
+ added in a future release
 
 -------------------------------------------------------------------------------
 VI.  Reference

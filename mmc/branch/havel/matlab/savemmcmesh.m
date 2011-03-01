@@ -1,4 +1,28 @@
 function savemmcmesh(key,node,elem,face,evol,facenb)
+%
+% savemmcmesh(key,node,elem,face,evol,facenb)
+%
+% Export a tetrahedral mesh to the MMC mesh format
+%
+% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+%
+% input:
+%     key: a string included in all exported mesh file names, the 
+%          format of the files are {node,elem,face,facenb,evol}_key.dat
+%      node: a node coordinate list, 3 columns for x/y/z
+%      elem: a tetrahedral element list
+%      face: a triangular surface face list, if missing, it will be calculated
+%      evol: the volumes of all tetrahedra, if missing, it will be calculated
+%      facenb: the 4 neighboring elements for each element, if missing, it will
+%             be calculated
+%
+% example:
+%     savemmcmesh('sph1',node,elem);
+%
+% this file is part of Mesh-based Monte Carlo (MMC)
+%
+% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+%
 
 if(nargin<4)
   face=volface(elem(:,1:4)); % volface is part of iso2mesh toolbox,http://iso2mesh.sf.net
