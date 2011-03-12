@@ -61,12 +61,16 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->isreflect=0;
      cfg->isref3=0;
      cfg->isnormalized=1;
-     cfg->issavedet=1;
+     cfg->issavedet=0;
      cfg->respin=1;
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
+#ifndef MMC_USE_SSE
      cfg->method=0;
+#else
+     cfg->method=1;
+#endif
      cfg->prop=NULL;
      cfg->detpos=NULL;
      cfg->vol=NULL;
@@ -561,7 +565,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
- -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
+ -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
@@ -570,7 +574,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
  -E [0|int]    (--seed)        set random-number-generator seed\n\
- -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+ -M [%c|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
 			       B - partial Badouel's method (used by TIM-OS)\n\
@@ -592,5 +596,11 @@ where possible parameters include (the first item in [] is the default value)\n\
                             4096 E  exit photon info\n\
       add the numbers together to print mulitple items, or one can use a string\n\
 example:\n\
-       %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,exename);
+       %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,
+#ifdef MMC_USE_SSE
+'H',
+#else
+'P',
+#endif
+exename);
 }
