@@ -54,7 +54,7 @@ cfg.kin=sqrt((-cfg.v*cfg.imua+i*cfg.omega)/cfg.Din);
 cfg.kout=sqrt((-cfg.v*cfg.omua+i*cfg.omega)/cfg.Dout);
 src0=cfg.src;
 
-[res,xi,yi,zi]=sphdiffusionsemi(Reff1,xrange,yrange,zrange);
+[res,xi,yi,zi]=sphdiffusionsemi(Reff1,xrange,yrange,zrange,cfg);
 
 D = 1/(3*(cfg.omua+cfg.omusp));
 zb = (1+Reff2)/(1-Reff2)*2*D;
