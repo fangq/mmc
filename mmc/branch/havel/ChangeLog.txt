@@ -1,6 +1,39 @@
 Change Log
 
-== MMC 0.2 (Cheesecake) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+== MMC 0.8.pre (Snow Cone) private dev branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+
+2011/03/17 fix a critical bug in sphdiffusionslab.m
+2011/02/25 use atomic for weight accumulation and double precision weight array
+2011/02/20 can output fluence and energy deposit with the -O option
+2011/02/18 supported recording photon partial path lengths
+2011/02/17 supported specular reflection, match results from other simulators
+2011/02/11 basic support of source types, set seed from command line
+2011/01/12 select ray-tracing method from command line
+2011/01/11 added sse math support, gain about 10% speed-up
+2011/01/11 simplified Plucker method with initial barycentric coordinates
+2011/01/09 used initial barycentric coordinates for Havel/Plucker methods
+2011/01/05 added branchless Badouel with SSE, improves speed by 13%
+2010/12/21 added support for Badouel's method
+2010/12/20 merged with mmc 0.4.0 public svn
+2010/11/17 Havel's SSE4 ray-tracing algorithm worked
+2010/11/14 branch mmc source code for SSE implementation
+
+
+== MMC 0.4.0 (Pecan Pie) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+
+2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C, add documentation
+2010/12/13 fixed negative time difference by promoting time counter from int to long
+2010/12/13 fixed diminishing absorption fraction by using a double accumulator
+2010/12/12 added initial support for SFMT RNG, speed and accuracy need further optimization
+2010/12/11 included RNG C units in the main code to enable static inlining
+2010/12/04 initial doxygen support for automatic documentation
+2010/12/04 support llvm-gcc, icc and tcc via "make target CC=compiler"
+2010/12/03 speed up gcc-compiled binary by 2x with fast exponential
+2010/11/30 fix normalization using the correct time unit
+2010/08/29 initial Windows support using MinGW and Libgw32c
+
+
+== MMC 0.2 (Cheese Cake) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2010/08/29 first public release of MMC - v0.2
 2010/08/28 update examples to use iso2mesh 1.0 and MCX 0.4.9 options, remove unused input file format

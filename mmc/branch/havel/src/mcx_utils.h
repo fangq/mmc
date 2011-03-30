@@ -64,8 +64,8 @@ in 1/mm, the refractive index (n) and anisotropy (g).
 typedef struct MMC_medium{
 	float mua;        /**<absorption coeff in 1/mm unit*/
 	float mus;        /**<scattering coeff in 1/mm unit*/
-	float n;          /**<refractive index*/
 	float g;          /**<anisotropy*/
+	float n;          /**<refractive index*/
 } medium;
 
 typedef struct MMC_history{
@@ -169,7 +169,7 @@ int  mcx_remap(char *opt);
 int  mcx_lookupindex(char *key, const char *index);
 int  mcx_getsrcid(char *srctype);
 int  mcx_parsedebugopt(char *debugopt);
-void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg);
+void mcx_progressbar(unsigned int n, mcconfig *cfg);
 
 #ifdef	__cplusplus
 }

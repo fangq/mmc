@@ -319,7 +319,7 @@ int mcx_parsedebugopt(char *debugopt){
     return debuglevel;
 }
 
-void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg){
+void mcx_progressbar(unsigned int n, mcconfig *cfg){
     unsigned int percentage, j,colwidth=79;
     static unsigned int oldmarker=0;
 
@@ -329,7 +329,7 @@ void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg){
     colwidth=ttys.ws_col;
 #endif
     
-    percentage=(float)n*(colwidth-18)/ntotal;
+    percentage=(float)n*(colwidth-18)/cfg->nphoton;
 
     if(percentage != oldmarker){
         oldmarker=percentage;

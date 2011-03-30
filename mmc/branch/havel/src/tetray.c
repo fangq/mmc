@@ -102,7 +102,7 @@ int main(int argc, char**argv){
 		   ncomplete++;
 
 		if((cfg.debuglevel & dlProgress) && threadid==0)
-			mcx_progressbar(ncomplete,cfg.nphoton,&cfg);
+			mcx_progressbar(ncomplete,&cfg);
 	}
 	if(cfg.issavedet){
 	    #pragma omp atomic
@@ -125,7 +125,7 @@ int main(int argc, char**argv){
         /** \subsection sreport Post simulation */
 
 	if((cfg.debuglevel & dlProgress))
-		mcx_progressbar(cfg.nphoton,cfg.nphoton,&cfg);
+		mcx_progressbar(cfg.nphoton,&cfg);
 
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));

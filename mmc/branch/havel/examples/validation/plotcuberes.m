@@ -2,7 +2,7 @@
 %% add paths to the necessary toolboxes
 %%-----------------------------------------------------------------
 
-addpath('/space/kwafoo/2/users/fangq/Projects/mcx/utils/')
+%addpath('/Please/add/path/to/mcx/utils/')
 addpath('../../matlab')
 
 c0=299792458000;
