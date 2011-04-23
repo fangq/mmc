@@ -48,4 +48,10 @@ __device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]);
 __device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]);
 __device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]);
 __device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]);
+
+#ifdef MMC_USE_SSE_MATH
+__device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co);
+__device__ float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]);
+#endif
+
 #endif

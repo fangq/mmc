@@ -32,6 +32,7 @@
 #define MAX_DETECTORS       256
 #define MAX_PATH_LENGTH     1024
 #define MAX_SESSION_LENGTH  256
+#define DET_PHOTON_BUF      100000
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 
 #define MMCDEBUG(cfg,debugflag,outputstr)  {\
@@ -43,7 +44,12 @@
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
-                  dlProgress=2048};
+                  dlProgress=2048,dlExit=4096};
+
+enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
+enum TSrcType {stPencil, stCone, stGaussian};
+enum TOutputType {otFlux, otFluence, otEnergy};
+
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -58,10 +64,22 @@ in 1/mm, the refractive index (n) and anisotropy (g).
 typedef struct MMC_medium{
 	float mua;        /**<absorption coeff in 1/mm unit*/
 	float mus;        /**<scattering coeff in 1/mm unit*/
-	float n;          /**<refractive index*/
 	float g;          /**<anisotropy*/
+	float n;          /**<refractive index*/
 } medium;
 
+typedef struct MMC_history{
+        char magic[4];
+        unsigned int  version;
+        unsigned int  maxmedia;
+        unsigned int  detnum;
+        unsigned int  colcount;
+        unsigned int  totalphoton;
+        unsigned int  detected;
+        unsigned int  savedphoton;
+        float unitinmm;
+        int reserved[7];
+} history;
 
 /***************************************************************************//**
 \struct MMC_config mcx_utils.h
@@ -74,18 +92,20 @@ typedef struct MMC_config{
 	int nphoton;      /**<(total simulated photon number) we now use this to 
 	                     temporarily alias totalmove, as to specify photon
 			     number is causing some troubles*/
-	//int totalmove;   /**< [depreciated] total move per photon*/
         int nblocksize;   /**<thread block size*/
 	int nthread;      /**<num of total threads, multiple of 128*/
 	int seed;         /**<random number generator seed*/
 	
 	float3 srcpos;    /**<src position in mm*/
 	float3 srcdir;    /**<src normal direction*/
+	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
+	float4 srcparam;  /**<additional parameters for advanced sources */
+	float4 bary0;     /**<initial bary centric coordinates of the source*/
 	float tstart;     /**<start time in second*/
 	float tstep;      /**<time step in second*/
 	float tend;       /**<end time in second*/
 	float3 steps;     /**<voxel sizes along x/y/z in mm*/
-	
+
 	uint3 dim;        /**<domain size*/
 	uint3 crop0;      /**<sub-volume for cache*/
 	uint3 crop1;      /**<the other end of the caching box*/
@@ -114,7 +134,10 @@ typedef struct MMC_config{
 	char issavedet;     /**<1 to count all photons hits the detectors*/
 	char issave2pt;     /**<1 to save the 2-point distribution, 0 do not save*/
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
+	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
+	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
+        char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
 	float roulettesize; /**<number of roulette for termination*/
         float minenergy;    /**<minimum energy to propagate photon*/
 	float nout;         /**<refractive index for the domain outside the mesh*/
@@ -122,6 +145,7 @@ typedef struct MMC_config{
         char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
 	float unitinmm;     /**<define the length unit in mm*/
+	history his;        /**<header info of the history file*/
 } mcconfig;
 
 #ifdef	__cplusplus
@@ -142,8 +166,10 @@ void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
 int  mcx_remap(char *opt);
+int  mcx_lookupindex(char *key, const char *index);
+int  mcx_getsrcid(char *srctype);
 int  mcx_parsedebugopt(char *debugopt);
-void mcx_progressbar(unsigned int n, unsigned int ntotal, mcconfig *cfg);
+void mcx_progressbar(unsigned int n, mcconfig *cfg);
 
 #ifdef	__cplusplus
 }

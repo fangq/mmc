@@ -1,11 +1,11 @@
 ===============================================================================
 =                       Mesh-based Monte Carlo (MMC)                          =
-=                          Multi-threaded Edition                             =
+=                     Multi-threaded Edition with SSE4                        =
 ===============================================================================
 
 Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.4.0 (Pecan Pie)
+Version: 0.8.pre (Snow cone)
 
 -------------------------------------------------------------------------------
 
@@ -34,24 +34,21 @@ basis functions, thus, providing additional accuracy. This implementation
 also supports multi-threaded parallel computing and can give a nearly 
 proportional acceleration when running on multi-core processors.
 
-MMC uses FE meshes to represent a complex domain. To generate 
+MMC uses FE meshes to represent a complex domain. To generate
 an accurate FE mesh for arbitrary object had been a difficult task
 in the past. Fortunately, this had been greatly simplified
 with the development of a simple-to-use-yet-powerful mesh 
-generation tool, iso2mesh [1]. One should download and install 
-the latest iso2mesh toolbox when running all the build-in examples 
-in MMC.
+generation tool, iso2mesh [1]. One should download and 
+install the latest iso2mesh toolbox when running all the 
+build-in examples in MMC.
 
-We are currently working on a massively-parallel version of MMC by porting
+We will soon develop a massively-parallel version of MMC by porting
 this code to CUDA and OpenCL. This is expected to produce a hundreds
-or even a thousand fold of acceleration in speed, similar to what we had 
-observed with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, 
-or MCX [2]).
+or even thousands fold of acceleration in speed as we had observed
+with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, or 
+MCX [2]), developed by the same author.
 
-MMC is a partial but evolving implementation of the mesh-based
-Monte Carlo method (MMCM). MMCM describes simulating photon transport
-using ray-tracing in a general mesh structure. The details of MMCM 
-can be found in the following paper:
+The details of MMC can be found in the following paper:
 
   Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
   in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
@@ -69,8 +66,8 @@ The latest release of MMC can be downloaded from the following URL:
   http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
 
 The development branch (not fully tested) of the code can be accessed 
-using Subversion (SVN), however this is not encouraged. To check out 
-the SVN source code, you should use the following command:
+using Subversion (SVN), however this is not encouraged. To 
+check out the SVN source code, you should use the following command:
 
   svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mmc/trunk mmc
 
@@ -90,12 +87,8 @@ to install the necessary compilers. To compile the binary supporting
 OpenMP multi-threaded computing, your gcc version should be at least 4.0.
 To compile the binary supporting SSE4 instructions, gcc version should
 be at least 4.3.4. For windows users, you should install MinGW
-with a later version of gcc [3]. You should also install LibGW32C
-library [4] and copy the missing header files from GnuWin32\include\glibc
-to MinGW\include when you compile the code (these files typically include
-ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
-and sys/ttydefaults.h). For Mac OS X users, you need to install Xcode 3 
-and find gcc or llvm-gcc [5] from the installation.
+with a later version of gcc [3]. For Mac OS X users, you can install
+Xcode 3 and find gcc or llvm-gcc [4] from the installation.
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
@@ -108,30 +101,21 @@ folder. Other make options include
   make omp  # this compiles an OpenMP multi-threaded binary
   make prof # this makes a binary to produce profiling info for gprof
   make sse  # this uses SSE4 optimized subroutines for vector operations
-  make doc  # generate automatic source code documentation with doxygen
   make      # this produces an non-optimized binary with debugging symbols
 
-If you append "-f makefile_logistic" at the end of any of the above 
+If you append "-f makefile_log" at the end of any of the above 
 make commands, you will create an executable named mmc_log, which uses a 
-Logistic-Lattice RNG instead of the 48bit POSIX RNG. Similarly,
-if you append "-f makefile_sfmt", mmc will use an SIMD-oriented Fast 
-Mersenne Twister (SFMT19937) RNG with a binary name mmc_sfmt.
+Logistic-Lattice RNG instead of the 48bit POSIX RNG.
 
 You should be able to compile the code with Intel C++ compiler,
-AMD C compiler or LLVM. To use other compilers, simply follow
-the following command line format
-
-  make target CC=compiler <-f makefilename>
-
-where target is one of "release/omp/prof/sse/doc", and 
-compiler can be "gcc/cc/icc/llvm-gcc/tcc" etc, and the
-optional makefilename can be either makefile_logistic or
-makefile_sfmt.
+AMD C compiler or LLVM. If you see any error message, please 
+follow the instruction to fix your compiler settings or install 
+the missing libraries.
 
 After compilation, you can add the path to the "mmc" binary (typically
 mmc/src/bin) to the search path, so you don't have to type the fully 
 path to run it. To do so, you should modify your PATH environment 
-variable. Detailed instructions can be found at [6].
+variable. Detailed instructions can be found at [5].
 
 -------------------------------------------------------------------------------
 
@@ -171,9 +155,16 @@ where possible parameters include (the first item in [] is the default value)
  -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
+ -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead
+ -E [0|int]    (--seed)        set random-number-generator seed
+ -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
+                               P - Plucker-coordinate ray-tracing algorithm
+			       H - Havel's SSE4 ray-tracing algorithm
+			       B - partial Badouel's method
+			       S - branch-less Badouel's method with SSE
  -D [0|int]    (--debug)       print debug information (you can use an integer
   or                           or a string by combining the following flags)
  -D [''|MCBWDIOXATRP]          1 M  photon movement info
@@ -188,6 +179,7 @@ where possible parameters include (the first item in [] is the default value)
                              512 T  timing information
                             1024 R  debugging reflection
                             2048 P  show progress bar
+                            4096 E  exit photon info
       add the numbers together to print mulitple items, or one can use a string
 example:
        mmc -n 1000000 -f input.inp -s test -b 0 -D TP
@@ -269,7 +261,7 @@ interpolation functions such as griddata3. However, it is very
 slow for large meshes. In iso2mesh toolbox, a fast mesh slicing
 & plotting function, qmeshcut, is very efficient in making 3D
 plots of mesh or cross-sections. More details can be found at 
-this webpage [7], or "help qmeshcut" in matlab. Another useful
+this webpage [6], or "help qmeshcut" in matlab. Another useful
 function is plotmesh in iso2mesh toolbox. It has very flexible
 syntax to allow users to plot surfaces, volumetric meshes and
 cross-section plots. One can use something like
@@ -285,24 +277,18 @@ to find more options to make plot from MMC output.
 
 V. Known issues and TODOs
 
-* the boundary-reflection code in MMC is experimental and has not been\
- validated rigorously
 * MMC only supports linear tetrahedral elements at this point. Quadratic \
  elements will be added later
-* currently, this code only support element-based optical properties; \
- nodal-based optical properties (for continuous varying media) will be \
- added in the next release
-* the current version of MMC does not support saving partial-path-length \
- data at detector sites as MCX does; this is expected to be added in the \
- next release.
+* Currently, this code only supports element-based optical properties; \
+ nodal-based optical properties (for continuously varying media) will be \
+ added in a future release
 
 -------------------------------------------------------------------------------
 VI.  Reference
 
 [1] http://iso2mesh.sf.net  -- an image-based surface/volumetric mesh generator
 [2] http://mcx.sf.net       -- Monte Carlo eXtreme: a GPU-accelerated MC code
-[3] http://sourceforge.net/projects/mingw/files/Automated%20MinGW%20Installer/
-[4] http://sourceforge.net/projects/gnuwin32/files/libgw32c/0.4/libgw32c-0.4.exe/download
-[5] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
-[6] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
-[7] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut
+[3] http://sourceforge.net/projects/mingw/files/GCC%20Version%204/
+[4] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
+[5] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
+[6] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut

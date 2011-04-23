@@ -9,7 +9,7 @@ spherebox.bin     # volume ('uchar' format)
 1 60 1 60            # z: voxel size, dim, start/end indices
 2                    # num of media
 1. 0.01 0.002 1.37  # scat(1/mm), g, mua (1/mm), n
-5. 0.9  0.050 1.37  # scat(1/mm), g, mua (1/mm), n
+5. 0.90 0.050 1.37  # scat(1/mm), g, mua (1/mm), n
 4	1            # detector number and radius (mm)
 30.0	20.0	1.0  # detector 1 position (mm)
 30.0	40.0	1.0  # ...

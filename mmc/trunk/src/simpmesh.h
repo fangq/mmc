@@ -50,7 +50,7 @@
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 
-                                                                                                                                                                                    
+
 /***************************************************************************//**
 \struct MMC_mesh simpmesh.h
 \brief  Basic FEM mesh data structrure
@@ -70,7 +70,7 @@ typedef struct MMC_mesh{
 	int4 *facenb;/**< face neighbors, idx of the element sharing a face */
 	medium *med; /**< optical property of different media */
 	float *atte; /**< precomputed attenuation for each media */
-	float *weight;/**< volumetric fluence for all nodes at all time-gates */
+	double *weight;/**< volumetric fluence for all nodes at all time-gates */
 	float *evol; /**< volume of an element */
 	float *nvol; /**< veronio volume of a node */
 } tetmesh;
@@ -87,8 +87,10 @@ moment vectors for each edge in a tetrahedron.
 
 typedef struct MMC_raytracer{
 	tetmesh *mesh;/**< link to the mesh structure */
+	char method;  /**< 1 for Plucker-based ray-tracing, 0 for Havel */
 	float3 *d;    /**< precomputed data: for Pluckers, this is displacement */
 	float3 *m;    /**< precomputed data: for Pluckers, this is moment */
+	float3 *n;    /**< precomputed data: for Pluckers, face norm */
 } raytracer;
 
 void mesh_init(tetmesh *mesh);
@@ -105,9 +107,11 @@ void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
+void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg);
 
-void tracer_init(raytracer *tracer,tetmesh *mesh);
+void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);
 void tracer_build(raytracer *tracer);
+void tracer_prep(raytracer *tracer,mcconfig *cfg);
 void tracer_clear(raytracer *tracer);
 float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,mcconfig *cfg);
 
@@ -121,6 +125,11 @@ static inline void vec_diff(float3 *a,float3 *b,float3 *res){
         res->x=b->x-a->x;
         res->y=b->y-a->y;
         res->z=b->z-a->z;
+}
+static inline void vec_mult(float3 *a,float sa,float3 *res){
+        res->x=sa*a->x;
+        res->y=sa*a->y;
+        res->z=sa*a->z;
 }
 static inline void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
 	res->x=sb*b->x+sa*a->x;
@@ -142,10 +151,10 @@ static inline void mmc_sincosf(float x, float * sine, float * cosine){
 #endif
 }
 
-#ifndef MMC_USE_SSE
+//#ifndef MMC_USE_SSE
 static inline float vec_dot(float3 *a,float3 *b){
         return a->x*b->x+a->y*b->y+a->z*b->z;
-}
+}/*
 #else
 
 #ifndef __SSE4_1__
@@ -171,8 +180,8 @@ static inline float vec_dot(float3 *a,float3 *b){
         return dot;
 }
 #endif
-        
 #endif
+*/        
  
 static inline float pinner(float3 *Pd,float3 *Pm,float3 *Ad,float3 *Am){
         return vec_dot(Pd,Am)+vec_dot(Pm,Ad);
@@ -186,4 +195,14 @@ static inline float dist2(float3 *p0,float3 *p1){
 static inline float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
+
+
+static inline float mmc_rsqrtf(float a){
+#ifdef MMC_USE_SSE
+        return _mm_cvtss_f32( _mm_rsqrt_ss( _mm_set_ss( a ) ) );
+#else
+	return 1.f/sqrtf(a);
+#endif
+}
+
 #endif
