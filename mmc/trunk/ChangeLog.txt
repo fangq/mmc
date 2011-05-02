@@ -3,7 +3,7 @@ Change Log
 == MMC 0.8.pre (Snow Cone) dev branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2011/04/23 sync private dev branch to trunk, publish v0.8.pre in the SVN
-2011/04/19 the second paper regarding MMC published on Biomed. Opt. Exp. 2(5):1377–1393
+2011/04/19 the second paper regarding MMC published on Biomed. Opt. Exp. 2(5):1258–1264
 2011/03/17 fix a critical bug in sphdiffusionslab.m
 2011/02/25 use atomic for weight accumulation and double precision weight array
 2011/02/20 can output fluence and energy deposit with the -O option
