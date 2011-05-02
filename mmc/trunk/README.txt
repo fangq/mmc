@@ -101,11 +101,12 @@ folder. Other make options include
   make omp  # this compiles an OpenMP multi-threaded binary
   make prof # this makes a binary to produce profiling info for gprof
   make sse  # this uses SSE4 optimized subroutines for vector operations
+  make ssemath  # this uses SSE4 for both vector operations and math fun
   make      # this produces an non-optimized binary with debugging symbols
 
-If you append "-f makefile_log" at the end of any of the above 
-make commands, you will create an executable named mmc_log, which uses a 
-Logistic-Lattice RNG instead of the 48bit POSIX RNG.
+If you append "-f makefile_sfmt" at the end of any of the above 
+make commands, you will create an executable named mmc_sfmt, which uses a 
+MT19937 RNG instead of the 48bit POSIX RNG.
 
 You should be able to compile the code with Intel C++ compiler,
 AMD C compiler or LLVM. If you see any error message, please 
