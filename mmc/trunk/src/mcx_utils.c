@@ -581,7 +581,7 @@ where possible parameters include (the first item in [] is the default value)\n\
 			       S - branch-less Badouel's method with SSE\n\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
- -D [''|MCBWDIOXATRP]          1 M  photon movement info\n\
+ -D [''|MCBWDIOXATRPE]         1 M  photon movement info\n\
                                2 C  print ray-polygon testing details\n\
                                4 B  print Bary-centric coordinates\n\
                                8 W  print photon weight changes\n\
@@ -594,7 +594,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
                             4096 E  exit photon info\n\
-      add the numbers together to print mulitple items, or one can use a string\n\
+      combine multiple items by using a string, or add selected numbers together\n\
 example:\n\
        %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,
 #ifdef MMC_USE_SSE

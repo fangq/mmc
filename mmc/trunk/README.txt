@@ -5,7 +5,7 @@
 
 Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.8.pre (Snow cone)
+Version: 0.8.0 (Snow cone)
 
 -------------------------------------------------------------------------------
 
@@ -23,30 +23,36 @@ VI. Reference
 I.  Introduction
 
 Mesh-based Monte Carlo (MMC) is a 3D Monte Carlo (MC) simulation software 
-for photon transport in complex turbid media. MMC combines the strength
-of both MC-based photon migration and finite-element (FE) method: on one 
-hand, it can handle low-scattering media as in MC, on the other hand, it 
-can use nonstructural meshes to represent curved boundaries and complex 
-domains as in FE. MMC implements a precise ray-tracing technique to propagate 
-a photon using a fast Plucker-coordinate-based ray-triangle intersection 
-test.  Both the media and the fluence can be represented by piece-wise-linear 
-basis functions, thus, providing additional accuracy. This implementation 
-also supports multi-threaded parallel computing and can give a nearly 
-proportional acceleration when running on multi-core processors.
+for photon transport in complex turbid media. MMC combines the strengths
+of the MC-based technique and the finite-element (FE) method: on the 
+one hand, it can handle general media, including low-scattering ones, 
+as in the MC method; on the other hand, it can use an FE-like tetrahedral 
+mesh to represent curved boundaries and complex structures, making it
+even more accurate, flexible, and memory efficient. MMC uses the
+state-of-the-art ray-tracing techniques to propagate photons in a mesh 
+space. This code is highly optimized for excellent computational
+efficiency and portability. MMC currently supports both multi-threaded 
+parallel computing and Single Instruction Multiple Data (SIMD) parallism 
+to maximize the performance on a multi-core processors.
 
-MMC uses FE meshes to represent a complex domain. To generate
-an accurate FE mesh for arbitrary object had been a difficult task
-in the past. Fortunately, this had been greatly simplified
-with the development of a simple-to-use-yet-powerful mesh 
-generation tool, iso2mesh [1]. One should download and 
-install the latest iso2mesh toolbox when running all the 
-build-in examples in MMC.
+To run an MMC simulation, one has to prepare an FE mesh mesh first to
+discretize the problem domain. Image based 3D mesh generation has been 
+a very challenging task only until recently. One can now use a powerful 
+yet easy-to-use mesh generator, iso2mesh [1], to make tetrahedral meshes
+directly from volumetric medical images. You should download and install 
+the latest iso2mesh toolbox in order to run the build-in examples in MMC.
 
-We will soon develop a massively-parallel version of MMC by porting
+We are working on a massively-parallel version of MMC by porting
 this code to CUDA and OpenCL. This is expected to produce a hundreds
-or even thousands fold of acceleration in speed as we had observed
-with the GPU-accelerated Monte Carlo code (Monte Carlo eXtreme, or 
-MCX [2]), developed by the same author.
+or even thousands fold of acceleration in speed similarly to what we 
+have observed with our GPU-accelerated Monte Carlo code (Monte Carlo 
+eXtreme, or MCX [2]).
+
+Please keep in mind that MMC is only a partial but evolving implementation 
+of the mesh-based Monte Carlo method (MMCM). The limitations and issues
+you observed in the current software will likely be removed in the future
+version of the software. The details of MMCM can be found in the following 
+paper:
 
 The details of MMC can be found in the following paper:
 
@@ -83,12 +89,16 @@ and for Fedora/Redhat based GNU/Linux systems, you can type
 
   su -c 'yum install gcc'
  
-to install the necessary compilers. To compile the binary supporting
-OpenMP multi-threaded computing, your gcc version should be at least 4.0.
-To compile the binary supporting SSE4 instructions, gcc version should
-be at least 4.3.4. For windows users, you should install MinGW
-with a later version of gcc [3]. For Mac OS X users, you can install
-Xcode 3 and find gcc or llvm-gcc [4] from the installation.
+To compile the binary with multi-threaded computing via OpenMP, 
+your gcc version should be at least 4.0. To compile the binary 
+supporting SSE4 instructions, gcc version should be at least 
+4.3.4. For windows users, you should install MinGW with a later 
+version of gcc [3]. You should also install LibGW32C library [4] 
+and copy the missing header files from GnuWin32\include\glibc
+to MinGW\include when you compile the code (these files typically include
+ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
+and sys/ttydefaults.h). For Mac OS X users, you need to install Xcode 3 
+and use gcc or llvm-gcc [5] from the installation.
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
@@ -106,37 +116,42 @@ folder. Other make options include
 
 If you append "-f makefile_sfmt" at the end of any of the above 
 make commands, you will create an executable named mmc_sfmt, which uses a 
-MT19937 RNG instead of the 48bit POSIX RNG.
+fast MT19937 random-number-generator (RNG) instead of the GLIBC 
+48bit RNG. If your CPU supports SSE4, the fastest binary can be compiled
+by the following command:
 
-You should be able to compile the code with Intel C++ compiler,
-AMD C compiler or LLVM. If you see any error message, please 
-follow the instruction to fix your compiler settings or install 
-the missing libraries.
+  make ssemath -f makefile_sfmt
+
+You should be able to compile the code with an Intel C++ compiler,
+an AMD C compiler or LLVM without any difficulty. To use other
+compilers, you simply append "CC=compiler_exe" to the end of the
+make command. If you see any error message, please follow the 
+instruction to fix your compiler settings or install the missing 
+libraries.
 
 After compilation, you can add the path to the "mmc" binary (typically
-mmc/src/bin) to the search path, so you don't have to type the fully 
-path to run it. To do so, you should modify your PATH environment 
-variable. Detailed instructions can be found at [5].
+mmc/src/bin) to your search path. To do so, you should modify your 
+PATH environment variable. Detailed instructions can be found at [5].
 
 -------------------------------------------------------------------------------
 
 III.Running Simulations
 
 Before you create/run your own MMC simulations, we suggest you
-first going through all the subfolders under the mmc/example 
-directory and check out the formats of the input files and the 
-scripts for pre- and post-processing.
+first understand all the examples under the mmc/example 
+directory, checking out the formats of the input files and the 
+scripts for pre- and post-processings.
 
 Because MMC uses FE mesh in the simulation, you should create
 a mesh for your problem domain before you running the simulation.
-Fortunately, you can do this fairly straightforwardly using a 
-matlab/octave mesh generator, iso2mesh [1], developed by the same 
-author. In the mmc/matlab folder, we also provide additional 
-functions to generate regular grid-shaped tetrahedral mesh.
+This can be done fairly straightforwardly using a matlab/octave 
+mesh generator, iso2mesh [1], developed by the same author. In 
+the mmc/matlab folder, we also provide additional functions to 
+generate regular grid-shaped tetrahedral mesh.
 
-It is HIGHLY recommended to use the "savemmcmesh" function under
-mmc/matlab folder to save the mesh produced by iso2mesh, as it
-performs a number of tests to ensure the consistency of element 
+It is required to use the "savemmcmesh" function under the 
+mmc/matlab folder to save the mesh produced by iso2mesh, because 
+it performs additional tests to ensure the consistency of element 
 orientations. If you choose not to use savemmcmesh, you 
 MUST call "meshreorient" function in iso2mesh for elem/face
 to make sure all elements are oriented in the same direction. 
@@ -152,19 +167,20 @@ where possible parameters include (the first item in [] is the default value)
  -n [0.|float] (--photon)      total photon number
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
- -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
- -d [1|0]      (--savedet)     1 to save photon info at detectors,0 not to save
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
- -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
+ -U [1|0]      (--normalize)   1 to normalize the flux to unitary,0 save raw
+ -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
+ -S [1|0]      (--save2pt)     1 to save the flux field, 0 do not save
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for flux,0 constant
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
+ -O [X|XFE]    (--outputtype)  X - output flux, F - flux, E - energy deposit
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead
  -E [0|int]    (--seed)        set random-number-generator seed
- -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
+ -M [H|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
 			       H - Havel's SSE4 ray-tracing algorithm
-			       B - partial Badouel's method
+			       B - partial Badouel's method (used by TIM-OS)
 			       S - branch-less Badouel's method with SSE
  -D [0|int]    (--debug)       print debug information (you can use an integer
   or                           or a string by combining the following flags)
@@ -202,27 +218,28 @@ the same format as in MCX (certain fields are no-longer used).
 It looks like the following
 
  100                  # total photon number (can be overwriten by -n)
- 17182818             # RNG seed, negative to generate
+ 17182818             # RNG seed, negative to regenerate
  2. 8. 0.             # source position (mm)
  0. 0. 1.             # initial incident vector
  0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
  onecube              # mesh id: name stub to all mesh files
  3                    # index of element (starting from 1) which encloses the source
- 4       1            # detector number and radius (mm) (not used)
+ 4       1.0          # detector number and radius (mm)
  30.0    20.0    1.0  # detector 1 position (mm)
  30.0    40.0    1.0  # ...
  20.0    30.0    1.0
  40.0    30.0    1.0
 
-The mesh files are linked through the mesh id (a name stub) with a 
-format of {node|elem|facenb|velem}_meshid.dat. All files must exist.
-If the index to the element that enclosing the source is not known,
-please use the "tsearchn" function in matlab/octave to find out.
-Examples are provided in mmc/examples/meshtest/createmesh.m.
+The mesh files are linked through the "mesh id" (a name stub) with a 
+format of {node|elem|facenb|velem}_meshid.dat. All mesh files must 
+exist for an MMC simulation. If the index to the element that 
+enclosing the source is not known, please use the "tsearchn" 
+function in matlab/octave to find out. Examples are provided 
+in mmc/examples/meshtest/createmesh.m.
 
-To run the simulation, you should run run_test.sh bash
-script. If you want to run mmc directly from the command
-line, you can do so by typing
+To run a simulation, you should execute the "run_test.sh" bash
+script in this folder. If you want to run mmc directly from the 
+command line, you can do so by typing
 
  ../../src/bin/mmc -n 20 -f onecube.inp -s onecube 
 
@@ -230,17 +247,17 @@ where -n specifies the total photon number to be simulated,
 -f specifies the input file and -s gives the output file name.
 To see all the supported options, run mmc without any parameters.
 
-The above command only runs 20 photons and it will complete
+The above command only simulates 20 photons and will complete
 instantly. An output onecube.dat will be saved to record the
-normalized (unitary) fluence at each node. If one specifies
+normalized (unitary) flux at each node. If one specifies
 multiple time-windows from the input file, the output will 
 contain multiple blocks with each block corresponding to the
 time-domain solution at all nodes computed for each time window.
 
-More sophisticated examples can be found under 
-example/validation and example/meshtest folder, where you
-can find createmesh scripts and data analysis script after
-you running the simulations.
+More sophisticated examples can be found under the
+example/validation and example/meshtest folders, where you
+can find "createmesh" scripts and post-processing script to make
+plots from the simulation results.
 
 
 -------------------------------------------------------------------------------
@@ -249,20 +266,21 @@ IV. Plotting the Results
 
 As described above, MMC produces a single output file, named as
 "session-id".dat. By default, this file contains the normalized,
-i.e. under unitary source, fluence at each node of the mesh. If
-multiple time-windows are defined, the output file will contain
-multiple blocks of data, with each block being the fluence distribution
+i.e. under unitary source, flux at each node of the mesh. The detailed
+interpretation of the output data can be found in [6]. If multiple 
+time-windows are defined, the output file will contain
+multiple blocks of data, with each block being the flux distribution
 at each node at the center point of each time-window. The total
 number of blocks equals to the total time-gate number.
 
-To read in the mesh files (tetrahedral elements and nodes), one
-can use readmmcnode and readmmcelem function under mmc/matlab
+To read the mesh files (tetrahedral elements and nodes) into matlab, 
+one can use readmmcnode and readmmcelem function under the mmc/matlab
 directory. Plotting non-structural meshes in matlab is possible with
 interpolation functions such as griddata3. However, it is very
-slow for large meshes. In iso2mesh toolbox, a fast mesh slicing
+time-consuming for large meshes. In iso2mesh, a fast mesh slicing
 & plotting function, qmeshcut, is very efficient in making 3D
 plots of mesh or cross-sections. More details can be found at 
-this webpage [6], or "help qmeshcut" in matlab. Another useful
+this webpage [7], or "help qmeshcut" in matlab. Another useful
 function is plotmesh in iso2mesh toolbox. It has very flexible
 syntax to allow users to plot surfaces, volumetric meshes and
 cross-section plots. One can use something like
@@ -292,4 +310,5 @@ VI.  Reference
 [3] http://sourceforge.net/projects/mingw/files/GCC%20Version%204/
 [4] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
 [5] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
-[6] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut
+[6] http://mcx.sf.net/cgi-bin/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data
+[7] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut
