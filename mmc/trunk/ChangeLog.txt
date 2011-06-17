@@ -2,7 +2,7 @@ Change Log
 
 == MMC 0.8.0 (Snow Cone) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
-2011/06/16 final release of 0.8.0
+2011/06/17 final release of 0.8.0
 2011/04/23 sync private dev branch to trunk, publish v0.8.pre in the SVN
 2011/04/19 the second paper regarding MMC published on Biomed. Opt. Exp. 2(5):1258–1264
 2011/03/17 fix a critical bug in sphdiffusionslab.m

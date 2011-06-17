@@ -15,7 +15,7 @@ I.  Introduction
 II. Download and Compile MMC
 III.Running Simulations
 IV. Plotting the Results
-V.  Known issues and TODOs
+V.  Known Issues and TODOs
 VI. Reference
 
 ------------------------------------------------------------------------------- 
@@ -29,38 +29,38 @@ one hand, it can handle general media, including low-scattering ones,
 as in the MC method; on the other hand, it can use an FE-like tetrahedral 
 mesh to represent curved boundaries and complex structures, making it
 even more accurate, flexible, and memory efficient. MMC uses the
-state-of-the-art ray-tracing techniques to propagate photons in a mesh 
-space. This code is highly optimized for excellent computational
+state-of-the-art ray-tracing techniques to simulate photon propagation in 
+a mesh space. It has been extensively optimized for excellent computational
 efficiency and portability. MMC currently supports both multi-threaded 
 parallel computing and Single Instruction Multiple Data (SIMD) parallism 
-to maximize the performance on a multi-core processors.
+to maximize performance on a multi-core processor.
 
-To run an MMC simulation, one has to prepare an FE mesh mesh first to
-discretize the problem domain. Image based 3D mesh generation has been 
+To run an MMC simulation, one has to prepare an FE mesh first to
+discretize the problem domain. Image-based 3D mesh generation has been 
 a very challenging task only until recently. One can now use a powerful 
 yet easy-to-use mesh generator, iso2mesh [1], to make tetrahedral meshes
 directly from volumetric medical images. You should download and install 
 the latest iso2mesh toolbox in order to run the build-in examples in MMC.
 
 We are working on a massively-parallel version of MMC by porting
-this code to CUDA and OpenCL. This is expected to produce a hundreds
-or even thousands fold of acceleration in speed similarly to what we 
-have observed with our GPU-accelerated Monte Carlo code (Monte Carlo 
+this code to CUDA and OpenCL. This is expected to produce a hundred-
+or even thousand-fold acceleration in speed similar to what we 
+have observed in our GPU-accelerated Monte Carlo software (Monte Carlo 
 eXtreme, or MCX [2]).
 
-Please keep in mind that MMC is only a partial but evolving implementation 
-of the mesh-based Monte Carlo method (MMCM). The limitations and issues
+Please keep in mind that MMC is only a partial implementation of the 
+general Mesh-based Monte Carlo Method (MMCM). The limitations and issues
 you observed in the current software will likely be removed in the future
-version of the software. The details of MMCM can be found in the following 
-paper:
-
-The details of MMC can be found in the following paper:
+version of the software. If you plan to perform comparison studies with 
+other works, please communicate with the software author to make
+sure you have correctly understood the details of the implementation.
+The details of MMCM can be found in the following paper:
 
   Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
   in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
 
-The author of this paper is greatly appreciated if you cite the 
-above paper as reference if you use MMC and related software
+The author of this paper is greatly appreciated if you can cite 
+the above paper as reference if you use MMC and related software
 in your publication.
 
 -------------------------------------------------------------------------------
@@ -72,8 +72,9 @@ The latest release of MMC can be downloaded from the following URL:
   http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
 
 The development branch (not fully tested) of the code can be accessed 
-using Subversion (SVN), however this is not encouraged. To 
-check out the SVN source code, you should use the following command:
+using Subversion (SVN). However this is not encouraged unless you are
+a developer. To check out the SVN source code, you should use the following 
+command:
 
   svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mmc/trunk mmc
 
@@ -97,77 +98,76 @@ version of gcc [3]. You should also install LibGW32C library [4]
 and copy the missing header files from GnuWin32\include\glibc
 to MinGW\include when you compile the code (these files typically include
 ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
-and sys/ttydefaults.h). For Mac OS X users, you need to install Xcode 3 
-and use gcc or llvm-gcc [5] from the installation.
+and sys/ttydefaults.h). For Mac OS X users, you need to install the
+mp-gcc4.x series from MacPorts and use the instructions below to compile
+the MMC source code.
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
 
   make release
 
-this will compile a single-threaded optimized binary under mmc/src/bin
-folder. Other make options include
+this will compile a single-threaded, optimized binary under mmc/src/bin
+folder. Other "make" options include
 
-  make omp  # this compiles an OpenMP multi-threaded binary
-  make prof # this makes a binary to produce profiling info for gprof
-  make sse  # this uses SSE4 optimized subroutines for vector operations
-  make ssemath  # this uses SSE4 for both vector operations and math fun
-  make      # this produces an non-optimized binary with debugging symbols
+  make omp      # this compiles a multi-threaded binary using OpenMP
+  make prof     # this makes a binary to produce profiling info for gprof
+  make ssemath  # this uses SSE4 for both vector operations and math functions
+  make          # this produces an non-optimized binary with debugging symbols
 
 If you append "-f makefile_sfmt" at the end of any of the above 
-make commands, you will create an executable named mmc_sfmt, which uses a 
-fast MT19937 random-number-generator (RNG) instead of the GLIBC 
-48bit RNG. If your CPU supports SSE4, the fastest binary can be compiled
-by the following command:
+make commands, you will get an executable named "mmc_sfmt", which uses a 
+fast MT19937 random-number-generator (RNG) instead of the default GLIBC 
+48bit RNG. If your CPU supports SSE4, the fastest binary can be obtained
+by running the following command:
 
   make ssemath -f makefile_sfmt
 
 You should be able to compile the code with an Intel C++ compiler,
-an AMD C compiler or LLVM without any difficulty. To use other
-compilers, you simply append "CC=compiler_exe" to the end of the
-make command. If you see any error message, please follow the 
-instruction to fix your compiler settings or install the missing 
-libraries.
+an AMD C compiler or LLVM compiler without any difficulty. To use other
+compilers, you simply append "CC=compiler_exe" to the above make 
+commands. If you see any error messages, please google and fix 
+your compiler settings or install the missing libraries.
 
-A special note for Mac OS users: you need to install gcc-4.{4,5,6}
+A special note for Mac OS users: you need to install mp-gcc4{4,5,6}
 from MacPorts in order to compile MMC. The default gcc (4.2) installed
-by Xcode 3.x does not support thread-local storage. Once download
-and install MacPorts from www.macports.org, you can install gcc by
+by Xcode 3.x does not support thread-local storage. Once downloaded
+and installed MacPorts from www.macports.org, you can install gcc by
 
   sudo port install mp-gcc44
 
-Then add /opt/local/bin to your $PATH variable. The compilation command
-for MMC is
+Then add /opt/local/bin to your $PATH variable. A example compilation 
+command for MMC looks like
 
   make ssemath -f makefile_sfmt CC=gcc-mp-4.4
 
-After compilation, you can add the path to the "mmc" binary (typically
+After compilation, you may add the path to the "mmc" binary (typically,
 mmc/src/bin) to your search path. To do so, you should modify your 
-PATH environment variable. Detailed instructions can be found at [5].
+$PATH environment variable. Detailed instructions can be found at [5].
 
 -------------------------------------------------------------------------------
 
-III.Running Simulations
+III. Running Simulations
 
 Before you create/run your own MMC simulations, we suggest you
-first understand all the examples under the mmc/example 
+first understanding all the examples under the mmc/example 
 directory, checking out the formats of the input files and the 
-scripts for pre- and post-processings.
+scripts for pre- and post-processing.
 
-Because MMC uses FE mesh in the simulation, you should create
-a mesh for your problem domain before you running the simulation.
-This can be done fairly straightforwardly using a matlab/octave 
-mesh generator, iso2mesh [1], developed by the same author. In 
+Because MMC uses FE meshes in the simulation, you should create
+a mesh for your problem domain before launching any simulation.
+This can be done fairly straightforwardly using a Matlab/Octave 
+mesh generator, iso2mesh [1], developed by the MMC author. In 
 the mmc/matlab folder, we also provide additional functions to 
-generate regular grid-shaped tetrahedral mesh.
+generate regular grid-shaped tetrahedral meshes.
 
 It is required to use the "savemmcmesh" function under the 
-mmc/matlab folder to save the mesh produced by iso2mesh, because 
+mmc/matlab folder to save the mesh output from iso2mesh, because 
 it performs additional tests to ensure the consistency of element 
 orientations. If you choose not to use savemmcmesh, you 
-MUST call "meshreorient" function in iso2mesh for elem/face
-to make sure all elements are oriented in the same direction. 
-Otherwise, MMC will give incorrect results.
+MUST call the "meshreorient" function in iso2mesh to test 
+the "elem" array and make sure all elements are oriented in the 
+same direction. Otherwise, MMC will give incorrect results.
 
 The full command line options of MMC include the following:
 <pre>
@@ -215,7 +215,7 @@ example:
 </pre>
 
 The simplest example can be found under the "example/onecube" 
-folder. Please run "createmesh" first from matlab/octave to 
+folder. Please run "createmesh.m" first from Matlab/Octave to 
 create all the mesh files, which include
 
   elem_onecube.dat    -- tetrahedral element file
@@ -224,10 +224,9 @@ create all the mesh files, which include
   prop_onecube.dat    -- optical properties of each element type
   velem_onecube.dat   -- volume of each element
 
-The input file of the example is onecube.inp, where we
+The input file of the example is named "onecube.inp", where we
 specify most of the simulation parameters. The input file follows
-the same format as in MCX (certain fields are no-longer used).
-It looks like the following
+a similar format as in MCX, which looks like the following
 
  100                  # total photon number (can be overwriten by -n)
  17182818             # RNG seed, negative to regenerate
@@ -244,10 +243,10 @@ It looks like the following
 
 The mesh files are linked through the "mesh id" (a name stub) with a 
 format of {node|elem|facenb|velem}_meshid.dat. All mesh files must 
-exist for an MMC simulation. If the index to the element that 
-enclosing the source is not known, please use the "tsearchn" 
-function in matlab/octave to find out. Examples are provided 
-in mmc/examples/meshtest/createmesh.m.
+exist for an MMC simulation. If the index to the tetrahedron that 
+encloses the source is not known, please use the "tsearchn" 
+function in matlab/octave to find out and supply it in the 7th line
+in the input file. Examples are provided in mmc/examples/meshtest/createmesh.m.
 
 To run a simulation, you should execute the "run_test.sh" bash
 script in this folder. If you want to run mmc directly from the 
@@ -256,11 +255,11 @@ command line, you can do so by typing
  ../../src/bin/mmc -n 20 -f onecube.inp -s onecube 
 
 where -n specifies the total photon number to be simulated,
--f specifies the input file and -s gives the output file name.
-To see all the supported options, run mmc without any parameters.
+-f specifies the input file, and -s gives the output file name.
+To see all the supported options, run "mmc" without any parameters.
 
 The above command only simulates 20 photons and will complete
-instantly. An output onecube.dat will be saved to record the
+instantly. An output file "onecube.dat" will be saved to record the
 normalized (unitary) flux at each node. If one specifies
 multiple time-windows from the input file, the output will 
 contain multiple blocks with each block corresponding to the
@@ -303,6 +302,18 @@ to plot a sliced mesh.
 
 Please edit or browse the *.m files under all example subfolder
 to find more options to make plot from MMC output.
+
+When users specify "-d 1" to record partial path lengths for all
+detected photons, an output file named "sessionid".mch will be 
+saved under the same folder. This file can be loaded into 
+Matlab/Octave using the "loadmch.m" script under the mmc/matlab
+folder. The output of loadmch script has the following columns:
+
+  detector-id, scattering-events, partial-length_1, partial-length_2, ...., additional data ...
+
+The simulation settings will be returned by a structure. Using the
+information from the mch file will allow you to re-scale the detector
+readings without rerunning the simulation (for absorption changes only).
 
 -------------------------------------------------------------------------------
 
