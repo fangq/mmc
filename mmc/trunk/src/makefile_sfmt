@@ -8,6 +8,10 @@ else
   FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc tetray
 endif
 
+ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+  EXTRALIB:=-static-libgcc /opt/local/lib/gcc44/libgomp.a
+endif
+
 DOXYCFG=mmcdoxy.cfg
 
 USERCCFLAGS=-DMMC_SFMT -DUSE_OS_TIMER -DMEXP=19937

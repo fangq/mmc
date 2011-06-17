@@ -129,6 +129,18 @@ make command. If you see any error message, please follow the
 instruction to fix your compiler settings or install the missing 
 libraries.
 
+A special note for Mac OS users: you need to install gcc-4.{4,5,6}
+from MacPorts in order to compile MMC. The default gcc (4.2) installed
+by Xcode 3.x does not support thread-local storage. Once download
+and install MacPorts from www.macports.org, you can install gcc by
+
+  sudo port install mp-gcc44
+
+Then add /opt/local/bin to your $PATH variable. The compilation command
+for MMC is
+
+  make ssemath -f makefile_sfmt CC=gcc-mp-4.4
+
 After compilation, you can add the path to the "mmc" binary (typically
 mmc/src/bin) to your search path. To do so, you should modify your 
 PATH environment variable. Detailed instructions can be found at [5].
