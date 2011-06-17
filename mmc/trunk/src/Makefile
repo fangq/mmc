@@ -9,7 +9,7 @@ else
 endif
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-  EXTRALIB:=-static-gcc /opt/local/lib/gcc44/libgomp.a
+  EXTRALIB:=-static-gcc
 endif
 
 DOXYCFG=mmcdoxy.cfg
