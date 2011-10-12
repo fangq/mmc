@@ -528,7 +528,7 @@ void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg){
         else
                 sprintf(fhistory,"%s.mch",cfg->session);
 
-	if((fp=fopen(fhistory,"wt"))==NULL){
+	if((fp=fopen(fhistory,"wb"))==NULL){
 		mesh_error("can not open history file to write");
 	}
 	cfg->his.totalphoton=cfg->nphoton;
