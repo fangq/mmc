@@ -428,7 +428,9 @@ void tracer_clear(raytracer *tracer){
 	tracer->mesh=NULL;
 }
 
-float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg){
+
+float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg, float *pmom){
+
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
@@ -484,6 +486,9 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
 	p.y=stheta*sphi;
 	p.z=(dir->z>0.f)?ctheta:-ctheta;
     }
+    if (cfg->ismomentum)
+        pmom[0]+=(1.f-ctheta);
+
     dir->x=p.x;
     dir->y=p.y;
     dir->z=p.z;
@@ -536,7 +541,7 @@ void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg){
         cfg->his.detected=count;
 	cfg->his.savedphoton=count;
 	cfg->his.detnum=cfg->detnum;
-        cfg->his.colcount=cfg->his.maxmedia+2; /*column count=maxmedia+2*/
+        cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+2; /*column count=maxmedia+2*/
 
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);

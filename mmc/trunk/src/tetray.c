@@ -85,8 +85,9 @@ int main(int argc, char**argv){
 #pragma omp parallel private(ran0,ran1,threadid)
 {
 	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
+	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
 	if(cfg.issavedet) 
-	    visit.partialpath=(float*)calloc(visit.detcount*(mesh.prop+2),sizeof(float));
+	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();	
 #endif
@@ -109,12 +110,12 @@ int main(int argc, char**argv){
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
 	    if(threadid==0)
-	        master.partialpath=(float*)calloc(master.detcount*(mesh.prop+2),sizeof(float));
+		master.partialpath=(float*)calloc(master.detcount*buflen,sizeof(float));
             #pragma omp barrier
             #pragma omp critical
             {
-		memcpy(master.partialpath+master.bufpos*(mesh.prop+2),
-		    visit.partialpath,visit.bufpos*(mesh.prop+2)*sizeof(float));
+		memcpy(master.partialpath+master.bufpos*buflen,
+		       visit.partialpath,visit.bufpos*buflen*sizeof(float));
 		master.bufpos+=visit.bufpos;
             }
             #pragma omp barrier

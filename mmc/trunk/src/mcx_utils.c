@@ -32,14 +32,15 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-		 'i','V','O','\0'};
+                 'i','V','O','m','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
                  "--repeat","--save2pt","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
-		 "--method","--interactive","--specular","--outputtype",""};
+                 "--method","--interactive","--specular","--outputtype",
+                 "--momentum",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -88,7 +89,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->srctype=0;
      cfg->isspecular=0;
      cfg->outputtype=otFlux;
-
+     cfg->ismomentum=0;
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
      memcpy(cfg->his.magic,"MCXH",4);
@@ -465,6 +466,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'd':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->issavedet),"bool");
 		     	        break;
+		     case 'm':
+		                i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");
+				if (cfg->ismomentum) cfg->issavedet=1;
+				break;			       
 		     case 'C':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"bool");
 		     	        break;
@@ -566,6 +571,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
+ -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\

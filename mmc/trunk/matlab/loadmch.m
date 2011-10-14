@@ -40,14 +40,14 @@ while(~feof(fid))
 		end
 		break;
 	end
-	hd=fread(fid,7,'uint');
+	hd=fread(fid,7,'uint'); % version, maxmedia, detnum, colcount, totalphoton, detected, savedphoton
 	if(hd(1)~=1) error('version higher than 1 is not supported'); end
 	unitmm=fread(fid,1,'float32');
 	junk=fread(fid,7,'uint');
 	
 	dat=fread(fid,hd(7)*hd(4),format);
 	dat=reshape(dat,[hd(4),hd(7)])';
-	dat(:,3:end)=dat(:,3:end)*unitmm;
+	dat(:,3:(2+hd(2)))=dat(:,3:(2+hd(2)))*unitmm;
 	data=[data;dat];
 	if(isempty(header))
 		header=[hd;unitmm]';

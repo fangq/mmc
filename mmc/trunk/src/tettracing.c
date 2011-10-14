@@ -661,7 +661,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			r.vec.z=cosf(aangle);
 		}
 	}
-	r.partialpath=(float*)calloc(mesh->prop+1,sizeof(float));
+	r.partialpath=(float*)calloc((1+(cfg->ismomentum>0))*mesh->prop+1,sizeof(float));
 
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
@@ -763,18 +763,20 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		else
 			break;
 	    }
-	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg);
+	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,
+	                           r.partialpath+mesh->prop+mesh->type[r.eid-1]);
             r.partialpath[0]++;
 	}
 	if(cfg->issavedet && exitdet>0){
-		int offset=visit->bufpos*(mesh->prop+2);
+		int buflen=(1+(cfg->ismomentum>0))*mesh->prop+2;
+		int offset=visit->bufpos*buflen;
 		if(visit->bufpos>=visit->detcount){
 		    visit->detcount+=DET_PHOTON_BUF;
 		    visit->partialpath=(float *)realloc(visit->partialpath,
-		               visit->detcount*(mesh->prop+2)*sizeof(float));
+				visit->detcount*buflen*sizeof(float));
 		}
 		visit->partialpath[offset]=exitdet;
-		memcpy(visit->partialpath+offset+1,r.partialpath, (mesh->prop+1)*sizeof(float));
+	        memcpy(visit->partialpath+offset+1,r.partialpath,(buflen-1)*sizeof(float));
 		visit->bufpos++;
 	}
 	free(r.partialpath);

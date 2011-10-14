@@ -113,8 +113,8 @@ void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);
 void tracer_build(raytracer *tracer);
 void tracer_prep(raytracer *tracer,mcconfig *cfg);
 void tracer_clear(raytracer *tracer);
-float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,mcconfig *cfg);
 
+float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,mcconfig *cfg,float *pmom);
 
 static inline void vec_add(float3 *a,float3 *b,float3 *res){
 	res->x=a->x+b->x;
