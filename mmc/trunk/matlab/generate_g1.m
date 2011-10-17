@@ -82,7 +82,8 @@ for I=1:mch_header.detnum,
         eval(disp_str);
         g1(I,J)=sum(exp(-(k0.^2.*rmsdisp/3)*mch_data(idx,(3+mch_header.medianum):end)'-mua*mch_data(idx,3:(3+mch_header.medianum-1))'));
     end
-    g1(I,:)=g1(I,:)./max(g1(I,:));
+    g1_norm=sum(exp(-mua*mch_data(idx,3:(3+mch_header.medianum-1))'));
+    g1(I,:)=g1(I,:)./g1_norm;
 end
     
 
