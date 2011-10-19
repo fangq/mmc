@@ -17,6 +17,7 @@ examples/
 |-onecube    - debugging flag show case 1, simple mesh without reflection
 |-reftest    - debugging flag show case 2, simple mesh with reflection
 |-rngtest    - random number generator test
+|-dcs        - validation of momentum transfer in DCS simulation
 |-misctest   - other misc. tests
 |-mouse      - legacy example
 |-sphbox     - legacy example

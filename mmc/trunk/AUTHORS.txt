@@ -8,3 +8,12 @@ Address: Martinos Center for Biomedical Imaging,
          Bldg 149, 13th St, Charlestown, MA 02129, USA
 URL: http://nmr.mgh.harvard.edu/~fangq/
 Email: <fangq at nmr.mgh.harvard.edu>
+
+
+The follow people had also contributed to this software:
+
+* Stefan Carp <carp at nmr.mgh.harvard.edu>
+
+Stefan contributed a patch to enable DCS (Diffuse Correlation 
+Spectroscopy) modeling with MMC. He also added validation 
+examples and MATLAB units for DCS related computation. 

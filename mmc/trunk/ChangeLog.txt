@@ -1,5 +1,12 @@
 Change Log
 
+== MMC 0.9.pre (Banana Pudding) dev branch, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+
+2011/10/14 Stefan Carp contributed a patch and validation package for DCS simulations
+2011/10/12 fix a bug in writing mch file under Windows
+2011/08/24 fix an sfmt bug when initializing rng seed in multi-threads
+
+
 == MMC 0.8.0 (Snow Cone) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2011/06/17 final release of 0.8.0

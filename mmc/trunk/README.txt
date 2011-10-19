@@ -181,6 +181,7 @@ where possible parameters include (the first item in [] is the default value)
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
  -U [1|0]      (--normalize)   1 to normalize the flux to unitary,0 save raw
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
+ -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
  -S [1|0]      (--save2pt)     1 to save the flux field, 0 do not save
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for flux,0 constant
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
