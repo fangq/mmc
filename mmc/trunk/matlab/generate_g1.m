@@ -1,6 +1,6 @@
 function [tau,g1]=generate_g1(fhist,tau, disp_model, DV, lambda, format, varargin)
 %
-%   g1=generate_g1(fhist,tau, disp_model, DV, lambda, format)
+%   [tau,g1]=generate_g1(fhist,tau, disp_model, DV, lambda, format)
 %
 %   Compute simulated electric-field auto-correlation function using
 %   simulated photon pathlengths and scattering momentum transfer
@@ -22,6 +22,10 @@ function [tau,g1]=generate_g1(fhist,tau, disp_model, DV, lambda, format, varargi
 %                   (default: 'float')
 %
 %   output:
+%
+%       tau:        correlation times at which g1 was computed provided for
+%                   convenience (copied from input if set, otherwise 
+%                   outputs default)
 %       g1:         field auto-correlation curves, one for each detector
 %
 %   The displacement model indicates the formula used to compute the root
