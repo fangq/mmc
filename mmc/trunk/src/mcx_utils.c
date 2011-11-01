@@ -281,7 +281,6 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
 
         strncpy(val,FIND_JSON_KEY("RayTracer","Session.RayTracer",Session,raytracing+cfg->method,valuestring),1);
-	printf("val=%c\n",val[0]);
         if(mcx_lookupindex(val, raytracing)){
 		mcx_error(-2,"the specified ray-tracing method is not recognized");
 	}
