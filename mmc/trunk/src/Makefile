@@ -3,9 +3,9 @@ BINARY=mmc
 
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-  FILES=posix_randr simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c tetray
+  FILES=posix_randr simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c tetray cjson/cJSON
 else
-  FILES=posix_randr simpmesh tettracing mcx_utils tictoc tetray
+  FILES=posix_randr simpmesh tettracing mcx_utils tictoc tetray cjson/cJSON
 endif
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
@@ -15,6 +15,8 @@ endif
 DOXYCFG=mmcdoxy.cfg
 
 USERCCFLAGS=-DUSE_OS_TIMER
+
+DUMMY:=$(shell mkdir -p built/cjson)
 
 include $(ROOTDIR)/commons/Makefile_common.mk
 

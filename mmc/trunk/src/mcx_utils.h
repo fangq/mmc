@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <vector_types.h>
+#include "cjson/cJSON.h"
 
 #define MAX_PROP            256
 #define MAX_DETECTORS       256
@@ -171,6 +172,7 @@ int  mcx_lookupindex(char *key, const char *index);
 int  mcx_getsrcid(char *srctype);
 int  mcx_parsedebugopt(char *debugopt);
 void mcx_progressbar(unsigned int n, mcconfig *cfg);
+int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 
 #ifdef	__cplusplus
 }

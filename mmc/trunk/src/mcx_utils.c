@@ -30,6 +30,17 @@
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
 
+#define FIND_JSON_KEY(id,idfull,parent,fallback,val) \
+                    ((tmp=cJSON_GetObjectItem(parent,id))==0 ? \
+                                ((tmp=cJSON_GetObjectItem(root,idfull))==0 ? fallback : tmp->val) \
+                     : tmp->val)
+
+#define FIND_JSON_OBJ(id,idfull,parent) \
+                    ((tmp=cJSON_GetObjectItem(parent,id))==0 ? \
+                                ((tmp=cJSON_GetObjectItem(root,idfull))==0 ? NULL : tmp) \
+                     : tmp)
+
+
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
                  'i','V','O','m','\0'};
@@ -148,14 +159,148 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
 		strcpy(cfg->session,"default");
 	}
      }else{
-     	FILE *fp=fopen(fname,"rt");
-	if(fp==NULL) mcx_error(-2,"can not load the specified config file");
-	mcx_loadconfig(fp,cfg); 
-	fclose(fp);
+        FILE *fp=fopen(fname,"rt");
+        if(fp==NULL) mcx_error(-2,"can not load the specified config file");
+        if(strstr(fname,".json")!=NULL){
+            char *jbuf;
+            int len;
+            cJSON *jroot;
+
+            fseek (fp, 0, SEEK_END);
+            len=ftell(fp)+1;
+            jbuf=(char *)malloc(len);
+            rewind(fp);
+            if(fread(jbuf,len-1,1,fp)!=1)
+                mcx_error(-2,"reading input file is terminated");
+            jbuf[len-1]='\0';
+            jroot = cJSON_Parse(jbuf);
+            if(jroot){
+                mcx_loadjson(jroot,cfg);
+                cJSON_Delete(jroot);
+            }else{
+                char *ptrold, *ptr=(char*)cJSON_GetErrorPtr();
+                if(ptr) ptrold=strstr(jbuf,ptr);
+                fclose(fp);
+                if(ptr && ptrold){
+                   char *offs=(ptrold-jbuf>=50) ? ptrold-50 : jbuf;
+                   while(offs<ptrold){
+                      fprintf(stderr,"%c",*offs);
+                      offs++;
+                   }
+                   fprintf(stderr,"<error>%.50s\n",ptrold);
+                }
+                free(jbuf);
+                mcx_error(-9,"invalid JSON input file");
+            }
+            free(jbuf);
+        }else{
+	    mcx_loadconfig(fp,cfg); 
+        }
+        fclose(fp);
         if(cfg->session[0]=='\0'){
-		strcpy(cfg->session,fname);
+		strncpy(cfg->session,fname,MAX_SESSION_LENGTH);
 	}
      }
+}
+
+int mcx_loadjson(cJSON *root, mcconfig *cfg){
+     int i;
+     cJSON *Mesh, *Optode, *Forward, *Session, *tmp, *subitem;
+     char comment[MAX_PATH_LENGTH];
+     Mesh    = cJSON_GetObjectItem(root,"Mesh");
+     Optode  = cJSON_GetObjectItem(root,"Optode");
+     Session = cJSON_GetObjectItem(root,"Session");
+     Forward = cJSON_GetObjectItem(root,"Forward");
+
+     if(Mesh){
+        strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,"",valuestring), MAX_PATH_LENGTH);
+        cfg->dim.x=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(mcx_error(-1,"InitElem must be given"),0.0),valueint);
+        if(cfg->rootpath[0]){
+#ifdef WIN32
+           sprintf(comment,"%s\\%s",cfg->rootpath,cfg->meshtag);
+#else
+           sprintf(comment,"%s/%s",cfg->rootpath,cfg->meshtag);
+#endif
+           strncpy(cfg->meshtag,comment,MAX_PATH_LENGTH);
+        }
+        cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
+     }
+     if(Optode){
+        cJSON *dets, *src=FIND_JSON_OBJ("Source","Optode.Source",Optode);
+        if(src){
+           subitem=FIND_JSON_OBJ("Pos","Optode.Source.Pos",src);
+           if(subitem){
+              cfg->srcpos.x=subitem->child->valuedouble;
+              cfg->srcpos.y=subitem->child->next->valuedouble;
+              cfg->srcpos.z=subitem->child->next->next->valuedouble;
+           }
+           subitem=FIND_JSON_OBJ("Dir","Optode.Source.Dir",src);
+           if(subitem){
+              cfg->srcdir.x=subitem->child->valuedouble;
+              cfg->srcdir.y=subitem->child->next->valuedouble;
+              cfg->srcdir.z=subitem->child->next->next->valuedouble;
+           }
+        }
+        dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);
+        if(dets){
+           cJSON *det=dets->child;
+           if(det){
+             cfg->detnum=cJSON_GetArraySize(dets);
+             cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
+             for(i=0;i<cfg->detnum;i++){
+               cJSON *pos=dets, *rad=NULL;
+               rad=FIND_JSON_OBJ("R","Optode.Detector.R",det);
+               if(cJSON_GetArraySize(det)==2){
+                   pos=FIND_JSON_OBJ("Pos","Optode.Detector.Pos",det);
+               }
+               if(pos){
+	           cfg->detpos[i].x=pos->child->valuedouble;
+                   cfg->detpos[i].y=pos->child->next->valuedouble;
+	           cfg->detpos[i].z=pos->child->next->next->valuedouble;
+               }
+               if(rad){
+                   cfg->detpos[i].w=rad->valuedouble;
+               }
+               det=det->next;
+               if(det==NULL) break;
+             }
+           }
+        }
+     }
+     if(Session){
+        char val[1];
+        if(cfg->seed==0)    cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
+        if(cfg->nphoton==0) cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
+        if(cfg->session[0]=='\0') strncpy(cfg->session, FIND_JSON_KEY("ID","Session.ID",Session,"default",valuestring), MAX_SESSION_LENGTH);
+
+        cfg->isreflect=FIND_JSON_KEY("DoMismatch","Session.DoMismatch",Session,cfg->isreflect,valueint);
+        cfg->isnormalized=FIND_JSON_KEY("DoNormalize","Session.DoNormalize",Session,cfg->isnormalized,valueint);
+        cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
+        cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
+        cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
+        cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
+
+        strncpy(val,FIND_JSON_KEY("RayTracer","Session.RayTracer",Session,raytracing+cfg->method,valuestring),1);
+	printf("val=%c\n",val[0]);
+        if(mcx_lookupindex(val, raytracing)){
+		mcx_error(-2,"the specified ray-tracing method is not recognized");
+	}
+	cfg->method=val[0];
+        memcpy(val,FIND_JSON_KEY("OutputType","Session.OutputType",Session,"x",valuestring),1);
+        if(mcx_lookupindex(val, outputtype)){
+                mcx_error(-2,"the specified output data type is not recognized");
+        }
+	cfg->outputtype=val[0];
+     }
+     if(Forward){
+        cfg->tstart=FIND_JSON_KEY("T0","Forward.T0",Forward,0.0,valuedouble);
+        cfg->tend  =FIND_JSON_KEY("T1","Forward.T1",Forward,0.0,valuedouble);
+        cfg->tstep =FIND_JSON_KEY("Dt","Forward.Dt",Forward,0.0,valuedouble);
+        cfg->nout=FIND_JSON_KEY("N0","Forward.N0",Forward,cfg->nout,valuedouble);
+
+        cfg->maxgate=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
+     }
+     return 0;
 }
 
 void mcx_writeconfig(char *fname, mcconfig *cfg){
