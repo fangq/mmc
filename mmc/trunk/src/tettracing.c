@@ -628,15 +628,15 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 #else
 
 float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
-	mcx_error(-6,"wrong option, please recompile with SSE4 enabled");
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
 	return MMC_UNDEFINED;
 }
 float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
-	mcx_error(-6,"wrong option, please recompile with SSE4 enabled");
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
 	return MMC_UNDEFINED;
 }
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
-	mcx_error(-6,"wrong option, please recompile with SSE4 enabled");
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
 	return MMC_UNDEFINED;
 }
 #endif
@@ -667,7 +667,7 @@ float onephoton(int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	if(cfg->method>=0 && cfg->method<4)
 	    tracercore=engines[(int)(cfg->method)];
 	else
-	    mcx_error(-6,"specified ray-tracing algorithm is not defined");
+	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
 
 	/*initialize the photon parameters*/
 	r.slen=rand_next_scatlen(ran);

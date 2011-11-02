@@ -40,6 +40,8 @@
                                 ((tmp=cJSON_GetObjectItem(root,idfull))==0 ? NULL : tmp) \
                      : tmp)
 
+#define MMC_ASSERT(id)   mcx_assert(id,__FILE__,__LINE__)
+
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
@@ -143,13 +145,17 @@ void mcx_normalize(float field[], float scale, int fieldlen){
      }
 }
 
-void mcx_error(int id,char *msg){
-     fprintf(stdout,"MMC ERROR(%d): %s\n",id,msg);
+void mcx_error(const int id,const char *msg,const char *file,const int linenum){
+     fprintf(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
+#ifdef MCX_CONTAINER
+     mcx_throw_exception(id,msg,file,linenum);
+#else
      exit(id);
+#endif
 }
 
-void mcx_assert(int ret){
-     if(!ret) mcx_error(ret,"assert error");
+void mcx_assert(const int ret,const char *file,const int linenum){
+     if(!ret) mcx_error(ret,"assert error",file,linenum);
 }
 
 void mcx_readconfig(char *fname, mcconfig *cfg){
@@ -160,7 +166,7 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
 	}
      }else{
         FILE *fp=fopen(fname,"rt");
-        if(fp==NULL) mcx_error(-2,"can not load the specified config file");
+        if(fp==NULL) MMC_ERROR(-2,"can not load the specified config file");
         if(strstr(fname,".json")!=NULL){
             char *jbuf;
             int len;
@@ -171,7 +177,7 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
             jbuf=(char *)malloc(len);
             rewind(fp);
             if(fread(jbuf,len-1,1,fp)!=1)
-                mcx_error(-2,"reading input file is terminated");
+                MMC_ERROR(-2,"reading input file is terminated");
             jbuf[len-1]='\0';
             jroot = cJSON_Parse(jbuf);
             if(jroot){
@@ -190,7 +196,7 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
                    fprintf(stderr,"<error>%.50s\n",ptrold);
                 }
                 free(jbuf);
-                mcx_error(-9,"invalid JSON input file");
+                MMC_ERROR(-9,"invalid JSON input file");
             }
             free(jbuf);
         }else{
@@ -213,8 +219,8 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      Forward = cJSON_GetObjectItem(root,"Forward");
 
      if(Mesh){
-        strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,"",valuestring), MAX_PATH_LENGTH);
-        cfg->dim.x=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(mcx_error(-1,"InitElem must be given"),0.0),valueint);
+        strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_PATH_LENGTH);
+        cfg->dim.x=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
         if(cfg->rootpath[0]){
 #ifdef WIN32
            sprintf(comment,"%s\\%s",cfg->rootpath,cfg->meshtag);
@@ -285,12 +291,12 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
            cfg->debuglevel=mcx_parsedebugopt(FIND_JSON_KEY("DebugFlag","Session.DebugFlag",Session,"",valuestring));
         strncpy(val,FIND_JSON_KEY("RayTracer","Session.RayTracer",Session,raytracing+cfg->method,valuestring),1);
         if(mcx_lookupindex(val, raytracing)){
-		mcx_error(-2,"the specified ray-tracing method is not recognized");
+		MMC_ERROR(-2,"the specified ray-tracing method is not recognized");
 	}
 	cfg->method=val[0];
         strncpy(val,FIND_JSON_KEY("OutputType","Session.OutputType",Session,outputtype+cfg->outputtype,valuestring),1);
         if(mcx_lookupindex(val, outputtype)){
-                mcx_error(-2,"the specified output data type is not recognized");
+                MMC_ERROR(-2,"the specified output data type is not recognized");
         }
 	cfg->outputtype=val[0];
      }
@@ -302,6 +308,10 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
 
         cfg->maxgate=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
      }
+     if(cfg->meshtag[0]=='\0')
+         MMC_ERROR(-1,"You must specify mesh files");
+     if(cfg->dim.x==0)
+	 MMC_ERROR(-1,"InitElem must be given");
      return 0;
 }
 
@@ -310,7 +320,7 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
      	mcx_saveconfig(stdout,cfg);
      else{
      	FILE *fp=fopen(fname,"wt");
-	if(fp==NULL) mcx_error(-2,"can not write to the specified config file");
+	if(fp==NULL) MMC_ERROR(-2,"can not write to the specified config file");
 	mcx_saveconfig(fp,cfg);     
 	fclose(fp);
      }
@@ -322,43 +332,43 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of photons: [1000000]\n\t");
-     mcx_assert(fscanf(in,"%d", &(i) )==1); 
+     MMC_ASSERT(fscanf(in,"%d", &(i) )==1); 
      if(cfg->nphoton==0) cfg->nphoton=i;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
      if(cfg->seed==0)
-        mcx_assert(fscanf(in,"%d", &(cfg->seed) )==1);
+        MMC_ASSERT(fscanf(in,"%d", &(cfg->seed) )==1);
      else
-        mcx_assert(fscanf(in,"%d", &itmp )==1);
+        MMC_ASSERT(fscanf(in,"%d", &itmp )==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
-     mcx_assert(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
+     MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",
                                    cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
      //cfg->srcpos.x--;cfg->srcpos.y--;cfg->srcpos.z--; /*convert to C index, grid center*/
-     mcx_assert(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) )==3);
+     MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the time gates in seconds (start end and step) [0.0 1e-9 1e-10]\n\t",
                                    cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z);
-     mcx_assert(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
+     MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the path to the volume binary file:\n\t",
                                    cfg->tstart,cfg->tend,cfg->tstep);
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
-         mcx_error(-9,"incorrect time gate settings");
+         MMC_ERROR(-9,"incorrect time gate settings");
      }
      gates=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
      /*if(cfg->maxgate>gates)*/
 	 cfg->maxgate=gates;
 
-     mcx_assert(fscanf(in,"%s", cfg->meshtag)==1);
+     MMC_ASSERT(fscanf(in,"%s", cfg->meshtag)==1);
      if(cfg->rootpath[0]){
 #ifdef WIN32
          sprintf(comment,"%s\\%s",cfg->rootpath,cfg->meshtag);
@@ -371,7 +381,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 
      if(in==stdin)
      	fprintf(stdout,"%s\nPlease specify the index to the tetrahedral element enclosing the source [start from 1]:\n\t",cfg->meshtag);
-     mcx_assert(fscanf(in,"%d", &(cfg->dim.x))==1);
+     MMC_ASSERT(fscanf(in,"%d", &(cfg->dim.x))==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      cfg->minstep=MIN(cfg->steps.x,cfg->steps.y);
@@ -379,7 +389,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of detectors and fiber diameter (in mm):\n\t");
-     mcx_assert(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
+     MMC_ASSERT(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(in==stdin)
      	fprintf(stdout,"%d %f\n",cfg->detnum,cfg->detradius);
@@ -389,7 +399,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      for(i=0;i<cfg->detnum;i++){
         if(in==stdin)
 		fprintf(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
-     	mcx_assert(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
+     	MMC_ASSERT(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
         //cfg->detpos[i].x--;cfg->detpos[i].y--;cfg->detpos[i].z--;  /*convert to C index*/
         comm=fgets(comment,MAX_PATH_LENGTH,in);
         if(in==stdin)
@@ -400,13 +410,13 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
         srctype=mcx_getsrcid(strtypestr);
 	if(srctype==-1)
-	   mcx_error(-6,"the specified source type is not supported");
+	   MMC_ERROR(-6,"the specified source type is not supported");
         if(srctype>0){
            comm=fgets(comment,MAX_PATH_LENGTH,in);
 	   cfg->srctype=srctype;
 	   if(in==stdin)
      	      fprintf(stdout,"Please specify the source parameters (4 floating-points):\n\t");
-           mcx_assert(fscanf(in, "%f %f %f %f", &(cfg->srcparam.x),
+           MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam.x),
 	          &(cfg->srcparam.y),&(cfg->srcparam.z),&(cfg->srcparam.w))==4);
 	}else
 	   return;
@@ -439,7 +449,7 @@ void mcx_loadvolume(char *filename,mcconfig *cfg){
      int datalen,res;
      FILE *fp=fopen(filename,"rb");
      if(fp==NULL){
-     	     mcx_error(-5,"the specified binary volume file does not exist");
+     	     MMC_ERROR(-5,"the specified binary volume file does not exist");
      }
      if(cfg->vol){
      	     free(cfg->vol);
@@ -450,7 +460,7 @@ void mcx_loadvolume(char *filename,mcconfig *cfg){
      res=fread(cfg->vol,sizeof(unsigned char),datalen,fp);
      fclose(fp);
      if(res!=datalen){
-     	 mcx_error(-6,"file size does not match specified dimensions");
+     	 MMC_ERROR(-6,"file size does not match specified dimensions");
      }
 }
 
@@ -512,7 +522,7 @@ int mcx_readarg(int argc, char *argv[], int id, void *output,char *type){
 	 else if(strcmp(type,"string")==0)
 	     strcpy((char *)output,argv[id+1]);
      }else{
-     	 mcx_error(-1,"incomplete input");
+     	 MMC_ERROR(-1,"incomplete input");
      }
      return id+1;
 }
@@ -568,7 +578,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      	    if(argv[i][0]=='-'){
 		if(argv[i][1]=='-'){
 			if(mcx_remap(argv[i])){
-				mcx_error(-2,"unsupported verbose option");
+				MMC_ERROR(-2,"unsupported verbose option");
 			}
 		}
 	        switch(argv[i][1]){
@@ -577,7 +587,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 				exit(0);
 		     case 'i':
 				if(filename[0]){
-					mcx_error(-2,"you can not specify both interactive mode and config file");
+					MMC_ERROR(-2,"you can not specify both interactive mode and config file");
 				}
 		     		isinteractive=1;
 				break;
@@ -641,13 +651,13 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                      case 'O':
                                 i=mcx_readarg(argc,argv,i,&(cfg->outputtype),"char");
 				if(mcx_lookupindex(&(cfg->outputtype), outputtype)){
-                                        mcx_error(-2,"the specified output data type is not recognized");
+                                        MMC_ERROR(-2,"the specified output data type is not recognized");
                                 }
                                 break;
                      case 'M':
                                 i=mcx_readarg(argc,argv,i,&(cfg->method),"char");
 				if(mcx_lookupindex(&(cfg->method), raytracing)){
-					mcx_error(-2,"the specified ray-tracing method is not recognized");
+					MMC_ERROR(-2,"the specified ray-tracing method is not recognized");
 				}
                                 break;
                      case 'R':
@@ -675,7 +685,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 	                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");
                                 break;
                      default:
-				mcx_error(-1,"unsupported command line option");
+				MMC_ERROR(-1,"unsupported command line option");
 		}
 	    }
 	    i++;

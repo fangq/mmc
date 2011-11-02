@@ -35,6 +35,7 @@
 #define MAX_SESSION_LENGTH  256
 #define DET_PHOTON_BUF      100000
 #define MIN(a,b)            ((a)<(b)?(a):(b))
+#define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 
 #define MMCDEBUG(cfg,debugflag,outputstr)  {\
 				if((cfg)->debuglevel & (debugflag)) {\
@@ -154,7 +155,7 @@ typedef struct MMC_config{
 extern "C" {
 #endif
 void mcx_savedata(float *dat,int len,mcconfig *cfg);
-void mcx_error(int id,char *msg);
+void mcx_error(const int id,const char *msg,const char *file,const int linenum);
 void mcx_loadconfig(FILE *in, mcconfig *cfg);
 void mcx_saveconfig(FILE *in, mcconfig *cfg);
 void mcx_readconfig(char *fname, mcconfig *cfg);
