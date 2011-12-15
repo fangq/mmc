@@ -4,10 +4,10 @@
 
 % preparation
 
-% 1. you have to add the path to iso2mesh toolbox 
+% 1. you need to add the path to iso2mesh toolbox 
 % addpath('/path/to/iso2mesh/toolbox/');
 
-% 2. you have to add the path to MMC matlab folder
+% 2. you need to add the path to MMC matlab folder
 addpath('../../matlab')
 
 

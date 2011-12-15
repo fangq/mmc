@@ -5,8 +5,7 @@
 0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
 onecube              # volume ('uchar' format)
 3
-4	1            # detector number and radius (mm)
-30.0	20.0	1.0  # detector 1 position (mm)
-30.0	40.0	1.0  # ...
-20.0	30.0	1.0
-40.0	30.0	1.0
+3	1            # detector number and radius (mm)
+2.0	6.0	0.0  # detector 1 position (mm)
+2.0	4.0	0.0  # ...
+2.0	2.0	0.0

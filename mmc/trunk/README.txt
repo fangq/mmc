@@ -5,18 +5,19 @@
 
 Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.8.0 (Snow cone)
+Version: 0.9.0 (Banana Pudding)
 
 -------------------------------------------------------------------------------
 
 Table of Content:
 
 I.  Introduction
-II. Download and Compile MMC
+II. Downloading and Compiling MMC
 III.Running Simulations
 IV. Plotting the Results
 V.  Known Issues and TODOs
-VI. Reference
+VI  Getting Involved
+VII.Reference
 
 ------------------------------------------------------------------------------- 
 
@@ -174,18 +175,18 @@ The full command line options of MMC include the following:
 usage: mmc <param1> <param2> ...
 where possible parameters include (the first item in [] is the default value)
  -i 	       (--interactive) interactive mode
- -s sessionid  (--session)     a string to label all output file names
+ -s sessionid  (--session)     a string used to tag all output file names
  -f config     (--input)       read config from a file
- -n [0.|float] (--photon)      total photon number
+ -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
- -U [1|0]      (--normalize)   1 to normalize the flux to unitary,0 save raw
+ -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
  -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
- -S [1|0]      (--save2pt)     1 to save the flux field, 0 do not save
- -C [1|0]      (--basisorder)  1 piece-wise-linear basis for flux,0 constant
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
- -O [X|XFE]    (--outputtype)  X - output flux, F - flux, E - energy deposit
+ -O [X|XFE]    (--outputtype)  X - output flux, F - fluence, E - energy deposit
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead
@@ -197,7 +198,7 @@ where possible parameters include (the first item in [] is the default value)
 			       S - branch-less Badouel's method with SSE
  -D [0|int]    (--debug)       print debug information (you can use an integer
   or                           or a string by combining the following flags)
- -D [''|MCBWDIOXATRP]          1 M  photon movement info
+ -D [''|MCBWDIOXATRPE]         1 M  photon movement info
                                2 C  print ray-polygon testing details
                                4 B  print Bary-centric coordinates
                                8 W  print photon weight changes
@@ -210,7 +211,7 @@ where possible parameters include (the first item in [] is the default value)
                             1024 R  debugging reflection
                             2048 P  show progress bar
                             4096 E  exit photon info
-      add the numbers together to print mulitple items, or one can use a string
+      combine multiple items by using a string, or add selected numbers together
 example:
        mmc -n 1000000 -f input.inp -s test -b 0 -D TP
 </pre>
@@ -276,7 +277,7 @@ plots from the simulation results.
 
 IV. Plotting the Results
 
-As described above, MMC produces a single output file, named as
+As described above, MMC produces a flux/fluence output file as
 "session-id".dat. By default, this file contains the normalized,
 i.e. under unitary source, flux at each node of the mesh. The detailed
 interpretation of the output data can be found in [6]. If multiple 
@@ -327,7 +328,30 @@ V. Known issues and TODOs
  added in a future release
 
 -------------------------------------------------------------------------------
-VI.  Reference
+VI.   Getting Involved
+
+MMC is an open-source software. It is released under the terms of GNU 
+General Public License version 3 (GPLv3). That means not only everyone 
+can download and use MMC for any purposes, but also you can modify the 
+code and share the improved software with others (as long as the derived 
+work is also licensed under the GPLv3 license).
+
+If you already made a change to the source code to fix a bug you encountered 
+in your research, we are appreciated if you can share your changes (as 
+"git diff" outputs) with the developers. We will patch the code as soon 
+as we fully test the changes (we will acknowledge your contribution in 
+the MMC documentation). If you want to become a developer, please send 
+an email to Qianqian and we will review your request. Once permitted, 
+you will have developer access to the source code repository.
+
+In you are a user, please use our mmc-users mailing list to post 
+questions or share experience regarding MMC. The mailing lists can be
+found from this link:
+
+ http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/Portal
+
+-------------------------------------------------------------------------------
+VII.  Reference
 
 [1] http://iso2mesh.sf.net  -- an image-based surface/volumetric mesh generator
 [2] http://mcx.sf.net       -- Monte Carlo eXtreme: a GPU-accelerated MC code

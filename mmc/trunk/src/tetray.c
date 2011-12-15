@@ -48,7 +48,7 @@ int main(int argc, char**argv){
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
-	int i;
+	unsigned int i;
 	float raytri=0.f;
 	unsigned int threadid=0,ncomplete=0,t0,dt;
 

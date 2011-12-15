@@ -582,7 +582,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 			}
 		}
 	        switch(argv[i][1]){
-		     case 'h': 
+		     case 'h':
 		                mcx_usage(argv[0]);
 				exit(0);
 		     case 'i':
@@ -721,9 +721,9 @@ $MMC $Rev::     $ Last Commit $Date::                     $ by $Author:: fangq$\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
  -i 	       (--interactive) interactive mode\n\
- -s sessionid  (--session)     a string to label all output file names\n\
+ -s sessionid  (--session)     a string used to tag all output file names\n\
  -f config     (--input)       read config from a file\n\
- -n [0.|float] (--photon)      total photon number\n\
+ -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\

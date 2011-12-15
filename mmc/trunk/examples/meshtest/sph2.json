@@ -1,12 +1,12 @@
 {
     "Mesh": {
-	"MeshID": "sph1",
-	"InitElem": 11
+	"MeshID": "sph2",
+	"InitElem": 5
     },
     "Session": {
 	"Photons":  1000000,
 	"Seed":     27182820,
-	"ID":       "sph1"
+	"ID":       "sph2"
     },
     "Forward": {
 	"T0": 0.0e+00,

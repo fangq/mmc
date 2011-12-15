@@ -91,7 +91,7 @@ typedef struct MMC_history{
 *******************************************************************************/  
 
 typedef struct MMC_config{
-	int nphoton;      /**<(total simulated photon number) we now use this to 
+	unsigned int nphoton;      /**<(total simulated photon number) we now use this to 
 	                     temporarily alias totalmove, as to specify photon
 			     number is causing some troubles*/
         int nblocksize;   /**<thread block size*/
