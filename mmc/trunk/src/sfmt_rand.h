@@ -25,7 +25,7 @@ typedef unsigned int uint;
 
 #define MCX_RNG_NAME       "SFMT19937 RNG"
 
-#define RAND_BUF_LEN       624     //buffer length
+#define RAND_BUF_LEN       1248    //buffer length
 #define RAND_SEED_LEN      2       //
 #define MEXP               19937
 

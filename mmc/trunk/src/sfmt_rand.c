@@ -37,13 +37,19 @@ __device__ void sfmt_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
      ini[0]=n_seed[0];
      ini[1]=(INIT_MULT * (n_seed[0] ^ (n_seed[0] >> 30)) + idx);
      init_by_array(ini, 2);
-     fill_array32(t,RAND_BUF_LEN);
+     #progma omp critical
+     {
+        fill_array32(t,RAND_BUF_LEN);
+     }
 }
 // transform into [0,1] random number
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
     static __thread unsigned int pos;
     if(pos>=RAND_BUF_LEN) {
-	fill_array32(t,RAND_BUF_LEN);
+        #progma omp critical
+	{
+	    fill_array32(t,RAND_BUF_LEN);
+	}
 	pos=0;
     }
     return t[pos++]*R_MAX_SFMT_RAND;
