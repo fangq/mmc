@@ -109,6 +109,7 @@ void mcx_initcfg(mcconfig *cfg){
 
      memset(&(cfg->bary0),0,sizeof(float4));
      memset(&(cfg->srcparam),0,sizeof(float4));
+     memset(cfg->checkpt,0,sizeof(unsigned int)*MAX_CHECKPOINT);
 }
 
 void mcx_clearcfg(mcconfig *cfg){
@@ -275,6 +276,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      }
      if(Session){
         char val[1];
+        cJSON *ck;
         if(cfg->seed==0)      cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
         if(cfg->nphoton==0)   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
         if(cfg->session[0]=='\0') strncpy(cfg->session, FIND_JSON_KEY("ID","Session.ID",Session,"default",valuestring), MAX_SESSION_LENGTH);
@@ -299,6 +301,16 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
                 MMC_ERROR(-2,"the specified output data type is not recognized");
         }
 	cfg->outputtype=val[0];
+        ck=FIND_JSON_OBJ("Checkpoints","Session.Checkpoints",Session);
+        if(ck){
+            int num=MIN(cJSON_GetArraySize(ck),MAX_CHECKPOINT);
+            ck=ck->child;
+            for(i=0;i<num;i++){
+               cfg->checkpt[i]=ck->valueint;
+               ck=ck->next;
+               if(ck==NULL) break;
+            }
+        }
      }
      if(Forward){
         cfg->tstart=FIND_JSON_KEY("T0","Forward.T0",Forward,0.0,valuedouble);
@@ -479,7 +491,7 @@ int mcx_parsedebugopt(char *debugopt){
 
 void mcx_progressbar(unsigned int n, mcconfig *cfg){
     unsigned int percentage, j,colwidth=79;
-    static unsigned int oldmarker=0;
+    static unsigned int oldmarker=0xFFFFFFFF;
 
 #ifdef TIOCGWINSZ 
     struct winsize ttys;

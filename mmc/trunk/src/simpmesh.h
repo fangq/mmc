@@ -106,6 +106,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);
 void mesh_build(tetmesh *mesh);
 void mesh_error(char *msg);
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg);
+void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
 void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg);
 

@@ -33,6 +33,7 @@
 #define MAX_DETECTORS       256
 #define MAX_PATH_LENGTH     1024
 #define MAX_SESSION_LENGTH  256
+#define MAX_CHECKPOINT      16
 #define DET_PHOTON_BUF      100000
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
@@ -85,9 +86,9 @@ typedef struct MMC_history{
 
 /***************************************************************************//**
 \struct MMC_config mcx_utils.h
-                                                                                                                                                                                    
+
 \brief  This structure defines the problem settings (domain, filenames, session)
-                                                                                                                                                                                    
+
 *******************************************************************************/  
 
 typedef struct MMC_config{
@@ -97,7 +98,7 @@ typedef struct MMC_config{
         int nblocksize;   /**<thread block size*/
 	int nthread;      /**<num of total threads, multiple of 128*/
 	int seed;         /**<random number generator seed*/
-	
+
 	float3 srcpos;    /**<src position in mm*/
 	float3 srcdir;    /**<src normal direction*/
 	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
@@ -149,6 +150,7 @@ typedef struct MMC_config{
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
 	float unitinmm;     /**<define the length unit in mm*/
 	history his;        /**<header info of the history file*/
+	unsigned int checkpt[MAX_CHECKPOINT]; /**<a list of photon numbers at which a snapshot of the weights will be saved*/
 } mcconfig;
 
 #ifdef	__cplusplus

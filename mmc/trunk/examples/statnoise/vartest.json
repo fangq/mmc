@@ -1,0 +1,23 @@
+{
+    "Mesh": {
+	"MeshID": "cube20",
+	"InitElem": 2201
+    },
+    "Session": {
+	"Photons":  30000000,
+	"Seed":     27182818,
+	"ID":       "vartest",
+	"Checkpoints": [10000,100000,1000000,10000000]
+    },
+    "Forward": {
+	"T0": 0.0e+00,
+	"T1": 5.0e-09,
+	"Dt": 5.0e-09
+    },
+    "Optode": {
+	"Source": {
+	    "Pos": [10.1, 10.2, 0.0],
+	    "Dir": [0.0, 0.0, 1.0]
+	}
+    }
+}

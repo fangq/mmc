@@ -23,6 +23,7 @@
 
 #include <stdlib.h>
 #include "simpmesh.h"
+#include <string.h>
 
 #ifdef WIN32
          char pathsep='\\';
@@ -493,6 +494,23 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
     dir->y=p.y;
     dir->z=p.z;
     return nextslen;
+}
+
+void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
+	char sess[MAX_SESSION_LENGTH];
+	int i,found=0;
+	for(i=0;i<MAX_CHECKPOINT;i++){
+           if(cfg->checkpt[i]==0)  return;
+	   if(id==cfg->checkpt[i]) {
+		found=1;
+		break;
+	   }
+	}
+        if(!found) return;
+	memcpy(sess,cfg->session,MAX_SESSION_LENGTH);
+	sprintf(cfg->session,"%s_%d",sess,id);
+	mesh_saveweight(mesh,cfg);
+	memcpy(cfg->session,sess,MAX_SESSION_LENGTH);
 }
 
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){

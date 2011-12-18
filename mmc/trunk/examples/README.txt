@@ -18,9 +18,8 @@ examples/
 |-reftest    - debugging flag show case 2, simple mesh with reflection
 |-rngtest    - random number generator test
 |-dcs        - validation of momentum transfer in DCS simulation
+|-statnoise  - test statistical noise against launched photon numbers
 |-misctest   - other misc. tests
-|-mouse      - legacy example
-|-sphbox     - legacy example
 
 A complex human brain atlas mesh, i.e. Fig. 4 in [Fang2010], can 
 be downloaded separately at the following URL:

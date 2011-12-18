@@ -104,6 +104,8 @@ int main(int argc, char**argv){
 
 		if((cfg.debuglevel & dlProgress) && threadid==0)
 			mcx_progressbar(ncomplete,&cfg);
+		if(cfg.issave2pt && cfg.checkpt[0])
+			mesh_saveweightat(&mesh,&cfg,i+1);
 	}
 	if(cfg.issavedet){
 	    #pragma omp atomic
