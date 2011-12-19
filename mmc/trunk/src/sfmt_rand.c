@@ -37,7 +37,7 @@ __device__ void sfmt_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
      ini[0]=n_seed[0];
      ini[1]=(INIT_MULT * (n_seed[0] ^ (n_seed[0] >> 30)) + idx);
      init_by_array(ini, 2);
-     #progma omp critical
+     #pragma omp critical
      {
         fill_array32(t,RAND_BUF_LEN);
      }
@@ -46,7 +46,7 @@ __device__ void sfmt_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
     static __thread unsigned int pos;
     if(pos>=RAND_BUF_LEN) {
-        #progma omp critical
+        #pragma omp critical
 	{
 	    fill_array32(t,RAND_BUF_LEN);
 	}

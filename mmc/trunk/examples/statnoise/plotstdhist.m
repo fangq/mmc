@@ -10,20 +10,18 @@ for i=1:length(chpt)
       end
 end
 
-data=log10(data);
-%chpt=sqrt(chpt);
+%data=log10(data);
+chpt=sqrt(chpt);
 
-idx=find(ismember(no,[10 10 0],'rows'));
-loglog(chpt,[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))],'bo-');
-hold on;
-idx=find(ismember(no,[10 10 5],'rows'));
-loglog(chpt,[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))],'ro-');
-idx=find(ismember(no,[10 10 10],'rows'));
-loglog(chpt,[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))],'ko-');
-idx=find(ismember(no,[10 10 15],'rows'));
-loglog(chpt,[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))],'co-');
-idx=find(ismember(no,[10 5 5],'rows'));
-loglog(chpt,[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))],'bo:');
-idx=find(ismember(no,[10 5 10],'rows'));
-loglog(chpt,[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))],'ro:');
+figure; hold on;
+sty={'bo-','ro-','ko-','co-','bo:','ro:'};
+pos=[10 10 0;10 10 5;10 10 10;10 10 15;10 5 5;10 5 10];
 
+% plot trial numbers with Coefficient of Variation (100*std/mean)
+
+for i=1:size(pos,1)
+	idx=find(ismember(no,pos(i,:),'rows'));
+	plot(chpt,100*[std(data(1,:,idx)),std(data(2,:,idx)),std(data(3,:,idx)),std(data(4,:,idx))]./chpt ... % standard error
+                    ./[mean(data(1,:,idx)),mean(data(2,:,idx)),mean(data(3,:,idx)),mean(data(4,:,idx))],sty{i});
+end
+hold off;
