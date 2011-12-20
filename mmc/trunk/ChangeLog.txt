@@ -5,9 +5,11 @@ Change Log
 2011/12/19 final release of 0.9.0
 2011/12/19 fix a critical bug in the Havel ray-tracer, all SSE4 binaries are effected
 2011/12/15 make nphoton unsigned int, maximum photon number is 2^32-1
+2011/11/02 print unit and line number during error handling
+2011/11/01 accept JSON-formatted input files
 2011/10/14 Stefan Carp contributed a patch and validation package for DCS simulations
 2011/10/12 fix a bug in writing mch file under Windows
-2011/08/24 fix an sfmt bug when initializing rng seed in multi-threads
+2011/08/24 fix an SFMT bug when initializing RNG seeds in multiple parallel threads
 
 
 == MMC 0.8.0 (Snow Cone) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==

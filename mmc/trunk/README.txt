@@ -3,9 +3,10 @@
 =                     Multi-threaded Edition with SSE4                        =
 ===============================================================================
 
-Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+Author:  Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
 Version: 0.9.0 (Banana Pudding)
+URL:     http://mcx.sf.net/mmc/
 
 -------------------------------------------------------------------------------
 
@@ -113,6 +114,7 @@ folder. Other "make" options include
 
   make omp      # this compiles a multi-threaded binary using OpenMP
   make prof     # this makes a binary to produce profiling info for gprof
+  make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
   make ssemath  # this uses SSE4 for both vector operations and math functions
   make          # this produces an non-optimized binary with debugging symbols
 
@@ -150,6 +152,9 @@ $PATH environment variable. Detailed instructions can be found at [5].
 
 III. Running Simulations
 
+
+3.1 Preparation
+
 Before you create/run your own MMC simulations, we suggest you
 first understanding all the examples under the mmc/example 
 directory, checking out the formats of the input files and the 
@@ -169,6 +174,9 @@ orientations. If you choose not to use savemmcmesh, you
 MUST call the "meshreorient" function in iso2mesh to test 
 the "elem" array and make sure all elements are oriented in the 
 same direction. Otherwise, MMC will give incorrect results.
+
+
+3.2 Command line options
 
 The full command line options of MMC include the following:
 <pre>
@@ -216,6 +224,9 @@ example:
        mmc -n 1000000 -f input.inp -s test -b 0 -D TP
 </pre>
 
+
+3.3 Input files
+
 The simplest example can be found under the "example/onecube" 
 folder. Please run "createmesh.m" first from Matlab/Octave to 
 create all the mesh files, which include
@@ -237,11 +248,10 @@ a similar format as in MCX, which looks like the following
  0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
  onecube              # mesh id: name stub to all mesh files
  3                    # index of element (starting from 1) which encloses the source
- 4       1.0          # detector number and radius (mm)
- 30.0    20.0    1.0  # detector 1 position (mm)
- 30.0    40.0    1.0  # ...
- 20.0    30.0    1.0
- 40.0    30.0    1.0
+ 3       1.0          # detector number and radius (mm)
+ 2.0     6.0    0.0   # detector 1 position (mm)
+ 2.0     4.0    0.0   # ...
+ 2.0     2.0    0.0
 
 The mesh files are linked through the "mesh id" (a name stub) with a 
 format of {node|elem|facenb|velem}_meshid.dat. All mesh files must 
@@ -272,6 +282,100 @@ example/validation and example/meshtest folders, where you
 can find "createmesh" scripts and post-processing script to make
 plots from the simulation results.
 
+
+3.4 JSON-formatted input files
+
+Starting from version 0.9, MMC accepts a JSON-formatted input file in
+addition to the conventional tMCimg-like input format. JSON 
+(JavaScript Object Notation) is a portable, human-readable and 
+"fat-free" text format to represent complex and hierarchical data.
+Using the JSON format makes a input file self-explanatory, extensible
+and easy-to-interface with other applications (like MATLAB).
+
+A sample JSON input file can be found under the examples/onecube
+folder. The same file, onecube.json, is also shown below:
+
+ {
+    "Mesh": {
+	"MeshID": "onecube",
+	"InitElem": 3
+    },
+    "Session": {
+	"Photons":  100,
+	"Seed":     17182818,
+	"ID":       "onecube"
+    },
+    "Forward": {
+	"T0": 0.0e+00,
+	"T1": 5.0e-09,
+	"Dt": 5.0e-10
+    },
+    "Optode": {
+	"Source": {
+	    "Pos": [2.0, 8.0, 0.0],
+	    "Dir": [0.0, 0.0, 1.0]
+	},
+	"Detector": [
+	    {
+		"Pos": [2.0, 6.0, 0.0],
+		"R": 1.0
+	    },
+            {
+                "Pos": [2.0, 4.0, 0.0],
+                "R": 1.0
+            },
+            {
+                "Pos": [2.0, 2.0, 0.0],
+                "R": 1.0
+            }
+	]
+    }
+ }
+
+A JSON input file requires 4 root objects, namely "Mesh", "Session", "Forward" 
+and "Optode". Each object is a data structure providing information
+as indicated by its name. Each object can contain various sub-fields. 
+The orders of the fields in the same level are flexible. For each field, 
+you can always find the equivalent fields in the *.inp input files. 
+For example, The "MeshID" field under the "Mesh" object 
+is the same as Line#6 in onecube.inp; the "InitElem" under "Mesh" is
+the same as Line#7; the "Forward.T0" is the same as the first number 
+in Line#5, etc.
+
+An MMC JSON input file must be a valid JSON text file. You can validate
+your input file by running a JSON validator, for example http://jsonlint.com/
+You should always use "..." to quote a "name" and separate parallel
+items by ",".
+
+MMC accepts an alternative form of JSON input, but using it is not 
+recommended. In the alternative format, you can use 
+ "rootobj_name.field_name": value 
+to represent any parameter directly in the root level. For example
+
+ {
+    "Mesh.MeshID": "onecube",
+    "Session.ID": "onecube",
+    ...
+ }
+
+You can even mix the alternative format with the standard format. 
+If any input parameter has values in both formats in a single input 
+file, the standard-formatted value has higher priority.
+
+To invoke the JSON-formatted input file in your simulations, you 
+can use the "-f" command line option with MMC, just like using an 
+.inp file. For example:
+
+  ../../src/bin/mmc -n 20 -f onecube.json -s onecubejson -D M
+
+The input file must have a ".json" suffix in order for MMC to 
+recognize. If the input information is set in both command line,
+and input file, the command line value has higher priority
+(this is the same for .inp input files). For example, when 
+using "-n 20", the value set in "Session"/"Photons" is overwritten 
+to 20; when using "-s onecubejson", the "Session"/"ID" value is modified.
+If your JSON input file is invalid, MMC will quit and point out
+where it expects you to double check.
 
 -------------------------------------------------------------------------------
 

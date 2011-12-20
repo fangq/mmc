@@ -81,7 +81,6 @@ __device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_L
 __device__ void logistic_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
      int i;
      uint seed=*n_seed;
-printf("%u\n",*n_seed);
      seed=(uint) ((INIT_MULT * (seed ^ (seed >> 30)) + idx));
      for(i=0;i<RAND_BUF_LEN;i++){
 	seed=(uint) ((INIT_MULT * (seed ^ (seed >> 30)) + i));

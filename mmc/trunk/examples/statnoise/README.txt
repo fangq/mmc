@@ -22,7 +22,7 @@ with a text editor and replace the number after "InitElem".
 for 10 repetitions and save fluence maps for 1E4, 1E5, 1E6 and 1E7 photons.
 
 4. When all simulations complete, you start matlab again, and 
-run plotstdhist to generate a plot between signal standard deviation
+run plotstdhist.m to generate a plot between signal standard error
 and photon number.
 
 
