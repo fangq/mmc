@@ -458,7 +458,7 @@ found from this link:
 
 -------------------------------------------------------------------------------
 
-VIII.  Acknowledgement
+VII.  Acknowledgement
 
 MMC uses the following open-source libraries:
 
