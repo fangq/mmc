@@ -31,7 +31,7 @@ __device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]){
 // generate [0,1] random number for the sin/cos of arimuthal angles
 __device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co){
     static __thread V4SF sine[MATH_BLOCK], cosine[MATH_BLOCK];
-    static __thread int pos=MATH_BLOCK+1;
+    static __thread int pos=(MATH_BLOCK<<2);
     if(pos>=(MATH_BLOCK<<2)){
     	V4SF ran[MATH_BLOCK];
 	int i,j;
@@ -48,7 +48,7 @@ __device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, floa
 // generate [0,1] random number for the next scattering length
 __device__ float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]){
     static __thread V4SF logval[MATH_BLOCK];
-    static __thread int pos=MATH_BLOCK+1;
+    static __thread int pos=(MATH_BLOCK<<2);
     float res;
     if(pos>=(MATH_BLOCK<<2)){
     	V4SF ran[MATH_BLOCK];
