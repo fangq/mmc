@@ -58,7 +58,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
 const char outputtype[]={'x','f','e','\0'};
-const char *srctypeid[]={"pencil","cone","gaussian",""};
+const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
@@ -248,6 +248,17 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
               cfg->srcdir.x=subitem->child->valuedouble;
               cfg->srcdir.y=subitem->child->next->valuedouble;
               cfg->srcdir.z=subitem->child->next->next->valuedouble;
+           }
+           subitem=FIND_JSON_OBJ("Type","Optode.Source.Type",src);
+           if(subitem){
+              cfg->srctype=mcx_getsrcid(subitem->valuestring);
+           }
+           subitem=FIND_JSON_OBJ("Param","Optode.Source.Param",src);
+           if(subitem && cJSON_GetArraySize(subitem)==4){
+              cfg->srcparam.x=subitem->child->valuedouble;
+              cfg->srcparam.y=subitem->child->next->valuedouble;
+              cfg->srcparam.z=subitem->child->next->next->valuedouble;
+              cfg->srcparam.w=subitem->child->next->next->next->valuedouble;
            }
         }
         dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);

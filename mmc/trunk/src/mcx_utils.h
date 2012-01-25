@@ -50,7 +50,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
                   dlProgress=2048,dlExit=4096};
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
-enum TSrcType {stPencil, stCone, stGaussian};
+enum TSrcType {stPencil, stIsotropic, stCone, stGaussian};
 enum TOutputType {otFlux, otFluence, otEnergy};
 
 

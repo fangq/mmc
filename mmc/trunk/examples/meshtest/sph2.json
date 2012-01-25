@@ -5,7 +5,7 @@
     },
     "Session": {
 	"Photons":  1000000,
-	"Seed":     27182820,
+	"RNGSeed":  27182820,
 	"ID":       "sph2"
     },
     "Forward": {

@@ -674,9 +674,13 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
 
 	/*initialize the photon parameters*/
-	r.slen=rand_next_scatlen(ran);
-	
-	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout){
+	if(cfg->srctype==stIsotropic){
+		r.slen=mc_next_scatter(0,&r.vec,ran,ran0,cfg,r.partialpath+mesh->prop+mesh->type[r.eid-1]);
+	}else{
+		r.slen=rand_next_scatlen(ran);
+	}
+
+	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout && cfg->srctype==stPencil){
 	    float Rspecular=reflectray(cfg,&r.vec,tracer,&r.eid,&r.eid,faceorder[r.faceid],ran);
 	    if(Rspecular<1.f)
 	       r.weight*=(1.f-Rspecular);
