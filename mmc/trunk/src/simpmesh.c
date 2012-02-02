@@ -523,6 +523,14 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         else
                 sprintf(fweight,"%s.dat",cfg->session);
 
+        if(cfg->outputformat==ofBin){
+		if((fp=fopen(fweight,"wb"))==NULL)
+         	        mesh_error("can not open weight file to write");
+		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),mesh->nn*cfg->maxgate,fp)!=mesh->nn*cfg->maxgate)
+			mesh_error("fail to write binary weight file");
+		fclose(fp);
+		return;
+	}
 	if((fp=fopen(fweight,"wt"))==NULL){
 		mesh_error("can not open weight file to write");
 	}

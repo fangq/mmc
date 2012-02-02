@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','\0'};
+                 'i','V','O','m','F','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -53,11 +53,12 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
-                 "--momentum",""};
+                 "--momentum","--outputformat",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
 const char outputtype[]={'x','f','e','\0'};
+const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
 void mcx_initcfg(mcconfig *cfg){
@@ -102,6 +103,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->srctype=0;
      cfg->isspecular=0;
      cfg->outputtype=otFlux;
+     cfg->outputformat=ofASCII;
      cfg->ismomentum=0;
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
@@ -251,7 +253,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
            }
            subitem=FIND_JSON_OBJ("Type","Optode.Source.Type",src);
            if(subitem){
-              cfg->srctype=mcx_getsrcid(subitem->valuestring);
+              cfg->srctype=mcx_keylookup(subitem->valuestring,srctypeid);
            }
            subitem=FIND_JSON_OBJ("Param","Optode.Source.Param",src);
            if(subitem && cJSON_GetArraySize(subitem)==4){
@@ -301,6 +303,9 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         if(!cfg->isspecular)  cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
         if(!cfg->ismomentum)  cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
         if(cfg->basisorder)   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
+        if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup(FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
+        if(cfg->outputformat<0)
+		MMC_ERROR(-2,"the specified output format is not recognized");
 
         if(cfg->debuglevel==0)
            cfg->debuglevel=mcx_parsedebugopt(FIND_JSON_KEY("DebugFlag","Session.DebugFlag",Session,"",valuestring));
@@ -433,7 +438,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      if(in==stdin)
      	fprintf(stdout,"Please specify the source type[pencil|cone|gaussian]:\n\t");
      if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
-        srctype=mcx_getsrcid(strtypestr);
+        srctype=mcx_keylookup(strtypestr,srctypeid);
 	if(srctype==-1)
 	   MMC_ERROR(-6,"the specified source type is not supported");
         if(srctype>0){
@@ -574,15 +579,15 @@ int mcx_lookupindex(char *key, const char *index){
     }
     return 1;
 }
-int mcx_getsrcid(char *srctype){
+int mcx_keylookup(char *key, const char *table[]){
     int i=0;
-    while(srctype[i]){
-        srctype[i]=tolower(srctype[i]);
+    while(key[i]){
+        key[i]=tolower(key[i]);
 	i++;
     }
     i=0;
-    while(srctypeid[i]!='\0'){
-	if(strcmp(srctype,srctypeid[i])==0){
+    while(table[i]!='\0'){
+	if(strcmp(key,table[i])==0){
 		return i;
 	}
 	i++;
@@ -673,6 +678,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'E':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->seed),"int");
 		     	        break;
+                     case 'F':
+                                if(i>=argc)
+                                        MMC_ERROR(-1,"incomplete input");
+                                if((cfg->outputformat=mcx_keylookup(argv[++i], outputformat))<0)
+                                        MMC_ERROR(-2,"the specified output data type is not recognized");
+                                break;
                      case 'O':
                                 i=mcx_readarg(argc,argv,i,&(cfg->outputtype),"char");
 				if(mcx_lookupindex(&(cfg->outputtype), outputtype)){
@@ -758,6 +769,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -O [X|XFE]    (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
+ -F type       (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
