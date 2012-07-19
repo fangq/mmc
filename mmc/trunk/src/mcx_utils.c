@@ -769,7 +769,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -O [X|XFE]    (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
- -F type       (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
+ -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\

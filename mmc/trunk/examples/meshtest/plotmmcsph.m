@@ -57,11 +57,11 @@ ycirc=ycirc(1,:)+30;
 %%-----------------------------------------------------------------
 %% plot sphere 1
 %%-----------------------------------------------------------------
-node1=readmmcnode('node_sph1.dat');  
-elem1=readmmcelem('elem_sph1.dat');
-load sph1.dat
-sph1=reshape(sph1(:,end),[size(node1,1),length(sph1)/size(node1,1)]);
-s1=sum(sph1,2)*dt;
+node1=readmmcnode('node_mesh0.dat');  
+elem1=readmmcelem('elem_mesh0.dat');
+load mesh0.dat
+mesh0=reshape(mesh0(:,end),[size(node1,1),length(mesh0)/size(node1,1)]);
+s1=sum(mesh0,2)*dt;
 [cutpos,cutvalue,facedata]=qmeshcut(elem1(:,1:4),node1,s1,[0 30 0; 0 30 1; 1 30 0]);
 %patch('Vertices',cutpos,'Faces',facedata,'FaceVertexCData',log10(cutvalue),'FaceColor','interp','linestyle','none');
 %view([0 1 0])
@@ -85,17 +85,17 @@ legend('Diffusion','MCX','MMCM')
 legend boxoff;
 box on;
 set(gcf,'PaperPositionMode','auto');
-print -depsc2 sph1.eps
+print -depsc2 mesh0.eps
 
 %%-----------------------------------------------------------------
 %% plot sphere 2
 %%-----------------------------------------------------------------
 
-node2=readmmcnode('node_sph2.dat');						    
-elem2=readmmcelem('elem_sph2.dat');										    
-load sph2.dat
-sph2=reshape(sph2(:,end),[size(node2,1),length(sph2)/size(node2,1)]);
-s2=sum(sph2,2)*dt;
+node2=readmmcnode('node_mesh1.dat');						    
+elem2=readmmcelem('elem_mesh1.dat');										    
+load mesh1.dat
+mesh1=reshape(mesh1(:,end),[size(node2,1),length(mesh1)/size(node2,1)]);
+s2=sum(mesh1,2)*dt;
 [cutpos,cutvalue,facedata]=qmeshcut(elem2(:,1:4),node2,s2,[0 30 0; 0 30 1; 1 30 0]);
 %patch('Vertices',cutpos,'Faces',facedata,'FaceVertexCData',log10(cutvalue),'FaceColor','interp','linestyle','none');
 %view([0 1 0])
@@ -118,17 +118,17 @@ legend('Diffusion','MCX','MMCM')
 legend boxoff;
 box on;
 set(gcf,'PaperPositionMode','auto');
-print -depsc2 sph2.eps
+print -depsc2 mesh1.eps
 
 %%-----------------------------------------------------------------
 %% plot sphere 3
 %%-----------------------------------------------------------------
 
-node3=readmmcnode('node_sph3.dat');
-elem3=readmmcelem('elem_sph3.dat');
-load sph3.dat
-sph3=reshape(sph3(:,end),[size(node3,1),length(sph3)/size(node3,1)]);
-s3=sum(sph3,2)*dt;
+node3=readmmcnode('node_mesh2.dat');
+elem3=readmmcelem('elem_mesh2.dat');
+load mesh2.dat
+mesh2=reshape(mesh2(:,end),[size(node3,1),length(mesh2)/size(node3,1)]);
+s3=sum(mesh2,2)*dt;
 [cutpos,cutvalue,facedata]=qmeshcut(elem3(:,1:4),node3,s3,[0 29 0; 0 29 1; 1 29 0]);
 
 vi=griddata(cutpos(:,1),cutpos(:,3),cutvalue,xi,yi);
@@ -153,5 +153,5 @@ legend boxoff;
 box on;
 
 set(gcf,'PaperPositionMode','auto');
-print -depsc2 sph3.eps
+print -depsc2 mesh2.eps
 

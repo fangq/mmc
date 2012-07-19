@@ -16,10 +16,10 @@ been done, the result for plane y=30 is saved in the
 sphdiffsemiinf.mat file).
 
 To validate MMCM, we generate an FE-mesh for the sphere and the cube.
-Three meshes are tested: sph1: a coarse FE mesh with only 10,000 nodes,
-sph2: a uniform dense FE mesh with 60000 nodes, and sph3: a mesh
+Three meshes are tested: mesh0: a coarse FE mesh with only 10,000 nodes,
+mesh1: a uniform dense FE mesh with 60000 nodes, and mesh2: a mesh
 with higher density around the sphere surface and near the source.
-The case sph2 and sph3 correspond to "MMCM Mesh 1" and "MMCM Mesh 2"
+The case mesh1 and mesh2 correspond to "MMCM Mesh 1" and "MMCM Mesh 2"
 in the paper (Table 1), respectively.
 
 == Steps ==
