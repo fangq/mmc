@@ -178,7 +178,14 @@ int  mcx_parsedebugopt(char *debugopt);
 void mcx_progressbar(unsigned int n, mcconfig *cfg);
 int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 
-#ifdef	__cplusplus
+#ifdef MCX_CONTAINER
+#ifdef __cplusplus
+extern "C"
+#endif
+ int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+#endif
+
+#ifdef  __cplusplus
 }
 #endif
 

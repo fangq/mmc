@@ -92,7 +92,9 @@ typedef struct MMC_raytracer{
 	float3 *m;    /**< precomputed data: for Pluckers, this is moment */
 	float3 *n;    /**< precomputed data: for Pluckers, face norm */
 } raytracer;
-
+#ifdef	__cplusplus
+extern "C" {
+#endif
 void mesh_init(tetmesh *mesh);
 void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg);
@@ -116,6 +118,16 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg);
 void tracer_clear(raytracer *tracer);
 
 float mc_next_scatter(float g, float3 *dir,RandType *ran,RandType *ran0,mcconfig *cfg,float *pmom);
+#ifdef MCX_CONTAINER
+#ifdef __cplusplus
+extern "C"
+#endif
+ int mcx_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+#endif
+
+#ifdef	__cplusplus
+}
+#endif
 
 static inline void vec_add(float3 *a,float3 *b,float3 *res){
 	res->x=a->x+b->x;

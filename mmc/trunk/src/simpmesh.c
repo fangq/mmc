@@ -61,7 +61,11 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
 
 void mesh_error(char *msg){
 	fprintf(stderr,"%s\n",msg);
-	exit(1);
+#ifdef MCX_CONTAINER
+        mmc_throw_exception(1,msg,__FILE__,__LINE__);
+#else
+        exit(1);
+#endif
 }
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
@@ -127,8 +131,6 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
 			mesh_error("property file has wrong format");
 		mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);
-		/*user input musp, MMCM converts to mus
-		mesh->med[i].mus=musp/(1.f-mesh->med[i].g); */
 	}
 	fclose(fp);
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/

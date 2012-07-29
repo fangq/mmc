@@ -44,6 +44,8 @@ MKDIR      := mkdir
 DOXY       := doxygen
 DOCDIR     := $(MMCDIR)/doc
 
+DLLFLAG=-fPIC
+
 ifeq ($(CC),icc)
 	OPENMP   := -openmp
 	FASTMATH :=
@@ -63,14 +65,24 @@ TARGETSUFFIX:=$(suffix $(BINARY))
 
 release:   CCFLAGS+= -O3
 sse ssemath:       CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
-sse ssemath omp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+sse ssemath omp mex oct:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
+mex oct:           ARFLAGS+= -lgomp $(FASTMATH)
 ssemath:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
-dp dpomp:  CCFLAGS+= -mdouble-float -O3
-dpomp:     CCFLAGS+= $(OPENMP)
-dpomp:     ARFLAGS+= $(OPENMP) 
+
+mex oct:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER -O3
+mex oct:   CPPFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex:       AR=mex
+mex:       BINDIR=../mmclab
+mex:       BINARY:=$(BINARY)lab
+mex:       ARFLAGS+=mmclab.cpp -cxx -outdir $(BINDIR) -I$(INCLUDEDIR)
+
+oct:       AR=mkoctfile
+oct:       BINARY:=$(BINARY)lab.mex
+oct:       ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
+
 
 ifeq ($(TARGETSUFFIX),.so)
 	CCFLAGS+= -fPIC 
@@ -84,7 +96,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release sse ssemath prof omp dp icc: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp mex oct: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
@@ -116,7 +128,7 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 ##  Link  ##
 $(BINDIR)/$(BINARY): makedirs $(OBJS)
 	@$(ECHO) Building $@
-	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS)
+	$(AR) $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS)
 
 ##  Documentation  ##
 doc: makedocdir
