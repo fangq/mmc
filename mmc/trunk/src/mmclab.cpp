@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <exception>
 
 #include "mex.h"
 #include "simpmesh.h"
@@ -27,6 +28,7 @@
                                  printf("mmc.%s=[%g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z));}
 #define ABS(a)    ((a)<0?-(a):(a))
 #define MAX(a,b)  ((a)>(b)?(a):(b))
+#define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh);
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh);
@@ -35,7 +37,7 @@ void mmclab_usage();
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
-  raytracer tracer;
+  raytracer tracer={NULL,0,NULL,NULL,NULL};
   visitor master={0.f,0.f,0,0,NULL};
   double Eabsorb=0.0;
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
@@ -56,7 +58,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   }
   printf("Launching MMCLAB - Mesh-based Monte Carlo for MATLAB & GNU Octave ...\n");
   if (!mxIsStruct(prhs[0]))
-     mexErrMsgTxt("Input must be a structure.");
+     MEXERROR("Input must be a structure.");
 
   nfields = mxGetNumberOfFields(prhs[0]);
   ncfg = mxGetNumberOfElements(prhs[0]);
@@ -69,118 +71,143 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
     printf("Running simulations for configuration #%d ...\n", jstruct+1);
 
-    t0=StartTimer();
-    mcx_initcfg(&cfg);
-    MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
-    mesh_init(&mesh);
+    try{
+	t0=StartTimer();
+	mcx_initcfg(&cfg);
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
+	mesh_init(&mesh);
 
-    for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
-        tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
-	if (tmp == NULL) {
-		continue;
+	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
+            tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
+	    if (tmp == NULL) {
+		    continue;
+	    }
+	    mmc_set_field(prhs[0],tmp,ifield,&cfg,&mesh);
 	}
-	mmc_set_field(prhs[0],tmp,ifield,&cfg,&mesh);
-    }
-    mexEvalString("pause(.001);");
-    cfg.issave2pt=(nlhs>=1);
-    cfg.issavedet=(nlhs>=2);
+	mexEvalString("pause(.001);");
+	cfg.issave2pt=(nlhs>=1);
+	cfg.issavedet=(nlhs>=2);
 
-    mmc_validate_config(&cfg,&mesh);
+	mmc_validate_config(&cfg,&mesh);
 
-    tracer_init(&tracer,&mesh,cfg.method);
-    tracer_prep(&tracer,&cfg);
+	tracer_init(&tracer,&mesh,cfg.method);
+	tracer_prep(&tracer,&cfg);
 
-    MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
 
-/** \subsection ssimu Parallel photon transport simulation */
+    /** \subsection ssimu Parallel photon transport simulation */
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-    visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
-    int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
-    if(cfg.issavedet) 
-	visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
-#ifdef _OPENMP
-    threadid=omp_get_thread_num();	
-#endif
-    rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
+	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
+	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2, oldprog=0;
+	if(cfg.issavedet) 
+	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
+    #ifdef _OPENMP
+	threadid=omp_get_thread_num();	
+    #endif
+	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
-    /*launch photons*/
-    #pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
-    for(i=0;i<cfg.nphoton;i++){
-	    visit.raytet=0.f;
-	    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
-	    raytri+=visit.raytet;
-	    #pragma omp atomic
-	       ncomplete++;
+	/*launch photons*/
+	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
+	for(i=0;i<cfg.nphoton;i++){
+		visit.raytet=0.f;
+		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
+		raytri+=visit.raytet;
+		#pragma omp atomic
+		   ncomplete++;
 
-	    if((cfg.debuglevel & dlProgress) && threadid==0)
-		    mcx_progressbar(ncomplete,&cfg);
-	    if(cfg.issave2pt && cfg.checkpt[0])
-		    mesh_saveweightat(&mesh,&cfg,i+1);
-    }
-    if(cfg.issavedet){
-	#pragma omp atomic
-	    master.detcount+=visit.bufpos;
-        #pragma omp barrier
-	if(threadid==0){
-	    if(nlhs>=2){
-	        fielddim[0]=master.detcount*buflen; fielddim[1]=0; fielddim[2]=0; fielddim[3]=0; 
-    		mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(4,fielddim,mxSINGLE_CLASS,mxREAL));
-		master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
-	    }else
-	        master.partialpath=(float*)calloc(master.detcount*buflen,sizeof(float));
+		if((cfg.debuglevel & dlProgress) && threadid==0)
+                        mcx_progressbar(ncomplete,&cfg);
+		if(cfg.issave2pt && cfg.checkpt[0])
+			mesh_saveweightat(&mesh,&cfg,i+1);
 	}
-        #pragma omp barrier
-        #pragma omp critical
-        {
-	    memcpy(master.partialpath+master.bufpos*buflen,
-		   visit.partialpath,visit.bufpos*buflen*sizeof(float));
-	    master.bufpos+=visit.bufpos;
-        }
-        #pragma omp barrier
-	free(visit.partialpath);
-    }
+	if(cfg.issavedet){
+	    #pragma omp atomic
+		master.detcount+=visit.bufpos;
+            #pragma omp barrier
+	    if(threadid==0){
+		if(nlhs>=2){
+	            fielddim[0]=master.detcount*buflen; fielddim[1]=0; fielddim[2]=0; fielddim[3]=0; 
+    		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(4,fielddim,mxSINGLE_CLASS,mxREAL));
+		    master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+		}else
+	            master.partialpath=(float*)calloc(master.detcount*buflen,sizeof(float));
+	    }
+            #pragma omp barrier
+            #pragma omp critical
+            {
+		memcpy(master.partialpath+master.bufpos*buflen,
+		       visit.partialpath,visit.bufpos*buflen*sizeof(float));
+		master.bufpos+=visit.bufpos;
+            }
+            #pragma omp barrier
+	    free(visit.partialpath);
+            visit.partialpath=NULL;
+	}
 }
 
-    /** \subsection sreport Post simulation */
+	/** \subsection sreport Post simulation */
 
-    if((cfg.debuglevel & dlProgress))
-	    mcx_progressbar(cfg.nphoton,&cfg);
+	if((cfg.debuglevel & dlProgress))
+		mcx_progressbar(cfg.nphoton,&cfg);
 
-    dt=GetTimeMillis()-t0;
-    MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
-    MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-    MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests\n",raytri));
+	dt=GetTimeMillis()-t0;
+	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests\n",raytri));
 
-    tracer_clear(&tracer);
-    if(cfg.isnormalized && cfg.nphoton){
-      fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-	    cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
-    }
-    if(cfg.issavedet && master.partialpath)
-	    free(master.partialpath);
-
-    MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
-
-    if(nlhs>=1){
-    	if(!cfg.basisorder)
-	    fielddim[0]=mesh.ne*cfg.maxgate; 
-	else
-	    fielddim[0]=mesh.nn*cfg.maxgate; 
-	fielddim[1]=0; fielddim[2]=0; fielddim[3]=0; 
-    	mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(1,fielddim,mxDOUBLE_CLASS,mxREAL));
-	double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
-	memcpy(output,mesh.weight,fielddim[0]*sizeof(double));
-    }
-    if(nlhs>=2){
-        fielddim[0]=(mesh.prop+1); fielddim[1]=cfg.his.savedphoton;
-	fielddim[2]=0; fielddim[3]=0;
-	if(cfg.his.savedphoton>0){
-		mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
-		memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0)),master.partialpath,
-		     fielddim[0]*fielddim[1]*sizeof(float));
+	tracer_clear(&tracer);
+	if(cfg.isnormalized && cfg.nphoton){
+	  fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
+	if(cfg.issavedet && master.partialpath){
+		free(master.partialpath);
+        	master.partialpath=NULL;
+	}
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
+
+	if(nlhs>=1){
+    	    if(!cfg.basisorder)
+		fielddim[0]=mesh.ne*cfg.maxgate; 
+	    else
+		fielddim[0]=mesh.nn*cfg.maxgate; 
+	    fielddim[1]=0; fielddim[2]=0; fielddim[3]=0; 
+    	    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(1,fielddim,mxDOUBLE_CLASS,mxREAL));
+	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
+	    memcpy(output,mesh.weight,fielddim[0]*sizeof(double));
+	}
+	if(nlhs>=2){
+            fielddim[0]=(mesh.prop+1); fielddim[1]=cfg.his.savedphoton;
+	    fielddim[2]=0; fielddim[3]=0;
+	    if(cfg.his.savedphoton>0){
+		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+		    memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0)),master.partialpath,
+			 fielddim[0]*fielddim[1]*sizeof(float));
+	    }
+	}
+    }catch(const char *err){
+      tracer_clear(&tracer);
+      if(master.partialpath){
+         free(master.partialpath);
+	 master.partialpath=NULL;
+      }
+      mexPrintf("Error: %s\n",err);
+    }catch(const std::exception &err){
+      tracer_clear(&tracer);
+      if(master.partialpath){
+         free(master.partialpath);
+	 master.partialpath=NULL;
+      }
+      mexPrintf("C++ Error: %s\n",err.what());
+    }catch(...){
+      tracer_clear(&tracer);
+      if(master.partialpath){
+         free(master.partialpath);
+	 master.partialpath=NULL;
+      }
+      mexPrintf("Unknown Exception");
     }
 
     /** \subsection sclean End the simulation */
@@ -226,7 +253,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"node")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]!=3)
-            mexErrMsgTxt("the 'node' field must have 3 columns (x,y,z)");
+            MEXERROR("the 'node' field must have 3 columns (x,y,z)");
         double *val=mxGetPr(item);
         mesh->nn=arraydim[0];
 	if(mesh->node) free(mesh->node);
@@ -238,7 +265,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]!=4)
-            mexErrMsgTxt("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
+            MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
         double *val=mxGetPr(item);
         mesh->ne=arraydim[0];
 	if(mesh->elem) free(mesh->elem);
@@ -250,7 +277,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
-            mexErrMsgTxt("the 'elemprop' field can not be empty");
+            MEXERROR("the 'elemprop' field can not be empty");
         double *val=mxGetPr(item);
         mesh->ne=MAX(arraydim[0],arraydim[1]);
 	if(mesh->type) free(mesh->type);
@@ -261,7 +288,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"facenb")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]!=4)
-            mexErrMsgTxt("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
+            MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
         double *val=mxGetPr(item);
         mesh->ne=arraydim[0];
 	if(mesh->facenb) free(mesh->facenb);
@@ -273,7 +300,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"evol")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
-            mexErrMsgTxt("the 'evol' field can not be empty");
+            MEXERROR("the 'evol' field can not be empty");
         double *val=mxGetPr(item);
         mesh->ne=MAX(arraydim[0],arraydim[1]);
 	if(mesh->evol) free(mesh->evol);
@@ -284,7 +311,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"detpos")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]>0 && arraydim[1]!=4)
-            mexErrMsgTxt("the 'detpos' field must have 4 columns (x,y,z,radius)");
+            MEXERROR("the 'detpos' field must have 4 columns (x,y,z,radius)");
         double *val=mxGetPr(item);
         cfg->detnum=arraydim[0];
 	if(cfg->detpos) free(cfg->detpos);
@@ -296,7 +323,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"prop")==0){
         arraydim=mxGetDimensions(item);
         if(arraydim[0]>0 && arraydim[1]!=4)
-            mexErrMsgTxt("the 'prop' field must have 4 columns (mua,mus,g,n)");
+            MEXERROR("the 'prop' field must have 4 columns (mua,mus,g,n)");
         double *val=mxGetPr(item);
         mesh->prop=arraydim[0]-1;
         if(mesh->med) free(mesh->med);
@@ -314,21 +341,21 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         int len=mxGetNumberOfElements(item);
 	char buf[MAX_SESSION_LENGTH];
         if(!mxIsChar(item) || len==0)
-             mexErrMsgTxt("the 'debuglevel' field must be a non-empty string");
+             MEXERROR("the 'debuglevel' field must be a non-empty string");
 	if(len>MAX_SESSION_LENGTH)
-	     mexErrMsgTxt("the 'session' field is too long");
+	     MEXERROR("the 'debuglevel' field is too long");
         int status = mxGetString(item, buf, MAX_SESSION_LENGTH);
         if (status != 0)
              mexWarnMsgTxt("not enough space. string is truncated.");
         cfg->debuglevel=mcx_parsedebugopt(buf);
-	printf("mmc.session='%s';\n",buf);
+	printf("mmc.debuglevel='%s';\n",buf);
     }else if(strcmp(name,"srctype")==0){
         int len=mxGetNumberOfElements(item);
 	char buf[MAX_SESSION_LENGTH];
         if(!mxIsChar(item) || len==0)
-             mexErrMsgTxt("the 'srctype' field must be a non-empty string");
+             MEXERROR("the 'srctype' field must be a non-empty string");
 	if(len>MAX_SESSION_LENGTH)
-	     mexErrMsgTxt("the 'srctype' field is too long");
+	     MEXERROR("the 'srctype' field is too long");
         int status = mxGetString(item, buf, MAX_SESSION_LENGTH);
         if (status != 0)
              mexWarnMsgTxt("not enough space. string is truncated.");
@@ -337,9 +364,9 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"session")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
-             mexErrMsgTxt("the 'session' field must be a non-empty string");
+             MEXERROR("the 'session' field must be a non-empty string");
 	if(len>MAX_SESSION_LENGTH)
-	     mexErrMsgTxt("the 'session' field is too long");
+	     MEXERROR("the 'session' field is too long");
         int status = mxGetString(item, cfg->session, MAX_SESSION_LENGTH);
         if (status != 0)
              mexWarnMsgTxt("not enough space. string is truncated.");
@@ -348,7 +375,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"shapes")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
-             mexErrMsgTxt("the 'shapes' field must be a non-empty string");
+             MEXERROR("the 'shapes' field must be a non-empty string");
 
         jsonshapes=new char[len+1];
         mxGetString(item, jsonshapes, len+1);
@@ -361,20 +388,20 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      int i,j,gates,idx1d,*ee;
      if(cfg->nphoton<=0){
-         mexErrMsgTxt("cfg.nphoton must be defined as a positive number");
+         MEXERROR("cfg.nphoton must be a positive number");
      }
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
-         mexErrMsgTxt("incorrect time gate settings");
+         MEXERROR("incorrect time gate settings");
      }
      if(ABS(cfg->srcdir.x*cfg->srcdir.x+cfg->srcdir.y*cfg->srcdir.y+cfg->srcdir.z*cfg->srcdir.z - 1.f)>1e-5)
-         mexErrMsgTxt("field 'srcdir' must be a unitary vector");
+         MEXERROR("field 'srcdir' must be a unitary vector");
      if(cfg->tend<=cfg->tstart)
-         mexErrMsgTxt("field 'tend' must be greater than field 'tstart'");
+         MEXERROR("field 'tend' must be greater than field 'tstart'");
      gates=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
      if(mesh->prop==0)
-        mexErrMsgTxt("you must define the 'prop' field in the input structure");
+        MEXERROR("you must define the 'prop' field in the input structure");
      if(mesh->nn==0||mesh->ne==0||mesh->evol==NULL || mesh->facenb==NULL)
-        mexErrMsgTxt("a complete input mesh include 'node','elem','facenb' and 'evol'");
+        MEXERROR("a complete input mesh include 'node','elem','facenb' and 'evol'");
 
      mesh->nvol=(float *)calloc(sizeof(float),mesh->nn);
      for(i=0;i<mesh->ne;i++){
@@ -407,7 +434,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 	}
      }
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
-	 mexErrMsgTxt("You must define 'mesh' and 'prop' fields.");
+	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }
      if(cfg->issavedet && cfg->detnum==0) 
       	cfg->issavedet=0;
@@ -421,7 +448,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){
      printf("MMCLAB ERROR %d in unit %s:%d\n",id,filename,linenum);
-     mexErrMsgTxt(msg);
+     throw msg;
      return id;
 }
 

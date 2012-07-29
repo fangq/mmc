@@ -149,10 +149,10 @@ void mcx_normalize(float field[], float scale, int fieldlen){
 }
 
 void mcx_error(const int id,const char *msg,const char *file,const int linenum){
-     fprintf(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
 #ifdef MCX_CONTAINER
      mmc_throw_exception(id,msg,file,linenum);
 #else
+     fprintf(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
      exit(id);
 #endif
 }

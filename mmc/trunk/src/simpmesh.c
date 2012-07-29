@@ -60,10 +60,10 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
 }
 
 void mesh_error(char *msg){
-	fprintf(stderr,"%s\n",msg);
 #ifdef MCX_CONTAINER
         mmc_throw_exception(1,msg,__FILE__,__LINE__);
 #else
+	fprintf(stderr,"%s\n",msg);
         exit(1);
 #endif
 }

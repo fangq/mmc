@@ -72,15 +72,14 @@ ssemath:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
 
-mex oct:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER -O3
+mex oct:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
 mex oct:   CPPFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
 mex:       AR=mex
-mex:       BINDIR=../mmclab
-mex:       BINARY:=$(BINARY)lab
-mex:       ARFLAGS+=mmclab.cpp -cxx -outdir $(BINDIR) -I$(INCLUDEDIR)
+mex oct:   BINDIR=../mmclab
+mex:       ARFLAGS+=mmclab.cpp -cxx -I$(INCLUDEDIR)
 
 oct:       AR=mkoctfile
-oct:       BINARY:=$(BINARY)lab.mex
+oct:       BINARY=mmc.mex
 oct:       ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 
 
@@ -128,7 +127,7 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 ##  Link  ##
 $(BINDIR)/$(BINARY): makedirs $(OBJS)
 	@$(ECHO) Building $@
-	$(AR) $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS)
+	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/$(BINARY) $(OBJS) $(USERARFLAGS)
 
 ##  Documentation  ##
 doc: makedocdir
