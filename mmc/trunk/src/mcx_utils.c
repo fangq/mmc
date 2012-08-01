@@ -522,11 +522,11 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
     if(percentage != oldmarker){
         oldmarker=percentage;
     	for(j=0;j<colwidth;j++)     fprintf(stdout,"\b");
-    	fprintf(stdout,"Progress: [");
+    	MMC_FPRINTF(stdout,"Progress: [");
     	for(j=0;j<percentage;j++)      fprintf(stdout,"=");
-    	fprintf(stdout,(percentage<colwidth-18) ? ">" : "=");
+    	MMC_FPRINTF(stdout,(percentage<colwidth-18) ? ">" : "=");
     	for(j=percentage;j<colwidth-18;j++) fprintf(stdout," ");
-    	fprintf(stdout,"] %3d%%",percentage*100/(colwidth-18));
+    	MMC_FPRINTF(stdout,"] %3d%%",percentage*100/(colwidth-18));
 	    fflush(stdout);
     }
 }

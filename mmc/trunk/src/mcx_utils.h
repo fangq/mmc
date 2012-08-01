@@ -38,13 +38,6 @@
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 
-#define MMCDEBUG(cfg,debugflag,outputstr)  {\
-				if((cfg)->debuglevel & (debugflag)) {\
-					fprintf outputstr ;\
-					fflush((cfg)->flog);\
-				}\
-                            }
-
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
@@ -182,8 +175,18 @@ int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 #ifdef __cplusplus
 extern "C"
 #endif
- int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+  int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+  #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
+#else
+  #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)
 #endif
+
+#define MMCDEBUG(cfg,debugflag,outputstr)  {\
+				if((cfg)->debuglevel & (debugflag)) {\
+					MMC_FPRINTF outputstr ;\
+					fflush((cfg)->flog);\
+				}\
+                            }
 
 #ifdef  __cplusplus
 }

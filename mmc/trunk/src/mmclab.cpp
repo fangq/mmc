@@ -25,6 +25,8 @@
 #include "simpmesh.h"
 #include "tictoc.h"
 #include "tettracing.h"
+#include "waitmex/waitmex.c"
+
 
 #define GET_1ST_FIELD(x,y)  if(strcmp(name,#y)==0) {double *val=mxGetPr(item);x->y=val[0];printf("mmc.%s=%g;\n",#y,(float)(x->y));}
 #define GET_ONE_FIELD(x,y)  else GET_1ST_FIELD(x,y)
@@ -55,6 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ncfg, nfields;
   int        fielddim[4];
   const char       *outputtag[]={"data"};
+  waitbar    *hprop;
 
   if (nrhs==0){
      mmclab_usage();
@@ -104,13 +107,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #pragma omp parallel private(ran0,ran1,threadid)
 {
 	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
-	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2, oldprog=0;
+	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2,oldprog=-1;
+        char percent[8];
 	if(cfg.issavedet) 
 	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
     #ifdef _OPENMP
 	threadid=omp_get_thread_num();	
     #endif
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
+        if((cfg.debuglevel & dlProgress) && threadid==0)
+             hprop = waitbar_create (0, NULL);
 
 	/*launch photons*/
 	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
@@ -121,10 +127,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		#pragma omp atomic
 		   ncomplete++;
 
-		if((cfg.debuglevel & dlProgress) && threadid==0)
-                        mcx_progressbar(ncomplete,&cfg);
-		if(cfg.issave2pt && cfg.checkpt[0])
-			mesh_saveweightat(&mesh,&cfg,i+1);
+		if((cfg.debuglevel & dlProgress) && threadid==0 && cfg.nphoton>0){
+                    int prog=ncomplete*100/cfg.nphoton;
+                    char percent[8]="";
+                    sprintf(percent,"%d%%",prog);
+                    if(prog!=oldprog)
+                        waitbar_update (((double)ncomplete)/cfg.nphoton, hprop, percent);
+                    oldprog=prog;
+                }
 	}
 	if(cfg.issavedet){
 	    #pragma omp atomic
@@ -154,7 +164,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	/** \subsection sreport Post simulation */
 
 	if((cfg.debuglevel & dlProgress))
-		mcx_progressbar(cfg.nphoton,&cfg);
+                 waitbar_update (1.0, hprop, NULL);
 
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
@@ -163,7 +173,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	tracer_clear(&tracer);
 	if(cfg.isnormalized && cfg.nphoton){
-	  fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+	  printf("total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
 		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
 	if(cfg.issavedet && master.partialpath){
@@ -172,6 +182,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
+        if((cfg.debuglevel & dlProgress))
+             waitbar_destroy (hprop) ;
 	if(nlhs>=1){
     	    if(!cfg.basisorder)
 		fielddim[0]=mesh.ne*cfg.maxgate; 
