@@ -64,23 +64,25 @@ OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 release:   CCFLAGS+= -O3
-sse ssemath:       CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
-sse ssemath omp mex oct:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+sse ssemath mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
+sse ssemath omp mex oct mexsse octsse:   CCFLAGS+=-O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
-mex oct:           ARFLAGS+= -lgomp $(FASTMATH)
-ssemath:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
+mex oct mexsse octsse:   ARFLAGS+= CXXFLAGS='$$CXXFLAGS $(OPENMP)' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH)
+ssemath mexsse octsse:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
 
-mex oct:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
-mex oct:   CPPFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
-mex:       AR=mex
-mex oct:   BINDIR=../mmclab
-mex:       ARFLAGS+=mmclab.cpp -cxx -I$(INCLUDEDIR)
+mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex oct mexsse octsse:   CPPFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex oct mexsse octsse:   BINDIR=../mmclab
+mex mexsse:     AR=mex
+mex mexsse:     ARFLAGS+=mmclab.cpp -cxx -I$(INCLUDEDIR)
+mexsse:         BINARY=mmc_sse
 
-oct:       AR=mkoctfile
-oct:       BINARY=mmc.mex
-oct:       ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
+oct octsse:     AR=mkoctfile
+oct:            BINARY=mmc.mex
+octsse:         BINARY=mmc_sse.mex
+oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 
 
 ifeq ($(TARGETSUFFIX),.so)
@@ -95,7 +97,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	AROUTPUT   :=
 endif
 
-all release sse ssemath prof omp mex oct: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp mex oct mexsse octsse: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory

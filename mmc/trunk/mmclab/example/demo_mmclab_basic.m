@@ -1,0 +1,10 @@
+cfg.nphoton=100000;
+[cfg.node face cfg.elem]=meshabox([0 0 0],[60 60 30],6);
+cfg.elemprop=ones(size(cfg.elem,1),1);
+cfg.srcpos=[30 30 0];
+cfg.srcdir=[0 0 1];
+cfg.prop=[0 0 1 1;0.005 1 0 1.37];
+cfg.tstart=0;
+cfg.tend=5e-9;
+cfg.tstep=5e-9;
+flux=mmclab(cfg);

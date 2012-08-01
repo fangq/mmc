@@ -17,6 +17,10 @@
 #include <time.h>
 #include <exception>
 
+#ifdef _OPENMP
+  #include <omp.h>
+#endif
+
 #include "mex.h"
 #include "simpmesh.h"
 #include "tictoc.h"

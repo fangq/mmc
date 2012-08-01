@@ -1,4 +1,4 @@
-function [flux,detphoton]=mmclab(cfg)
+function [flux,detphoton]=mmclab(cfg,type)
 %
 %====================================================================
 %      MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave
@@ -8,7 +8,7 @@ function [flux,detphoton]=mmclab(cfg)
 %====================================================================
 %
 % Format:
-%    [flux,detphoton]=mmclab(cfg);
+%    [flux,detphoton]=mmclab(cfg,type);
 %
 % Input:
 %    cfg: a struct, or struct array. Each element in cfg defines 
@@ -46,9 +46,11 @@ function [flux,detphoton]=mmclab(cfg)
 %      cfg.srctype:     source type, can be ["pencil"],"isotropic" or "cone"
 %      cfg.srcparam:    1x4 vector for additional source parameter
 %      cfg.unitinmm:    defines the unit in the input mesh [1.0]
-%      
 %
 %      fields with * are required; options in [] are the default values
+%
+%    type: omit or 'omp' for multi-threading version; 'sse' for SSE4 version
+%          the SSE4 version is about 25% faster, but requires newer CPUs.
 %
 % Output:
 %      flux: a struct array, with a length equals to that of cfg.
@@ -132,4 +134,12 @@ for i=1:len
     end
 end
 
-[flux,detphoton]=mmc(cfg);
+if(nargin<2)
+  [flux,detphoton]=mmc(cfg);
+elseif(strcmp(type,'omp'))
+  [flux,detphoton]=mmc(cfg);
+elseif(strcmp(type,'sse'))
+  [flux,detphoton]=mmc_sse(cfg);
+else
+  error('type is not recognized');
+end
