@@ -107,6 +107,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->ismomentum=0;
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
+     cfg->his.savedphoton=0;
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->bary0),0,sizeof(float4));

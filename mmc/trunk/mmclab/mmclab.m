@@ -1,4 +1,4 @@
-function [flux,detphoton]=mmclab(cfg,type)
+function varargout=mmclab(cfg,type)
 %
 %====================================================================
 %      MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave
@@ -96,6 +96,13 @@ function [flux,detphoton]=mmclab(cfg,type)
 % License: GNU General Public License version 3, please read LICENSE.txt for details
 %
 
+if(nargin==0)
+    error('input field cfg must be defined');
+end
+if(~isstruct(cfg))
+    error('cfg must be a struct or struct array');
+end
+
 len=length(cfg);
 for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
@@ -135,11 +142,11 @@ for i=1:len
 end
 
 if(nargin<2)
-  [flux,detphoton]=mmc(cfg);
+  [varargout{1:nargout}]=mmc(cfg);
 elseif(strcmp(type,'omp'))
-  [flux,detphoton]=mmc(cfg);
+  [varargout{1:nargout}]=mmc(cfg);
 elseif(strcmp(type,'sse'))
-  [flux,detphoton]=mmc_sse(cfg);
+  [varargout{1:nargout}]=mmc_sse(cfg);
 else
   error('type is not recognized');
 end

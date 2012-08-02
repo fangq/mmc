@@ -70,6 +70,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   nfields = mxGetNumberOfFields(prhs[0]);
   ncfg = mxGetNumberOfElements(prhs[0]);
 
+  printf("Expected output count: %d\n",nlhs);
   if(nlhs>=1)
       plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=2)
