@@ -303,7 +303,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 }
 
 void tracer_build(raytracer *tracer){
-	int nn,ne,i,j;
+	int ne,i,j;
 	const int pairs[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
 
 	float3 *nodes;
@@ -317,7 +317,6 @@ void tracer_build(raytracer *tracer){
 	   tracer->mesh->facenb==NULL||tracer->mesh->med==NULL)
                 mesh_error("mesh is missing");
 
-	nn=tracer->mesh->nn;
 	ne=tracer->mesh->ne;
 	nodes=tracer->mesh->node;
 	elems=(int *)(tracer->mesh->elem); // convert int4* to int*
@@ -518,7 +517,6 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int i,j;
-	float3 *pn;
 	char fweight[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
                 sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
@@ -539,8 +537,8 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	if(cfg->basisorder)
 	  for(i=0;i<cfg->maxgate;i++)
 	   for(j=0;j<mesh->nn;j++){
-		pn=mesh->node+j;
-		/*if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
+		/*pn=mesh->node+j;
+		if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
 		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
 			mesh_error("can not write to weight file");
 	   }

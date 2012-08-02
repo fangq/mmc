@@ -84,7 +84,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	float w[6],Rv,ww,currweight,dlen=0.f,rc; /*dlen is the physical distance*/
 	unsigned int *wi=(unsigned int*)w;
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
-	float Lp0=0.f,atte,ratio;
+	float Lp0=0.f,ratio;
 
 	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
 		return -1;
@@ -97,7 +97,6 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	vec_cross(&(r->p0),&p1,&pcrx);
 	ee=(int *)(tracer->mesh->elem+eid);
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	rc=prop->n*R_C0;
         currweight=r->weight;
 
@@ -273,7 +272,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
 	float barypout[4] __attribute__ ((aligned(16)));
-	float atte,rc,currweight,dlen,ww,Lp0;
+	float rc,currweight,dlen,ww,Lp0;
 	int i,j,k,tshift,*enb=NULL,*nextenb=NULL,eid;
 	__m128 O,T,S;
 
@@ -287,7 +286,6 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	medium *prop;
 	int *ee=(int *)(tracer->mesh->elem+eid);
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	rc=prop->n*R_C0;
         currweight=r->weight;
 
@@ -411,7 +409,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,atte,rc,currweight,dlen,ww,t[4]={1e10f,1e10f,1e10f,1e10f};
+	float Lp0=0.f,rc,currweight,dlen,ww,t[4]={1e10f,1e10f,1e10f,1e10f};
 	int i,tshift,faceidx=-1,eid;
 
 	r->p0.w=1.f;
@@ -461,7 +459,6 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	    medium *prop;
 	    int *ee=(int *)(tracer->mesh->elem+eid);;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	    atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	    rc=prop->n*R_C0;
             currweight=r->weight;
 
@@ -516,7 +513,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,atte,rc,currweight,dlen,ww;
+	float Lp0=0.f,rc,currweight,dlen,ww;
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
 
@@ -567,7 +564,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid);;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	    atte=tracer->mesh->atte[tracer->mesh->type[eid]];
 	    rc=prop->n*R_C0;
             currweight=r->weight;
 

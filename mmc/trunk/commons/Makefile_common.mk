@@ -67,7 +67,8 @@ release:   CCFLAGS+= -O3
 sse ssemath mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
 sse ssemath omp mex oct mexsse octsse:   CCFLAGS+=-O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
-mex oct mexsse octsse:   ARFLAGS+= CXXFLAGS='$$CXXFLAGS $(OPENMP) -Wall' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH)
+mex mexsse:   ARFLAGS+= CXXFLAGS='$$CXXFLAGS $(OPENMP) -Wall' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH)
+#oct octsse:   += $(OPENMP) -Wall $(FASTMATH)
 ssemath mexsse octsse:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
@@ -79,7 +80,7 @@ mex mexsse:     AR=mex
 mex mexsse:     ARFLAGS+=mmclab.cpp -cxx -I$(INCLUDEDIR)
 mexsse:         BINARY=mmc_sse
 
-oct octsse:     AR=mkoctfile
+oct octsse:     AR=LDFLAGS='-fopenmp' mkoctfile
 oct:            BINARY=mmc.mex
 octsse:         BINARY=mmc_sse.mex
 oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
