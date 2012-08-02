@@ -67,7 +67,7 @@ release:   CCFLAGS+= -O3
 sse ssemath mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
 sse ssemath omp mex oct mexsse octsse:   CCFLAGS+=-O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
-mex oct mexsse octsse:   ARFLAGS+= CXXFLAGS='$$CXXFLAGS $(OPENMP)' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH)
+mex oct mexsse octsse:   ARFLAGS+= CXXFLAGS='$$CXXFLAGS $(OPENMP) -Wall' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH)
 ssemath mexsse octsse:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg

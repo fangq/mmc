@@ -108,7 +108,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 {
 	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
 	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2,oldprog=-1;
-        char percent[8];
 	if(cfg.issavedet) 
 	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
     #ifdef _OPENMP
@@ -402,7 +401,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 }
 
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
-     int i,j,gates,idx1d,*ee;
+     int i,j,gates,*ee;
      if(cfg->nphoton<=0){
          MEXERROR("cfg.nphoton must be a positive number");
      }
