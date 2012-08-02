@@ -401,7 +401,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 }
 
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
-     int i,j,gates,*ee;
+     int i,j,*ee;
      if(cfg->nphoton<=0){
          MEXERROR("cfg.nphoton must be a positive number");
      }
@@ -412,7 +412,8 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
          MEXERROR("field 'srcdir' must be a unitary vector");
      if(cfg->tend<=cfg->tstart)
          MEXERROR("field 'tend' must be greater than field 'tstart'");
-     gates=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
+     cfg->maxgate=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
+
      if(mesh->prop==0)
         MEXERROR("you must define the 'prop' field in the input structure");
      if(mesh->nn==0||mesh->ne==0||mesh->evol==NULL || mesh->facenb==NULL)

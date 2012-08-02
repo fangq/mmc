@@ -358,6 +358,7 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates,srctype,itmp;
+     float dtmp;
      char comment[MAX_PATH_LENGTH],*comm, strtypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
@@ -432,6 +433,9 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      	MMC_ASSERT(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
         //cfg->detpos[i].x--;cfg->detpos[i].y--;cfg->detpos[i].z--;  /*convert to C index*/
         comm=fgets(comment,MAX_PATH_LENGTH,in);
+        if(comm!=NULL && sscanf(comm,"%f",&dtmp)==1)
+            cfg->detpos[i].w=dtmp;
+
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }

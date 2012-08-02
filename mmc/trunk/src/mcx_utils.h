@@ -197,6 +197,10 @@ extern "C"
 }
 #endif
 
+#ifdef MATLAB_MEX_FILE
 int mexPrintf(const char * format, ... );
+#else
+void mexPrintf(const char * format, ... );
+#endif
 
 #endif
