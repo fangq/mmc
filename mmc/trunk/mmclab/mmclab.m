@@ -141,6 +141,11 @@ for i=1:len
     end
 end
 
+% must do a fflush, otherwise octave buffers the output until complete
+if(exist('OCTAVE_VERSION'))
+   fflush(stdout);
+end
+
 if(nargin<2)
   [varargout{1:nargout}]=mmc(cfg);
 elseif(strcmp(type,'omp'))
