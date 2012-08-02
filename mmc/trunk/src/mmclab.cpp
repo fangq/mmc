@@ -115,9 +115,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	threadid=omp_get_thread_num();	
     #endif
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
+    #ifdef MATLAB_MEX_FILE
         if((cfg.debuglevel & dlProgress) && threadid==0)
              hprop = waitbar_create (0, NULL);
-
+    #endif
 	/*launch photons*/
 	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
@@ -128,12 +129,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		   ncomplete++;
 
 		if((cfg.debuglevel & dlProgress) && threadid==0 && cfg.nphoton>0){
+#ifdef MATLAB_MEX_FILE
                     int prog=ncomplete*100/cfg.nphoton;
                     char percent[8]="";
                     sprintf(percent,"%d%%",prog);
                     if(prog!=oldprog)
                         waitbar_update (((double)ncomplete)/cfg.nphoton, hprop, percent);
                     oldprog=prog;
+#else
+                    mcx_progressbar(ncomplete,&cfg);
+#endif
                 }
 	}
 	if(cfg.issavedet){
@@ -162,10 +167,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 }
 
 	/** \subsection sreport Post simulation */
-
+#ifdef MATLAB_MEX_FILE
 	if((cfg.debuglevel & dlProgress))
                  waitbar_update (1.0, hprop, NULL);
-
+#endif
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));

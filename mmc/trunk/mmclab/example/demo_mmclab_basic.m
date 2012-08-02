@@ -25,6 +25,9 @@ flux=mmclab(cfg);
 
 % plotting the result
 
+% if you have the SVN version of iso2mesh, use the next line to plot:
+% qmeshcut(cfg.elem(:,1:4),cfg.node(:,1:3),log10(abs(flux.data(:))),'y=30','linestyle','none');
+
 [cutpos,cutvalue,facedata]=qmeshcut(cfg.elem(:,1:4),cfg.node(:,1:3),log10(abs(flux.data(:))),'y=30');
 hcut=patch('Faces',facedata,'Vertices',cutpos,'FaceVertexCData',cutvalue,'facecolor','interp','linestyle','none');
 view([0 1 0]);
