@@ -57,6 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ncfg, nfields;
   int        fielddim[4];
   const char       *outputtag[]={"data"};
+  int buflen;
   waitbar    *hprop;
 
   if (nrhs==0){
@@ -100,6 +101,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
+	buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
 
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
 
@@ -108,7 +110,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #pragma omp parallel private(ran0,ran1,threadid)
 {
 	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
-	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2,oldprog=-1;
+
 	if(cfg.issavedet) 
 	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
     #ifdef _OPENMP
@@ -131,6 +133,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		if((cfg.debuglevel & dlProgress) && threadid==0 && cfg.nphoton>0){
 #ifdef MATLAB_MEX_FILE
                     int prog=ncomplete*100/cfg.nphoton;
+                    static int oldprog=-1;
                     char percent[8]="";
                     sprintf(percent,"%d%%",prog);
                     if(prog!=oldprog)
@@ -145,20 +148,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
-	    if(threadid==0){
+            if(master.detcount>0){
+	      if(threadid==0){
 		if(nlhs>=2){
-	            fielddim[0]=master.detcount*buflen; fielddim[1]=0; fielddim[2]=0; fielddim[3]=0; 
-    		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(4,fielddim,mxSINGLE_CLASS,mxREAL));
+	            fielddim[0]=buflen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
+    		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
 		    master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
 		}else
 	            master.partialpath=(float*)calloc(master.detcount*buflen,sizeof(float));
-	    }
-            #pragma omp barrier
-            #pragma omp critical
-            {
+	      }
+              #pragma omp barrier
+              #pragma omp critical
+              {
 		memcpy(master.partialpath+master.bufpos*buflen,
 		       visit.partialpath,visit.bufpos*buflen*sizeof(float));
 		master.bufpos+=visit.bufpos;
+              }
             }
             #pragma omp barrier
 	    free(visit.partialpath);
@@ -181,53 +186,30 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	  printf("total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
 		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
 	}
-	if(cfg.issavedet && master.partialpath){
-		free(master.partialpath);
-        	master.partialpath=NULL;
-	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
+#ifdef MATLAB_MEX_FILE
         if((cfg.debuglevel & dlProgress))
              waitbar_destroy (hprop) ;
+#endif
 	if(nlhs>=1){
     	    if(!cfg.basisorder)
-		fielddim[0]=mesh.ne*cfg.maxgate; 
+		fielddim[0]=mesh.ne;
 	    else
-		fielddim[0]=mesh.nn*cfg.maxgate; 
-	    fielddim[1]=0; fielddim[2]=0; fielddim[3]=0; 
-    	    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(1,fielddim,mxDOUBLE_CLASS,mxREAL));
+		fielddim[0]=mesh.nn;
+	    fielddim[1]=cfg.maxgate; fielddim[2]=0; fielddim[3]=0; 
+    	    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
-	    memcpy(output,mesh.weight,fielddim[0]*sizeof(double));
-	}
-	if(nlhs>=2){
-            fielddim[0]=(mesh.prop+1); fielddim[1]=cfg.his.savedphoton;
-	    fielddim[2]=0; fielddim[3]=0;
-	    if(cfg.his.savedphoton>0){
-		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
-		    memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0)),master.partialpath,
-			 fielddim[0]*fielddim[1]*sizeof(float));
-	    }
+	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
 	}
     }catch(const char *err){
       tracer_clear(&tracer);
-      if(master.partialpath){
-         free(master.partialpath);
-	 master.partialpath=NULL;
-      }
       mexPrintf("Error: %s\n",err);
     }catch(const std::exception &err){
       tracer_clear(&tracer);
-      if(master.partialpath){
-         free(master.partialpath);
-	 master.partialpath=NULL;
-      }
       mexPrintf("C++ Error: %s\n",err.what());
     }catch(...){
       tracer_clear(&tracer);
-      if(master.partialpath){
-         free(master.partialpath);
-	 master.partialpath=NULL;
-      }
       mexPrintf("Unknown Exception");
     }
 
@@ -254,6 +236,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,tend)
     GET_ONE_FIELD(cfg,isreflect)
     GET_ONE_FIELD(cfg,isspecular)
+    GET_ONE_FIELD(cfg,ismomentum)
     GET_ONE_FIELD(cfg,outputtype)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
