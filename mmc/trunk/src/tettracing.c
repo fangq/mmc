@@ -747,11 +747,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		 fprintf(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
-		       float detrad2=cfg->detradius*cfg->detradius;
 		       for(i=0;i<cfg->detnum;i++){
         		  if((cfg->detpos[i].x-r.p0.x)*(cfg->detpos[i].x-r.p0.x)+
         		     (cfg->detpos[i].y-r.p0.y)*(cfg->detpos[i].y-r.p0.y)+
-        		     (cfg->detpos[i].z-r.p0.z)*(cfg->detpos[i].z-r.p0.z) < detrad2){
+        		     (cfg->detpos[i].z-r.p0.z)*(cfg->detpos[i].z-r.p0.z) < cfg->detpos[i].w*cfg->detpos[i].w){
 			          exitdet=i+1;
                 		  break;
         		     }

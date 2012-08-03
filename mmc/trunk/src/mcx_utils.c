@@ -436,6 +436,8 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
         comm=fgets(comment,MAX_PATH_LENGTH,in);
         if(comm!=NULL && sscanf(comm,"%f",&dtmp)==1)
             cfg->detpos[i].w=dtmp;
+        else
+            cfg->detpos[i].w=cfg->detradius;
 
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
