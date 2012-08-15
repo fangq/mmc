@@ -58,7 +58,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        fielddim[4];
   const char       *outputtag[]={"data"};
   int buflen;
+#ifdef MATLAB_MEX_FILE
   waitbar    *hprop;
+#endif
 
   if (nrhs==0){
      mmclab_usage();

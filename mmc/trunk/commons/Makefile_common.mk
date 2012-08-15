@@ -41,10 +41,22 @@ FASTMATH   := #-ffast-math
 ECHO	   := echo
 MKDIR      := mkdir
 
-DOXY       := doxygen
-DOCDIR     := $(MMCDIR)/doc
+MKMEX      :=mex
+MKMEXOPT    =CC='$$CC' CXX='$$CXX' CXXFLAGS='$$CXXFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH) -cxx
+MKOCT      :=mkoctfile
 
 DLLFLAG=-fPIC
+
+ARCH = $(shell uname -m)
+PLATFORM = $(shell uname -s)
+ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
+    MKMEX      :=cmd /c mex.bat
+    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMP)' $(FASTMATH)
+    DLLFLAG     =
+endif
+
+DOXY       := doxygen
+DOCDIR     := $(MMCDIR)/doc
 
 ifeq ($(CC),icc)
 	OPENMP   := -openmp
@@ -68,25 +80,26 @@ sse ssemath mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
 sse ssemath omp mex oct mexsse octsse:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMP) $(FASTMATH)
 ssemath mexsse octsse:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
-mex mexsse:        ARFLAGS+= CXXFLAGS='$$CXXFLAGS $(CCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMP)' $(FASTMATH)
+mex mexsse:        ARFLAGS+=$(MKMEXOPT)
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
 
 mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
 mex oct mexsse octsse:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
 mex oct mexsse octsse:   BINDIR=../mmclab
-mex mexsse:     AR=mex
-mex mexsse:     ARFLAGS+=mmclab.cpp -cxx -I$(INCLUDEDIR)
+mex mexsse:     AR=$(MKMEX)
+mex mexsse:     AROUTPUT=-output
+mex mexsse:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 mexsse:         BINARY=mmc_sse
 
 oct:            BINARY=mmc.mex
 octsse:         BINARY=mmc_sse.mex
 oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
-oct octsse:     AR=LDFLAGS='$(OPENMP)' CPPFLAGS='$(CCFLAGS)' mkoctfile
+oct octsse:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(OPENMP)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS)' $(MKOCT)
 
 
 ifeq ($(TARGETSUFFIX),.so)
-	CCFLAGS+= -fPIC 
+	CCFLAGS+= $(DLLFLAG) 
 	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1 
 endif
 

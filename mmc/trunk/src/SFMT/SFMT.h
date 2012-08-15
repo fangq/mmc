@@ -72,6 +72,10 @@
   #define PRE_ALWAYS inline
 #endif
 
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 uint32_t gen_rand32(void);
 uint64_t gen_rand64(void);
 void fill_array32(uint32_t *array, int size);
@@ -82,6 +86,9 @@ const char *get_idstring(void);
 int get_min_array_size32(void);
 int get_min_array_size64(void);
 
+#ifdef	__cplusplus
+}
+#endif
 /* These real versions are due to Isaku Wada */
 /** generates a random number on [0,1]-real-interval */
 inline static double to_real1(uint32_t v)
