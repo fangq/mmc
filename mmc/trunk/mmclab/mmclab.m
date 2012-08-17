@@ -60,7 +60,8 @@ function varargout=mmclab(cfg,type)
 %      fields marked with - are calculated if not given (can be faster if precomputed)
 %
 %    type: omit or 'omp' for multi-threading version; 'sse' for the SSE4 MMC,
-%          the SSE4 version is about 25% faster, but requires newer CPUs.
+%          the SSE4 version is about 25% faster, but requires newer CPUs; 
+%          if type='prep' with a single output, mmclab returns ncfg only.
 %
 % Output:
 %      flux: a struct array, with a length equals to that of cfg.
@@ -92,8 +93,8 @@ function varargout=mmclab(cfg,type)
 %      cfg.tend=5e-9;
 %      cfg.tstep=5e-10;
 %      cfg.debuglevel='TP';
-%      % calculate the flux distribution with the given config
-%      [flux detp ncfg]=mmclab(cfg);
+%      % populate the missing fields to save computation
+%      ncfg=mmclab(cfg,'prep');
 %
 %      cfgs(1)=ncfg;
 %      cfgs(2)=ncfg;
@@ -121,7 +122,7 @@ for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
         error('cfg.node or cfg.elem is missing');
     end
-    if(~isfield(cfg(i),'elemprop') && size(cfg(i).elem,2)>4)
+    if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
     cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
@@ -186,7 +187,7 @@ for i=1:len
     if(~isfield(cfg(i),'nphoton'))
         error('cfg.nphoton field is missing');
     end
-    if(~isfield(cfg(i),'prop') || size(cfg(i).prop,1)<max(cfg(i).elemprop)+1)
+    if(~isfield(cfg(i),'prop') || size(cfg(i).prop,1)<max(cfg(i).elemprop)+1 || min(cfg(i).elemprop<=0))
         error('cfg.prop field is missing or insufficient');
     end
 end
@@ -208,6 +209,8 @@ elseif(strcmp(type,'omp'))
   [varargout{1:mmcout}]=mmc(cfg);
 elseif(strcmp(type,'sse'))
   [varargout{1:mmcout}]=mmc_sse(cfg);
+elseif(strcmp(type,'prep') && nargout==1)
+  varargout{1}=cfg;
 else
   error('type is not recognized');
 end
