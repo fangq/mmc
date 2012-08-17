@@ -45,12 +45,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
   visitor master={0.f,0.f,0,0,NULL};
-  double Eabsorb=0.0;
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
-  float raytri=0.f;
-  unsigned int threadid=0,ncomplete=0,t0,dt;
+  unsigned int threadid=0,t0,dt;
 
   mxArray    *tmp;
   int        ifield, jstruct;
@@ -83,6 +81,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     printf("Running simulations for configuration #%d ...\n", jstruct+1);
 
     try{
+        unsigned int ncomplete=0;
+        double Eabsorb=0.0;
+        float raytri=0.f;
+
 	t0=StartTimer();
 	mcx_initcfg(&cfg);
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
