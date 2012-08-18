@@ -50,7 +50,7 @@ DLLFLAG=-fPIC
 ARCH = $(shell uname -m)
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-    MKMEX      :=cmd /c mex.bat
+    MKMEX      :=cmd //c mex.bat
     MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMP)' $(FASTMATH)
     DLLFLAG     =
 endif
