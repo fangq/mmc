@@ -199,6 +199,19 @@ This test is similar to the simulations under mmc/examples/onecube.
 
 == # How to compile MMCLAB ==
 
+To compile MMCLAB from source code, you need to make sure your 
+computer have the following requirements:
+
+* your computer should have MATLAB C compiler (mex) and/or octave3.x-headers installed
+* to compile the SSE versions, your computer should support SSE4 instructions
+* the commands "mex" and "mkoctfile" should be in the search path ($PATH)
+* you should have both gcc and g++ with version 4.4 or newer
+* for windows, you should install MinGW32 with gcc/g++ via mingw-get-inst
+* for windows, you need to create a mexopts.bat file as \
+C:\Users\<username>\AppData\Roaming\MathWorks\MATLAB\RXXXX\mexopts.bat \
+with content modified from \
+https://www.dynare.org/trac/browser/windows/mexopts-win64.bat?rev=fd693204f929a11378f78de6c5e750bc094c71d5
+
 To compile MMCLAB for MATLAB, you need to cd mmc/src directory, and type 
 
  make mex
@@ -216,6 +229,17 @@ or
 The command <tt>mkoctfile</tt> must be accessible from your command line
 and it is provided in a package named "octave3.x-headers" in Ubuntu (3.x
 can be 3.2 or 3.4 etc).
+
+Compiling MMCLAB on Windows and Mac OS, you should use the following
+command:
+
+ make ... -f makefile_sfmt ...
+
+If you have multiple gcc/g++ installed on your system, and the default 
+gcc and g++ is older than 4.4 (use gcc -v to print version), you can 
+use the following command to specify the correct gcc command:
+
+ make ... CC=/path/to/gcc/4.4 CXX=/path/to/g++/4.4
 
 
 == # Screenshots ==
