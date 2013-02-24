@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','\0'};
+                 'i','V','O','m','F','q','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -53,7 +53,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
-                 "--momentum","--outputformat",""};
+                 "--momentum","--outputformat","--saveseed",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -105,9 +105,11 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->outputtype=otFlux;
      cfg->outputformat=ofASCII;
      cfg->ismomentum=0;
+     cfg->issaveseed=0;
+
+     memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
-     cfg->his.savedphoton=0;
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->bary0),0,sizeof(float4));
@@ -645,8 +647,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 's':
 		     	        i=mcx_readarg(argc,argv,i,cfg->session,"string");
 		     	        break;
-		     case 'a':
-		     	        i=mcx_readarg(argc,argv,i,&(cfg->isrowmajor),"bool");
+		     case 'q':
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->issaveseed),"bool");
 		     	        break;
 		     case 'g':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->maxgate),"int");

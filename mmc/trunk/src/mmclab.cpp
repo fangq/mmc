@@ -44,7 +44,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0,0,NULL};
+  visitor master={0.f,0.f,0,0,0,NULL,NULL};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -55,7 +55,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ncfg, nfields;
   int        fielddim[4];
   const char       *outputtag[]={"data"};
-  int buflen;
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop;
 #endif
@@ -76,6 +75,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
       plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=2)
       plhs[1] = mxCreateStructMatrix(ncfg,1,1,outputtag);
+  if(nlhs>=3)
+      plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
 
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
     printf("Running simulations for configuration #%d ...\n", jstruct+1);
@@ -100,12 +101,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	mexEvalString("pause(.001);");
 	cfg.issave2pt=(nlhs>=1);
 	cfg.issavedet=(nlhs>=2);
-
+	cfg.issaveseed=(nlhs>=3);
+#if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
+        cfg.issaveseed=0;
+#endif
 	mmc_validate_config(&cfg,&mesh);
 
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
-	buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
 
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
 
@@ -113,10 +116,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
-
-	if(cfg.issavedet) 
-	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
+	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
+	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
+	if(cfg.issavedet){
+            if(cfg.issaveseed)
+                visit.photonseed=calloc(visit.detcount,sizeof(RandType));
+	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
+        }
     #ifdef _OPENMP
 	threadid=omp_get_thread_num();	
     #endif
@@ -155,17 +161,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             if(master.detcount>0){
 	      if(threadid==0){
 		if(nlhs>=2){
-	            fielddim[0]=buflen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
+	            fielddim[0]=visit.reclen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
     		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
 		    master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
-		}else
-	            master.partialpath=(float*)calloc(master.detcount*buflen,sizeof(float));
+                    if(nlhs>=3 && cfg.issaveseed){
+                        fielddim[0]=sizeof(RandType); fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
+                        mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
+                        master.photonseed = (unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0));
+		    }
+		}else{
+	            master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
+                    if(cfg.issaveseed)
+                        master.photonseed=calloc(master.detcount,sizeof(RandType));
+                }
 	      }
               #pragma omp barrier
               #pragma omp critical
               {
-		memcpy(master.partialpath+master.bufpos*buflen,
-		       visit.partialpath,visit.bufpos*buflen*sizeof(float));
+		memcpy(master.partialpath+master.bufpos*visit.reclen,
+		       visit.partialpath,visit.bufpos*visit.reclen*sizeof(float));
+                if(nlhs>=3 && cfg.issaveseed)
+                    memcpy((unsigned char*)master.photonseed+master.bufpos*sizeof(RandType),
+                            visit.photonseed,visit.bufpos*sizeof(RandType));
 		master.bufpos+=visit.bufpos;
               }
             }
@@ -447,7 +464,6 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      }
      if(cfg->issavedet && cfg->detnum==0) 
       	cfg->issavedet=0;
-
      if(cfg->seed<0) cfg->seed=time(NULL);
 
      cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/

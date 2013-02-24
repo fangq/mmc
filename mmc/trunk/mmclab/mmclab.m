@@ -8,7 +8,7 @@ function varargout=mmclab(cfg,type)
 %====================================================================
 %
 % Format:
-%    [flux,detphoton,ncfg]=mmclab(cfg,type);
+%    [flux,detphoton,ncfg,seeds]=mmclab(cfg,type);
 %
 % Input:
 %    cfg: a struct, or struct array. Each element in cfg defines 
@@ -81,6 +81,8 @@ function varargout=mmclab(cfg,type)
 %      ncfg: (optional), if given, mmclab returns the preprocessed cfg structure,
 %            including the calculated subfields (marked by "-"). This can be
 %            used as the input to avoid repetitive preprocessing.
+%      seeds: (optional), if give, mmclab returns the seeds, in the form of
+%            a byte array (uint8) for each detected photon.
 %
 % Example:
 %      cfg.nphoton=1e5;
@@ -199,8 +201,8 @@ end
 
 mmcout=nargout;
 if(nargout>=3)
-    mmcout=2;
-    varargout{3}=cfg;
+    mmcout=nargout-1;
+    varargout{nargout}=cfg;
 end
 
 if(nargin<2)
@@ -213,4 +215,8 @@ elseif(strcmp(type,'prep') && nargout==1)
   varargout{1}=cfg;
 else
   error('type is not recognized');
+end
+
+if(nargout>=4)
+  [varargout{3:end}]=deal(varargout{[end 3:end-1]});
 end

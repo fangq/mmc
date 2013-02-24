@@ -52,6 +52,7 @@ typedef struct MMC_ray{
 	float Lmove;
 	double Eabsorb;
 	float *partialpath;
+        void  *photonseed;
 } ray;
 
 /***************************************************************************//**
@@ -65,7 +66,9 @@ typedef struct MMC_visitor{
 	float rtstep;
 	int   detcount;
 	int   bufpos;
+	int   reclen;
 	float *partialpath;
+	void  *photonseed;
 } visitor;
 
 #ifdef	__cplusplus

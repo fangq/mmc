@@ -142,7 +142,7 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 ##  Link  ##
 $(BINDIR)/$(BINARY): makedirs $(OBJS)
 	@$(ECHO) Building $@
-	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/$(BINARY) $(OBJS) $(USERARFLAGS)
+	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/$(BINARY) $(OBJS) $(USERARFLAGS) $(EXTRALIB)
 
 ##  Documentation  ##
 doc: makedocdir

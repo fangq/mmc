@@ -6,7 +6,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pluker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2009) Qianqian Fang and David A. Boas, 
 **          <a href="http://www.opticsinfobase.org/abstract.cfm?uri=oe-17-22-20178">
 **          "Monte Carlo Simulation of Photon Migration in 3D Turbid Media Accelerated 
@@ -44,7 +44,7 @@ int main(int argc, char**argv){
 	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
-	visitor master={0.f,0.f,0,0,NULL};
+	visitor master={0.f,0.f,0,0,0,NULL,NULL};
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
@@ -67,6 +67,9 @@ int main(int argc, char**argv){
 	tracer_prep(&tracer,&cfg);
 
 	if(cfg.seed<0) cfg.seed=time(NULL);
+#if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
+	cfg.issaveseed=0;
+#endif
 
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
 
@@ -84,12 +87,15 @@ int main(int argc, char**argv){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,NULL};
-	int buflen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
-	if(cfg.issavedet) 
-	    visit.partialpath=(float*)calloc(visit.detcount*buflen,sizeof(float));
+	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
+	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
+	if(cfg.issavedet){
+	    if(cfg.issaveseed)
+	        visit.photonseed=calloc(visit.detcount,sizeof(RandType));
+	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
+	}
 #ifdef _OPENMP
-	threadid=omp_get_thread_num();	
+	threadid=omp_get_thread_num();
 #endif
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
@@ -111,17 +117,25 @@ int main(int argc, char**argv){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
-	    if(threadid==0)
-		master.partialpath=(float*)calloc(master.detcount*buflen,sizeof(float));
+	    if(threadid==0){
+		master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
+	        if(cfg.issaveseed)
+        	    master.photonseed=calloc(master.detcount,sizeof(RandType));
+            }
             #pragma omp barrier
             #pragma omp critical
             {
-		memcpy(master.partialpath+master.bufpos*buflen,
-		       visit.partialpath,visit.bufpos*buflen*sizeof(float));
+		memcpy(master.partialpath+master.bufpos*visit.reclen,
+		       visit.partialpath,visit.bufpos*visit.reclen*sizeof(float));
+                if(cfg.issaveseed)
+                    memcpy((unsigned char*)master.photonseed+master.bufpos*sizeof(RandType),
+                            visit.photonseed,visit.bufpos*sizeof(RandType));
 		master.bufpos+=visit.bufpos;
             }
             #pragma omp barrier
 	    free(visit.partialpath);
+            if(cfg.issaveseed && visit.photonseed)
+                 free(visit.photonseed);
 	}
 }
 
@@ -151,8 +165,10 @@ int main(int argc, char**argv){
 	}
 	if(cfg.issavedet){
 		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving detected photons ..."));
-		mesh_savedetphoton(master.partialpath,master.bufpos,&cfg);
+		mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,sizeof(RandType),&cfg);
 		free(master.partialpath);
+                if(cfg.issaveseed && master.photonseed)
+                    free(master.photonseed);
 	}
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 

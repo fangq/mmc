@@ -551,7 +551,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 }
 
-void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg){
+void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg){
 	FILE *fp;
 	char fhistory[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
@@ -567,10 +567,15 @@ void mesh_savedetphoton(float *ppath, int count, mcconfig *cfg){
         cfg->his.detected=count;
 	cfg->his.savedphoton=count;
 	cfg->his.detnum=cfg->detnum;
+	if(cfg->issaveseed && seeds!=NULL){
+	   cfg->his.seedbyte=seedbyte;
+        }
         cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+2; /*column count=maxmedia+2*/
 
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
+	if(cfg->issaveseed && seeds!=NULL)
+           fwrite(seeds,seedbyte,count,fp);
 	fclose(fp);
 }
 

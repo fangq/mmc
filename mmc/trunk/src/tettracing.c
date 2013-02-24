@@ -5,7 +5,7 @@
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
+**          in Pluker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
 **
 **  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
 **          Migration in 3D Turbid Media Accelerated by Graphics Processing 
@@ -646,11 +646,16 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,NULL};
+	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,NULL,NULL};
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
+	r.partialpath=(float*)calloc(visit->reclen-1,sizeof(float));
+        if(cfg->issavedet && cfg->issaveseed){
+                r.photonseed=(void*)calloc(1,sizeof(RandType));
+		memcpy(r.photonseed,(void *)ran, sizeof(RandType));
+        }
         if(cfg->srctype>0){
 		if(cfg->srctype==stCone){
 			float zangle, aangle;
@@ -661,7 +666,6 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			r.vec.z=cosf(aangle);
 		}
 	}
-	r.partialpath=(float*)calloc((1+(cfg->ismomentum>0))*mesh->prop+1,sizeof(float));
 
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
@@ -771,18 +775,23 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
             r.partialpath[0]++;
 	}
 	if(cfg->issavedet && exitdet>0){
-		int buflen=(1+(cfg->ismomentum>0))*mesh->prop+2;
-		int offset=visit->bufpos*buflen;
+		int offset=visit->bufpos*visit->reclen;
 		if(visit->bufpos>=visit->detcount){
 		    visit->detcount+=DET_PHOTON_BUF;
 		    visit->partialpath=(float *)realloc(visit->partialpath,
-				visit->detcount*buflen*sizeof(float));
+				visit->detcount*visit->reclen*sizeof(float));
+		    if(cfg->issaveseed)
+	                    visit->photonseed=realloc(visit->photonseed,visit->detcount*sizeof(RandType));
 		}
 		visit->partialpath[offset]=exitdet;
-	        memcpy(visit->partialpath+offset+1,r.partialpath,(buflen-1)*sizeof(float));
+	        memcpy(visit->partialpath+offset+1,r.partialpath,(visit->reclen-1)*sizeof(float));
+                if(cfg->issaveseed)
+	            memcpy(visit->photonseed+visit->bufpos*sizeof(RandType),r.photonseed,sizeof(RandType));
 		visit->bufpos++;
 	}
 	free(r.partialpath);
+        if(r.photonseed)
+		free(r.photonseed);
 	return r.Eabsorb;
 }
 
