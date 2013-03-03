@@ -130,7 +130,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
 			mesh_error("property file has wrong format");
-		mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);
+		/*mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
 	}
 	fclose(fp);
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
@@ -570,7 +570,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	if(cfg->issaveseed && seeds!=NULL){
 	   cfg->his.seedbyte=seedbyte;
         }
-        cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+2; /*column count=maxmedia+2*/
+        cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+2*/
 
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);

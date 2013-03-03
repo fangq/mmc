@@ -45,6 +45,9 @@ function varargout=mmclab(cfg,type)
 %      cfg.isreflect:   [1]-consider refractive index mismatch, 0-matched index
 %      cfg.isnormalized:[1]-normalize the output flux to unitary source, 0-no reflection
 %      cfg.isspecular:  [1]-calculate specular reflection if source is outside
+%      cfg.ismomentum:  [0]-save momentum transfer for each detected photon
+%      cfg.issaveexit:  [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
+%      cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
 %      cfg.basisorder:  [1]-linear basis, 0-piece-wise constant basis
 %      cfg.outputformat:['ascii'] or 'bin' (in 'double')
 %      cfg.outputtype:  [X] - output flux, F - fluence, E - energy deposit

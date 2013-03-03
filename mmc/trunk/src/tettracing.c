@@ -646,6 +646,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
+        float mom;
 	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,NULL,NULL};
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
@@ -675,7 +676,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*initialize the photon parameters*/
 	if(cfg->srctype==stIsotropic){
-		r.slen=mc_next_scatter(0,&r.vec,ran,ran0,cfg,r.partialpath+mesh->prop+mesh->type[r.eid-1]);
+                mom=0.f;
+		r.slen=mc_next_scatter(0,&r.vec,ran,ran0,cfg,&mom);
+                if(cfg->ismomentum)
+                   r.partialpath[mesh->prop+mesh->type[r.eid-1]]+=mom;
 	}else{
 		r.slen=rand_next_scatlen(ran);
 	}
@@ -742,10 +746,15 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
         		 fprintf(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    else if(r.eid==0 && (cfg->debuglevel&dlExit))
+		    else if(r.eid==0){
+                       if(cfg->debuglevel&dlExit)
         		 fprintf(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
-		    else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
+                       if(cfg->issavedet && cfg->issaveexit){
+                            memcpy(r.partialpath+(visit->reclen-1-6),&(r.p0.x),sizeof(float)*3);
+                            memcpy(r.partialpath+(visit->reclen-1-3),&(r.vec.x),sizeof(float)*3);
+                       }
+		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          fprintf(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 fprintf(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
@@ -770,8 +779,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		else
 			break;
 	    }
-	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,
-	                           r.partialpath+mesh->prop+mesh->type[r.eid-1]);
+            mom=0.f;
+	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
+            if(cfg->ismomentum)
+                  r.partialpath[mesh->prop+mesh->type[r.eid-1]]+=mom;
             r.partialpath[0]++;
 	}
 	if(cfg->issavedet && exitdet>0){

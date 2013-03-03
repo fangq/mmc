@@ -29,15 +29,18 @@ cfg.detpos=[30. 20. 0. 1.
    30. 40. 0. 1.
    20. 30. 0. 1.
    40. 30. 0. 1.];
+cfg.issaveexit=1;
 
-[cube detp newcfg seeds]=mmclab(cfg);
+newcfg=mmclab(cfg,'prep');
+
+[cube detp ncfg seeds]=mmclab(newcfg,'sse');
 
 % now replay the detected photons
 
-cfg.seed=seeds.data;
-cfg.isnormalized=0;
+newcfg.seed=seeds.data;
+newcfg.isnormalized=0;
 
-[cube2 detp2 newcfg2 seeds2]=mmclab(cfg);
+[cube2 detp2 ncfg2 seeds2]=mmclab(newcfg,'sse');
 
 % the two detected photon arrays should be the same. however, because
 % the program uses multi-threading, the orders may be different
@@ -45,7 +48,9 @@ cfg.isnormalized=0;
 [isreplayed, mapidx]=ismember(detp.data',detp2.data','rows');
 
 if(all(isreplayed))
-   disp('replay is successful');
+   disp('replay is successful :-)');
+else
+   disp('replay failed :-(');
 end
 
 qmeshcut(cfg.elem(:,1:4),cfg.node,sum(cube2.data,2),'y=30.2');

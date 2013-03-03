@@ -117,7 +117,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #pragma omp parallel private(ran0,ran1,threadid)
 {
 	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
-	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+2;
+	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,sizeof(RandType));
@@ -263,6 +263,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,isreflect)
     GET_ONE_FIELD(cfg,isspecular)
     GET_ONE_FIELD(cfg,ismomentum)
+    GET_ONE_FIELD(cfg,issaveexit)
     GET_ONE_FIELD(cfg,outputtype)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
@@ -487,10 +488,13 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(cfg->issavedet && cfg->detnum==0) 
       	cfg->issavedet=0;
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
-
+     if(cfg->issavedet==0){
+        cfg->ismomentum=0;
+        cfg->issaveexit=0;
+     }
      cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
-     cfg->his.colcount=cfg->medianum+1; /*column count=maxmedia+2*/
+     cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+1;
 }
 
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){

@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','\0'};
+                 'i','V','O','m','F','q','x','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -53,7 +53,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
-                 "--momentum","--outputformat","--saveseed",""};
+                 "--momentum","--outputformat","--saveseed","--saveexit",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -106,6 +106,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->outputformat=ofASCII;
      cfg->ismomentum=0;
      cfg->issaveseed=0;
+     cfg->issaveexit=0;
      cfg->photonseed=NULL;
 
      memset(&(cfg->his),0,sizeof(history));
@@ -308,6 +309,8 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         if(!cfg->issavedet)   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
         if(!cfg->isspecular)  cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
         if(!cfg->ismomentum)  cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
+        if(!cfg->issaveexit)  cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
+        if(!cfg->issaveseed)  cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
         if(cfg->basisorder)   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
         if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup(FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
         if(cfg->outputformat<0)
@@ -420,9 +423,6 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      	fprintf(stdout,"%s\nPlease specify the index to the tetrahedral element enclosing the source [start from 1]:\n\t",cfg->meshtag);
      MMC_ASSERT(fscanf(in,"%d", &(cfg->dim.x))==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
-
-     cfg->minstep=MIN(cfg->steps.x,cfg->steps.y);
-     cfg->minstep=MIN(cfg->minstep,cfg->steps.z);
 
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of detectors and fiber diameter (in mm):\n\t");
@@ -691,7 +691,11 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'm':
 		                i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");
 				if (cfg->ismomentum) cfg->issavedet=1;
-				break;			       
+				break;
+		     case 'x':
+		                i=mcx_readarg(argc,argv,i,&(cfg->issaveexit),"bool");
+				if (cfg->issaveexit) cfg->issavedet=1;
+				break;
 		     case 'C':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"bool");
 		     	        break;
