@@ -39,6 +39,8 @@ function varargout=mmclab(cfg,type)
 %                       '<': search along the backward direction
 %                       '-': search both directions
 %      cfg.seed:        seed for the random number generator (integer) [0]
+%                       if set as a uint8 array, the binary data in each column is used 
+%                       to seed a photon (i.e. the "replay" mode)
 %      cfg.detpos:      an N by 4 array, each row specifying a detector: [x,y,z,radius]
 %      cfg.isreflect:   [1]-consider refractive index mismatch, 0-matched index
 %      cfg.isnormalized:[1]-normalize the output flux to unitary source, 0-no reflection
@@ -82,7 +84,8 @@ function varargout=mmclab(cfg,type)
 %            including the calculated subfields (marked by "-"). This can be
 %            used as the input to avoid repetitive preprocessing.
 %      seeds: (optional), if give, mmclab returns the seeds, in the form of
-%            a byte array (uint8) for each detected photon.
+%            a byte array (uint8) for each detected photon. The column number
+%            of seed equals that of detphoton.
 %
 % Example:
 %      cfg.nphoton=1e5;

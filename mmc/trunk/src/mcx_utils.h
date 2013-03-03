@@ -35,6 +35,7 @@
 #define MAX_SESSION_LENGTH  256
 #define MAX_CHECKPOINT      16
 #define DET_PHOTON_BUF      100000
+#define SEED_FROM_FILE      -999
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 
@@ -147,6 +148,7 @@ typedef struct MMC_config{
 	float unitinmm;     /**<define the length unit in mm*/
 	history his;        /**<header info of the history file*/
 	unsigned int checkpt[MAX_CHECKPOINT]; /**<a list of photon numbers at which a snapshot of the weights will be saved*/
+	void *photonseed;
 } mcconfig;
 
 #ifdef	__cplusplus

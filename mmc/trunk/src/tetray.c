@@ -66,7 +66,8 @@ int main(int argc, char**argv){
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
 
-	if(cfg.seed<0) cfg.seed=time(NULL);
+	if(cfg.seed<0 && cfg.seed!=SEED_FROM_FILE)
+	    cfg.seed=time(NULL);
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg.issaveseed=0;
 #endif
@@ -103,7 +104,10 @@ int main(int argc, char**argv){
         #pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
-		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
+		if(cfg.seed==SEED_FROM_FILE)
+		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i,ran1,&visit);
+		else
+		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
 		#pragma omp atomic
 		   ncomplete++;

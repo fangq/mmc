@@ -135,7 +135,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
-		Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
+                if(cfg.seed==SEED_FROM_FILE)
+                   Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i,ran1,&visit);
+                else
+                   Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
 		#pragma omp atomic
 		   ncomplete++;
@@ -249,9 +252,11 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     int i,j;
     const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
+    if(strcmp(name,"nphoton")==0 && cfg->photonseed!=NULL)
+	return;
+
     cfg->flog=stderr;
     GET_1ST_FIELD(cfg,nphoton)
-    GET_ONE_FIELD(cfg,seed)
     GET_ONE_FIELD(cfg,tstart)
     GET_ONE_FIELD(cfg,tstep)
     GET_ONE_FIELD(cfg,tend)
@@ -405,6 +410,23 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         jsonshapes=new char[len+1];
         mxGetString(item, jsonshapes, len+1);
         jsonshapes[len]='\0';
+    }else if(strcmp(name,"seed")==0){
+        arraydim=mxGetDimensions(item);
+	if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'seed' field can not be empty");
+        if(!mxIsUint8(item)){
+            double *val=mxGetPr(item);
+            cfg->seed=val[0];
+            printf("mmc.seed=%d;\n",cfg->seed);
+        }else{
+	    cfg->photonseed=malloc(arraydim[0]*arraydim[1]);
+            if(arraydim[0]!=sizeof(RandType))
+		MEXERROR("the row number of cfg.seed does not match RNG seed byte-length");
+            memcpy(cfg->photonseed,mxGetData(item),arraydim[0]*arraydim[1]);
+            cfg->seed=SEED_FROM_FILE;
+            cfg->nphoton=arraydim[1];
+            printf("mmc.nphoton=%d;\n",cfg->nphoton);
+        }
     }else{
         printf("WARNING: redundant field '%s'\n",name);
     }
@@ -464,7 +486,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      }
      if(cfg->issavedet && cfg->detnum==0) 
       	cfg->issavedet=0;
-     if(cfg->seed<0) cfg->seed=time(NULL);
+     if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
 
      cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
