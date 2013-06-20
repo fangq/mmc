@@ -273,6 +273,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,isref3)
     GET_ONE_FIELD(cfg,isnormalized)
     GET_ONE_FIELD(cfg,minenergy)
+    GET_ONE_FIELD(cfg,replaydet)
     GET_ONE_FIELD(cfg,unitinmm)
     GET_VEC3_FIELD(cfg,srcpos)
     GET_VEC3_FIELD(cfg,srcdir)

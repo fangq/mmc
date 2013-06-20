@@ -57,6 +57,9 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
+	if(cfg->seed==SEED_FROM_FILE && cfg->seedfile[0]){
+          mesh_loadseedfile(mesh,cfg);
+        }
 }
 
 void mesh_error(char *msg){
@@ -213,6 +216,53 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 }
+
+void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
+    history his;
+    FILE *fp=fopen(cfg->seedfile,"rb");
+    if(fp==NULL)
+        mesh_error("can not open the specified history file");
+    if(fread(&his,sizeof(history),1,fp)!=1)
+        mesh_error("error when reading the history file");
+    if(his.savedphoton==0 || his.seedbyte==0){
+        fclose(fp);
+        return;
+    }
+    if(his.maxmedia!=mesh->prop)
+        mesh_error("the history file was generated with a different media setting");
+    if(fseek(fp,his.savedphoton*his.colcount*sizeof(float),SEEK_CUR))
+        mesh_error("illegal history file");
+    cfg->photonseed=malloc(his.savedphoton*his.seedbyte);
+    if(cfg->photonseed==NULL)
+        mesh_error("can not allocate memory");
+    if(fread(cfg->photonseed,his.seedbyte,his.savedphoton,fp)!=his.savedphoton)
+        mesh_error("error when reading the seed data");
+    cfg->seed=SEED_FROM_FILE;
+    cfg->nphoton=his.savedphoton;
+    if(cfg->replaydet>0){
+       int i,j;
+       float *ppath=malloc(his.savedphoton*his.colcount*sizeof(float));
+       cfg->replayweight=malloc(his.savedphoton*sizeof(float));
+       fseek(fp,sizeof(his),SEEK_SET);
+       if(fread(ppath,his.savedphoton,his.colcount,fp)!=his.colcount)
+           mesh_error("error when reading the seed data");
+
+       cfg->nphoton=0;
+       for(i=0;i<his.savedphoton;i++)
+           if(cfg->replaydet==(int)(ppath[i*his.colcount])){
+               memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
+               cfg->replayweight[cfg->nphoton]=1.f;
+               for(j=2;j<his.maxmedia+2;j++)
+                  cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]);
+               cfg->nphoton++;
+           }
+	free(ppath);
+        cfg->photonseed=realloc(cfg->photonseed, cfg->nphoton*his.seedbyte);
+        cfg->replayweight=(float*)realloc(cfg->replayweight, cfg->nphoton*sizeof(float));
+    }
+    fclose(fp);
+}
+
 void mesh_clear(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;

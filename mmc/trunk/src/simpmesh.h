@@ -102,6 +102,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg);
 
 void mesh_clear(tetmesh *mesh);
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);
