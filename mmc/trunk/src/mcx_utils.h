@@ -121,6 +121,7 @@ typedef struct MMC_config{
 	int maxgate;        /**<simultaneous recording gates*/
 	int respin;         /**<number of repeatitions*/
 	int printnum;       /**<number of printed threads (for debugging)*/
+        int replaydet;      /**<the detector id for which to replay the detected photons, start from 1*/
 
 	unsigned char *vol; /**<pointer to the volume*/
 	char session[MAX_SESSION_LENGTH]; /**<session id, a string*/
@@ -136,6 +137,7 @@ typedef struct MMC_config{
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char issaveseed;    /**<1 save the seed for a detected photon, 0 do not save*/
+	char isjacobian;    /**<1 calculate Jacobian in the replay mode, 0 do not calculate*/
 	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
         char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
@@ -150,6 +152,8 @@ typedef struct MMC_config{
 	history his;        /**<header info of the history file*/
 	unsigned int checkpt[MAX_CHECKPOINT]; /**<a list of photon numbers at which a snapshot of the weights will be saved*/
 	void *photonseed;
+	float *replayweight;
+        char seedfile[MAX_PATH_LENGTH];
 } mcconfig;
 
 #ifdef	__cplusplus

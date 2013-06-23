@@ -49,6 +49,7 @@
 #define LOG_MT_MAX 22.1807097779182f
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
+#define DELTA_MUA  1e-4f
 
 
 /***************************************************************************//**
@@ -102,6 +103,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg);
 
 void mesh_clear(tetmesh *mesh);
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);

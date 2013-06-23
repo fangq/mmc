@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','x','\0'};
+                 'i','V','O','m','F','q','x','P','J','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -53,7 +53,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
-                 "--momentum","--outputformat","--saveseed","--saveexit",""};
+                 "--momentum","--outputformat","--saveseed","--saveexit","--replaydet","--jacobian",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -95,6 +95,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->flog=stdout;
      cfg->sradius=0.f;
      cfg->rootpath[0]='\0';
+     cfg->seedfile[0]='\0';
      cfg->debuglevel=0;
      cfg->minstep=1.f;
      cfg->roulettesize=10.f;
@@ -108,6 +109,9 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issaveseed=0;
      cfg->issaveexit=0;
      cfg->photonseed=NULL;
+     cfg->replaydet=0;
+     cfg->replayweight=NULL;
+     cfg->isjacobian=0;
 
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
@@ -128,6 +132,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->vol);
      if(cfg->photonseed)
         free(cfg->photonseed);
+     if(cfg->replayweight)
+        free(cfg->replayweight);
      if(cfg->flog)
         fclose(cfg->flog);
      mcx_initcfg(cfg);
@@ -606,33 +612,11 @@ int mcx_keylookup(char *key, const char *table[]){
     }
     return -1;
 }
-void mcx_loadseedfile(char *fname, mcconfig *cfg){
-    history his;
-    FILE *fp=fopen(fname,"rb");
-    if(fp==NULL)
-        MMC_ERROR(-2,"can not open the specified history file");
-    if(fread(&his,sizeof(history),1,fp)!=1)
-        MMC_ERROR(-2,"error when reading the history file");
-    if(his.savedphoton==0 || his.seedbyte==0){
-        fclose(fp);
-        return;
-    }
-    if(fseek(fp,his.savedphoton*his.colcount*sizeof(float),SEEK_CUR))
-        MMC_ERROR(-2,"illegal history file");
-    cfg->photonseed=malloc(his.savedphoton*his.seedbyte);
-    if(cfg->photonseed==NULL)
-        MMC_ERROR(-2,"can not allocate memory");
-    if(fread(cfg->photonseed,his.seedbyte,his.savedphoton,fp)!=his.savedphoton)
-        MMC_ERROR(-2,"error when reading the seed data");
-    cfg->seed=SEED_FROM_FILE;
-    cfg->nphoton=his.savedphoton;
-    fclose(fp);
-}
+
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      int i=1,isinteractive=1,issavelog=0;
      char filename[MAX_PATH_LENGTH]={0};
      char logfile[MAX_PATH_LENGTH]={0};
-     char seedfile[MAX_PATH_LENGTH]={0};
      float np=0.f;
 
      if(argc<=1){
@@ -719,7 +703,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 					MMC_ERROR(-1,"seeding file is not supported in this binary");
 #else
-                                        i=mcx_readarg(argc,argv,i,seedfile,"string");
+                                        i=mcx_readarg(argc,argv,i,cfg->seedfile,"string");
 					cfg->seed=SEED_FROM_FILE;
 #endif
 		     	        }else
@@ -745,6 +729,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                 break;
                      case 'R':
                                 i=mcx_readarg(argc,argv,i,&(cfg->sradius),"float");
+                                break;
+                     case 'P':
+                                i=mcx_readarg(argc,argv,i,&(cfg->replaydet),"int");
+                                break;
+                     case 'J':
+                                i=mcx_readarg(argc,argv,i,&(cfg->isjacobian),"bool");
                                 break;
                      case 'u':
                                 i=mcx_readarg(argc,argv,i,&(cfg->unitinmm),"float");
@@ -780,9 +770,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		cfg->flog=stdout;
 		fprintf(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
-     }
-     if(cfg->seed==SEED_FROM_FILE && seedfile[0]){
-          mcx_loadseedfile(seedfile,cfg);
      }
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
        if(isinteractive){
