@@ -168,7 +168,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-		if(cfg->seed==SEED_FROM_FILE && cfg->isjacobian){
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
 #else
@@ -334,7 +334,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-		if(cfg->seed==SEED_FROM_FILE && cfg->isjacobian){
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
 #else
@@ -498,7 +498,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
-	    if(cfg->seed==SEED_FROM_FILE && cfg->isjacobian){
+	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
 #else
@@ -626,7 +626,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
-	    if(cfg->seed==SEED_FROM_FILE && cfg->isjacobian){
+	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
 #else

@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','x','P','J','\0'};
+                 'i','V','O','m','F','q','x','P','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -53,11 +53,11 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
-                 "--momentum","--outputformat","--saveseed","--saveexit","--replaydet","--jacobian",""};
+                 "--momentum","--outputformat","--saveseed","--saveexit","--replaydet",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
-const char outputtype[]={'x','f','e','\0'};
+const char outputtype[]={'x','f','e','j','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
@@ -111,7 +111,6 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->photonseed=NULL;
      cfg->replaydet=0;
      cfg->replayweight=NULL;
-     cfg->isjacobian=0;
 
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
@@ -733,9 +732,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                      case 'P':
                                 i=mcx_readarg(argc,argv,i,&(cfg->replaydet),"int");
                                 break;
-                     case 'J':
-                                i=mcx_readarg(argc,argv,i,&(cfg->isjacobian),"bool");
-                                break;
                      case 'u':
                                 i=mcx_readarg(argc,argv,i,&(cfg->unitinmm),"float");
                                 break;
@@ -771,6 +767,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		fprintf(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
+     if(cfg->outputtype==otJacobian && cfg->seed!=SEED_FROM_FILE)
+         MMC_ERROR(-1,"Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
        if(isinteractive){
           mcx_readconfig("",cfg);

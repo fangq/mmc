@@ -634,14 +634,15 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
-	if(cfg->seed==SEED_FROM_FILE && cfg->isjacobian){
+
+	if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
-            normalizor=1.f/DELTA_MUA;
+            float rdmua=1.f/DELTA_MUA;
             
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
-                  mesh->weight[i*datalen+j]*=normalizor;
-	    return normalizor;
+                  mesh->weight[i*datalen+j]*=rdmua;
+           return rdmua;
         }
 	if(cfg->outputtype==otEnergy){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
@@ -691,6 +692,5 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
                for(j=0;j<mesh->ne;j++)
                   mesh->weight[i*mesh->ne+j]*=normalizor;
 	}
-
 	return normalizor;
 }

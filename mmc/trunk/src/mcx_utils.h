@@ -45,7 +45,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian};
-enum TOutputType {otFlux, otFluence, otEnergy};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 
 /***************************************************************************//**
