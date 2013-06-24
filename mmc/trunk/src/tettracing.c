@@ -168,11 +168,21 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
-		r->weight*=expf(-prop->mua*r->Lmove);
+		    currweight=expf(-DELTA_MUA*r->Lmove);
 #else
-		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
 #endif
+                    currweight*=cfg->replayweight[r->photoid];
+                    r->weight=0.f;
+                }else{
+#ifdef __INTEL_COMPILER
+		    r->weight*=expf(-prop->mua*r->Lmove);
+#else
+		    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+		}
 		r->slen-=r->Lmove*prop->mus;
                 r->p0.x+=r->Lmove*r->vec.x;
                 r->p0.y+=r->Lmove*r->vec.y;
@@ -324,8 +334,21 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-
-		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
+#ifdef __INTEL_COMPILER
+		    currweight=expf(-DELTA_MUA*r->Lmove);
+#else
+		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
+#endif
+                    currweight*=cfg->replayweight[r->photoid];
+                    r->weight=0.f;
+                }else{
+#ifdef __INTEL_COMPILER
+		    r->weight*=expf(-prop->mua*r->Lmove);
+#else
+		    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+		}
 		r->slen-=r->Lmove*prop->mus;
 	        if(bary.x==0.f){
 			break;
@@ -475,8 +498,21 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
-
-	    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
+#ifdef __INTEL_COMPILER
+		currweight=expf(-DELTA_MUA*r->Lmove);
+#else
+		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
+#endif
+                currweight*=cfg->replayweight[r->photoid];
+                r->weight=0.f;
+            }else{
+#ifdef __INTEL_COMPILER
+		r->weight*=expf(-prop->mua*r->Lmove);
+#else
+		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+	    }
 	    r->slen-=r->Lmove*prop->mus;
 	    if(bary.x>=0.f){
 		ww=currweight-r->weight;
@@ -590,8 +626,21 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
-
-	    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
+#ifdef __INTEL_COMPILER
+		currweight=expf(-DELTA_MUA*r->Lmove);
+#else
+		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
+#endif
+                currweight*=cfg->replayweight[r->photoid];
+                r->weight=0.f;
+            }else{
+#ifdef __INTEL_COMPILER
+		r->weight*=expf(-prop->mua*r->Lmove);
+#else
+		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+	    }
 	    r->slen-=r->Lmove*prop->mus;
 	    if(bary.x>=0.f){
 		ww=currweight-r->weight;
@@ -647,12 +696,13 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
         float mom;
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,NULL,NULL};
+	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL};
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
 	r.partialpath=(float*)calloc(visit->reclen-1,sizeof(float));
+	r.photoid=id;
         if(cfg->issavedet && cfg->issaveseed){
                 r.photonseed=(void*)calloc(1,sizeof(RandType));
 		memcpy(r.photonseed,(void *)ran, sizeof(RandType));

@@ -51,6 +51,7 @@ typedef struct MMC_ray{
 	float slen;
 	float Lmove;
 	double Eabsorb;
+	unsigned int photoid;
 	float *partialpath;
         void  *photonseed;
 } ray;

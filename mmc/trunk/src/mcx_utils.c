@@ -57,7 +57,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
-const char outputtype[]={'x','f','e','\0'};
+const char outputtype[]={'x','f','e','j','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
@@ -767,6 +767,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		fprintf(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
+     if(cfg->outputtype==otJacobian && cfg->seed!=SEED_FROM_FILE)
+         MMC_ERROR(-1,"Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
        if(isinteractive){
           mcx_readconfig("",cfg);
