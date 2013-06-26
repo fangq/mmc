@@ -241,8 +241,8 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
     cfg->nphoton=his.savedphoton;
     if(cfg->replaydet>0){
        int i,j;
-       float *ppath=malloc(his.savedphoton*his.colcount*sizeof(float));
-       cfg->replayweight=malloc(his.savedphoton*sizeof(float));
+       float *ppath=(float*)malloc(his.savedphoton*his.colcount*sizeof(float));
+       cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));
        fseek(fp,sizeof(his),SEEK_SET);
        if(fread(ppath,his.savedphoton,his.colcount,fp)!=his.colcount)
            mesh_error("error when reading the seed data");

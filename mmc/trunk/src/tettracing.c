@@ -163,7 +163,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	}
 	visit->raytet++;
         if(r->pout.x!=MMC_UNDEFINED){
-		if(r->photontimer+r->Lmove*rc>=cfg->tend){ /*exit time window*/
+                if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 		   r->faceid=-2;
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
@@ -329,7 +329,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	        S = _mm_add_ps(S, O);
 	        _mm_store_ps(&(r->pout.x),S);
 
-		if(r->photontimer+r->Lmove*rc>=cfg->tend){ /*exit time window*/
+		if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 		   r->faceid=-2;
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
@@ -493,7 +493,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	    r->pout.x=r->p0.x+bary.x*r->vec.x;
 	    r->pout.y=r->p0.y+bary.x*r->vec.y;
 	    r->pout.z=r->p0.z+bary.x*r->vec.z;
-	    if(r->photontimer+r->Lmove*rc>=cfg->tend){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
@@ -621,7 +621,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    T = _mm_add_ps(T, S);
 	    _mm_store_ps(&(r->pout.x),T);
 
-	    if(r->photontimer+r->Lmove*rc>=cfg->tend){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
