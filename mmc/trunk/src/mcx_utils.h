@@ -45,7 +45,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian};
-enum TOutputType {otFlux, otFluence, otEnergy, otJacobian};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otTaylor};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 
 /***************************************************************************//**
@@ -137,7 +137,6 @@ typedef struct MMC_config{
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char issaveseed;    /**<1 save the seed for a detected photon, 0 do not save*/
-	char isjacobian;    /**<1 calculate Jacobian in the replay mode, 0 do not calculate*/
 	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
         char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/

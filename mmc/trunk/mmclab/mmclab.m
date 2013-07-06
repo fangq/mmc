@@ -51,6 +51,7 @@ function varargout=mmclab(cfg,type)
 %      cfg.basisorder:  [1]-linear basis, 0-piece-wise constant basis
 %      cfg.outputformat:['ascii'] or 'bin' (in 'double')
 %      cfg.outputtype:  [X] - output flux, F - fluence, E - energy deposit
+%                       J - Jacobian (replay), T - approximated Jacobian (replay mode)
 %      cfg.method:      ray-tracing method, [P]:Plucker, H:Havel (SSE4),
 %                       B: partial Badouel, S: branchless Badouel (SSE)
 %      cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space

@@ -176,6 +176,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                     currweight*=cfg->replayweight[r->photoid];
                     r->weight=0.f;
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		    currweight=r->Lmove;
+		    currweight*=cfg->replayweight[r->photoid];
+		    r->weight=0.f;
                 }else{
 #ifdef __INTEL_COMPILER
 		    r->weight*=expf(-prop->mua*r->Lmove);
@@ -342,6 +346,10 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                     currweight*=cfg->replayweight[r->photoid];
                     r->weight=0.f;
+                }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		    currweight=r->Lmove;
+		    currweight*=cfg->replayweight[r->photoid];
+		    r->weight=0.f;
                 }else{
 #ifdef __INTEL_COMPILER
 		    r->weight*=expf(-prop->mua*r->Lmove);
@@ -506,6 +514,10 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                 currweight*=cfg->replayweight[r->photoid];
                 r->weight=0.f;
+            }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		currweight=r->Lmove;
+		currweight*=cfg->replayweight[r->photoid];
+		r->weight=0.f;
             }else{
 #ifdef __INTEL_COMPILER
 		r->weight*=expf(-prop->mua*r->Lmove);
@@ -634,6 +646,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 #endif
                 currweight*=cfg->replayweight[r->photoid];
                 r->weight=0.f;
+            }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		currweight=r->Lmove;
+		currweight*=cfg->replayweight[r->photoid];
+		r->weight=0.f;
             }else{
 #ifdef __INTEL_COMPILER
 		r->weight*=expf(-prop->mua*r->Lmove);

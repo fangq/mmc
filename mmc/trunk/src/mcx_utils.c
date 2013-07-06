@@ -57,7 +57,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
-const char outputtype[]={'x','f','e','j','\0'};
+const char outputtype[]={'x','f','e','j','t','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
@@ -767,7 +767,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		fprintf(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
-     if(cfg->outputtype==otJacobian && cfg->seed!=SEED_FROM_FILE)
+     if((cfg->outputtype==otJacobian || cfg->outputtype==otTaylor) && cfg->seed!=SEED_FROM_FILE)
          MMC_ERROR(-1,"Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
        if(isinteractive){
@@ -803,12 +803,19 @@ where possible parameters include (the first item in [] is the default value)\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
- -O [X|XFE]    (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
+ -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
+                               J - Jacobian (replay mode),   T - approximated\n\
+                               Jacobian (replay mode only)\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
  -l            (--log)         print messages to a log file instead\n\
- -E [0|int]    (--seed)        set random-number-generator seed\n\
+ -E [0|int|mch](--seed)        set random-number-generator seed;\n\
+                               if an mch file is followed, MMC will \"replay\" \n\
+                               the detected photon; the replay mode can be used\n\
+                               to calculate the Jacobian\n\
+ -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
+                               detector (det ID starts from 1), used with -E \n\
  -M [%c|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
