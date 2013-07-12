@@ -239,6 +239,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
         mesh_error("error when reading the seed data");
     cfg->seed=SEED_FROM_FILE;
     cfg->nphoton=his.savedphoton;
+
     if(cfg->outputtype==otJacobian || cfg->outputtype==otTaylor){ //cfg->replaydet>0
        int i,j;
        float *ppath=(float*)malloc(his.savedphoton*his.colcount*sizeof(float));
@@ -253,12 +254,13 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
                memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
                cfg->replayweight[cfg->nphoton]=1.f;
                for(j=2;j<his.maxmedia+2;j++)
-                  cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]);
+                  cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
                cfg->nphoton++;
            }
 	free(ppath);
         cfg->photonseed=realloc(cfg->photonseed, cfg->nphoton*his.seedbyte);
         cfg->replayweight=(float*)realloc(cfg->replayweight, cfg->nphoton*sizeof(float));
+	cfg->minenergy=0.f;
     }
     fclose(fp);
 }

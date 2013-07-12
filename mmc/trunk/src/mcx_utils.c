@@ -796,7 +796,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -f config     (--input)       read config from a file\n\
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
- -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette\n\
+ -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
