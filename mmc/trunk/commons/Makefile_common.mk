@@ -64,7 +64,7 @@ ifeq ($(CC),icc)
 	EXTRALIB :=
 endif
 
-ARFLAGS    := $(EXTRALIB)
+ARFLAGS    := 
 
 OBJSUFFIX  := .o
 BINSUFFIX  := 
@@ -142,7 +142,7 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 ##  Link  ##
 $(BINDIR)/$(BINARY): makedirs $(OBJS)
 	@$(ECHO) Building $@
-	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/$(BINARY) $(OBJS) $(USERARFLAGS) $(EXTRALIB)
+	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
 
 ##  Documentation  ##
 doc: makedocdir

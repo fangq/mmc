@@ -75,11 +75,11 @@ The latest release of MMC can be downloaded from the following URL:
   http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
 
 The development branch (not fully tested) of the code can be accessed 
-using Subversion (SVN). However this is not encouraged unless you are
-a developer. To check out the SVN source code, you should use the following 
+using Git. However this is not encouraged unless you are
+a developer. To check out the Git source code, you should use the following 
 command:
 
-  svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mmc/trunk mmc
+  git clone git://mcx.git.sourceforge.net/gitroot/mcx/mcx/ mmc
 
 then type the password as "anonymous_user". This will allow you to 
 anonymously check out the entire source code tree.

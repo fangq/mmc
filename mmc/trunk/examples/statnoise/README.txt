@@ -5,13 +5,9 @@
 == Steps ==
 
 1. First, you need to create the mesh files to run this example. You
-need to first download and install iso2mesh version 1.0 from
+need to first download and install iso2mesh version 1.0 or newer from
 
   http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
-
-or, you can download the svn version of iso2mesh from
-
-  svn checkout https://iso2mesh.svn.sourceforge.net/svnroot/iso2mesh/trunk/iso2mesh iso2mesh
 
 2. Start matlab, run createmesh to create all mesh files. Matlab will
 print a value for variable eid. This value indicates the initial element
