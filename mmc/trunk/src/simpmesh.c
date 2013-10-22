@@ -522,8 +522,8 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
 	stheta=sqrt(1.f-tmp0*tmp0);
 	//stheta=sinf(theta);
 	ctheta=tmp0;
-    }else{  //Wang1995 has acos(2*ran-1), rather than 2*pi*ran, need to check
-	theta=M_PI*rand_next_zangle(ran);
+    }else{
+	theta=acosf(2.f*rand_next_zangle(ran)-1.f);
     	mmc_sincosf(theta,&stheta,&ctheta);
     }
 
