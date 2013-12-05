@@ -27,6 +27,7 @@ nfull=[no;fixednodes];
 [node3,elem3,face3]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,8,[30 30 30],[],[1.5 1.5 1.5 1.5 5 5 5 5]);
 [node3,elem3]=sortmesh(srcpos,node3,elem3,1:4);
 elem3(:,1:4)=meshreorient(node3,elem3(:,1:4));
+elem3(:,5)=elem3(:,5)+1;
 savemmcmesh('mesh2',node3,elem3(:,1:5),[]);
 eid3=tsearchn(node3,elem3(:,1:4),srcpos);
 
@@ -39,6 +40,7 @@ nodesize=[1*ones(size(no,1),1) ; 1; 1];
 [node2,elem2,face2]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,2,[30 30 30],[],[1 1 1 1 1 1 1 1]);
 [node2,elem2]=sortmesh(srcpos,node2,elem2,1:4);
 elem2(:,1:4)=meshreorient(node2,elem2(:,1:4));
+elem2(:,5)=elem2(:,5)+1;
 savemmcmesh('mesh1',node2,elem2(:,1:5),[]);
 eid2=tsearchn(node2,elem2(:,1:4),srcpos);
 
@@ -56,6 +58,7 @@ nfull=[no; 30 30 30];
 [node1,elem1,face1]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,10,[30 30 30],[],[2 2 2 2 5 5 5 5]);
 [node1,elem1]=sortmesh(srcpos,node1,elem1,1:4);
 elem1(:,1:4)=meshreorient(node1,elem1(:,1:4));
+elem1(:,5)=elem1(:,5)+1;
 savemmcmesh('mesh0',node1,elem1(:,1:5),[]);
 eid1=tsearchn(node1,elem1(:,1:4),srcpos);
 
