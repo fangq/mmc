@@ -5,7 +5,7 @@
 
 Author:  Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.9.0 (Banana Pudding)
+Version: 0.9.5 (Wasabi Peas)
 URL:     http://mcx.sf.net/mmc/
 
 -------------------------------------------------------------------------------

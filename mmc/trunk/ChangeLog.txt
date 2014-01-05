@@ -1,5 +1,19 @@
 Change Log
 
+== MMC 0.9.5 (Wasabi Peas) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
+
+2013/10/22 fix a critical bug for isotropic scattering at g=0
+2013/06/26 (experimental) output absorption Jacobian pattern in the replay mode
+2013/03/03 saving photon exit pos and direction with the "-x" flag
+2013/03/02 photon replay with a pre-recorded seed for perturbation MC
+2012/08/17 add MMCLAB examples
+2012/08/16 initial ray-tracing in MMCLAB if source is not inside the mesh
+2012/08/03 allow detector individual radius
+2012/07/19 (experimental) add MMCLAB - a matlab interface
+2012/02/02 support binary output format with -F flag
+2012/01/25 support isotropic source, reading source types from JSON input
+
+
 == MMC 0.9.0 (Banana Pudding) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
 2011/12/19 final release of 0.9.0

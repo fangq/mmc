@@ -1,5 +1,5 @@
-The author of MMC is Qianqian Fang. Qianqian is currently 
-an Instructor at Massachusetts General Hospital, 
+The author of MMC is Qianqian Fang. Qianqian is currently an 
+Assistant Professor of Radiology at Massachusetts General Hospital, 
 Harvard Medical School.
 
 Address: Martinos Center for Biomedical Imaging, 
