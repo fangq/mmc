@@ -2,7 +2,8 @@ Change Log
 
 == MMC 0.9.5 (Wasabi Peas) stable release, Qianqian Fang <fangq@nmr.mgh.harvard.edu> ==
 
-2013/10/22 fix a critical bug for isotropic scattering at g=0
+2013/12/22 WebMMC skeleton uploaded, allowing MMC to run inside a web browser
+2013/12/20 output static or dynamic libraries (libmmc.a/libmmc.so)
 2013/06/26 (experimental) output absorption Jacobian pattern in the replay mode
 2013/03/03 saving photon exit pos and direction with the "-x" flag
 2013/03/02 photon replay with a pre-recorded seed for perturbation MC
