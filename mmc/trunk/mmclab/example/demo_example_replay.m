@@ -21,7 +21,7 @@ cfg.srcpos=[30.1,30.2,0];
 cfg.srcdir=[0 0 1];
 cfg.tstart=0;
 cfg.tend=5e-9;
-cfg.tstep=1e-10;
+cfg.tstep=5e-9;
 cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0];
 cfg.debuglevel='TP';
 cfg.isreflect=0;
@@ -39,6 +39,7 @@ newcfg=mmclab(cfg,'prep');
 
 newcfg.seed=seeds.data;
 newcfg.isnormalized=0;
+newcfg.outputtype=4;
 
 [cube2 detp2 ncfg2 seeds2]=mmclab(newcfg);
 
