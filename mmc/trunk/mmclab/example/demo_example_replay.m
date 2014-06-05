@@ -33,14 +33,14 @@ cfg.issaveexit=1;
 
 newcfg=mmclab(cfg,'prep');
 
-[cube detp ncfg seeds]=mmclab(newcfg,'sse');
+[cube detp ncfg seeds]=mmclab(newcfg');
 
 % now replay the detected photons
 
 newcfg.seed=seeds.data;
 newcfg.isnormalized=0;
 
-[cube2 detp2 ncfg2 seeds2]=mmclab(newcfg,'sse');
+[cube2 detp2 ncfg2 seeds2]=mmclab(newcfg);
 
 % the two detected photon arrays should be the same. however, because
 % the program uses multi-threading, the orders may be different
