@@ -44,7 +44,7 @@ int main(int argc, char**argv){
 	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
-	visitor master={0.f,0.f,0,0,0,NULL,NULL};
+	visitor master={0.f,0.f,0,0,0,NULL,NULL,0.f};
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
@@ -86,8 +86,8 @@ int main(int argc, char**argv){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
-	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f};
+	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
 	    if(cfg.issaveseed)
 	        visit.photonseed=calloc(visit.detcount,sizeof(RandType));
@@ -133,6 +133,7 @@ int main(int argc, char**argv){
                     memcpy((unsigned char*)master.photonseed+master.bufpos*sizeof(RandType),
                             visit.photonseed,visit.bufpos*sizeof(RandType));
 		master.bufpos+=visit.bufpos;
+		master.accumu_weight += visit.accumu_weight;
             }
             #pragma omp barrier
 	    free(visit.partialpath);

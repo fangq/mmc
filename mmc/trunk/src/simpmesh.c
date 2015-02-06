@@ -648,7 +648,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	if(cfg->issaveseed && seeds!=NULL){
 	   cfg->his.seedbyte=seedbyte;
         }
-        cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+2*/
+        cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+3; /*column count=maxmedia+3*/
 
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);

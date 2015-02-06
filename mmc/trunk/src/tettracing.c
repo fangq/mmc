@@ -724,6 +724,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	r.partialpath=(float*)calloc(visit->reclen-1,sizeof(float));
 	r.photoid=id;
+	r.partialpath[visit->reclen-2] = r.weight;
+	visit->accumu_weight += r.weight;
+
         if(cfg->issavedet && cfg->issaveseed){
                 r.photonseed=(void*)calloc(1,sizeof(RandType));
 		memcpy(r.photonseed,(void *)ran, sizeof(RandType));
@@ -778,7 +781,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	  r.eid=-r.eid;
         	  r.faceid=-1;
 	    }
-	    if(cfg->issavedet && r.Lmove>0.f)
+	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 	            r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
@@ -798,14 +801,14 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    		fprintf(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
-		    if(cfg->issavedet && r.Lmove>0.f)
-		            r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
+		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
+			r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 		       fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+r.eid-1));
                        r.slen=(*tracercore)(&r,tracer,cfg,visit);
-		       if(cfg->issavedet && r.Lmove>0.f)
+		       if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 	            		r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
@@ -846,13 +849,14 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f)
 			r.weight*=cfg->roulettesize;
-                        if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"Russian Roulette bumps r.weight to %f\n",r.weight);
+                        if(cfg->debuglevel&dlWeight)
+			    fprintf(cfg->flog,"Russian Roulette bumps r.weight to %f\n",r.weight);
 		else
 			break;
 	    }
             mom=0.f;
 	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
-            if(cfg->ismomentum)
+            if(cfg->ismomentum && mesh->type[r.eid-1]>0)
                   r.partialpath[mesh->prop+mesh->type[r.eid-1]]+=mom;
             r.partialpath[0]++;
 	}
