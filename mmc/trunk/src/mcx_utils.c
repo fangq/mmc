@@ -29,6 +29,7 @@
 #include <ctype.h>
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
+#include "mcx_const.h"
 
 #define FIND_JSON_KEY(id,idfull,parent,fallback,val) \
                     ((tmp=cJSON_GetObjectItem(parent,id))==0 ? \
@@ -59,7 +60,8 @@ const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'
 const char raytracing[]={'p','h','b','s','\0'};
 const char outputtype[]={'x','f','e','j','t','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
-const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
+const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
+    "pattern","fourier","arcsine","disk","fourierx","fourierx2d",""};
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
@@ -118,7 +120,9 @@ void mcx_initcfg(mcconfig *cfg){
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->bary0),0,sizeof(float4));
-     memset(&(cfg->srcparam),0,sizeof(float4));
+	memset(&(cfg->srcparam1),0,sizeof(float4));
+	memset(&(cfg->srcparam2),0,sizeof(float4));
+	cfg->srcpattern=NULL;
      memset(cfg->checkpt,0,sizeof(unsigned int)*MAX_CHECKPOINT);
 }
 
@@ -129,6 +133,8 @@ void mcx_clearcfg(mcconfig *cfg){
      	free(cfg->detpos);
      if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
         free(cfg->vol);
+	if(cfg->srcpattern)
+     	free(cfg->srcpattern);
      if(cfg->photonseed)
         free(cfg->photonseed);
      if(cfg->replayweight)
@@ -380,6 +386,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      MMC_ASSERT(fscanf(in,"%d", &(i) )==1); 
      if(cfg->nphoton==0) cfg->nphoton=i;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
+     
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
      if(cfg->seed==0)
@@ -387,25 +394,21 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      else
         MMC_ASSERT(fscanf(in,"%d", &itmp )==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
+     
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
+	
      if(in==stdin)
-     	fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",
-                                   cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
-     //cfg->srcpos.x--;cfg->srcpos.y--;cfg->srcpos.z--; /*convert to C index, grid center*/
+		fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) )==3);
-     comm=fgets(comment,MAX_PATH_LENGTH,in);
-     if(in==stdin)
-     	fprintf(stdout,"%f %f %f\nPlease specify the time gates in seconds (start end and step) [0.0 1e-9 1e-10]\n\t",
-                                   cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z);
-     MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,"%f %f %f\nPlease specify the path to the volume binary file:\n\t",
-                                   cfg->tstart,cfg->tend,cfg->tstep);
+		fprintf(stdout,"%f %f %f\nPlease specify the time gates in seconds (start end and step) [0.0 1e-9 1e-10]\n\t",cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z);
+     MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
+     comm=fgets(comment,MAX_PATH_LENGTH,in);
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
          MMC_ERROR(-9,"incorrect time gate settings");
      }
@@ -413,6 +416,8 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      /*if(cfg->maxgate>gates)*/
 	 cfg->maxgate=gates;
 
+	if(in==stdin)
+		fprintf(stdout,"%f %f %f\nPlease specify the path to the volume binary file:\n\t",cfg->tstart,cfg->tend,cfg->tstep);
      MMC_ASSERT(fscanf(in,"%s", cfg->meshtag)==1);
      if(cfg->rootpath[0]){
 #ifdef WIN32
@@ -433,6 +438,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      	fprintf(stdout,"Please specify the total number of detectors and fiber diameter (in mm):\n\t");
      MMC_ASSERT(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
+
      if(in==stdin)
      	fprintf(stdout,"%d %f\n",cfg->detnum,cfg->detradius);
      cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
@@ -442,7 +448,6 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
         if(in==stdin)
 		fprintf(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
      	MMC_ASSERT(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
-        //cfg->detpos[i].x--;cfg->detpos[i].y--;cfg->detpos[i].z--;  /*convert to C index*/
         comm=fgets(comment,MAX_PATH_LENGTH,in);
         if(comm!=NULL && sscanf(comm,"%f",&dtmp)==1)
             cfg->detpos[i].w=dtmp;
@@ -452,19 +457,37 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
         if(in==stdin)
 		fprintf(stdout,"%f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }
+
      if(in==stdin)
-     	fprintf(stdout,"Please specify the source type[pencil|cone|gaussian]:\n\t");
+		fprintf(stdout,"Please specify the source type[pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d]:\n\t");
      if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
         srctype=mcx_keylookup(strtypestr,srctypeid);
 	if(srctype==-1)
 	   MMC_ERROR(-6,"the specified source type is not supported");
-        if(srctype>0){
+		if(srctype>=0){
            comm=fgets(comment,MAX_PATH_LENGTH,in);
 	   cfg->srctype=srctype;
 	   if(in==stdin)
-     	      fprintf(stdout,"Please specify the source parameters (4 floating-points):\n\t");
-           MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam.x),
-	          &(cfg->srcparam.y),&(cfg->srcparam.z),&(cfg->srcparam.w))==4);
+			fprintf(stdout,"Please specify the source parameters set 1 (4 floating-points):\n\t");
+		MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam1.x),&(cfg->srcparam1.y),&(cfg->srcparam1.z),&(cfg->srcparam1.w))==4);
+		comm=fgets(comment,MAX_PATH_LENGTH,in);
+		if(in==stdin)
+			fprintf(stdout,"Please specify the source parameters set 2 (4 floating-points):\n\t");
+		MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam2.x),&(cfg->srcparam2.y),&(cfg->srcparam2.z),&(cfg->srcparam2.w))==4);
+		comm=fgets(comment,MAX_PATH_LENGTH,in);
+		if(cfg->srctype==MCX_SRC_PATTERN && cfg->srcparam1.w*cfg->srcparam2.w>0){
+			char patternfile[MAX_PATH_LENGTH];
+			FILE *fp;
+			if(cfg->srcpattern) free(cfg->srcpattern);
+			cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
+			MMC_ASSERT(fscanf(in, "%s", patternfile)==1);
+			comm=fgets(comment,MAX_PATH_LENGTH,in);
+			fp=fopen(patternfile,"rb");
+			if(fp==NULL)
+				MMC_ERROR(-6,"pattern file can not be opened");
+			MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w,sizeof(float),fp)==sizeof(float));
+			fclose(fp);
+		}
 	}else
 	   return;
      }else

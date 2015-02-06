@@ -67,6 +67,7 @@ typedef struct MMC_mesh{
 	int prop;    /**< number of media */
 	float3 *node;/**< node coordinates */
 	int4 *elem;  /**< element indices */
+	int *init_elem;	/**< candidate list of elements containing the source*/
 	int  *type;  /**< element-based media index */
 	int4 *facenb;/**< face neighbors, idx of the element sharing a face */
 	medium *med; /**< optical property of different media */
@@ -136,21 +137,25 @@ static inline void vec_add(float3 *a,float3 *b,float3 *res){
 	res->y=a->y+b->y;
 	res->z=a->z+b->z;
 }
+
 static inline void vec_diff(float3 *a,float3 *b,float3 *res){
         res->x=b->x-a->x;
         res->y=b->y-a->y;
         res->z=b->z-a->z;
 }
+
 static inline void vec_mult(float3 *a,float sa,float3 *res){
         res->x=sa*a->x;
         res->y=sa*a->y;
         res->z=sa*a->z;
 }
+
 static inline void vec_mult_add(float3 *a,float3 *b,float sa,float sb,float3 *res){
 	res->x=sb*b->x+sa*a->x;
 	res->y=sb*b->y+sa*a->y;
 	res->z=sb*b->z+sa*a->z;
 }
+
 static inline void vec_cross(float3 *a,float3 *b,float3 *res){
 	res->x=a->y*b->z-a->z*b->y;
 	res->y=a->z*b->x-a->x*b->z;

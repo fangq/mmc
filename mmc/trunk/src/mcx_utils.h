@@ -96,15 +96,20 @@ typedef struct MMC_config{
 
 	float3 srcpos;    /**<src position in mm*/
 	float3 srcdir;    /**<src normal direction*/
-	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
-	float4 srcparam;  /**<additional parameters for advanced sources */
+//	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
+//	float4 srcparam;  /**<additional parameters for advanced sources */
+	char srctype;	  /**<source type */
+	float4 srcparam;
+	float4 srcparam1;	/**<source parameters set 1*/
+	float4 srcparam2;	/**<source parameters set 2*/
+	float* srcpattern;	/**<source pattern*/
 	float4 bary0;     /**<initial bary centric coordinates of the source*/
 	float tstart;     /**<start time in second*/
 	float tstep;      /**<time step in second*/
 	float tend;       /**<end time in second*/
 	float3 steps;     /**<voxel sizes along x/y/z in mm*/
 
-	uint3 dim;        /**<domain size*/
+	uint3 dim;        /**dim.x is initial element number in MMC, dim.y is faceid*/
 	uint3 crop0;      /**<sub-volume for cache*/
 	uint3 crop1;      /**<the other end of the caching box*/
 	int medianum;     /**<total types of media*/
@@ -127,7 +132,7 @@ typedef struct MMC_config{
 	char session[MAX_SESSION_LENGTH]; /**<session id, a string*/
         char meshtag[MAX_PATH_LENGTH];   /**<a string to tag all input mesh files*/
 	char isrowmajor;    /**<1 for C-styled array in vol, 0 for matlab-styled array*/
-	char isreflect;     /**<1 for reflecting photons at boundary,0 for exiting*/
+	char isreflect;
         char isref3;        /**<1 considering maximum 3 ref. interfaces; 0 max 2 ref*/
 	char isnormalized;  /**<1 to normalize the fluence, 0 for raw fluence*/
 	char issavedet;     /**<1 to count all photons hits the detectors*/

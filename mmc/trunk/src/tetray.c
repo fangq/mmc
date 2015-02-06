@@ -61,7 +61,6 @@ int main(int argc, char**argv){
         mcx_parsecmd(argc,argv,&cfg);
 	
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
-
 	mesh_init_from_cfg(&mesh,&cfg);
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
@@ -71,7 +70,6 @@ int main(int argc, char**argv){
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg.issaveseed=0;
 #endif
-
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
 
 	/***************************************************************************//**

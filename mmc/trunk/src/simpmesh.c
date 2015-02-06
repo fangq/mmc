@@ -41,6 +41,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->prop=0;
 	mesh->node=NULL;
 	mesh->elem=NULL;
+	mesh->init_elem=NULL;
 	mesh->facenb=NULL;
 	mesh->type=NULL;
 	mesh->med=NULL;
@@ -70,15 +71,16 @@ void mesh_error(char *msg){
         exit(1);
 #endif
 }
+
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
-
 	if(cfg->rootpath[0]) 
 		sprintf(foutput,"%s%c%s",cfg->rootpath,pathsep,filename);
 	else
 		sprintf(foutput,"%s",filename);
 }
+
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
@@ -95,17 +97,17 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
 	if(cfg->basisorder) 
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
-
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
 			mesh_error("node file has wrong format");
 	}
-	if(cfg->unitinmm!=1.f)
+	if(cfg->unitinmm!=1.f){
 	  for(i=0;i<mesh->nn;i++){
 		mesh->node[i].x*=cfg->unitinmm;
 		mesh->node[i].y*=cfg->unitinmm;
 		mesh->node[i].z*=cfg->unitinmm;
 	  }
+	}
 	fclose(fp);
 }
 
@@ -138,9 +140,10 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
 }
+
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i;
+	int tmp,len,i,j=0;
 	int4 *pe;
 	char felem[MAX_PATH_LENGTH];
 	mesh_filenames("elem_%s.dat",felem,cfg);
@@ -160,9 +163,25 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 		pe=mesh->elem+i;
 		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
 			mesh_error("element file has wrong format");
+		if(*(mesh->type+i)==-1)	/*number of elements in the initial candidate list*/
+			j++;
+	}
+	/*Record the index of inital elements to initail elements*/	
+	/*Then change the type of initial elements back to 0 to continue propogation*/
+	mesh->init_elem=(int *)calloc(sizeof(int),j);
+//	fprintf(stdout,"%d \n", j);
+//	fprintf(stdout,"%d \n", sizeof(mesh->init_elem));
+	j=0;
+	for(i=0;i<mesh->ne;i++){
+		if(*(mesh->type+i)==-1){
+			*(mesh->init_elem+j)=i+1;
+			*(mesh->type+i)=0;
+			j++;
+		}
 	}
 	fclose(fp);
 }
+
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,*ee;
@@ -321,12 +340,14 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		tracer_build(tracer);
 	    else
 	    	mesh_error("tracer is not associated with a mesh");
-	}else{
+	}
+/*
+	else{
             int eid=cfg->dim.x-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
 	    int i,ea,eb,ec;
-	    float s=0.f, *bary=&(cfg->bary0.x);
-	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*
+	    float s=0.f, *bary=&(cfg->bary0.x);		// initial bary centric coordinates of the source
+	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*, initial element
 
 	    for(i=0;i<4;i++){
             	ea=elems[out[i][0]]-1;
@@ -338,20 +359,27 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
             	vec_cross(&vecAB,&vecAC,&vecN);
 	    	bary[facemap[i]]=-vec_dot(&vecS,&vecN);
 	    }
+
 	    if(cfg->debuglevel&dlWeight)
 	       fprintf(cfg->flog,"initial bary-centric volumes [%e %e %e %e]\n",
 	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
+
+//		fprintf(stdout,"initial bary-centric volumes [%e %e %e %e]\n",
+//	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
+
 	    for(i=0;i<4;i++){
 	        if(bary[i]<0.f)
 		    mesh_error("initial element does not enclose the source!");
 	        s+=bary[i];
 	    }
+		fprintf(stdout,"break 3\n");
 	    for(i=0;i<4;i++){
 	        bary[i]/=s;
 		if(bary[i]<1e-5f)
 		    cfg->dim.y=ifacemap[i]+1;
 	    }
 	}
+*/
 }
 
 void tracer_build(raytracer *tracer){
@@ -394,7 +422,6 @@ void tracer_build(raytracer *tracer){
                                 vec_diff(&nodes[ea],&nodes[eb],&vecAB);
                                 vec_diff(&nodes[ea],&nodes[ec],&vecAC);
 				vec_cross(&vecAB,&vecAC,tracer->n+ebase+j);
-
 				Rn2=1.f/sqrt(vec_dot(tracer->n+ebase+j,tracer->n+ebase+j));
 				vec_mult(tracer->n+ebase+j,Rn2,tracer->n+ebase+j);
 			}
@@ -415,7 +442,6 @@ void tracer_build(raytracer *tracer){
 				ec=elems[ebase+out[j][2]]-1;
                                 vec_diff(&nodes[ea],&nodes[eb],&vecAB);
                                 vec_diff(&nodes[ea],&nodes[ec],&vecAC);
-
 				vec_cross(&vecAB,&vecAC,vecN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
                                 vec_cross(&vecAC,vecN,vecN+1);
                                 vec_cross(vecN,&vecAB,vecN+2);

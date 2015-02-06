@@ -21,8 +21,8 @@ function face=readmmcface(filename)
 %
 
 fid=fopen(filename,'rt');
-[header,c]=fscanf(fid,'%d',4);
-face=fscanf(fid,'%d',[6 header(4)]);
+[header,c]=fscanf(fid,'%d',2);
+face=fscanf(fid,'%d',[5 header(2)]);
 fclose(fid);
 
 face=face';

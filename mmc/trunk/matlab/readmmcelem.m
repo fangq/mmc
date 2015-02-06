@@ -26,4 +26,4 @@ elem=fscanf(fid,'%d',[6 header(2)]);
 fclose(fid);
 
 elem=elem';
-elem=elem(:,2:5);
+elem=elem(:,2:6);

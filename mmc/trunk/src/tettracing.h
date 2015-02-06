@@ -26,6 +26,7 @@
 
 #include "simpmesh.h"
 #include "mcx_utils.h"
+#include "mcx_const.h"
 
 #define MAX_TRIAL          3
 #define FIX_PHOTON         1e-3f
@@ -79,6 +80,7 @@ void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
 float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
+void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus

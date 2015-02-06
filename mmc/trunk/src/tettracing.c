@@ -1,7 +1,7 @@
 /*******************************************************************************
 **  Mesh-based Monte Carlo (MMC)
 **
-**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**  Author: Qianqian Fang <fangq at nmr->mgh.harvard.edu>
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
@@ -37,6 +37,7 @@ const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}}; /*node orders for each face, in clock-wise orders*/
 extern const int out[4][3]; /*defined in simpmesh.c, node orders for each face, in counter-clock-wise orders*/
 extern const int facemap[4];
+extern const int ifacemap[4];
 
 const int faceorder[]={1,3,2,0,-1};
 const int ifaceorder[]={3,0,2,1};
@@ -71,7 +72,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
 
 /*
   p0 and p1 ony determine the direction, slen determines the length
-  so, how long is the vector p0->p1 does not matter. infact, the longer
+  so, how long is the vector p0->p1 does not matter-> infact, the longer
   the less round off error when computing the Plucker coordinates.
 */
 
@@ -713,6 +714,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL};
+
+	/*initialize the photon parameters*/
+	launchphoton(cfg, &r, mesh, ran, ran0);
+
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
@@ -723,24 +728,24 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 r.photonseed=(void*)calloc(1,sizeof(RandType));
 		memcpy(r.photonseed,(void *)ran, sizeof(RandType));
         }
+/*
         if(cfg->srctype>0){
 		if(cfg->srctype==stCone){
 			float zangle, aangle;
-			zangle=(2.f*M_PI)*rand_next_zangle(ran);   /*this needs to rotate*/
+			zangle=(2.f*M_PI)*rand_next_zangle(ran);
 			aangle=cfg->srcparam.x*rand_next_aangle(ran);
 			r.vec.x=sinf(aangle)*cosf(zangle);
 			r.vec.y=sinf(aangle)*sinf(zangle);
 			r.vec.z=cosf(aangle);
 		}
 	}
-
+*/
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
 	    tracercore=engines[(int)(cfg->method)];
 	else
 	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
-
-	/*initialize the photon parameters*/
+/*
 	if(cfg->srctype==stIsotropic){
                 mom=0.f;
 		r.slen=mc_next_scatter(0,&r.vec,ran,ran0,cfg,&mom);
@@ -755,9 +760,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(Rspecular<1.f)
 	       r.weight*=(1.f-Rspecular);
 	    else
-	       return 0.f; /*total internal reflection outside of the mesh*/
+	       return 0.f;
 	}
-
+*/
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
@@ -929,3 +934,136 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           return 1.f;
        }
 }
+
+void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
+	/*a rectangular grid over a plane*/
+	if(cfg->srctype==MCX_SRC_PLANAR || cfg->srctype==MCX_SRC_PATTERN || cfg->srctype==MCX_SRC_FOURIER){
+		float rx=rand_uniform01(ran);
+		float ry=rand_uniform01(ran);
+		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
+		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
+		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
+		r->weight=1.f;
+		if(cfg->srctype==MCX_SRC_PATTERN){
+			r->weight=cfg->srcpattern[(int)(ry*JUST_BELOW_ONE*cfg->srcparam2.w)*(int)(cfg->srcparam1.w)+(int)(rx*JUST_BELOW_ONE*cfg->srcparam1.w)];
+		}
+		else if(cfg->srctype==MCX_SRC_FOURIER){
+			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
+		}
+	}
+	else if(cfg->srctype==MCX_SRC_FOURIERX || cfg->srctype==MCX_SRC_FOURIERX2D){
+		float rx=rand_uniform01(ran);
+		float ry=rand_uniform01(ran);
+		float4 v2=cfg->srcparam1;
+		v2.w*=1.f/(sqrt(cfg->srcparam1.x*cfg->srcparam1.x+cfg->srcparam1.y*cfg->srcparam1.y+cfg->srcparam1.z*cfg->srcparam1.z));
+		v2.x=v2.w*(cfg->srcdir.y*cfg->srcparam1.z - cfg->srcdir.z*cfg->srcparam1.y);
+		v2.y=v2.w*(cfg->srcdir.z*cfg->srcparam1.x - cfg->srcdir.x*cfg->srcparam1.z); 
+		v2.z=v2.w*(cfg->srcdir.x*cfg->srcparam1.y - cfg->srcdir.y*cfg->srcparam1.x);
+		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*v2.x;
+		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*v2.y;
+		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*v2.z;
+		if(cfg->srctype==MCX_SRC_FOURIERX2D)
+			r->weight=(sinf((cfg->srcparam2.x*rx+cfg->srcparam2.z)*TWO_PI)*sinf((cfg->srcparam2.y*ry+cfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
+		else
+			r->weight=(cosf((cfg->srcparam2.x*rx+cfg->srcparam2.y*ry+cfg->srcparam2.z)*TWO_PI)*(1.f-cfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
+	}
+	// uniform disk distribution
+	else if(cfg->srctype==MCX_SRC_DISK){
+		float sphi, cphi;
+		float phi=TWO_PI*rand_uniform01(ran);
+		sphi=sinf(phi);	cphi=cosf(phi);
+		float r0=sqrt(rand_uniform01(ran))*cfg->srcparam1.x;
+		if(cfg->srcdir.z>-1.f+EPS && cfg->srcdir.z<1.f-EPS){
+			float tmp0=1.f-cfg->srcdir.z*cfg->srcdir.z;
+			float tmp1=r0/sqrt(tmp0);
+			r->p0.x=cfg->srcpos.x+tmp1*(cfg->srcdir.x*cfg->srcdir.z*cphi - cfg->srcdir.y*sphi);
+			r->p0.y=cfg->srcpos.y+tmp1*(cfg->srcdir.y*cfg->srcdir.z*cphi + cfg->srcdir.x*sphi);
+			r->p0.z=cfg->srcpos.z-tmp1*tmp0*cphi;
+		}
+		else{
+   		  r->p0.x+=r0*cphi;
+		  r->p0.y+=r0*sphi;
+		}
+	}
+	else if(cfg->srctype==MCX_SRC_CONE || cfg->srctype==MCX_SRC_ISOTROPIC || cfg->srctype==MCX_SRC_ARCSINE){
+		float ang,stheta,ctheta,sphi,cphi;
+		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
+		sphi=sinf(ang);	cphi=cosf(ang);
+		if(cfg->srctype==MCX_SRC_CONE){  // a solid-angle section of a uniform sphere
+			do{
+				ang=(cfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
+		  }while(ang>cfg->srcparam1.x);
+		}
+		else{
+			if(cfg->srctype==MCX_SRC_ISOTROPIC) // uniform sphere
+				ang=acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
+			else
+				ang=ONE_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
+			}
+			stheta=sinf(ang);	ctheta=cosf(ang);
+			r->vec.x=stheta*cphi;
+			r->vec.y=stheta*sphi;
+			r->vec.z=ctheta;
+		}
+	else if(cfg->srctype==MCX_SRC_GAUSSIAN){
+		float ang,stheta,ctheta,sphi,cphi;
+		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
+		sphi=sinf(ang);	cphi=cosf(ang);
+		ang=sqrt(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran0))*cfg->srcparam1.x;
+		stheta=sinf(ang);	ctheta=cosf(ang);
+		r->vec.x=stheta*cphi;
+		r->vec.y=stheta*sphi;
+		r->vec.z=ctheta;
+	}
+
+	/*Caluclate intial element id and bary-centric coordinates*/
+	float3 vecS={0.f}, *nodes=mesh->node, vecAB, vecAC, vecN;
+	int ni=sizeof(mesh->init_elem)/sizeof(int);
+	int j=0,i,ea,eb,ec;
+	float *bary=&(cfg->bary0.x);
+	while(j<ni){
+		int include = 1;
+		int *elems=(int *)(mesh->elem+(mesh->init_elem[j])-1);
+		for(i=0;i<4;i++){
+			ea=elems[out[i][0]]-1;
+			eb=elems[out[i][1]]-1;
+			ec=elems[out[i][2]]-1;
+			vec_diff(&nodes[ea],&nodes[eb],&vecAB);
+			vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+			vec_diff(&nodes[ea],&(r->p0),&vecS);
+			vec_cross(&vecAB,&vecAC,&vecN);
+			bary[facemap[i]]=-vec_dot(&vecS,&vecN);
+		}
+
+		for(i=0;i<4;i++){
+			if(bary[i]<-1e-4f){
+				include = 0;
+			}
+		}
+
+		if(include==0)
+			j++;
+		else{
+			r->eid=mesh->init_elem[j];
+			float s=0.f;
+			for(i=0;i<4;i++){s+=bary[i];}
+			r->bary0.x=bary[0]/s;
+			r->bary0.y=bary[1]/s;
+			r->bary0.z=bary[2]/s;
+			r->bary0.w=bary[3]/s;
+			for(i=0;i<4;i++){
+				if((bary[i]/s)<1e-4f)
+					r->faceid=ifacemap[i]+1;
+			}
+			break;
+		}
+	}
+	if(j==ni){
+//		fprintf(stdout,"initial element does not enclose the source!");
+//		fprintf(stdout,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
+//		fprintf(stdout,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
+		mesh_error("initial element does not enclose the source!");
+	}
+}
+
+
