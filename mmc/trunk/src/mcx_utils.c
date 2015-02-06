@@ -120,9 +120,9 @@ void mcx_initcfg(mcconfig *cfg){
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->bary0),0,sizeof(float4));
-	memset(&(cfg->srcparam1),0,sizeof(float4));
-	memset(&(cfg->srcparam2),0,sizeof(float4));
-	cfg->srcpattern=NULL;
+     memset(&(cfg->srcparam1),0,sizeof(float4));
+     memset(&(cfg->srcparam2),0,sizeof(float4));
+     cfg->srcpattern=NULL;
      memset(cfg->checkpt,0,sizeof(unsigned int)*MAX_CHECKPOINT);
 }
 
@@ -133,8 +133,8 @@ void mcx_clearcfg(mcconfig *cfg){
      	free(cfg->detpos);
      if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
         free(cfg->vol);
-	if(cfg->srcpattern)
-     	free(cfg->srcpattern);
+     if(cfg->srcpattern)
+        free(cfg->srcpattern);
      if(cfg->photonseed)
         free(cfg->photonseed);
      if(cfg->replayweight)
@@ -394,21 +394,27 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      else
         MMC_ASSERT(fscanf(in,"%d", &itmp )==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
-     
+
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
-	
+
      if(in==stdin)
-		fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
+     	fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",
+	                            cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-		fprintf(stdout,"%f %f %f\nPlease specify the time gates in seconds (start end and step) [0.0 1e-9 1e-10]\n\t",cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z);
+        fprintf(stdout,"%f %f %f\nPlease specify the time gates in seconds (start end and step) [0.0 1e-9 1e-10]\n\t",
+	                            cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
+
+     if(in==stdin)
+        fprintf(stdout,"%f %f %f\nPlease specify the path to the volume binary file:\n\t",
+                                    cfg->tstart,cfg->tend,cfg->tstep);
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
          MMC_ERROR(-9,"incorrect time gate settings");
      }
@@ -416,8 +422,6 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      /*if(cfg->maxgate>gates)*/
 	 cfg->maxgate=gates;
 
-	if(in==stdin)
-		fprintf(stdout,"%f %f %f\nPlease specify the path to the volume binary file:\n\t",cfg->tstart,cfg->tend,cfg->tstep);
      MMC_ASSERT(fscanf(in,"%s", cfg->meshtag)==1);
      if(cfg->rootpath[0]){
 #ifdef WIN32
@@ -459,12 +463,12 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      }
 
      if(in==stdin)
-		fprintf(stdout,"Please specify the source type[pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d]:\n\t");
+        fprintf(stdout,"Please specify the source type[pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d]:\n\t");
      if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
         srctype=mcx_keylookup(strtypestr,srctypeid);
 	if(srctype==-1)
 	   MMC_ERROR(-6,"the specified source type is not supported");
-		if(srctype>=0){
+        if(srctype>=0){
            comm=fgets(comment,MAX_PATH_LENGTH,in);
 	   cfg->srctype=srctype;
 	   if(in==stdin)

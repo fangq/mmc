@@ -61,8 +61,7 @@ end
 
 if(~isempty(face))
   fid=fopen(['face_',key,'.dat'],'wt');
-%  fprintf(fid,'1 %d\n',size(face,1));
-	fprintf(fid,'%d\t%d\n',1,size(face,1));
+  fprintf(fid,'%d\t%d\n',1,size(face,1));
   if(size(face,2)==3)
     fprintf(fid,'%d\t%d\t%d\t%d\t1\n',[1:length(face);face']);
   elseif(size(face,2)==4)

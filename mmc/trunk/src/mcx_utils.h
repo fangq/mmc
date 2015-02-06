@@ -109,7 +109,7 @@ typedef struct MMC_config{
 	float tend;       /**<end time in second*/
 	float3 steps;     /**<voxel sizes along x/y/z in mm*/
 
-	uint3 dim;        /**dim.x is initial element number in MMC, dim.y is faceid*/
+	uint3 dim;        /**<dim.x is the initial element number in MMC, dim.y is faceid*/
 	uint3 crop0;      /**<sub-volume for cache*/
 	uint3 crop1;      /**<the other end of the caching box*/
 	int medianum;     /**<total types of media*/
@@ -132,7 +132,7 @@ typedef struct MMC_config{
 	char session[MAX_SESSION_LENGTH]; /**<session id, a string*/
         char meshtag[MAX_PATH_LENGTH];   /**<a string to tag all input mesh files*/
 	char isrowmajor;    /**<1 for C-styled array in vol, 0 for matlab-styled array*/
-	char isreflect;
+	char isreflect;     /**<1 for reflecting photons at boundary,0 for exiting*/
         char isref3;        /**<1 considering maximum 3 ref. interfaces; 0 max 2 ref*/
 	char isnormalized;  /**<1 to normalize the fluence, 0 for raw fluence*/
 	char issavedet;     /**<1 to count all photons hits the detectors*/

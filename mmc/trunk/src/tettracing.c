@@ -1,7 +1,7 @@
 /*******************************************************************************
 **  Mesh-based Monte Carlo (MMC)
 **
-**  Author: Qianqian Fang <fangq at nmr->mgh.harvard.edu>
+**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
@@ -72,7 +72,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
 
 /*
   p0 and p1 ony determine the direction, slen determines the length
-  so, how long is the vector p0->p1 does not matter-> infact, the longer
+  so, how long is the vector p0->p1 does not matter. infact, the longer
   the less round off error when computing the Plucker coordinates.
 */
 
@@ -731,18 +731,6 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 r.photonseed=(void*)calloc(1,sizeof(RandType));
 		memcpy(r.photonseed,(void *)ran, sizeof(RandType));
         }
-/*
-        if(cfg->srctype>0){
-		if(cfg->srctype==stCone){
-			float zangle, aangle;
-			zangle=(2.f*M_PI)*rand_next_zangle(ran);
-			aangle=cfg->srcparam.x*rand_next_aangle(ran);
-			r.vec.x=sinf(aangle)*cosf(zangle);
-			r.vec.y=sinf(aangle)*sinf(zangle);
-			r.vec.z=cosf(aangle);
-		}
-	}
-*/
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
 	    tracercore=engines[(int)(cfg->method)];

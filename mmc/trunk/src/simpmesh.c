@@ -75,6 +75,7 @@ void mesh_error(char *msg){
 void mesh_filenames(char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
+
 	if(cfg->rootpath[0]) 
 		sprintf(foutput,"%s%c%s",cfg->rootpath,pathsep,filename);
 	else
@@ -97,6 +98,7 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
 	if(cfg->basisorder) 
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
+
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
 			mesh_error("node file has wrong format");
@@ -163,19 +165,17 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 		pe=mesh->elem+i;
 		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
 			mesh_error("element file has wrong format");
-		if(*(mesh->type+i)==-1)	/*number of elements in the initial candidate list*/
+		if(mesh->type[i]==-1)	/*number of elements in the initial candidate list*/
 			j++;
 	}
 	/*Record the index of inital elements to initail elements*/	
 	/*Then change the type of initial elements back to 0 to continue propogation*/
 	mesh->init_elem=(int *)calloc(sizeof(int),j);
-//	fprintf(stdout,"%d \n", j);
-//	fprintf(stdout,"%d \n", sizeof(mesh->init_elem));
 	j=0;
 	for(i=0;i<mesh->ne;i++){
 		if(*(mesh->type+i)==-1){
-			*(mesh->init_elem+j)=i+1;
-			*(mesh->type+i)=0;
+			mesh->init_elem[j]=i+1;
+			mesh->type[i]=0;
 			j++;
 		}
 	}
@@ -341,45 +341,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    else
 	    	mesh_error("tracer is not associated with a mesh");
 	}
-/*
-	else{
-            int eid=cfg->dim.x-1;
-	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
-	    int i,ea,eb,ec;
-	    float s=0.f, *bary=&(cfg->bary0.x);		// initial bary centric coordinates of the source
-	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*, initial element
-
-	    for(i=0;i<4;i++){
-            	ea=elems[out[i][0]]-1;
-            	eb=elems[out[i][1]]-1;
-	    	ec=elems[out[i][2]]-1;
-            	vec_diff(&nodes[ea],&nodes[eb],&vecAB);
-            	vec_diff(&nodes[ea],&nodes[ec],&vecAC);
-	    	vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
-            	vec_cross(&vecAB,&vecAC,&vecN);
-	    	bary[facemap[i]]=-vec_dot(&vecS,&vecN);
-	    }
-
-	    if(cfg->debuglevel&dlWeight)
-	       fprintf(cfg->flog,"initial bary-centric volumes [%e %e %e %e]\n",
-	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
-
-//		fprintf(stdout,"initial bary-centric volumes [%e %e %e %e]\n",
-//	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
-
-	    for(i=0;i<4;i++){
-	        if(bary[i]<0.f)
-		    mesh_error("initial element does not enclose the source!");
-	        s+=bary[i];
-	    }
-		fprintf(stdout,"break 3\n");
-	    for(i=0;i<4;i++){
-	        bary[i]/=s;
-		if(bary[i]<1e-5f)
-		    cfg->dim.y=ifacemap[i]+1;
-	    }
-	}
-*/
+	/*calculations of the initial bary centric 
+	  coordinates are moved to launchphoton()*/
 }
 
 void tracer_build(raytracer *tracer){
