@@ -29,7 +29,6 @@
 #include <ctype.h>
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
-#include "mcx_const.h"
 
 #define FIND_JSON_KEY(id,idfull,parent,fallback,val) \
                     ((tmp=cJSON_GetObjectItem(parent,id))==0 ? \
@@ -379,7 +378,7 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates,srctype,itmp;
      float dtmp;
-     char comment[MAX_PATH_LENGTH],*comm, strtypestr[MAX_SESSION_LENGTH]={'\0'};
+     char comment[MAX_PATH_LENGTH],*comm, srctypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
      	fprintf(stdout,"Please specify the total number of photons: [1000000]\n\t");
@@ -464,34 +463,35 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 
      if(in==stdin)
         fprintf(stdout,"Please specify the source type[pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d]:\n\t");
-     if(fscanf(in,"%s", strtypestr)==1 && strtypestr[0]){
-        srctype=mcx_keylookup(strtypestr,srctypeid);
+     if(fscanf(in,"%s", srctypestr)==1 && srctypestr[0]){
+        srctype=mcx_keylookup(srctypestr,srctypeid);
 	if(srctype==-1)
 	   MMC_ERROR(-6,"the specified source type is not supported");
         if(srctype>=0){
            comm=fgets(comment,MAX_PATH_LENGTH,in);
 	   cfg->srctype=srctype;
 	   if(in==stdin)
-			fprintf(stdout,"Please specify the source parameters set 1 (4 floating-points):\n\t");
-		MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam1.x),&(cfg->srcparam1.y),&(cfg->srcparam1.z),&(cfg->srcparam1.w))==4);
-		comm=fgets(comment,MAX_PATH_LENGTH,in);
-		if(in==stdin)
-			fprintf(stdout,"Please specify the source parameters set 2 (4 floating-points):\n\t");
-		MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam2.x),&(cfg->srcparam2.y),&(cfg->srcparam2.z),&(cfg->srcparam2.w))==4);
-		comm=fgets(comment,MAX_PATH_LENGTH,in);
-		if(cfg->srctype==MCX_SRC_PATTERN && cfg->srcparam1.w*cfg->srcparam2.w>0){
-			char patternfile[MAX_PATH_LENGTH];
-			FILE *fp;
-			if(cfg->srcpattern) free(cfg->srcpattern);
-			cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
-			MMC_ASSERT(fscanf(in, "%s", patternfile)==1);
-			comm=fgets(comment,MAX_PATH_LENGTH,in);
-			fp=fopen(patternfile,"rb");
-			if(fp==NULL)
-				MMC_ERROR(-6,"pattern file can not be opened");
-			MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w,sizeof(float),fp)==sizeof(float));
-			fclose(fp);
+                fprintf(stdout,"Please specify the source parameters set 1 (4 floating-points):\n\t");
+           MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam1.x),&(cfg->srcparam1.y),&(cfg->srcparam1.z),&(cfg->srcparam1.w))==4);
+           comm=fgets(comment,MAX_PATH_LENGTH,in);
+           if(in==stdin)
+		fprintf(stdout,"Please specify the source parameters set 2 (4 floating-points):\n\t");
+           if(fscanf(in, "%f %f %f %f", &(cfg->srcparam2.x),&(cfg->srcparam2.y),&(cfg->srcparam2.z),&(cfg->srcparam2.w))==4){
+               comm=fgets(comment,MAX_PATH_LENGTH,in);
+               if(cfg->srctype==stPattern && cfg->srcparam1.w*cfg->srcparam2.w>0){
+		    char patternfile[MAX_PATH_LENGTH];
+		    FILE *fp;
+		    if(cfg->srcpattern) free(cfg->srcpattern);
+		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
+		    MMC_ASSERT(fscanf(in, "%s", patternfile)==1);
+		    comm=fgets(comment,MAX_PATH_LENGTH,in);
+		    fp=fopen(patternfile,"rb");
+		    if(fp==NULL)
+			MMC_ERROR(-6,"pattern file can not be opened");
+		    MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w,sizeof(float),fp)==sizeof(float));
+		    fclose(fp);
 		}
+	    }
 	}else
 	   return;
      }else

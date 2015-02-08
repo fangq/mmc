@@ -929,21 +929,21 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
 	/*a rectangular grid over a plane*/
-	if(cfg->srctype==MCX_SRC_PLANAR || cfg->srctype==MCX_SRC_PATTERN || cfg->srctype==MCX_SRC_FOURIER){
+	if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
 		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
 		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
 		r->weight=1.f;
-		if(cfg->srctype==MCX_SRC_PATTERN){
-			r->weight=cfg->srcpattern[(int)(ry*JUST_BELOW_ONE*cfg->srcparam2.w)*(int)(cfg->srcparam1.w)+(int)(rx*JUST_BELOW_ONE*cfg->srcparam1.w)];
+		if(cfg->srctype==stPattern){
+			r->weight=cfg->srcpattern[(int)(ry*(1.f-EPS)*cfg->srcparam2.w)*(int)(cfg->srcparam1.w)+(int)(rx*(1.f-EPS)*cfg->srcparam1.w)];
 		}
-		else if(cfg->srctype==MCX_SRC_FOURIER){
+		else if(cfg->srctype==stFourier){
 			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
 		}
 	}
-	else if(cfg->srctype==MCX_SRC_FOURIERX || cfg->srctype==MCX_SRC_FOURIERX2D){
+	else if(cfg->srctype==stFourierX || cfg->srctype==stFourier2D){
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		float4 v2=cfg->srcparam1;
@@ -954,13 +954,13 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*v2.x;
 		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*v2.y;
 		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*v2.z;
-		if(cfg->srctype==MCX_SRC_FOURIERX2D)
+		if(cfg->srctype==stFourier2D)
 			r->weight=(sinf((cfg->srcparam2.x*rx+cfg->srcparam2.z)*TWO_PI)*sinf((cfg->srcparam2.y*ry+cfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
 		else
 			r->weight=(cosf((cfg->srcparam2.x*rx+cfg->srcparam2.y*ry+cfg->srcparam2.z)*TWO_PI)*(1.f-cfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
 	}
 	// uniform disk distribution
-	else if(cfg->srctype==MCX_SRC_DISK){
+	else if(cfg->srctype==stDisk){
 		float sphi, cphi;
 		float phi=TWO_PI*rand_uniform01(ran);
 		sphi=sinf(phi);	cphi=cosf(phi);
@@ -977,17 +977,17 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		  r->p0.y+=r0*sphi;
 		}
 	}
-	else if(cfg->srctype==MCX_SRC_CONE || cfg->srctype==MCX_SRC_ISOTROPIC || cfg->srctype==MCX_SRC_ARCSINE){
+	else if(cfg->srctype==stCone || cfg->srctype==stIsotropic || cfg->srctype==stArcSin){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sinf(ang);	cphi=cosf(ang);
-		if(cfg->srctype==MCX_SRC_CONE){  // a solid-angle section of a uniform sphere
+		if(cfg->srctype==stCone){  // a solid-angle section of a uniform sphere
 			do{
 				ang=(cfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
 		  }while(ang>cfg->srcparam1.x);
 		}
 		else{
-			if(cfg->srctype==MCX_SRC_ISOTROPIC) // uniform sphere
+			if(cfg->srctype==stIsotropic) // uniform sphere
 				ang=acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
 			else
 				ang=ONE_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
@@ -997,7 +997,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 			r->vec.y=stheta*sphi;
 			r->vec.z=ctheta;
 		}
-	else if(cfg->srctype==MCX_SRC_GAUSSIAN){
+	else if(cfg->srctype==stGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sinf(ang);	cphi=cosf(ang);
