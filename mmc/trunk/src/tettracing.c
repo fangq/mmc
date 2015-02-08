@@ -715,9 +715,6 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         float mom;
 	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL};
 
-	/*initialize the photon parameters*/
-	launchphoton(cfg, &r, mesh, ran, ran0);
-
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
@@ -736,6 +733,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    tracercore=engines[(int)(cfg->method)];
 	else
 	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
+
+	/*initialize the photon parameters*/
+        launchphoton(cfg, &r, mesh, ran, ran0);
+
 /*
 	if(cfg->srctype==stIsotropic){
                 mom=0.f;
@@ -929,7 +930,10 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
 	/*a rectangular grid over a plane*/
-	if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
+	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow
+		r->slen=rand_next_scatlen(ran);
+		return;
+	}else if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
@@ -938,12 +942,10 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->weight=1.f;
 		if(cfg->srctype==stPattern){
 			r->weight=cfg->srcpattern[(int)(ry*(1.f-EPS)*cfg->srcparam2.w)*(int)(cfg->srcparam1.w)+(int)(rx*(1.f-EPS)*cfg->srcparam1.w)];
-		}
-		else if(cfg->srctype==stFourier){
+		}else if(cfg->srctype==stFourier){
 			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
 		}
-	}
-	else if(cfg->srctype==stFourierX || cfg->srctype==stFourier2D){
+	}else if(cfg->srctype==stFourierX || cfg->srctype==stFourier2D){
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		float4 v2=cfg->srcparam1;
@@ -958,51 +960,47 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 			r->weight=(sinf((cfg->srcparam2.x*rx+cfg->srcparam2.z)*TWO_PI)*sinf((cfg->srcparam2.y*ry+cfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
 		else
 			r->weight=(cosf((cfg->srcparam2.x*rx+cfg->srcparam2.y*ry+cfg->srcparam2.z)*TWO_PI)*(1.f-cfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
-	}
-	// uniform disk distribution
-	else if(cfg->srctype==stDisk){
+	}else if(cfg->srctype==stDisk){  // uniform disk distribution
 		float sphi, cphi;
 		float phi=TWO_PI*rand_uniform01(ran);
 		sphi=sinf(phi);	cphi=cosf(phi);
 		float r0=sqrt(rand_uniform01(ran))*cfg->srcparam1.x;
 		if(cfg->srcdir.z>-1.f+EPS && cfg->srcdir.z<1.f-EPS){
-			float tmp0=1.f-cfg->srcdir.z*cfg->srcdir.z;
-			float tmp1=r0/sqrt(tmp0);
-			r->p0.x=cfg->srcpos.x+tmp1*(cfg->srcdir.x*cfg->srcdir.z*cphi - cfg->srcdir.y*sphi);
-			r->p0.y=cfg->srcpos.y+tmp1*(cfg->srcdir.y*cfg->srcdir.z*cphi + cfg->srcdir.x*sphi);
-			r->p0.z=cfg->srcpos.z-tmp1*tmp0*cphi;
+		    float tmp0=1.f-cfg->srcdir.z*cfg->srcdir.z;
+		    float tmp1=r0/sqrt(tmp0);
+		    r->p0.x=cfg->srcpos.x+tmp1*(cfg->srcdir.x*cfg->srcdir.z*cphi - cfg->srcdir.y*sphi);
+		    r->p0.y=cfg->srcpos.y+tmp1*(cfg->srcdir.y*cfg->srcdir.z*cphi + cfg->srcdir.x*sphi);
+		    r->p0.z=cfg->srcpos.z-tmp1*tmp0*cphi;
+		}else{
+   		    r->p0.x+=r0*cphi;
+		    r->p0.y+=r0*sphi;
 		}
-		else{
-   		  r->p0.x+=r0*cphi;
-		  r->p0.y+=r0*sphi;
-		}
-	}
-	else if(cfg->srctype==stCone || cfg->srctype==stIsotropic || cfg->srctype==stArcSin){
+	}else if(cfg->srctype==stCone || cfg->srctype==stIsotropic || cfg->srctype==stArcSin){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sinf(ang);	cphi=cosf(ang);
 		if(cfg->srctype==stCone){  // a solid-angle section of a uniform sphere
-			do{
+		        do{
 				ang=(cfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
-		  }while(ang>cfg->srcparam1.x);
-		}
-		else{
+		        }while(ang>cfg->srcparam1.x);
+		}else{
 			if(cfg->srctype==stIsotropic) // uniform sphere
 				ang=acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
 			else
-				ang=ONE_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
-			}
-			stheta=sinf(ang);	ctheta=cosf(ang);
-			r->vec.x=stheta*cphi;
-			r->vec.y=stheta*sphi;
-			r->vec.z=ctheta;
+				ang=M_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
 		}
-	else if(cfg->srctype==stGaussian){
+		stheta=sinf(ang);
+		ctheta=cosf(ang);
+		r->vec.x=stheta*cphi;
+		r->vec.y=stheta*sphi;
+		r->vec.z=ctheta;
+	}else if(cfg->srctype==stGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sinf(ang);	cphi=cosf(ang);
 		ang=sqrt(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran0))*cfg->srcparam1.x;
-		stheta=sinf(ang);	ctheta=cosf(ang);
+		stheta=sinf(ang);
+		ctheta=cosf(ang);
 		r->vec.x=stheta*cphi;
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
@@ -1010,33 +1008,28 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 
 	/*Caluclate intial element id and bary-centric coordinates*/
 	float3 vecS={0.f}, *nodes=mesh->node, vecAB, vecAC, vecN;
-	int ni=sizeof(mesh->init_elem)/sizeof(int);
-	int j=0,i,ea,eb,ec;
-	float *bary=&(cfg->bary0.x);
-	while(j<ni){
+	int is,i,ea,eb,ec;
+	float bary[4]={0.f};
+	for(is=0;is<mesh->srcelemlen;is++){
 		int include = 1;
-		int *elems=(int *)(mesh->elem+(mesh->init_elem[j])-1);
+		int *elems=(int *)(mesh->elem+(mesh->srcelem[is])-1);
 		for(i=0;i<4;i++){
 			ea=elems[out[i][0]]-1;
 			eb=elems[out[i][1]]-1;
 			ec=elems[out[i][2]]-1;
-			vec_diff(&nodes[ea],&nodes[eb],&vecAB);
-			vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+			vec_diff(&nodes[ea],&nodes[eb],&vecAB); //repeated for all photons
+			vec_diff(&nodes[ea],&nodes[ec],&vecAC); //repeated for all photons
 			vec_diff(&nodes[ea],&(r->p0),&vecS);
-			vec_cross(&vecAB,&vecAC,&vecN);
+			vec_cross(&vecAB,&vecAC,&vecN); //repeated for all photons, vecN can be precomputed
 			bary[facemap[i]]=-vec_dot(&vecS,&vecN);
 		}
-
 		for(i=0;i<4;i++){
 			if(bary[i]<-1e-4f){
 				include = 0;
 			}
 		}
-
-		if(include==0)
-			j++;
-		else{
-			r->eid=mesh->init_elem[j];
+		if(include){
+			r->eid=mesh->srcelem[is];
 			float s=0.f;
 			for(i=0;i<4;i++){s+=bary[i];}
 			r->bary0.x=bary[0]/s;
@@ -1050,7 +1043,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 			break;
 		}
 	}
-	if(j==ni){
+	if(is==mesh->srcelemlen){
 //		fprintf(stdout,"initial element does not enclose the source!");
 //		fprintf(stdout,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
 //		fprintf(stdout,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);

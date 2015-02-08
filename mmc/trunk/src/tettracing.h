@@ -29,8 +29,6 @@
 
 #define MAX_TRIAL          3
 #define FIX_PHOTON         1e-3f
-#define ONE_PI             3.1415926535897932f     //pi
-
 
 /***************************************************************************//**
 \struct MMC_ray tettracing.h

@@ -41,7 +41,10 @@ void mesh_init(tetmesh *mesh){
 	mesh->prop=0;
 	mesh->node=NULL;
 	mesh->elem=NULL;
-	mesh->init_elem=NULL;
+	mesh->srcelemlen=0;
+	mesh->srcelem=NULL;
+	mesh->detelemlen=0;
+	mesh->detelem=NULL;
 	mesh->facenb=NULL;
 	mesh->type=NULL;
 	mesh->med=NULL;
@@ -145,7 +148,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i,j=0;
+	int tmp,len,i;
 	int4 *pe;
 	char felem[MAX_PATH_LENGTH];
 	mesh_filenames("elem_%s.dat",felem,cfg);
@@ -161,25 +164,35 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	if(!cfg->basisorder)
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
+        mesh->srcelemlen=0;
+        mesh->detelemlen=0;
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
 		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
 			mesh_error("element file has wrong format");
 		if(mesh->type[i]==-1)	/*number of elements in the initial candidate list*/
-			j++;
-	}
-	/*Record the index of inital elements to initail elements*/	
-	/*Then change the type of initial elements back to 0 to continue propogation*/
-	mesh->init_elem=(int *)calloc(sizeof(int),j);
-	j=0;
-	for(i=0;i<mesh->ne;i++){
-		if(*(mesh->type+i)==-1){
-			mesh->init_elem[j]=i+1;
-			mesh->type[i]=0;
-			j++;
-		}
+			mesh->srcelemlen++;
+		if(mesh->type[i]==-2)	/*number of elements in the initial candidate list*/
+			mesh->detelemlen++;
 	}
 	fclose(fp);
+
+	/*Record the index of inital elements to initiate source search*/
+	/*Then change the type of initial elements back to 0 to continue propogation*/
+	if(mesh->srcelemlen>0 ||  mesh->detelemlen>0){
+             int is=0,id=0;
+             mesh->srcelem=(int *)calloc(mesh->srcelemlen,sizeof(int));
+             mesh->detelem=(int *)calloc(mesh->detelemlen,sizeof(int));
+             for(i=0;i<mesh->ne;i++){
+		if(mesh->type[i]<0){
+                     if(mesh->type[i]==-1)
+			mesh->srcelem[is++]=i+1;
+                     else if(mesh->type[i]==-2)
+			mesh->detelem[id++]=i+1;
+                     mesh->type[i]=0;
+		}
+             }
+	}
 }
 
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
@@ -287,6 +300,8 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
 void mesh_clear(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
+        mesh->srcelemlen=0;
+        mesh->detelemlen=0;
 	if(mesh->node){
 		free(mesh->node);
 		mesh->node=NULL;
@@ -323,6 +338,14 @@ void mesh_clear(tetmesh *mesh){
 		free(mesh->nvol);
 		mesh->nvol=NULL;
 	}
+	if(mesh->srcelem){
+		free(mesh->srcelem);
+		mesh->srcelem=NULL;
+	}
+	if(mesh->detelem){
+		free(mesh->detelem);
+		mesh->detelem=NULL;
+	}
 }
 
 void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
@@ -340,9 +363,37 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		tracer_build(tracer);
 	    else
 	    	mesh_error("tracer is not associated with a mesh");
+	}else if(cfg->srctype==stPencil && cfg->dim.x>0){
+            int eid=cfg->dim.x-1;
+	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
+	    int i,ea,eb,ec;
+	    float s=0.f, *bary=&(cfg->bary0.x);
+	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*
+
+	    for(i=0;i<4;i++){
+            	ea=elems[out[i][0]]-1;
+            	eb=elems[out[i][1]]-1;
+	    	ec=elems[out[i][2]]-1;
+            	vec_diff(&nodes[ea],&nodes[eb],&vecAB);
+            	vec_diff(&nodes[ea],&nodes[ec],&vecAC);
+	    	vec_diff(&nodes[ea],&(cfg->srcpos),&vecS);
+            	vec_cross(&vecAB,&vecAC,&vecN);
+	    	bary[facemap[i]]=-vec_dot(&vecS,&vecN);
+	    }
+	    if(cfg->debuglevel&dlWeight)
+	       fprintf(cfg->flog,"initial bary-centric volumes [%e %e %e %e]\n",
+	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
+	    for(i=0;i<4;i++){
+	        if(bary[i]<0.f)
+		    mesh_error("initial element does not enclose the source!");
+	        s+=bary[i];
+	    }
+	    for(i=0;i<4;i++){
+	        bary[i]/=s;
+		if(bary[i]<1e-5f)
+		    cfg->dim.y=ifacemap[i]+1;
+	    }
 	}
-	/*calculations of the initial bary centric 
-	  coordinates are moved to launchphoton()*/
 }
 
 void tracer_build(raytracer *tracer){
