@@ -721,8 +721,6 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	r.partialpath=(float*)calloc(visit->reclen-1,sizeof(float));
 	r.photoid=id;
-	r.partialpath[visit->reclen-2] = r.weight;
-	visit->accumu_weight += r.weight;
 
         if(cfg->issavedet && cfg->issaveseed){
                 r.photonseed=(void*)calloc(1,sizeof(RandType));
@@ -736,17 +734,16 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*initialize the photon parameters*/
         launchphoton(cfg, &r, mesh, ran, ran0);
-
+	r.partialpath[visit->reclen-2] = r.weight;
+	visit->accumu_weight += r.weight;
 /*
 	if(cfg->srctype==stIsotropic){
                 mom=0.f;
 		r.slen=mc_next_scatter(0,&r.vec,ran,ran0,cfg,&mom);
                 if(cfg->ismomentum)
                    r.partialpath[mesh->prop+mesh->type[r.eid-1]]+=mom;
-	}else{
-		r.slen=rand_next_scatlen(ran);
 	}
-
+*/
 	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout && cfg->srctype==stPencil){
 	    float Rspecular=reflectray(cfg,&r.vec,tracer,&r.eid,&r.eid,faceorder[r.faceid],ran);
 	    if(Rspecular<1.f)
@@ -754,7 +751,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    else
 	       return 0.f;
 	}
-*/
+
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
@@ -814,8 +811,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		 fprintf(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
                        if(cfg->issavedet && cfg->issaveexit){
-                            memcpy(r.partialpath+(visit->reclen-1-6),&(r.p0.x),sizeof(float)*3);
-                            memcpy(r.partialpath+(visit->reclen-1-3),&(r.vec.x),sizeof(float)*3);
+                            memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);
+                            memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3);
                        }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          fprintf(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
