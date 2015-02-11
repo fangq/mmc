@@ -107,6 +107,7 @@ int main(int argc, char**argv){
 		else
 		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
+
 		#pragma omp atomic
 		   ncomplete++;
 
@@ -115,6 +116,10 @@ int main(int argc, char**argv){
 		if(cfg.issave2pt && cfg.checkpt[0])
 			mesh_saveweightat(&mesh,&cfg,i+1);
 	}
+
+	#pragma omp atomic
+		master.accumu_weight += visit.accumu_weight;
+
 	if(cfg.issavedet){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
@@ -133,7 +138,6 @@ int main(int argc, char**argv){
                     memcpy((unsigned char*)master.photonseed+master.bufpos*sizeof(RandType),
                             visit.photonseed,visit.bufpos*sizeof(RandType));
 		master.bufpos+=visit.bufpos;
-		master.accumu_weight += visit.accumu_weight;
             }
             #pragma omp barrier
 	    free(visit.partialpath);
@@ -155,8 +159,8 @@ int main(int argc, char**argv){
 	tracer_clear(&tracer);
 
 	if(cfg.isnormalized){
-          fprintf(cfg.flog,"total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,master.accumu_weight));
+          fprintf(cfg.flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+		master.accumu_weight,100.f*Eabsorb/master.accumu_weight,mesh_normalize(&mesh,&cfg,Eabsorb,master.accumu_weight));
 	}
 	if(cfg.issave2pt){
 		switch(cfg.outputtype){

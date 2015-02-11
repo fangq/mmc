@@ -708,13 +708,11 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	      for(j=0;j<cfg->maxgate;j++)
 		for(k=0;k<4;k++)
 		   energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
-
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
 	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
 	    if(cfg->outputtype==otFlux)
                normalizor/=cfg->tstep;
-
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<mesh->nn;j++)
 		  mesh->weight[i*mesh->nn+j]*=normalizor;

@@ -736,15 +736,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         launchphoton(cfg, &r, mesh, ran, ran0);
 	r.partialpath[visit->reclen-2] = r.weight;
 	visit->accumu_weight += r.weight;
-/*
-	if(cfg->srctype==stIsotropic){
-                mom=0.f;
-		r.slen=mc_next_scatter(0,&r.vec,ran,ran0,cfg,&mom);
-                if(cfg->ismomentum)
-                   r.partialpath[mesh->prop+mesh->type[r.eid-1]]+=mom;
-	}
-*/
-	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout && cfg->srctype==stPencil){
+
+	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout){
 	    float Rspecular=reflectray(cfg,&r.vec,tracer,&r.eid,&r.eid,faceorder[r.faceid],ran);
 	    if(Rspecular<1.f)
 	       r.weight*=(1.f-Rspecular);
