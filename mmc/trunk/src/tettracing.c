@@ -737,14 +737,6 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	r.partialpath[visit->reclen-2] = r.weight;
 	visit->accumu_weight += r.weight;
 
-	if(cfg->isspecular && r.faceid>=0 && mesh->med[mesh->type[r.eid-1]].n != cfg->nout){
-	    float Rspecular=reflectray(cfg,&r.vec,tracer,&r.eid,&r.eid,faceorder[r.faceid],ran);
-	    if(Rspecular<1.f)
-	       r.weight*=(1.f-Rspecular);
-	    else
-	       return 0.f;
-	}
-
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
