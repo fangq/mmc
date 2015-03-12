@@ -54,6 +54,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ifield, jstruct;
   int        ncfg, nfields;
   int        fielddim[4];
+  int        usewaitbar=1;
   const char       *outputtag[]={"data"};
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop;
@@ -77,6 +78,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
       plhs[1] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=3)
       plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
+
+  if(mexEvalString("mmclab_waitbar_handle=waitbar(0,'')")) // waitbar is not supported with nojvm after matlab R2013a
+      usewaitbar=0;
+  else
+      mexEvalString("close(mmclab_waitbar_handle)");
 
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
     printf("Running simulations for configuration #%d ...\n", jstruct+1);
@@ -129,6 +135,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
     #ifdef MATLAB_MEX_FILE
         if((cfg.debuglevel & dlProgress) && threadid==0)
+	  if(usewaitbar)
              hprop = waitbar_create (0, NULL);
     #endif
 	/*launch photons*/
@@ -149,9 +156,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
                     static int oldprog=-1;
                     char percent[8]="";
                     sprintf(percent,"%d%%",prog);
-                    if(prog!=oldprog)
+                    if(prog!=oldprog){
+		       if(usewaitbar)
                         waitbar_update (((double)ncomplete)/cfg.nphoton, hprop, percent);
-                    oldprog=prog;
+		       else
+		        mcx_progressbar(ncomplete,&cfg);
+                    }
+		    oldprog=prog;
 #else
                     mcx_progressbar(ncomplete,&cfg);
 #endif
@@ -197,8 +208,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	/** \subsection sreport Post simulation */
 #ifdef MATLAB_MEX_FILE
-	if((cfg.debuglevel & dlProgress))
+	if((cfg.debuglevel & dlProgress)){
+	    if(usewaitbar)
                  waitbar_update (1.0, hprop, NULL);
+	    else
+		 mcx_progressbar(cfg.nphoton,&cfg);
+	}
 #endif
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
@@ -214,6 +229,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 #ifdef MATLAB_MEX_FILE
         if((cfg.debuglevel & dlProgress))
+	   if(usewaitbar)
              waitbar_destroy (hprop) ;
 #endif
 	if(nlhs>=1){
