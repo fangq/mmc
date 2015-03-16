@@ -215,7 +215,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         	  tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
 
                         	  if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
-                        	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
+                        	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
 
 				  ww*=0.5f;
 				  if(r->isend)
@@ -391,7 +391,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		dlen=r->Lmove/bary.x;           /* normalized moving length */
 
                 if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
-                    r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid,dlen);
+                    r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
 
 		if(r->isend)                    /* S is the bary centric for the photon after move */
 		    S=_mm_add_ps(_mm_mul_ps(T,_mm_set1_ps(dlen)),_mm_mul_ps(O,_mm_set1_ps(1.f-dlen)));
@@ -767,6 +767,17 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
 	    	    if(r.eid==0) break;
+		    /*when a photon enters the domain from the background*/
+		    if((cfg->debuglevel&dlExit) && mesh->med[mesh->type[oldeid-1]].n == cfg->nout && mesh->med[mesh->type[r.eid-1]].n != cfg->nout )
+			    fprintf(cfg->flog,"e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    	r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+		    /*when a photon exits the domain into the background*/
+		    if((cfg->debuglevel&dlExit) && mesh->med[mesh->type[oldeid-1]].n != cfg->nout && mesh->med[mesh->type[r.eid-1]].n == cfg->nout ){
+		        fprintf(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+			r.eid=0;
+        		break;
+		    }
 //		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		fprintf(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
