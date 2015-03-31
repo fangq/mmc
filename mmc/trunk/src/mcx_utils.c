@@ -309,7 +309,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      if(Session){
         char val[1];
         cJSON *ck;
-        if(cfg->seed==0)      cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
+        if(cfg->seed==0x623F9A9E)      cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
         if(cfg->nphoton==0)   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
         if(cfg->session[0]=='\0') strncpy(cfg->session, FIND_JSON_KEY("ID","Session.ID",Session,"default",valuestring), MAX_SESSION_LENGTH);
 
@@ -388,7 +388,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      
      if(in==stdin)
      	fprintf(stdout,"%d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
-     if(cfg->seed==0)
+     if(cfg->seed==0x623F9A9E)
         MMC_ASSERT(fscanf(in,"%d", &(cfg->seed) )==1);
      else
         MMC_ASSERT(fscanf(in,"%d", &itmp )==1);

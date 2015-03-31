@@ -31,6 +31,7 @@
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
     double ran;
     drand48_r(t,&ran);
+//printf("RNG 01\n");
     return (float)ran;
 }
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){

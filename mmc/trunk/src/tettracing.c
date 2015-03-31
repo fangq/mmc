@@ -922,10 +922,10 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 }
 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
-	/*a rectangular grid over a plane*/
-	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow
-		r->slen=rand_next_scatlen(ran);
-		return;
+	r->slen=rand_next_scatlen(ran);
+	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
+		if(r->eid>0)
+		      return;
 	}else if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
