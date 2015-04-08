@@ -213,6 +213,8 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	for(i=0;i<mesh->ne;i++){
 		if(fscanf(fp,"%d %f",&tmp,mesh->evol+i)!=2)
 			mesh_error("mesh file has wrong format");
+                if(mesh->type[i]==0)
+			continue;
 		ee=(int *)(mesh->elem+i);
 		for(j=0;j<4;j++)
 			mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
@@ -700,7 +702,8 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
               for(j=0;j<mesh->nn;j++)
-        	mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
+        	if(mesh->nvol[j]>0.f)
+                   mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
 	      ee=(int *)(mesh->elem+i);
