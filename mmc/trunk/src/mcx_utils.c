@@ -599,7 +599,8 @@ int mcx_lookupindex(char *key, const char *index){
 int mcx_keylookup(char *key, const char *table[]){
     int i=0;
     while(key[i]){
-        key[i]=tolower(key[i]);
+        if(key[i]>='A' && key[i]<='Z')
+		key[i]+=('a'-'A');
 	i++;
     }
     i=0;
