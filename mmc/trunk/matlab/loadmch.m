@@ -1,6 +1,6 @@
-function [data, headerstruct, photonseed]=loadmch(fname,format)
+function [data, headerstruct, photonseed]=loadmch(fname,format,endian)
 %
-%    [data, header]=loadmch(fname,format)
+%    [data, header]=loadmch(fname,format,endian)
 %
 %    author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
 %
@@ -8,6 +8,8 @@ function [data, headerstruct, photonseed]=loadmch(fname,format)
 %        fname: the file name to the output .mch file
 %        format:a string to indicate the format used to save
 %               the .mch file; if omitted, it is set to 'float'
+%        endian: optional, specifying the endianness of the binary file
+%               can be either 'ieee-be' or 'ieee-le' (default)
 %
 %    output:
 %        data:   the output detected photon data array
@@ -32,7 +34,11 @@ if(nargin==1)
    format='float';
 end
 
-fid=fopen(fname,'rb');
+if(nargin<3)
+   endian='ieee-le';
+end
+
+fid=fopen(fname,'rb',endian);
 
 data=[];
 header=[];
@@ -47,7 +53,7 @@ while(~feof(fid))
 		end
 		break;
 	end
-	hd=fread(fid,7,'uint'); % version, maxmedia, detnum, colcount, totalphoton, detected, savedphoton
+	hd=fread(fid,7,'uint','ieee-be'); % version, maxmedia, detnum, colcount, totalphoton, detected, savedphoton
 	if(hd(1)~=1) error('version higher than 1 is not supported'); end
         unitmm=fread(fid,1,'float32');
 	seedbyte=fread(fid,1,'uint');
