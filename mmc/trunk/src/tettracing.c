@@ -163,6 +163,8 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		}
 	}
 	visit->raytet++;
+        if(tracer->mesh->type[eid]==0)
+		visit->raytet0++;
         if(r->pout.x!=MMC_UNDEFINED){
                 if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 		   r->faceid=-2;

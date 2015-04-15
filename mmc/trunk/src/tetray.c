@@ -44,12 +44,12 @@ int main(int argc, char**argv){
 	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
-	visitor master={0.f,0.f,0,0,0,NULL,NULL,0.f};
+	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f};
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
 	unsigned int i;
-	float raytri=0.f;
+	float raytri=0.f,raytri0=0.f;
 	unsigned int threadid=0,ncomplete=0,t0,dt;
 
 	t0=StartTimer();
@@ -86,7 +86,7 @@ int main(int argc, char**argv){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f};
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f};
 	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
 	    if(cfg.issaveseed)
@@ -99,14 +99,16 @@ int main(int argc, char**argv){
 	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
 
 	/*launch photons*/
-        #pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
+        #pragma omp for reduction(+:Eabsorb) reduction(+:raytri,raytri0)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
+		visit.raytet0=0.f;
 		if(cfg.seed==SEED_FROM_FILE)
 		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i,ran1,&visit);
 		else
 		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
+		raytri0+=visit.raytet0;
 
 		#pragma omp atomic
 		   ncomplete++;
@@ -154,7 +156,7 @@ int main(int argc, char**argv){
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests\n",raytri));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f are overhead)\n",raytri,raytri0));
 
 	tracer_clear(&tracer);
 

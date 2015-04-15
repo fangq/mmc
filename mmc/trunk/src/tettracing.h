@@ -63,6 +63,7 @@ typedef struct MMC_ray{
 
 typedef struct MMC_visitor{
 	float raytet;
+	float raytet0;
 	float rtstep;
 	int   detcount;
 	int   bufpos;
