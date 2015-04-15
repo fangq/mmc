@@ -277,7 +277,10 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         }
         dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);
         if(dets){
-           cJSON *det=dets->child;
+           cJSON *det=dets;
+           if(!FIND_JSON_OBJ("Pos","Optode.Detector.Pos",dets))
+              det=dets->child;
+
            if(det){
              cfg->detnum=cJSON_GetArraySize(dets);
              cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
