@@ -23,14 +23,19 @@ function varargout=mmcadddet(varargin)
 %     [nodesrc,elemsrc]=mmcaddsrc(node,elem,cfg);
 %
 %     % example with additional options
-%     cfg=struct('srctype','cone','srcpos',[-30 0 0],'srcdir',[1 0 0]);
+%     cfg=struct('srctype','planar','srcpos',[-30 -5 5],'srcdir',[1 0 0],...
+%                'srcparam1',[0 10 0 0],'srcparam2',[0 0 8 0]);
 %     [nodedet,elemdet]=mmcadddet(nodesrc,elemsrc,cfg);
 %     plotmesh(nodedet,elemdet);
+%
+%     cfg=struct('srctype','disk','srcpos',[-30 0 0],'srcdir',[1 0 0],'srcparam1',[4 0 0 0]);
+%     [nodedet,elemdet]=mmcadddet(nodesrc,elemsrc,cfg);
+%     figure;plotmesh(nodedet,elemdet);
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-[varargout{1:nargout}]=mmcaddsrc(varargin{:},'extcorelabel',-2);
+[varargout{1:nargout}]=mmcaddsrc(varargin{:},'extcorelabel',-2,'KeepShape',1,'Expansion',1.0);
 

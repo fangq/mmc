@@ -37,9 +37,10 @@ function [srcnode,srcface]=mmcsrcdomain(cfg,meshbbx,varargin)
 
 % the launching domain should be slightly larger than the actual source
 % domain to avoid starting from an edge or vertex
-expansion=1.1; 
 
 opt=varargin2struct(varargin{:});
+expansion=jsonopt('Expansion',1.1,opt); 
+
 if(~isstruct(cfg))
    error('input cfg must be a struct');
 end
@@ -73,7 +74,7 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
     end
     voff1=(v1+v2)*0.5;
     voff2=(v1-v2)*0.5;
-    if(jsonopt('SplitDomain',0,opt))
+    if(jsonopt('KeepShape',0,opt))
         srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2]*(expansion-1.0);
         srcface=[1 2 3;3 4 1];
     else
@@ -81,8 +82,13 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         srcface=[1 2 3];
     end
 elseif(strcmp(cfg.srctype,'disk'))
-    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,(cfg.srcparam1(1)*2.0)*expansion,3);
-    srcface=delaunay(srcnode(:,1),srcnode(:,2));
+    if(jsonopt('KeepShape',0,opt))
+        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,cfg.srcparam1(1)*expansion,jsonopt('CircleDiv',100,opt));
+        srcface=delaunay(srcnode(:,1),srcnode(:,2));
+    else
+        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,(cfg.srcparam1(1)*2.0)*expansion,3);
+        srcface=[1 2 3];
+    end
 else
     error(['source type not supported: ', cfg.srctype]);
 end

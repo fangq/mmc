@@ -65,7 +65,7 @@ if(~isfield(opt,'extcmdopt'))
    opt.extcmdopt='-Y';
 end
 if(isstruct(src))
-    src=mmcsrcdomain(src,[min(node);max(node)]);
+    src=mmcsrcdomain(src,[min(node);max(node)],opt);
 end
 opt.newnode=src;
 [newnode,newelem]=meshrefine(node,elem,opt);
