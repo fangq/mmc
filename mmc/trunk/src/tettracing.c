@@ -434,6 +434,9 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		break;
 	   }
 	visit->raytet++;
+        if(tracer->mesh->type[eid]==0)
+                visit->raytet0++;
+
 	r->p0.w=0.f;
 	if(r->faceid==-2)
            return 0.f;
@@ -554,6 +557,9 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	    }
 	}
 	visit->raytet++;
+        if(tracer->mesh->type[eid]==0)
+                visit->raytet0++;
+
 	r->p0.w=0.f;
 	if(r->faceid==-2)
            return 0.f;
@@ -687,6 +693,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    }
 	}
 	visit->raytet++;
+        if(tracer->mesh->type[eid]==0)
+                visit->raytet0++;
+
 	r->p0.w=0.f;
 	if(r->faceid==-2)
            return 0.f;
