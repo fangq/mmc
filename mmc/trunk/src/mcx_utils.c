@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','x','P','\0'};
+                 'i','V','O','m','F','q','x','P','k','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -53,7 +53,8 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
-                 "--momentum","--outputformat","--saveseed","--saveexit","--replaydet",""};
+                 "--momentum","--outputformat","--saveseed","--saveexit",
+                 "--replaydet","--voidtime",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -122,6 +123,7 @@ void mcx_initcfg(mcconfig *cfg){
      memset(&(cfg->srcparam1),0,sizeof(float4));
      memset(&(cfg->srcparam2),0,sizeof(float4));
      cfg->srcpattern=NULL;
+     cfg->voidtime=1;
      memset(cfg->checkpt,0,sizeof(unsigned int)*MAX_CHECKPOINT);
 }
 
@@ -780,6 +782,9 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 				else
 	                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");
                                 break;
+                     case 'k':
+                                i=mcx_readarg(argc,argv,i,&(cfg->voidtime),"int");
+                                break;
                      default:
 				MMC_ERROR(-1,"unsupported command line option");
 		}
@@ -833,6 +838,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
                                J - Jacobian (replay mode),   T - approximated\n\
                                Jacobian (replay mode only)\n\
+ -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\

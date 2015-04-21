@@ -104,6 +104,7 @@ typedef struct MMC_config{
 	float4 srcparam1;	/**<source parameters set 1*/
 	float4 srcparam2;	/**<source parameters set 2*/
 	float* srcpattern;	/**<source pattern*/
+        int voidtime;
 	float4 bary0;     /**<initial bary centric coordinates of the source*/
 	float tstart;     /**<start time in second*/
 	float tstep;      /**<time step in second*/
