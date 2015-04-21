@@ -39,7 +39,7 @@ function [srcnode,srcface]=mmcsrcdomain(cfg,meshbbx,varargin)
 % domain to avoid starting from an edge or vertex
 expansion=1.1; 
 
-%opt=varargin2struct(varargin{:});
+opt=varargin2struct(varargin{:});
 if(~isstruct(cfg))
    error('input cfg must be a struct');
 end
@@ -71,10 +71,15 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
     if(strcmp(cfg.srctype,'fourierx')||strcmp(cfg.srctype,'fourier2d'))
         v2=cross(v0,v1);
     end
-    voff1=(v1+v2)*0.5*(expansion-1.0);
-    voff2=(v1-v2)*0.5*(expansion-1.0);
-    srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2];
-    srcface=[1 2 3;3 4 1];
+    voff1=(v1+v2)*0.5;
+    voff2=(v1-v2)*0.5;
+    if(jsonopt('SplitDomain',0,opt))
+        srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2]*(expansion-1.0);
+        srcface=[1 2 3;3 4 1];
+    else
+        srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir,(max(norm(voff1),norm(voff2)))*2.0*expansion,3);
+        srcface=[1 2 3];
+    end
 elseif(strcmp(cfg.srctype,'disk'))
     srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,(cfg.srcparam1(1)*2.0)*expansion,3);
     srcface=delaunay(srcnode(:,1),srcnode(:,2));
