@@ -37,7 +37,7 @@ function [srcnode,srcface]=mmcsrcdomain(cfg,meshbbx,varargin)
 
 % the launching domain should be slightly larger than the actual source
 % domain to avoid starting from an edge or vertex
-expandsion=1.1; 
+expansion=1.1; 
 
 %opt=varargin2struct(varargin{:});
 if(~isstruct(cfg))
@@ -71,10 +71,12 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
     if(strcmp(cfg.srctype,'fourierx')||strcmp(cfg.srctype,'fourier2d'))
         v2=cross(v0,v1);
     end
-    srcnode=[v0; v0+v1; v0+v1+v2; v0+v2];
+    voff1=(v1+v2)*0.5*(expansion-1.0);
+    voff2=(v1-v2)*0.5*(expansion-1.0);
+    srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2];
     srcface=[1 2 3;3 4 1];
 elseif(strcmp(cfg.srctype,'disk'))
-    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,cfg.srcparam1(1)*expandsion,100);
+    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,(cfg.srcparam1(1)*2.0)*expansion,3);
     srcface=delaunay(srcnode(:,1),srcnode(:,2));
 else
     error(['source type not supported: ', cfg.srctype]);
