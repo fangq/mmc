@@ -5,12 +5,7 @@
 0 5e-09 1e-10           # time-gates(s): start, end, step
 sphere                  # volume ('uchar' format)
 -1                      # eid (not actually used)
-5 2.0                   # total number of detectors and radius
-15.0 50.0 0.0           # detector 1 position (mm)
-15.0 60.0 0.0
-25.0 50.0 0.0
-25.0 60.0 0.0
-20.0 55.0 0.0
+0 0                     # total number of detectors and radius
 planar	                # source type
 10.0 0.0 0.0 0.0        # parameters set 1
 0.0 10.0 0.0 0.0        # parameters set 2

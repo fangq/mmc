@@ -128,14 +128,23 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	if(len!=2 || mesh->prop<=0){
 		mesh_error("property file has wrong format");
 	}
-	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop+1);
-        mesh->atte=(float *)calloc(sizeof(float),mesh->prop+1);
-	
+        /*when there is an external detector, reindex the property to medianum+1*/
+	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop+1+cfg->isextdet);
+        mesh->atte=(float *)calloc(sizeof(float),mesh->prop+1+cfg->isextdet);
+
 	mesh->med[0].mua=0.f;
 	mesh->med[0].mus=0.f;
 	mesh->med[0].n=cfg->nout;
 	mesh->med[0].g=1.f;
 
+        /*make medianum+1 the same as medium 0*/
+        if(cfg->isextdet){
+		memcpy(mesh->med+mesh->prop+1,mesh->med,sizeof(medium));
+                for(i=0;i<mesh->ne;i++){
+                     if(mesh->type[i]==-2)
+                           mesh->type[i]=mesh->prop+1;
+                }
+        }
 	for(i=1;i<=mesh->prop;i++){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
@@ -172,8 +181,10 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 			mesh_error("element file has wrong format");
 		if(mesh->type[i]==-1)	/*number of elements in the initial candidate list*/
 			mesh->srcelemlen++;
-		if(mesh->type[i]==-2)	/*number of elements in the initial candidate list*/
+		if(mesh->type[i]==-2){	/*number of elements in the initial candidate list*/
 			mesh->detelemlen++;
+			cfg->isextdet=1;
+                }
 	}
 	fclose(fp);
 
@@ -185,11 +196,11 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
              mesh->detelem=(int *)calloc(mesh->detelemlen,sizeof(int));
              for(i=0;i<mesh->ne;i++){
 		if(mesh->type[i]<0){
-                     if(mesh->type[i]==-1)
+                     if(mesh->type[i]==-1){
 			mesh->srcelem[is++]=i+1;
-                     else if(mesh->type[i]==-2)
+			mesh->type[i]=0;
+                     }else if(mesh->type[i]==-2) /*keep -2, will be replaced to medianum+1 in loadmedia*/
 			mesh->detelem[id++]=i+1;
-                     mesh->type[i]=0;
 		}
              }
 	}

@@ -151,6 +151,7 @@ typedef struct MMC_config{
 	float roulettesize; /**<number of roulette for termination*/
         float minenergy;    /**<minimum energy to propagate photon*/
 	float nout;         /**<refractive index for the domain outside the mesh*/
+        int isextdet;      /**<if 1, there is external wide-field detector (marked by -2 in the mesh)*/
         FILE *flog;         /**<stream handle to print log information*/
         char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/

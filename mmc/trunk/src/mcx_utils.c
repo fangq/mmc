@@ -113,6 +113,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->photonseed=NULL;
      cfg->replaydet=0;
      cfg->replayweight=NULL;
+     cfg->isextdet=0;
 
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;

@@ -780,8 +780,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    if((cfg->debuglevel&dlExit) && mesh->med[mesh->type[oldeid-1]].n != cfg->nout && mesh->med[mesh->type[r.eid-1]].n == cfg->nout ){
 		        fprintf(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
-			r.eid=0;
-        		break;
+			if(!cfg->isextdet){
+                            r.eid=0;
+        		    break;
+                        }
 		    }
 //		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
@@ -807,7 +809,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
         		 fprintf(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    else if(r.eid==0){
+		    if(r.eid==0){
                        if(cfg->debuglevel&dlExit)
         		 fprintf(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
@@ -821,14 +823,17 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		 fprintf(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
-		       for(i=0;i<cfg->detnum;i++){
-        		  if((cfg->detpos[i].x-r.p0.x)*(cfg->detpos[i].x-r.p0.x)+
-        		     (cfg->detpos[i].y-r.p0.y)*(cfg->detpos[i].y-r.p0.y)+
-        		     (cfg->detpos[i].z-r.p0.z)*(cfg->detpos[i].z-r.p0.z) < cfg->detpos[i].w*cfg->detpos[i].w){
+                       if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
+                          exitdet=oldeid;
+                       }else
+		         for(i=0;i<cfg->detnum;i++){
+        		    if((cfg->detpos[i].x-r.p0.x)*(cfg->detpos[i].x-r.p0.x)+
+        		       (cfg->detpos[i].y-r.p0.y)*(cfg->detpos[i].y-r.p0.y)+
+        		       (cfg->detpos[i].z-r.p0.z)*(cfg->detpos[i].z-r.p0.z) < cfg->detpos[i].w*cfg->detpos[i].w){
 			          exitdet=i+1;
                 		  break;
         		     }
-		       }
+		         }
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
@@ -1042,9 +1047,9 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		}
 	}
 	if(is==mesh->srcelemlen){
-//		fprintf(stdout,"initial element does not enclose the source!");
-//		fprintf(stdout,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
-//		fprintf(stdout,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
+		fprintf(cfg->flog,"all tetrahedra labeled with -1 do not enclose the source!");
+		fprintf(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
+		fprintf(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
 		mesh_error("initial element does not enclose the source!");
 	}
 }
