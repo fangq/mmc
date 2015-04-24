@@ -200,7 +200,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         ww=currweight-r->weight;
                         r->Eabsorb+=ww;
                         r->photontimer+=r->Lmove*rc;
-                        tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->ne;
+                        tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
@@ -214,7 +214,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  ratio=r->Lmove/Lp0;
 				  r->Eabsorb+=ww;
 				  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
-                        	  tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn;
+                        	  tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
 
                         	  if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
                         	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
@@ -371,7 +371,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  r->Eabsorb+=ww;
 		  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
 		}
-                tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*tracer->mesh->nn-1;
+                tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn-1;
 
                 if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
@@ -536,7 +536,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
-		tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*
+		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
 	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
         	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
@@ -671,7 +671,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
-		tshift=(int)((r->photontimer-cfg->tstart)*visit->rtstep)*
+		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
 	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
         	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);

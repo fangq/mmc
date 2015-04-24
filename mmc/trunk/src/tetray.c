@@ -70,7 +70,7 @@ int main(int argc, char**argv){
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg.issaveseed=0;
 #endif
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nseed=%u\nsimulating ... ",GetTimeMillis()-t0,cfg.seed));
 
 	/***************************************************************************//**
 	The master thread then spawn multiple work-threads depending on your
@@ -156,7 +156,7 @@ int main(int argc, char**argv){
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f are overhead)\n",raytri,raytri0));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f were overhead)\n",raytri,raytri0));
 
 	tracer_clear(&tracer);
 
