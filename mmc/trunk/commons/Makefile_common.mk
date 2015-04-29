@@ -38,7 +38,7 @@ ECHO	   := echo
 MKDIR      := mkdir
 
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMPLIB)' $(FASTMATH) -cxx
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMPLIB)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile
 
 DLLFLAG=-fPIC

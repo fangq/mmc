@@ -191,6 +191,8 @@ where possible parameters include (the first item in [] is the default value)
  -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
+ -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
+                               setting -x to 1 also implies setting '-d' to 1
  -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant

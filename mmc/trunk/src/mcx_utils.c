@@ -285,7 +285,10 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         }
         dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);
         if(dets){
-           cJSON *det=dets->child;
+           cJSON *det=dets;
+           if(!FIND_JSON_OBJ("Pos","Optode.Detector.Pos",dets))
+              det=dets->child;
+
            if(det){
              cfg->detnum=cJSON_GetArraySize(dets);
              cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
@@ -629,7 +632,8 @@ int mcx_lookupindex(char *key, const char *index){
 int mcx_keylookup(char *key, const char *table[]){
     int i=0;
     while(key[i]){
-        key[i]=tolower(key[i]);
+        if(key[i]>='A' && key[i]<='Z')
+		key[i]+=('a'-'A');
 	i++;
     }
     i=0;
@@ -832,6 +836,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
+ -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
+                               setting -x to 1 also implies setting '-d' to 1\n\
  -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
