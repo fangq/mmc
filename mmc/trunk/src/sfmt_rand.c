@@ -24,7 +24,7 @@
 #endif
 
 #define MAX_SFMT_RAND        4294967296           //2^32
-#define R_MAX_SFMT_RAND      2.3283064365387e-10f //1/2^32
+#define R_MAX_SFMT_RAND      2.3283064359966e-10f //1/(2^32+1)
 #define LOG_RNG_MAX          22.1807097779182f    //log(2^32)
 #define INIT_MULT            1812433253
 
