@@ -102,6 +102,7 @@ oct:            BINARY=mmc.mex
 octsse:         BINARY=mmc_sse.mex
 oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 oct octsse:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(OPENMP)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS)' $(MKOCT)
+oct octsse:     USERARFLAGS=-o $(BINDIR)/mmc
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 

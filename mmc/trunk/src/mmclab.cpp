@@ -44,7 +44,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0,0,0,NULL,NULL};
+  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -122,7 +122,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
 	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
 	if(cfg.issavedet){
             if(cfg.issaveseed)

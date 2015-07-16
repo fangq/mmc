@@ -193,6 +193,12 @@ int  mcx_loadjson(cJSON *root, mcconfig *cfg);
   #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)
 #endif
 
+#if defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER)
+    int mexPrintf(const char * format, ... );
+#else
+    void mexPrintf(const char * format, ... );
+#endif
+
 #define MMCDEBUG(cfg,debugflag,outputstr)  {\
 				if((cfg)->debuglevel & (debugflag)) {\
 					MMC_FPRINTF outputstr ;\
