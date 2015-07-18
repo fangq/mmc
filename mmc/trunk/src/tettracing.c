@@ -923,21 +923,21 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
-	      return 1.f;
-	  }else if(cfg->isspecular==2 && *eid==0){   /*if do transmission, but next neighbor is 0, terminate*/
-	      return 1.f;
+	  }else if(cfg->isspecular==2 && *eid==0){
+              // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
               vec_mult_add(pn,c0,-Icos,1.f,c0);
               vec_mult_add(pn,c0,tmp2,n1/n2,c0);
               //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
-              return 1.f;
 	  }
        }else{ /*total internal reflection*/
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
 	  *eid=*oldeid;
           //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
-          return 1.f;
        }
+       tmp0=1.f/sqrt(vec_dot(c0,c0));
+       vec_mult(c0,tmp0,c0);
+       return 1.f;
 }
 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
