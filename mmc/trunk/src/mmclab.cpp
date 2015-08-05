@@ -32,6 +32,8 @@
 #define GET_ONE_FIELD(x,y)  else GET_1ST_FIELD(x,y)
 #define GET_VEC3_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];\
                                  printf("mmc.%s=[%g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z));}
+#define GET_VEC4_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];u->v.w=val[3];\
+                                 printf("mmc.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
 #define ABS(a)    ((a)<0?-(a):(a))
 #define MAX(a,b)  ((a)>(b)?(a):(b))
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)
@@ -90,7 +92,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     try{
         unsigned int ncomplete=0;
         double Eabsorb=0.0;
-        float raytri=0.f;
+        float raytri=0.f,raytri0=0.f;;
 
 	t0=StartTimer();
 	mcx_initcfg(&cfg);
@@ -111,6 +113,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
         cfg.issaveseed=0;
 #endif
+	mesh_srcdetelem(&mesh,&cfg);
 	mmc_validate_config(&cfg,&mesh);
 
 	tracer_init(&tracer,&mesh,cfg.method);
@@ -123,7 +126,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #pragma omp parallel private(ran0,ran1,threadid)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
-	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,sizeof(RandType));
@@ -139,14 +142,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
              hprop = waitbar_create (0, NULL);
     #endif
 	/*launch photons*/
-	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri)
+	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri,raytri0)
 	for(i=0;i<cfg.nphoton;i++){
 		visit.raytet=0.f;
+                visit.raytet0=0.f;
                 if(cfg.seed==SEED_FROM_FILE)
                    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i,ran1,&visit);
                 else
                    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
+                raytri0+=visit.raytet0;
 		#pragma omp atomic
 		   ncomplete++;
 
@@ -168,6 +173,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #endif
                 }
 	}
+
+        #pragma omp atomic
+                master.accumu_weight += visit.accumu_weight;
+
 	if(cfg.issavedet){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
@@ -223,7 +232,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	tracer_clear(&tracer);
 	if(cfg.isnormalized && cfg.nphoton){
 	  printf("total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		cfg.nphoton,100.f*Eabsorb/cfg.nphoton,mesh_normalize(&mesh,&cfg,Eabsorb,cfg.nphoton));
+		master.accumu_weight,100.f*Eabsorb/master.accumu_weight,mesh_normalize(&mesh,&cfg,Eabsorb,master.accumu_weight));
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
@@ -266,7 +275,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     const int *arraydim;
     char *jsonshapes=NULL;
     int i,j;
-    const char *srctypeid[]={"pencil","isotropic","cone","gaussian",""};
 
     if(strcmp(name,"nphoton")==0 && cfg->photonseed!=NULL)
 	return;
@@ -294,6 +302,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_VEC3_FIELD(cfg,srcpos)
     GET_VEC3_FIELD(cfg,srcdir)
     GET_VEC3_FIELD(cfg,steps)
+    GET_VEC4_FIELD(cfg,srcparam1)
+    GET_VEC4_FIELD(cfg,srcparam2)
     else if(strcmp(name,"e0")==0){
         double *val=mxGetPr(item);
 	cfg->dim.x=val[0];
@@ -399,16 +409,19 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	printf("mmc.debuglevel='%s';\n",buf);
     }else if(strcmp(name,"srctype")==0){
         int len=mxGetNumberOfElements(item);
-	char buf[MAX_SESSION_LENGTH];
+        const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar","pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian",""};
+        char strtypestr[MAX_SESSION_LENGTH]={'\0'};
         if(!mxIsChar(item) || len==0)
-             MEXERROR("the 'srctype' field must be a non-empty string");
+             mexErrMsgTxt("the 'srctype' field must be a non-empty string");
 	if(len>MAX_SESSION_LENGTH)
-	     MEXERROR("the 'srctype' field is too long");
-        int status = mxGetString(item, buf, MAX_SESSION_LENGTH);
+	     mexErrMsgTxt("the 'srctype' field is too long");
+        int status = mxGetString(item, strtypestr, MAX_SESSION_LENGTH);
         if (status != 0)
              mexWarnMsgTxt("not enough space. string is truncated.");
-        cfg->srctype=mcx_keylookup(buf,srctypeid);
-	printf("mmc.srctype='%s';\n",buf);
+        cfg->srctype=mcx_keylookup(strtypestr,srctypeid);
+        if(cfg->srctype==-1)
+             mexErrMsgTxt("the specified source type is not supported");
+	printf("mmc.srctype='%s';\n",strtypestr);
     }else if(strcmp(name,"session")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
@@ -420,6 +433,14 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
              mexWarnMsgTxt("not enough space. string is truncated.");
 
 	printf("mmc.session='%s';\n",cfg->session);
+    }else if(strcmp(name,"srcpattern")==0){
+        arraydim=mxGetDimensions(item);
+        double *val=mxGetPr(item);
+        if(cfg->srcpattern) free(cfg->srcpattern);
+        cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*sizeof(float));
+        for(i=0;i<arraydim[0]*arraydim[1];i++)
+             cfg->srcpattern[i]=val[i];
+        printf("mcx.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
     }else if(strcmp(name,"shapes")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
@@ -482,6 +503,9 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate);
      else
         mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate);
+
+     if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
+        mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
      if(cfg->unitinmm!=1.f){
 	float unit3d=cfg->unitinmm*cfg->unitinmm*cfg->unitinmm;

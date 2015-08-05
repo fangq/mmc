@@ -173,12 +173,21 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	if(!cfg->basisorder)
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
-        mesh->srcelemlen=0;
-        mesh->detelemlen=0;
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
 		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
 			mesh_error("element file has wrong format");
+        }
+	fclose(fp);
+	mesh_srcdetelem(mesh,cfg);
+}
+
+void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
+	int i;
+
+        mesh->srcelemlen=0;
+        mesh->detelemlen=0;
+	for(i=0;i<mesh->ne;i++){
 		if(mesh->type[i]==-1)	/*number of elements in the initial candidate list*/
 			mesh->srcelemlen++;
 		if(mesh->type[i]==-2){	/*number of elements in the initial candidate list*/
@@ -186,8 +195,6 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 			cfg->isextdet=1;
                 }
 	}
-	fclose(fp);
-
 	/*Record the index of inital elements to initiate source search*/
 	/*Then change the type of initial elements back to 0 to continue propogation*/
 	if(mesh->srcelemlen>0 ||  mesh->detelemlen>0){
