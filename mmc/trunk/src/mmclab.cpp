@@ -73,7 +73,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   nfields = mxGetNumberOfFields(prhs[0]);
   ncfg = mxGetNumberOfElements(prhs[0]);
 
-  printf("Expected output count: %d\n",nlhs);
   if(nlhs>=1)
       plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=2)
@@ -81,10 +80,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if(nlhs>=3)
       plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
 
-  if(mexEvalString("mmclab_waitbar_handle=waitbar(0,'')")) // waitbar is not supported with nojvm after matlab R2013a
+  if(mexEvalString("mmclab_waitbar_handle=waitbar(0,'');")) // waitbar is not supported with nojvm after matlab R2013a
       usewaitbar=0;
   else
-      mexEvalString("close(mmclab_waitbar_handle)");
+      mexEvalString("close(mmclab_waitbar_handle);");
 
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
     printf("Running simulations for configuration #%d ...\n", jstruct+1);
@@ -227,11 +226,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	dt=GetTimeMillis()-t0;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests\n",raytri));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f were overhead)\n",raytri,raytri0));
 
 	tracer_clear(&tracer);
-	if(cfg.isnormalized && cfg.nphoton){
-	  printf("total simulated energy: %d\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+	if(cfg.isnormalized && master.accumu_weight){
+	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
 		master.accumu_weight,100.f*Eabsorb/master.accumu_weight,mesh_normalize(&mesh,&cfg,Eabsorb,master.accumu_weight));
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
@@ -492,6 +491,8 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 
      mesh->nvol=(float *)calloc(sizeof(float),mesh->nn);
      for(i=0;i<mesh->ne;i++){
+        if(mesh->type[i]==0)
+		continue;
      	ee=(int *)(mesh->elem+i);
      	for(j=0;j<4;j++)
      	   	mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
