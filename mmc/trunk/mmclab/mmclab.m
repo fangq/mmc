@@ -141,6 +141,13 @@ for i=1:len
     if(~isfield(cfg(i),'evol') || isempty(cfg(i).evol))
         cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
     end
+    if(find(cfg(i).evol==0))
+        fprintf(1,['degenerated elements are detected: [' sprintf('%d ',find(cfg(i).evol==0)) ']\n']);
+        error(['input mesh can not contain degenerated elements, ' ...
+            'please double check your input mesh; if you use a ' ...
+            'widefield source, please rerun mmcsrcdomain and setting ' ...
+            '''Expansion'' option to a larger value (default is 1)']);
+    end
     if(~isfield(cfg(i),'srcpos'))
         error('cfg.srcpos field is missing');
     end
@@ -150,7 +157,8 @@ for i=1:len
     if(~isfield(cfg(i),'e0') || isempty(cfg(i).e0))
         cfg(i).e0=tsearchn(cfg(i).node,cfg(i).elem,cfg(i).srcpos);
     end
-    if(isnan(cfg(i).e0) || ischar(cfg(i).e0))
+    if((isnan(cfg(i).e0) && (isfield(cfg(i),'srctype') ...
+           && strcmp(cfg(i).srctype,'pencil')) )|| ischar(cfg(i).e0))
         disp('searching initial element ...');
         face=volface(cfg(i).elem);
         [t,u,v,idx]=raytrace(cfg(i).srcpos,cfg(i).srcdir,cfg(i).node,face);
@@ -189,6 +197,24 @@ for i=1:len
             if(loc==0) loc=size(cfg(i).elem,1); end
             cfg(i).e0=loc;
         end
+    end
+    if(isnan(cfg(i).e0))  % widefield source
+        if(~isfield(cfg(i),'srcparam1') || ~isfield(cfg(i),'srcparam2'))
+	        error('you must provide srcparam1 and srcparam2');
+        end
+	    srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
+               'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
+	    sdom=mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]);
+	    isinside=ismember(round(sdom*1e10)*1e-10,round(cfg(i).node*1e10)*1e-10,'rows');
+	    if(all(~isinside))
+	        if(size(cfg(i).elem,2)==4)
+                cfg(i).elem(:,5)=1;
+	        end
+	        [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
+	        cfg(i).elemprop=cfg(i).elem(:,5);
+	        cfg(i).elem=cfg(i).elem(:,1:4);
+        end
+        cfg(i).e0=-1;
     end
     if(~isfield(cfg(i),'elemprop'))
         error('cfg.elemprop field is missing');

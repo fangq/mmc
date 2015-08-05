@@ -47,6 +47,8 @@ if(planarsrc)   % when planar src is used, re-tessellate the mesh
     cfg.srcparam1=[40 0 0 0];
     cfg.srcparam2=[0 40 0 0];
 
+    % the following block before "end" can be removed as mmclab
+    % has this built-in
     srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
                   'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
     cfg.elem(:,5)=1;
