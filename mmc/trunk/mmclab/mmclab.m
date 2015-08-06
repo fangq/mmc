@@ -58,8 +58,6 @@ function varargout=mmclab(cfg,type)
 %      cfg.nout:        [1.0] refractive index for medium type 0 (background)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
 %      cfg.roulettesize:[10] size of Russian roulette
-%      cfg.srctype:     source type, can be ["pencil"],"isotropic" or "cone"
-%      cfg.srcparam:    1x4 vector for additional source parameter
 %      cfg.unitinmm:    defines the unit in the input mesh [1.0]
 %      cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
 %                      'pencil' - default, pencil beam, no param needed
