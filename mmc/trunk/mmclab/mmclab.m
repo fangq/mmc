@@ -61,6 +61,38 @@ function varargout=mmclab(cfg,type)
 %      cfg.srctype:     source type, can be ["pencil"],"isotropic" or "cone"
 %      cfg.srcparam:    1x4 vector for additional source parameter
 %      cfg.unitinmm:    defines the unit in the input mesh [1.0]
+%      cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
+%                      'pencil' - default, pencil beam, no param needed
+%                      'isotropic' - isotropic source, no param needed
+%                      'cone' - uniform cone beam, srcparam1(1) is the half-angle in radian
+%                      'gaussian' - a collimated gaussian beam, srcparam1(1) specifies the waist radius (in voxels)
+%                      'planar' - a 3D quadrilateral uniform planar source, with three corners specified 
+%                                by srcpos, srcpos+srcparam1(1:3) and srcpos+srcparam2(1:3)
+%                      'pattern' - a 3D quadrilateral pattern illumination, same as above, except
+%                                srcparam1(4) and srcparam2(4) specify the pattern array x/y dimensions,
+%                                and srcpattern is a pattern array, valued between [0-1]. 
+%                      'fourier' - spatial frequency domain source, similar to 'planar', except
+%                                the integer parts of srcparam1(4) and srcparam2(4) represent
+%                                the x/y frequencies; the fraction part of srcparam1(4) multiplies
+%                                2*pi represents the phase shift (phi0); 1.0 minus the fraction part of
+%                                srcparam2(4) is the modulation depth (M). Put in equations:
+%                                    S=0.5*[1+M*cos(2*pi*(fx*x+fy*y)+phi0)], (0<=x,y,M<=1)
+%                      'arcsine' - similar to isotropic, except the zenith angle is uniform
+%                                distribution, rather than a sine distribution.
+%                      'disk' - a uniform disk source pointing along srcdir; the radius is 
+%                               set by srcparam1(1) (in grid unit)
+%                      'fourierx' - a general Fourier source, the parameters are 
+%                               srcparam1: [v1x,v1y,v1z,|v2|], srcparam2: [kx,ky,phi0,M]
+%                               normalized vectors satisfy: srcdir cross v1=v2
+%                               the phase shift is phi0*2*pi
+%                      'fourierx2d' - a general 2D Fourier basis, parameters
+%                               srcparam1: [v1x,v1y,v1z,|v2|], srcparam2: [kx,ky,phix,phiy]
+%                               the phase shift is phi{x,y}*2*pi
+%                      'zgaussian' - an angular gaussian beam, srcparam1(0) specifies the variance in the zenith angle
+%      cfg.{srcparam1,srcparam2}: 1x4 vectors, see cfg.srctype for details
+%      cfg.srcpattern: see cfg.srctype for details
+%      cfg.voidtime:   for wide-field sources, [1]-start timer at launch, 0-when entering
+%                      the first non-zero voxel
 %
 %      fields marked with * are required; options in [] are the default values
 %      fields marked with - are calculated if not given (can be faster if precomputed)
