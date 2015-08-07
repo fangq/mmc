@@ -23,19 +23,30 @@ addpath('../../mmclab/');
 %%-----------------------------------------------------------------
 
 planarsrc=1; % set to 1 to compare planar src, set to 0 for pencil beam
+inclusion=1; % set to 1 to add an inclusion in the domain
 
 clear cfg;
 
 cfg.nphoton=3e7;
 cfg.seed=27182818;
-[cfg.node,tmp,cfg.elem]=meshabox([0 0 0],[60 60 60], 2*sqrt(2), 2^3/6);
-cfg.elemprop=ones(size(cfg.elem,1),1);
+if(~inclusion)
+    [cfg.node,tmp,cfg.elem]=meshabox([0 0 0],[60 60 60], 2*sqrt(2), 2^3/6);
+    cfg.elemprop=ones(size(cfg.elem,1),1);
+    cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0];
+else
+    [node1,face1]=meshabox([0 0 0],[60 60 60], 2*sqrt(2), 2^3/6);
+    [node2,face2]=meshabox([20 20 20],[40 40 40], 2*sqrt(2), 2^3/6);
+    [node,face]=mergemesh(node1,face1,node2,face2);
+    [cfg.node,cfg.elem]=surf2mesh(node,face,[],[],1,2^3/6,[1 1 1;30 30 30],[],0);
+    cfg.elemprop=cfg.elem(:,5);
+    cfg.elem=cfg.elem(:,1:4);
+    cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0;0.01 0.2, 0.01 1.0];
+end
 cfg.srcpos=[30.1,30.2,0];
 cfg.srcdir=[0 0 1];
 cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=1e-10;
-cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0];
 cfg.debuglevel='TP';
 cfg.isreflect=0;
 
@@ -51,8 +62,10 @@ if(planarsrc)   % when planar src is used, re-tessellate the mesh
     % has this built-in
     srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
                   'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
-    cfg.elem(:,5)=1;
-    [cfg.node,cfg.elem] = mmcaddsrc(cfg.node,cfg.elem,...
+    if(size(cfg.elem,2)==5)
+        cfg.elem=cfg.elem(:,1:4);
+    end
+    [cfg.node,cfg.elem] = mmcaddsrc(cfg.node,[cfg.elem cfg.elemprop],...
          mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]));
     cfg.elemprop=cfg.elem(:,5);
     cfg.elem=cfg.elem(:,1:4);
@@ -75,6 +88,9 @@ cfgx=rmfield(cfgx,{'node','elem','elemprop','debuglevel'});
 dim=60;
 cfgx.vol=ones(dim,dim,dim);
 cfgx.vol=uint8(cfgx.vol);
+if(inclusion)
+    cfgx.vol(21:40,21:40,21:40)=2;
+end
 cfgx.nphoton=numel(cfgx.vol)/size(cube,1)*cfg.nphoton; % for mcx, nphoton 
                                                        % needs to be bigger 
                                                        % to match the noise 
@@ -116,7 +132,7 @@ vix=squeeze(cwcbx(:,30,:))';
 figure
 hold on
 clines = -1.5:-0.5:-8;
-if(~planarsrc)
+if(~planarsrc && ~inclusion)
     srcs=[30.1,30.2,0];
     dets=[xi(:) 30.2*ones(size(xi(:))) yi(:)];
     phicw=reshape(cwdiffusion(0.005, 1.0, 0, srcs, dets),size(xi));
@@ -131,7 +147,7 @@ set(gca,'xlim',[1 60]);
 set(gca,'fontsize',20);
 xlabel('x (mm)');
 ylabel('z (mm)');
-if(planarsrc)
+if(planarsrc || inclusion)
     legend('MMC','MCX');
 else
     legend('Diffusion','MMC','MCX');
