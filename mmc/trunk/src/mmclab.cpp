@@ -80,7 +80,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if(nlhs>=3)
       plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
 
-  if(mexEvalString("mmclab_waitbar_handle=waitbar(0,'');")) // waitbar is not supported with nojvm after matlab R2013a
+  if(mexEvalString("mmclab_waitbar_handle=figure('visible','off');")) // waitbar is not supported with nojvm after matlab R2013a
       usewaitbar=0;
   else
       mexEvalString("close(mmclab_waitbar_handle);");
