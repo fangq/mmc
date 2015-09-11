@@ -287,7 +287,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,isspecular)
     GET_ONE_FIELD(cfg,ismomentum)
     GET_ONE_FIELD(cfg,issaveexit)
-    GET_ONE_FIELD(cfg,outputtype)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
     GET_ONE_FIELD(cfg,method)
@@ -440,7 +439,23 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*sizeof(float));
         for(i=0;i<arraydim[0]*arraydim[1];i++)
              cfg->srcpattern[i]=val[i];
-        printf("mcx.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
+        printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
+    }else if(strcmp(name,"outputtype")==0){
+        int len=mxGetNumberOfElements(item);
+        const char *outputtype[]={"flux","fluence","energy","jacobian",""};
+        char outputstr[MAX_SESSION_LENGTH]={'\0'};
+
+        if(!mxIsChar(item) || len==0)
+             mexErrMsgTxt("the 'outputtype' field must be a non-empty string");
+	if(len>MAX_SESSION_LENGTH)
+	     mexErrMsgTxt("the 'outputtype' field is too long");
+        int status = mxGetString(item, outputstr, MAX_SESSION_LENGTH);
+        if (status != 0)
+             mexWarnMsgTxt("not enough space. string is truncated.");
+        cfg->outputtype=mcx_keylookup(outputstr,outputtype);
+        if(cfg->outputtype==-1)
+             mexErrMsgTxt("the specified output type is not supported");
+	printf("mmc.outputtype='%s';\n",outputstr);
     }else if(strcmp(name,"shapes")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)

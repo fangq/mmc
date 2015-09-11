@@ -75,8 +75,8 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->seed=0x623F9A9E;
      cfg->isrowmajor=0; /* default is matlab array*/
      cfg->maxgate=1;
-     cfg->isreflect=0;
-     cfg->isref3=0;
+     cfg->isreflect=1;
+     cfg->isref3=1;
      cfg->isnormalized=1;
      cfg->issavedet=0;
      cfg->respin=1;

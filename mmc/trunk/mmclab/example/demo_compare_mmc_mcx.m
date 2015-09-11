@@ -22,10 +22,11 @@ addpath('../../mmclab/');
 %% run mmclab for the 60x60x60 homogeneous cubic domain
 %%-----------------------------------------------------------------
 
+clear cfg;
+clear all;
+
 planarsrc=1; % set to 1 to compare planar src, set to 0 for pencil beam
 inclusion=1; % set to 1 to add an inclusion in the domain
-
-clear cfg;
 
 cfg.nphoton=3e7;
 cfg.seed=27182818;
@@ -49,6 +50,7 @@ cfg.tend=5e-9;
 cfg.tstep=1e-10;
 cfg.debuglevel='TP';
 cfg.isreflect=0;
+cfg.detpos=[0 30 30 2];
 
 % define wide-field planar source
 
@@ -88,10 +90,11 @@ cfgx=rmfield(cfgx,{'node','elem','elemprop','debuglevel'});
 dim=60;
 cfgx.vol=ones(dim,dim,dim);
 cfgx.vol=uint8(cfgx.vol);
+cfgx.faststep=0;
 if(inclusion)
     cfgx.vol(21:40,21:40,21:40)=2;
 end
-cfgx.nphoton=numel(cfgx.vol)/size(cube,1)*cfg.nphoton; % for mcx, nphoton 
+cfgx.nphoton=numel(cfgx.vol)/size(cfg.node,1)*cfg.nphoton; % for mcx, nphoton 
                                                        % needs to be bigger 
                                                        % to match the noise 
                                                        % of mmc
@@ -131,7 +134,7 @@ vix=squeeze(cwcbx(:,30,:))';
 %%-----------------------------------------------------------------
 figure
 hold on
-clines = -1.5:-0.5:-8;
+clines = -1.5:-0.25:-8;
 if(~planarsrc && ~inclusion)
     srcs=[30.1,30.2,0];
     dets=[xi(:) 30.2*ones(size(xi(:))) yi(:)];
