@@ -145,6 +145,10 @@ end
 contour(xi,yi,log10(abs(vi*cfg.tstep)),clines,'r:')
 contour(xi,yi,log10(abs(vix*cfg.tstep)),clines,'b--')
 
+if(inclusion)
+    plot([20 20 40 40 20],[20 40 40 20 20],'k--');
+end
+
 axis equal
 set(gca,'xlim',[1 60]);
 set(gca,'fontsize',20);
