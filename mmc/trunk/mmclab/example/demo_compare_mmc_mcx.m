@@ -44,6 +44,7 @@ else
     cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0;0.01 0.2, 0.01 1.0];
 end
 cfg.srcpos=[30.1,30.2,0];
+% cfg.srcdir=[0 0 1 -30]; % to test a diverging beam with a focus of -30
 cfg.srcdir=[0 0 1];
 cfg.tstart=0;
 cfg.tend=5e-9;

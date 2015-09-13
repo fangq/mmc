@@ -53,6 +53,7 @@ typedef struct MMC_ray{
 	unsigned int photoid;
 	float *partialpath;
         void  *photonseed;
+	float focus;
 } ray;
 
 /***************************************************************************//**

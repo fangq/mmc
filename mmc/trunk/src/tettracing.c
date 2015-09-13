@@ -724,7 +724,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
         float mom;
-	ray r={cfg->srcpos,cfg->srcdir,{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
 
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
@@ -941,6 +941,9 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 }
 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
+        int canfocus=1;
+        float3 origin={r->p0.x,r->p0.y,r->p0.z};
+
 	r->slen=rand_next_scatlen(ran);
 	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
 		if(r->eid>0)
@@ -957,6 +960,9 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		}else if(cfg->srctype==stFourier){
 			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
 		}
+		origin.x+=(cfg->srcparam1.x+cfg->srcparam2.x)*0.5f;
+		origin.y+=(cfg->srcparam1.y+cfg->srcparam2.y)*0.5f;
+		origin.z+=(cfg->srcparam1.z+cfg->srcparam2.z)*0.5f;
 	}else if(cfg->srctype==stFourierX || cfg->srctype==stFourier2D){
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
@@ -972,6 +978,9 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 			r->weight=(sinf((cfg->srcparam2.x*rx+cfg->srcparam2.z)*TWO_PI)*sinf((cfg->srcparam2.y*ry+cfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
 		else
 			r->weight=(cosf((cfg->srcparam2.x*rx+cfg->srcparam2.y*ry+cfg->srcparam2.z)*TWO_PI)*(1.f-cfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
+		origin.x+=(cfg->srcparam1.x+v2.x)*0.5f;
+		origin.y+=(cfg->srcparam1.y+v2.y)*0.5f;
+		origin.z+=(cfg->srcparam1.z+v2.z)*0.5f;
 	}else if(cfg->srctype==stDisk){  // uniform disk distribution
 		float sphi, cphi;
 		float phi=TWO_PI*rand_uniform01(ran);
@@ -1006,6 +1015,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->vec.x=stheta*cphi;
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
+		canfocus=0;
 	}else if(cfg->srctype==stGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
@@ -1016,6 +1026,24 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->vec.x=stheta*cphi;
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
+		canfocus=0;
+	}
+        if(canfocus && r->focus!=0.f){ // if beam focus is set, determine the incident angle
+	        float Rn2;
+	        origin.x+=r->focus*r->vec.x;
+		origin.y+=r->focus*r->vec.y;
+		origin.z+=r->focus*r->vec.z;
+		if(r->focus<0.f){ // diverging beam
+                     r->vec.x=r->p0.x-origin.x;
+                     r->vec.y=r->p0.y-origin.y;
+                     r->vec.z=r->p0.z-origin.z;
+		}else{             // converging beam
+                     r->vec.x=origin.x-r->p0.x;
+                     r->vec.y=origin.y-r->p0.y;
+                     r->vec.z=origin.z-r->p0.z;
+		}
+		Rn2=1.f/sqrt(vec_dot(&r->vec,&r->vec)); // normalize
+		vec_mult(&r->vec,Rn2,&r->vec);
 	}
 
 	/*Caluclate intial element id and bary-centric coordinates*/

@@ -96,11 +96,9 @@ typedef struct MMC_config{
 	int seed;         /**<random number generator seed*/
 
 	float3 srcpos;    /**<src position in mm*/
-	float3 srcdir;    /**<src normal direction*/
-//	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
-//	float4 srcparam;  /**<additional parameters for advanced sources */
-	char srctype;	  /**<source type */
-	float4 srcparam;
+	float4 srcdir;    /**<src normal direction*/
+	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
+	float4 srcparam;  /**<additional parameters for advanced sources */
 	float4 srcparam1;	/**<source parameters set 1*/
 	float4 srcparam2;	/**<source parameters set 2*/
 	float* srcpattern;	/**<source pattern*/

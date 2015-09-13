@@ -50,10 +50,10 @@ if(~isfield(cfg,'srcpos') || ~isfield(cfg,'srcdir') || ...
 end
 
 if(strcmp(cfg.srctype,'isotropic'))
-    cfg.srcdir=rand(1,3);
-    cfg.srcdir=cfg.srcdir/norm(cfg.srcdir);
+    cfg.srcdir(1:3)=rand(1,3);
+    cfg.srcdir(1:3)=cfg.srcdir(1:3)/norm(cfg.srcdir(1:3));
 end
-cfg.srcdir=cfg.srcdir/norm(cfg.srcdir);
+cfg.srcdir(1:3)=cfg.srcdir(1:3)/norm(cfg.srcdir(1:3));
 domainradius=min(meshbbx(2,:)-meshbbx(1,:))*0.25;
 if(strcmp(cfg.srctype,'pencil'))
    warning(['for external pencil beams, you are highly recommended to set ' ...
@@ -62,7 +62,7 @@ end
 
 if(strcmp(cfg.srctype,'pencil') || strcmp(cfg.srctype,'cone') || ...
         strcmp(cfg.srctype,'zgaussian')|| strcmp(cfg.srctype,'isotropic') || strcmp(cfg.srctype,'arcsine'))
-    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,domainradius,3);
+    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domainradius,3);
     srcface=[1 2 3];
 elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         strcmp(cfg.srctype,'fourier') ||strcmp(cfg.srctype,'fourierx')||strcmp(cfg.srctype,'fourier2d'))
@@ -78,15 +78,15 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2]*(expansion-1.0);
         srcface=[1 2 3;3 4 1];
     else
-        srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir,(max(norm(voff1),norm(voff2)))*2.0*expansion,3);
+        srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir(1:3),(max(norm(voff1),norm(voff2)))*2.0*expansion,3);
         srcface=[1 2 3];
     end
 elseif(strcmp(cfg.srctype,'disk'))
     if(jsonopt('KeepShape',0,opt))
-        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,cfg.srcparam1(1)*expansion,jsonopt('CircleDiv',100,opt));
+        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),cfg.srcparam1(1)*expansion,jsonopt('CircleDiv',100,opt));
         srcface=delaunay(srcnode(:,1),srcnode(:,2));
     else
-        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir,(cfg.srcparam1(1)*2.0)*expansion,3);
+        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),(cfg.srcparam1(1)*2.0)*expansion,3);
         srcface=[1 2 3];
     end
 else

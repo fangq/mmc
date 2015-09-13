@@ -114,6 +114,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->replaydet=0;
      cfg->replayweight=NULL;
      cfg->isextdet=0;
+     cfg->srcdir.w=0.f;
 
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
@@ -270,6 +271,8 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
               cfg->srcdir.x=subitem->child->valuedouble;
               cfg->srcdir.y=subitem->child->next->valuedouble;
               cfg->srcdir.z=subitem->child->next->next->valuedouble;
+	      if(subitem->child->next->next->next)
+	         cfg->srcdir.w=subitem->child->next->next->next->valuedouble;
            }
            subitem=FIND_JSON_OBJ("Type","Optode.Source.Type",src);
            if(subitem){
@@ -408,7 +411,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      if(in==stdin)
      	fprintf(stdout,"%f %f %f\nPlease specify the normal direction of the source fiber: [0 0 1]\n\t",
 	                            cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
-     MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z) )==3);
+     MMC_ASSERT(fscanf(in,"%f %f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z),&(cfg->srcdir.w) )>=3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
