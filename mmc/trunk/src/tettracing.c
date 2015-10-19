@@ -779,16 +779,18 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 	    	    if(r.eid==0) break;
 		    /*when a photon enters the domain from the background*/
-		    if((cfg->debuglevel&dlExit) && mesh->med[mesh->type[oldeid-1]].n == cfg->nout && mesh->med[mesh->type[r.eid-1]].n != cfg->nout ){
+		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
+                        if(cfg->debuglevel&dlExit)
 			    fprintf(cfg->flog,"e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    	r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
-                            if(!cfg->voidtime)
-                                r.photontimer=0.f;
-                     }
+                        if(!cfg->voidtime)
+                            r.photontimer=0.f;
+                    }
 		    /*when a photon exits the domain into the background*/
-		    if((cfg->debuglevel&dlExit) && mesh->med[mesh->type[oldeid-1]].n != cfg->nout && mesh->med[mesh->type[r.eid-1]].n == cfg->nout ){
-		        fprintf(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
-			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+		    if(mesh->type[oldeid-1] && mesh->type[r.eid-1]==0){
+                        if(cfg->debuglevel&dlExit)
+		            fprintf(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			        r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
 			if(!cfg->isextdet){
                             r.eid=0;
         		    break;

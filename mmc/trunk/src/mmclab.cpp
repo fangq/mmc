@@ -483,6 +483,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             cfg->nphoton=arraydim[1];
             printf("mmc.nphoton=%d;\n",cfg->nphoton);
         }
+    }else if(strcmp(name,"isreoriented")==0){
+        /*internal flag, don't need to do anything*/
     }else{
         printf("WARNING: redundant field '%s'\n",name);
     }

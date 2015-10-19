@@ -164,7 +164,10 @@ for i=1:len
     if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
-    cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+    if(~isfield(cfg(i),'isreoriented') || cfg(i).isreoriented==0)
+        cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+        cfg(i).isreoriented=1;
+    end
     if(~isfield(cfg(i),'facenb') || isempty(cfg(i).facenb))
         cfg(i).facenb=faceneighbors(cfg(i).elem);
     end

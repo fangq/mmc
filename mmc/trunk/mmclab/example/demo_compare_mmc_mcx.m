@@ -57,7 +57,7 @@ cfg.detpos=[0 30 30 2];
 
 if(planarsrc)   % when planar src is used, re-tessellate the mesh
     cfg.srctype='planar';
-    cfg.srcpos=[10 10 -1];
+    cfg.srcpos=[10 10 -10];
     cfg.srcparam1=[40 0 0 0];
     cfg.srcparam2=[0 40 0 0];
 
@@ -73,6 +73,7 @@ if(planarsrc)   % when planar src is used, re-tessellate the mesh
     cfg.elemprop=cfg.elem(:,5);
     cfg.elem=cfg.elem(:,1:4);
 end
+cfg=mmclab(cfg,'prep');
 
 %%-----------------------------------------------------------------
 %% run mmclab
