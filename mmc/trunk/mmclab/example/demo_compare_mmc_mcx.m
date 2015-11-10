@@ -50,7 +50,7 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=1e-10;
 cfg.debuglevel='TP';
-cfg.isreflect=0;
+cfg.isreflect=1;
 cfg.detpos=[0 30 30 2];
 
 % define wide-field planar source
@@ -88,7 +88,7 @@ cube=cube.data;
 %%-----------------------------------------------------------------
 
 cfgx=cfg;
-cfgx=rmfield(cfgx,{'node','elem','elemprop','debuglevel'});
+cfgx=rmfield(cfgx,{'node','elem','elemprop','debuglevel','facenb','evol','e0','isreoriented'});
 dim=60;
 cfgx.vol=ones(dim,dim,dim);
 cfgx.vol=uint8(cfgx.vol);

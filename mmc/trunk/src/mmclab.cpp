@@ -48,7 +48,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL};
+  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -126,7 +126,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL};
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
 	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
             if(cfg.issaveseed)
@@ -176,7 +176,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	}
 
         #pragma omp atomic
-                master.accumu_weight += visit.accumu_weight;
+                master.totalweight += visit.totalweight;
 
 	if(cfg.issavedet){
 	    #pragma omp atomic
@@ -231,9 +231,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f were overhead)\n",raytri,raytri0));
 
 	tracer_clear(&tracer);
-	if(cfg.isnormalized && master.accumu_weight){
+	if(cfg.isnormalized && master.totalweight){
 	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.accumu_weight,100.f*Eabsorb/master.accumu_weight,mesh_normalize(&mesh,&cfg,Eabsorb,master.accumu_weight));
+		master.totalweight,100.f*Eabsorb/master.totalweight,mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight));
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 

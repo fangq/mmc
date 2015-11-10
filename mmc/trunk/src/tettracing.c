@@ -724,6 +724,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
         float mom;
+	float kahany, kahant;
 	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
 
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
@@ -746,7 +747,13 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	/*initialize the photon parameters*/
         launchphoton(cfg, &r, mesh, ran, ran0);
 	r.partialpath[visit->reclen-2] = r.weight;
-	visit->accumu_weight += r.weight;
+
+	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
+	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
+	kahany=r.weight-visit->kahanc;
+	kahant=visit->totalweight + kahany;
+	visit->kahanc=(kahant - visit->totalweight) - kahany;
+	visit->totalweight=kahant;
 
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };

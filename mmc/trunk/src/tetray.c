@@ -44,7 +44,7 @@ int main(int argc, char**argv){
 	mcconfig cfg;
 	tetmesh mesh;
 	raytracer tracer;
-	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f};
+	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
@@ -86,7 +86,7 @@ int main(int argc, char**argv){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f};
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
 	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
 	    if(cfg.issaveseed)
@@ -120,7 +120,7 @@ int main(int argc, char**argv){
 	}
 
 	#pragma omp atomic
-		master.accumu_weight += visit.accumu_weight;
+		master.totalweight += visit.totalweight;
 
 	if(cfg.issavedet){
 	    #pragma omp atomic
@@ -162,7 +162,7 @@ int main(int argc, char**argv){
 
 	if(cfg.isnormalized){
           fprintf(cfg.flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.accumu_weight,100.f*Eabsorb/master.accumu_weight,mesh_normalize(&mesh,&cfg,Eabsorb,master.accumu_weight));
+		master.totalweight,100.f*Eabsorb/master.totalweight,mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight));
 	}
 	if(cfg.issave2pt){
 		switch(cfg.outputtype){
