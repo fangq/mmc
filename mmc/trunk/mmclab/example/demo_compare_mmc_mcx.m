@@ -41,7 +41,7 @@ else
     [cfg.node,cfg.elem]=surf2mesh(node,face,[],[],1,2^3/6,[1 1 1;30 30 30],[],0);
     cfg.elemprop=cfg.elem(:,5);
     cfg.elem=cfg.elem(:,1:4);
-    cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0;0.01 0.2, 0.01 1.0];
+    cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0;0.01 0.2, 0.01 1.37];
 end
 cfg.srcpos=[30.1,30.2,0];
 % cfg.srcdir=[0 0 1 -30]; % to test a diverging beam with a focus of -30
