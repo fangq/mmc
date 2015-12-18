@@ -1,7 +1,7 @@
 /*****************************************************************//**
 *            A library for approximated math functions               *
 *                                                                    *
-*  \author Qianqian Fang <fangq at nmr.mgh.harvard.edu>              *
+*  \author Qianqian Fang <q.fang at neu.edu>                         *
 *                                                                    *
 *********************************************************************/
 

@@ -4,7 +4,7 @@ function [res,xi,yi,zi]=sphdiffusionscatteronly(xrange,yrange,zrange,cfg)
 %
 % analytical solution to the diffusion model (scattered field only)
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     xrange,yrange,zrange: a vector from where a grid will be created

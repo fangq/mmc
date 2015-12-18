@@ -4,7 +4,7 @@ function node=readmmcnode(filename)
 %
 % Loading MMC node coordinates data file
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     filename: the file name to the node coordinate file

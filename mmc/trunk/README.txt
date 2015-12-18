@@ -3,10 +3,10 @@
 =                     Multi-threaded Edition with SSE4                        =
 ===============================================================================
 
-Author:  Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 0.9.5 (Wasabi Peas)
-URL:     http://mcx.sf.net/mmc/
+Version: 1.0-beta (Cotton Candy)
+URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------
 
@@ -62,8 +62,16 @@ The details of MMCM can be found in the following paper:
   Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
   in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
 
-The author of this paper is greatly appreciated if you can cite 
-the above paper as reference if you use MMC and related software
+The generalized MMC algorithm for wide-field sources and detectors are
+described in the following paper, and was made possible with the collaboration
+with Ruoyang Yao and Prof. Xavier Intes from RPI
+
+  Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for
+  wide-field illumination and detection via mesh retessellation,"
+  Biomed. Optics Express, 7(1), 171-184 (2016)
+
+The authors of the papers are greatly appreciated if you can cite 
+the above papers as references if you use MMC and related software
 in your publication.
 
 -------------------------------------------------------------------------------
@@ -79,7 +87,7 @@ using Git. However this is not encouraged unless you are
 a developer. To check out the Git source code, you should use the following 
 command:
 
-  git clone git://mcx.git.sourceforge.net/gitroot/mcx/mcx/ mmc
+  git clone https://github.com/fangq/mmc.git mmc
 
 then type the password as "anonymous_user". This will allow you to 
 anonymously check out the entire source code tree.
@@ -188,7 +196,7 @@ where possible parameters include (the first item in [] is the default value)
  -f config     (--input)       read config from a file
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
- -e [0.|float] (--minenergy)   minimum energy level to trigger Russian roulette
+ -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
@@ -197,12 +205,21 @@ where possible parameters include (the first item in [] is the default value)
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
- -O [X|XFE]    (--outputtype)  X - output flux, F - fluence, E - energy deposit
+ -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit
+                               J - Jacobian (replay mode),   T - approximated
+                               Jacobian (replay mode only)
+ -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
+ -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
  -l            (--log)         print messages to a log file instead
- -E [0|int]    (--seed)        set random-number-generator seed
- -M [H|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
+ -E [0|int|mch](--seed)        set random-number-generator seed;
+                               if an mch file is followed, MMC will "replay" 
+                               the detected photon; the replay mode can be used
+                               to calculate the Jacobian
+ -P [0|int]    (--replaydet)   replay only the detected photons from a given 
+                               detector (det ID starts from 1), used with -E 
+ -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
 			       H - Havel's SSE4 ray-tracing algorithm
 			       B - partial Badouel's method (used by TIM-OS)
@@ -255,6 +272,9 @@ a similar format as in MCX, which looks like the following
  2.0     6.0    0.0   # detector 1 position (mm)
  2.0     4.0    0.0   # ...
  2.0     2.0    0.0
+ pencil               # optional: source type
+ 0 0 0 0              # optional: source parameter set 1
+ 0 0 0 0              # optional: source parameter set 2
 
 The mesh files are linked through the "mesh id" (a name stub) with a 
 format of {node|elem|facenb|velem}_meshid.dat. All mesh files must 
@@ -315,8 +335,11 @@ folder. The same file, onecube.json, is also shown below:
     },
     "Optode": {
 	"Source": {
+            "Type": "pencil",
 	    "Pos": [2.0, 8.0, 0.0],
-	    "Dir": [0.0, 0.0, 1.0]
+	    "Dir": [0.0, 0.0, 1.0],
+            "Param1": [0.0, 0.0, 0.0, 0.0],
+            "Param2": [0.0, 0.0, 0.0, 0.0]
 	},
 	"Detector": [
 	    {
@@ -405,9 +428,13 @@ function is plotmesh in iso2mesh toolbox. It has very flexible
 syntax to allow users to plot surfaces, volumetric meshes and
 cross-section plots. One can use something like
 
-  plotmesh(node,elem,'x<30 & y>30');
+  plotmesh([node fluence],elem,'x<30 & y>30');
 
-to plot a sliced mesh.
+to plot a sliced mesh, or 
+
+  plotmesh([node log10(fluence)],elem,'x=30'); view(3)
+
+to show a cross-sectional plot.
 
 Please edit or browse the *.m files under all example subfolder
 to find more options to make plot from MMC output.
@@ -561,6 +588,17 @@ MMC uses the following open-source libraries:
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.
 
+=== git-rcs-keywords by Martin Turon (turon) at Github ===
+
+   MMC includes a pair of git filters (.git_filters/rcs-keywords.clean
+   and .git_filters/rcs-keywords.smudge) to automatically update SVN
+   keywords in mcx_utils.c. The two simple filter scripts were licensed
+   under the BSD license according to this link:
+
+   https://github.com/turon/git-rcs-keywords/issues/4
+
+   Both filter files were significantly modified by Qianqian Fang.
+ 
 -------------------------------------------------------------------------------
 
 VIII.  Reference

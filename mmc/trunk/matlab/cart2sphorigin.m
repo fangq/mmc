@@ -4,7 +4,7 @@ function [T,P,R]=cart2sphorigin(xi,yi,zi,x0,y0,z0)
 %
 % Converting Cartesian coordinates to spherical with a reset of origin
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     xi,yi,zi: list of Cartesian coordinates

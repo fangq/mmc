@@ -1,7 +1,7 @@
 /*********************************************************************
 * A POSIX Random Number Generator for multi-threaded applications    *
 *                                                                    *
-*  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>              *
+*  Author: Qianqian Fang <q.fang at neu.edu>                         *
 *                                                                    *
 *********************************************************************/
 

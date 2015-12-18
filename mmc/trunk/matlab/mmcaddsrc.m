@@ -7,7 +7,7 @@ function [newnode,newelem]=mmcaddsrc(node,elem,src,varargin)
 % Adding an external wide-field (polyhedral) source domain to an
 % existing tetrahedral mesh
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     node: the node list of the original mesh

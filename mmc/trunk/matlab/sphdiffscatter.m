@@ -4,7 +4,7 @@ function res=sphdiffscatter(r,theta,phi,cfg)
 %
 % sphere exterior scattered field 
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     r,theta,phi: source position in spherical coordinates.

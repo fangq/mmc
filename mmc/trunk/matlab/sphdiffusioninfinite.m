@@ -4,7 +4,7 @@ function [res,xi,yi,zi]=sphdiffusioninfinite(xrange,yrange,zrange,cfg)
 %
 % diffusion solution for a sphere inside the infinite homogeneous medium 
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     xrange,yrange,zrange: a vector from where a grid will be created

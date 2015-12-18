@@ -1,7 +1,7 @@
 ########################################################
 #  MMC: Mesh-based Monte Carlo
 #  Copyright (C) 2009 Qianqian Fang 
-#                    <fangq at nmr.mgh.harvard.edu>
+#                    <q.fang at neu.edu>
 #
 #  $Id$
 ########################################################

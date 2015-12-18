@@ -3,8 +3,8 @@ function varargout=mmclab(cfg,type)
 %====================================================================
 %      MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave
 %--------------------------------------------------------------------
-%Copyright (c) 2012 Qianqian Fang <fangq at nmr.mgh.harvard.edu>
-%                   URL: http://mcx.sf.net/mmc/
+%Copyright (c) 2012-2015 Qianqian Fang <q.fang at neu.edu>
+%                   URL: http://mcx.space/mmc
 %====================================================================
 %
 % Format:

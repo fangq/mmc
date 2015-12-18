@@ -4,7 +4,7 @@ function yn=spbessely(n,z)
 %
 % spherical Neumann function 
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     n: order of the spherical Neumann function

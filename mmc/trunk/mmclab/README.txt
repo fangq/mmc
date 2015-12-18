@@ -1,6 +1,6 @@
 = MMCLAB: MMC for MATLAB and GNU Octave =
 
-*Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+*Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
 *Version: this package is part of Mesh-based Monte Carlo (MMC) 0.9.5
 *URL: http://mcx.sf.net/cgi-bin/index.cgi?MMC/Doc/MMCLAB
@@ -54,7 +54,7 @@ the verbose command line options in MMC.
 <pre>====================================================================
       mmclab - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave
 --------------------------------------------------------------------
-Copyright (c) 2012 Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+Copyright (c) 2012-2015 Qianqian Fang <q.fang at neu.edu>
 		   URL: http://mcx.sf.net/mmc/
 ====================================================================
 

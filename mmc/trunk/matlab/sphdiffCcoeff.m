@@ -4,7 +4,7 @@ function C=sphdiffCcoeff(m,l,cfg)
 %
 % sphere diffusion interior solution C coefficients
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     m: angular index

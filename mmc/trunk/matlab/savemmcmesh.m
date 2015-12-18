@@ -4,7 +4,7 @@ function savemmcmesh(key,node,elem,face,evol,facenb)
 %
 % Export a tetrahedral mesh to the MMC mesh format
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     key: a string included in all exported mesh file names, the 

@@ -7,7 +7,7 @@ function varargout=mmcadddet(varargin)
 % Adding an external wide-field (polyhedral) detector domain to an
 % existing tetrahedral mesh
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     see mmcaddsrc for details.

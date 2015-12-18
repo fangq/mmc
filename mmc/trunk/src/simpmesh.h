@@ -1,7 +1,7 @@
 /*******************************************************************************
 **  Mesh-based Monte Carlo (MMC)
 **
-**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**  Author: Qianqian Fang <q.fang at neu.edu>
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 

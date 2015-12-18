@@ -5,7 +5,7 @@ function [srcnode,srcface]=mmcsrcdomain(cfg,meshbbx,varargin)
 % Defining a source domain (for launching new photons) in the form of 
 % polyhedra based on an MMCLAB simulation configuration structure
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     cfg: the simulation configuration structure used by mmclab, the

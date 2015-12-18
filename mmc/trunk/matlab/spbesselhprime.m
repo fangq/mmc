@@ -4,7 +4,7 @@ function hn=spbesselhprime(n,k,z)
 %
 % spherical Hankel function first order derivative 
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     n: order of the spherical Hankel function

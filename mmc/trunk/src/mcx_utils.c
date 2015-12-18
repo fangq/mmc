@@ -278,12 +278,19 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
            if(subitem){
               cfg->srctype=mcx_keylookup(subitem->valuestring,srctypeid);
            }
-           subitem=FIND_JSON_OBJ("Param","Optode.Source.Param",src);
+           subitem=FIND_JSON_OBJ("Param1","Optode.Source.Param1",src);
            if(subitem && cJSON_GetArraySize(subitem)==4){
-              cfg->srcparam.x=subitem->child->valuedouble;
-              cfg->srcparam.y=subitem->child->next->valuedouble;
-              cfg->srcparam.z=subitem->child->next->next->valuedouble;
-              cfg->srcparam.w=subitem->child->next->next->next->valuedouble;
+              cfg->srcparam1.x=subitem->child->valuedouble;
+              cfg->srcparam1.y=subitem->child->next->valuedouble;
+              cfg->srcparam1.z=subitem->child->next->next->valuedouble;
+              cfg->srcparam1.w=subitem->child->next->next->next->valuedouble;
+           }
+           subitem=FIND_JSON_OBJ("Param2","Optode.Source.Param2",src);
+           if(subitem && cJSON_GetArraySize(subitem)==4){
+              cfg->srcparam2.x=subitem->child->valuedouble;
+              cfg->srcparam2.y=subitem->child->next->valuedouble;
+              cfg->srcparam2.z=subitem->child->next->next->valuedouble;
+              cfg->srcparam2.w=subitem->child->next->next->next->valuedouble;
            }
         }
         dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);

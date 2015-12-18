@@ -4,7 +4,7 @@ function [res,xi,yi,zi] = sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %
 % diffusion solution for a sphere inside a semi-infinite homogeneous medium 
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     Reff:  the effective reflection coeff.

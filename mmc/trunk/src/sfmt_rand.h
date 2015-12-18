@@ -1,7 +1,7 @@
 /*****************************************************************//**
 *  A Pseudo-RNG using the SIMD-oriented Fast Mersenne Twister (SFMT) *
 *                                                                    *
-*  \author Qianqian Fang <fangq at nmr.mgh.harvard.edu>              *
+*  \author Qianqian Fang <q.fang at neu.edu>                         *
 *                                                                    *
 *********************************************************************/
 

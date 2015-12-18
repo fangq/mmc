@@ -1,7 +1,7 @@
 /***************************************************************************//**
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  \author Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**  \author Qianqian Fang <q.fang at neu.edu>
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">

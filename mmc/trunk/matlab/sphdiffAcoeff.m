@@ -4,7 +4,7 @@ function A=sphdiffAcoeff(m,l,cfg)
 %
 % sphere diffusion exterior solution A coefficients
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     m: angular index

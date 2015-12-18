@@ -2,7 +2,7 @@
 **  Mesh-based Monte Carlo (MMC) -- this unit was ported from MCX
 **
 **  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
-**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**  Author: Qianqian Fang <q.fang at neu.edu>
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
@@ -98,7 +98,6 @@ typedef struct MMC_config{
 	float3 srcpos;    /**<src position in mm*/
 	float4 srcdir;    /**<src normal direction*/
 	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
-	float4 srcparam;  /**<additional parameters for advanced sources */
 	float4 srcparam1;	/**<source parameters set 1*/
 	float4 srcparam2;	/**<source parameters set 2*/
 	float* srcpattern;	/**<source pattern*/

@@ -4,7 +4,7 @@ function Y=spharmonic(l,m,theta,phi)
 %
 % spherical harmonic function Y_{m,l}(theta,phi)
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     m: angular index

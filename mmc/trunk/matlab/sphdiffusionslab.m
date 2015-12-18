@@ -4,7 +4,7 @@ function [res,xi,yi,zi] = sphdiffusionslab(Reff1,Reff2,h,xrange,yrange,zrange,cf
 %
 % diffusion solution for a sphere inside an infinite homogeneous slab 
 %
-% author: Qianqian Fang (fangq <at> nmr.mgh.harvard.edu)
+% author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     Reff:  the effective reflection coeff.
