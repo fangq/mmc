@@ -1,7 +1,0 @@
-initializing ... 	done	173
-seed=12345678
-simulating ... 
-	done	2737
-speed ...	132782192 ray-tetrahedron tests (132684752 were overhead)
-total simulated energy: 1499118.875000	absorbed: 0.00000%	normalizor=-nan
-saving flux ...	done	3002
