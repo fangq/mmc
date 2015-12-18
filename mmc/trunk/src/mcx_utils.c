@@ -2,7 +2,7 @@
 **  Mesh-based Monte Carlo (MMC) -- this unit was ported from MCX
 **
 **  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
-**  Author: Qianqian Fang <fangq at nmr.mgh.harvard.edu>
+**  Author: Qianqian Fang <q.fang at neu.edu>
 **
 **  Reference:
 **  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
@@ -822,11 +822,13 @@ void mcx_usage(char *exename){
      printf("\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
-#     Copyright (c) 2010,2011 Qianqian Fang <fangq at nmr.mgh.harvard.edu>    #\n\
+#          Copyright (c) 2010-2015 Qianqian Fang <q.fang at neu.edu>          #\n\
+#                            http://mcx.space/mmc/                            #\n\
 #                                                                             #\n\
-#    Martinos Center for Biomedical Imaging, Massachusetts General Hospital   #\n\
+#         Computational Imaging Laboratory (CIL) [http://fanglab.org]         #\n\
+#            Department of Bioengineering, Northeastern University            #\n\
 ###############################################################################\n\
-$MMC $Rev::e72b60d $ Last Commit $Date::2011-12-20 13:58:34$ by $Author:: fangq$\n\
+$Rev::       $ Last $Date::                       $ by $Author::              $\n\
 ###############################################################################\n\
 \n\
 usage: %s <param1> <param2> ...\n\
