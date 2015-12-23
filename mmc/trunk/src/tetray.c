@@ -70,7 +70,8 @@ int main(int argc, char**argv){
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg.issaveseed=0;
 #endif
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nseed=%u\nsimulating ... ",GetTimeMillis()-t0,cfg.seed));
+        dt=GetTimeMillis();
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nseed=%u\nsimulating ... ",dt-t0,cfg.seed));
 
 	/***************************************************************************//**
 	The master thread then spawn multiple work-threads depending on your
@@ -153,16 +154,17 @@ int main(int argc, char**argv){
 	if((cfg.debuglevel & dlProgress))
 		mcx_progressbar(cfg.nphoton,&cfg);
 
-	dt=GetTimeMillis()-t0;
+	dt=GetTimeMillis()-dt;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f were overhead)\n",raytri,raytri0));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg.nphoton/dt,raytri,raytri0));
 
 	tracer_clear(&tracer);
 
 	if(cfg.isnormalized){
+          cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight);
           fprintf(cfg.flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight));
+		master.totalweight,100.f*Eabsorb/master.totalweight,cfg.his.normalizer);
 	}
 	if(cfg.issave2pt){
 		switch(cfg.outputtype){

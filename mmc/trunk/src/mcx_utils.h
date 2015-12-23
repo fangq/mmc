@@ -38,6 +38,7 @@
 #define SEED_FROM_FILE      -999
 #define MIN(a,b)            ((a)<(b)?(a):(b))
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
+#define MMC_INFO            -99999
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
@@ -77,7 +78,8 @@ typedef struct MMC_history{
         unsigned int  savedphoton;
         float unitinmm;
 	unsigned int  seedbyte;
-        int reserved[6];
+        float normalizer;
+        int reserved[5];
 } history;
 
 /***************************************************************************//**
@@ -175,7 +177,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
 void mcx_usage(char *exename);
 void mcx_loadvolume(char *filename,mcconfig *cfg);
 void mcx_normalize(float field[], float scale, int fieldlen);
-int  mcx_readarg(int argc, char *argv[], int id, void *output,char *type);
+int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
 int  mcx_remap(char *opt);
 int  mcx_lookupindex(char *key, const char *index);
@@ -183,6 +185,7 @@ int  mcx_keylookup(char *key, const char *table[]);
 int  mcx_parsedebugopt(char *debugopt);
 void mcx_progressbar(unsigned int n, mcconfig *cfg);
 int  mcx_loadjson(cJSON *root, mcconfig *cfg);
+void mcx_version(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
   #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
@@ -190,7 +193,7 @@ int  mcx_loadjson(cJSON *root, mcconfig *cfg);
   #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)
 #endif
 
-#if defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER)
+#if defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER) || defined (HAVE_OCTAVE)
     int mexPrintf(const char * format, ... );
 #else
     void mexPrintf(const char * format, ... );

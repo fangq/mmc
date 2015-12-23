@@ -1,11 +1,17 @@
 function varargout=mmclab(cfg,type)
 %
-%====================================================================
-%      MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave
-%--------------------------------------------------------------------
-%Copyright (c) 2012-2015 Qianqian Fang <q.fang at neu.edu>
-%                   URL: http://mcx.space/mmc
-%====================================================================
+%#############################################################################%
+%         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
+%          Copyright (c) 2010-2015 Qianqian Fang <q.fang at neu.edu>          %
+%                            http://mcx.space/mmc/                            %
+%                                                                             %
+%         Computational Imaging Laboratory (CIL) [http://fanglab.org]         %
+%            Department of Bioengineering, Northeastern University            %
+%                                                                             %
+%               Research funded by NIH/NIGMS grant R01-GM114365               %
+%#############################################################################%
+%$Rev::      $ Last $Date::                       $ by $Author::             $%
+%#############################################################################%
 %
 % Format:
 %    [flux,detphoton,ncfg,seeds]=mmclab(cfg,type);

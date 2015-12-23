@@ -10,10 +10,10 @@ function node=readmmcnode(filename)
 %     filename: the file name to the node coordinate file
 %
 % output:
-%     node: the surface triangle element list 
+%     node: the node coordinate list 
 %
 % example:
-%     node=readmmcface('node_sph1.dat');
+%     node=readmmcnode('node_sph1.dat');
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %

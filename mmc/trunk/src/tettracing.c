@@ -171,25 +171,26 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
+
+#ifdef __INTEL_COMPILER
+		r->weight*=expf(-prop->mua*r->Lmove);
+#else
+		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
 #else
 		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
 #endif
-                    currweight*=cfg->replayweight[r->photoid];
-                    r->weight=0.f;
+                    currweight*=cfg->replayweight[r->photonid];
+		    currweight+=r->weight;
 		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
 		    currweight=r->Lmove;
-		    currweight*=cfg->replayweight[r->photoid];
-		    r->weight=0.f;
-                }else{
-#ifdef __INTEL_COMPILER
-		    r->weight*=expf(-prop->mua*r->Lmove);
-#else
-		    r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
-		}
+		    currweight*=cfg->replayweight[r->photonid];
+		    currweight+=r->weight;
+                }
 		r->slen-=r->Lmove*prop->mus;
                 r->p0.x+=r->Lmove*r->vec.x;
                 r->p0.y+=r->Lmove*r->vec.y;
@@ -341,25 +342,25 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
+#ifdef __INTEL_COMPILER
+		r->weight*=expf(-prop->mua*r->Lmove);
+#else
+		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
 #else
 		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
 #endif
-                    currweight*=cfg->replayweight[r->photoid];
-                    r->weight=0.f;
-                }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+                    currweight*=cfg->replayweight[r->photonid];
+		    currweight+=r->weight;
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
 		    currweight=r->Lmove;
-		    currweight*=cfg->replayweight[r->photoid];
-		    r->weight=0.f;
-                }else{
-#ifdef __INTEL_COMPILER
-		    r->weight*=expf(-prop->mua*r->Lmove);
-#else
-		    r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
-		}
+		    currweight*=cfg->replayweight[r->photonid];
+		    currweight+=r->weight;
+                }
 		r->slen-=r->Lmove*prop->mus;
 	        if(bary.x==0.f){
 			break;
@@ -512,25 +513,25 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
+#ifdef __INTEL_COMPILER
+	    r->weight*=expf(-prop->mua*r->Lmove);
+#else
+	    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
 #else
 		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
 #endif
-                currweight*=cfg->replayweight[r->photoid];
-                r->weight=0.f;
-            }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+                currweight*=cfg->replayweight[r->photonid];
+		currweight+=r->weight;
+	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
 		currweight=r->Lmove;
-		currweight*=cfg->replayweight[r->photoid];
-		r->weight=0.f;
-            }else{
-#ifdef __INTEL_COMPILER
-		r->weight*=expf(-prop->mua*r->Lmove);
-#else
-		r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
-	    }
+		currweight*=cfg->replayweight[r->photonid];
+		currweight+=r->weight;
+            }
 	    r->slen-=r->Lmove*prop->mus;
 	    if(bary.x>=0.f){
 		ww=currweight-r->weight;
@@ -647,25 +648,25 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
+#ifdef __INTEL_COMPILER
+	    r->weight*=expf(-prop->mua*r->Lmove);
+#else
+	    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+#endif
+
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
 #else
 		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
 #endif
-                currweight*=cfg->replayweight[r->photoid];
-                r->weight=0.f;
-            }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+                currweight*=cfg->replayweight[r->photonid];
+		currweight+=r->weight;
+	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
 		currweight=r->Lmove;
-		currweight*=cfg->replayweight[r->photoid];
-		r->weight=0.f;
-            }else{
-#ifdef __INTEL_COMPILER
-		r->weight*=expf(-prop->mua*r->Lmove);
-#else
-		r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
-	    }
+		currweight*=cfg->replayweight[r->photonid];
+		currweight+=r->weight;
+            }
 	    r->slen-=r->Lmove*prop->mus;
 	    if(bary.x>=0.f){
 		ww=currweight-r->weight;
@@ -732,7 +733,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
 	r.partialpath=(float*)calloc(visit->reclen-1,sizeof(float));
-	r.photoid=id;
+	r.photonid=id;
 
         if(cfg->issavedet && cfg->issaveseed){
                 r.photonseed=(void*)calloc(1,sizeof(RandType));
@@ -1025,6 +1026,9 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
 		canfocus=0;
+                if(cfg->srctype==stIsotropic)
+                    if(r->eid>0)
+                        return;
 	}else if(cfg->srctype==stGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle

@@ -127,6 +127,14 @@ folder. Other "make" options include
   make ssemath  # this uses SSE4 for both vector operations and math functions
   make          # this produces an non-optimized binary with debugging symbols
 
+if you wish to build the mmc mex file to be used in matlab, you should run
+
+  make mex      # this produces mmc.mex* under mmc/mmclab/ folder
+
+similarly, if you wish to build the mex file for GNU Octave, you should run
+
+  make oct      # this produces mmc.mex* under mmc/mmclab/ folder
+
 If you append "-f makefile_sfmt" at the end of any of the above 
 make commands, you will get an executable named "mmc_sfmt", which uses a 
 fast MT19937 random-number-generator (RNG) instead of the default GLIBC 
@@ -151,7 +159,7 @@ and installed MacPorts from www.macports.org, you can install gcc by
 Then add /opt/local/bin to your $PATH variable. A example compilation 
 command for MMC looks like
 
-  make ssemath -f makefile_sfmt CC=gcc-mp-4.4
+  make ssemath CC=gcc-mp-4.4
 
 After compilation, you may add the path to the "mmc" binary (typically,
 mmc/src/bin) to your search path. To do so, you should modify your 
@@ -198,11 +206,12 @@ where possible parameters include (the first item in [] is the default value)
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
+ -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
  -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit
@@ -212,6 +221,7 @@ where possible parameters include (the first item in [] is the default value)
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
  -h            (--help)        print this message
+ -v            (--version)     print MMC version information
  -l            (--log)         print messages to a log file instead
  -E [0|int|mch](--seed)        set random-number-generator seed;
                                if an mch file is followed, MMC will "replay" 

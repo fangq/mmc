@@ -120,7 +120,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
 
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",GetTimeMillis()-t0));
+        dt=GetTimeMillis();
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",dt-t0));
 
     /** \subsection ssimu Parallel photon transport simulation */
 
@@ -142,6 +143,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	  if(usewaitbar)
              hprop = waitbar_create (0, NULL);
     #endif
+
 	/*launch photons*/
 	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri,raytri0)
 	for(i=0;i<cfg.nphoton;i++){
@@ -225,15 +227,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		 mcx_progressbar(cfg.nphoton,&cfg);
 	}
 #endif
-	dt=GetTimeMillis()-t0;
+	dt=GetTimeMillis()-dt;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.0f ray-tetrahedron tests (%.0f were overhead)\n",raytri,raytri0));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg.nphoton/dt,raytri,raytri0));
 
 	tracer_clear(&tracer);
 	if(cfg.isnormalized && master.totalweight){
+          cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight);
 	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight));
+		master.totalweight,100.f*Eabsorb/master.totalweight,cfg.his.normalizer);
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
@@ -256,11 +259,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
       tracer_clear(&tracer);
       mexPrintf("Error: %s\n",err);
     }catch(const std::exception &err){
-      tracer_clear(&tracer);
       mexPrintf("C++ Error: %s\n",err.what());
-    }catch(...){
       tracer_clear(&tracer);
+    }catch(...){
       mexPrintf("Unknown Exception");
+      tracer_clear(&tracer);
     }
 
     /** \subsection sclean End the simulation */
@@ -289,6 +292,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,isspecular)
     GET_ONE_FIELD(cfg,ismomentum)
     GET_ONE_FIELD(cfg,issaveexit)
+    GET_ONE_FIELD(cfg,issaveseed)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
     GET_ONE_FIELD(cfg,method)
@@ -482,7 +486,15 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             cfg->seed=SEED_FROM_FILE;
             cfg->nphoton=arraydim[1];
             printf("mmc.nphoton=%d;\n",cfg->nphoton);
-        }
+	}
+    }else if(strcmp(name,"replayweight")==0){
+        arraydim=mxGetDimensions(item);
+	if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'replayweight' field can not be empty");
+	cfg->his.detected=arraydim[0]*arraydim[1];
+	cfg->replayweight=(float *)malloc(cfg->his.detected*sizeof(float));
+        memcpy(cfg->replayweight,mxGetData(item),cfg->his.detected*sizeof(float));
+        printf("mmc.replayweight=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{
@@ -554,6 +566,13 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         cfg->ismomentum=0;
         cfg->issaveexit=0;
      }
+     if(cfg->seed==SEED_FROM_FILE && cfg->his.detected!=cfg->nphoton){
+        cfg->his.detected=0;
+	if(cfg->replayweight==NULL)
+	    MEXERROR("You must define 'replayweight' when you specify 'seed'.");
+	else
+	    MEXERROR("The dimension of the 'replayweight' field does not match the column number of the 'seed' field.");
+     }
      cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
      cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+1;
@@ -561,7 +580,8 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){
      printf("MMCLAB ERROR %d in unit %s:%d\n",id,filename,linenum);
-     throw msg;
+     mexErrMsgTxt("MMCLAB session aborted.");
+     //throw(msg);
      return id;
 }
 

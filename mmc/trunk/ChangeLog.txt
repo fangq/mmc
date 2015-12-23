@@ -2,6 +2,8 @@ Change Log
 
 == MMC 1.0-beta (Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
 
+2015/12/23 debugged replay demo script in mmclab, plot the sensitivity profile
+2015/12/20 update cJSON library to the latest version
 2015/12/16 add SFDI simulation examples and demo script 
 2015/11/10 use Kahan sum for total weight accummulation to avoid incorrect normalization
 2015/09/13 support converting and diverging beams in all area-sources

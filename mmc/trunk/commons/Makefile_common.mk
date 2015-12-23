@@ -78,7 +78,7 @@ release:   CCFLAGS+= -O3
 sse ssemath mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
 sse ssemath omp mex oct mexsse octsse:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
-ssemath mexsse octsse:   CCFLAGS+= -DUSE_SSE2 -DMMC_USE_SSE_MATH
+ssemath mexsse octsse:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
 mex mexsse:        ARFLAGS+=$(MKMEXOPT)
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
@@ -167,3 +167,4 @@ endif
 
 .PHONY: regression clean arch makedirs dep $(SUBDIRS)
 
+.DEFAULT_GOAL := sse

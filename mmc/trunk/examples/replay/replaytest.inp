@@ -1,0 +1,15 @@
+1000000             # total photon
+27182818            # RNG seed, negative to generate
+30.1 30.2 0.0       # source position (mm)
+0. 0. 1.            # initial directional vector
+0.0 5e-9 5e-9       # time-gates(s): start, end, step
+replaytest          # volume ('uchar' format)
+27466
+4	1               # detector number and radius (mm)
+30.0	20.0	0.0 # detector 1 position (mm)
+20.0	30.0	0.0 # ...
+30.0	40.0	0.0
+40.0	30.0	0.0
+isotropic
+0 0 0 0
+0 0 0 0

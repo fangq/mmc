@@ -66,7 +66,7 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         }
 }
 
-void mesh_error(char *msg){
+void mesh_error(const char *msg){
 #ifdef MCX_CONTAINER
         mmc_throw_exception(1,msg,__FILE__,__LINE__);
 #else
@@ -75,7 +75,7 @@ void mesh_error(char *msg){
 #endif
 }
 
-void mesh_filenames(char *format,char *foutput,mcconfig *cfg){
+void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
 
@@ -292,7 +292,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
     cfg->seed=SEED_FROM_FILE;
     cfg->nphoton=his.savedphoton;
 
-    if(cfg->outputtype==otJacobian || cfg->outputtype==otTaylor){ //cfg->replaydet>0
+    if(cfg->outputtype==otJacobian || cfg->outputtype==otTaylor || cfg->replaydet>0){
        int i,j;
        float *ppath=(float*)malloc(his.savedphoton*his.colcount*sizeof(float));
        cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));

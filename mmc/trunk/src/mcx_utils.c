@@ -45,7 +45,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','B','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','x','P','k','\0'};
+                 'i','V','O','m','F','q','x','P','k','v','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--reflect3","--debug","--savedet",
@@ -54,7 +54,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
-                 "--replaydet","--voidtime",""};
+                 "--replaydet","--voidtime","--version",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -119,6 +119,7 @@ void mcx_initcfg(mcconfig *cfg){
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
+     cfg->his.normalizer=1.f;
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->bary0),0,sizeof(float4));
@@ -173,7 +174,10 @@ void mcx_error(const int id,const char *msg,const char *file,const int linenum){
 #ifdef MCX_CONTAINER
      mmc_throw_exception(id,msg,file,linenum);
 #else
-     fprintf(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
+     if(id==MMC_INFO)
+        fprintf(stdout,"%s\n",msg);
+     else
+        fprintf(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
      exit(id);
 #endif
 }
@@ -338,12 +342,12 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         if(!cfg->issaveexit)  cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
         if(!cfg->issaveseed)  cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
         if(cfg->basisorder)   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
-        if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup(FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
+        if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup((char *)FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
         if(cfg->outputformat<0)
 		MMC_ERROR(-2,"the specified output format is not recognized");
 
         if(cfg->debuglevel==0)
-           cfg->debuglevel=mcx_parsedebugopt(FIND_JSON_KEY("DebugFlag","Session.DebugFlag",Session,"",valuestring));
+           cfg->debuglevel=mcx_parsedebugopt((char *)FIND_JSON_KEY("DebugFlag","Session.DebugFlag",Session,"",valuestring));
         strncpy(val,FIND_JSON_KEY("RayTracer","Session.RayTracer",Session,raytracing+cfg->method,valuestring),1);
         if(mcx_lookupindex(val, raytracing)){
 		MMC_ERROR(-2,"the specified ray-tracing method is not recognized");
@@ -559,7 +563,7 @@ int mcx_parsedebugopt(char *debugopt){
     int debuglevel=0;
 
     while(*c){
-       p=strchr(debugflag, ((*c<='z' && *c>='a') ? *c-'a'+'A' : *c) );
+       p=strchr((char *)debugflag, ((*c<='z' && *c>='a') ? *c-'a'+'A' : *c) );
        if(p!=NULL)
 	  debuglevel |= (1 << (p-debugflag));
        c++;
@@ -591,7 +595,7 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
     }
 }
 
-int mcx_readarg(int argc, char *argv[], int id, void *output,char *type){
+int mcx_readarg(int argc, char *argv[], int id, void *output,const char *type){
      /*
          when a binary option is given without a following number (0~1), 
          we assume it is 1
@@ -729,6 +733,9 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'V':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->isspecular),"bool");
 		     	        break;
+		     case 'v':
+                                mcx_version(cfg);
+                                break;
 		     case 'r':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->respin),"int");
 		     	        break;
@@ -825,6 +832,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      }
 }
 
+void mcx_version(mcconfig *cfg){
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $");
+}
+
 void mcx_usage(char *exename){
      printf("\
 ###############################################################################\n\
@@ -834,6 +845,8 @@ void mcx_usage(char *exename){
 #                                                                             #\n\
 #         Computational Imaging Laboratory (CIL) [http://fanglab.org]         #\n\
 #            Department of Bioengineering, Northeastern University            #\n\
+#                                                                             #\n\
+#                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
 $Rev::       $ Last $Date::                       $ by $Author::              $\n\
 ###############################################################################\n\
@@ -847,11 +860,12 @@ where possible parameters include (the first item in [] is the default value)\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
+ -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
  -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
@@ -861,13 +875,14 @@ where possible parameters include (the first item in [] is the default value)\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
  -h            (--help)        print this message\n\
+ -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
  -E [0|int|mch](--seed)        set random-number-generator seed;\n\
                                if an mch file is followed, MMC will \"replay\" \n\
                                the detected photon; the replay mode can be used\n\
                                to calculate the Jacobian\n\
  -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
-                               detector (det ID starts from 1), used with -E \n\
+                               detector (det ID starts from 1), use with -E \n\
  -M [%c|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
