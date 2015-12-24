@@ -158,6 +158,8 @@ int main(int argc, char**argv){
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg.nphoton/dt,raytri,raytri0));
+        if(cfg.issavedet)
+           fprintf(cfg.flog,"detected %d photons\n",master.detcount);
 
 	tracer_clear(&tracer);
 
