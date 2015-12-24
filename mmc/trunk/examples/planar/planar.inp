@@ -1,5 +1,5 @@
 1000000                 # total photon counts (normally not used)
-12345678                # RNG seed, negative to generate
+1648335518                # RNG seed, negative to generate
 15.0 50.0 25.0          # source position in mm (corner 1)
 0.0 0.0 -1.0            # initial directional vector
 0 5e-09 1e-10           # time-gates(s): start, end, step

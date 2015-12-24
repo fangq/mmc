@@ -3,7 +3,7 @@
 =                     Multi-threaded Edition with SSE4                        =
 ===============================================================================
 
-Copyright (C) 2011-2015  Qianqian Fang <q.fang at neu.edu>
+Copyright (C) 2010-2015  Qianqian Fang <q.fang at neu.edu>
 
 -------------------------------------------------------------------------------
 

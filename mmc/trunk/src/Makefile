@@ -3,9 +3,9 @@ BINARY=mmc
 
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-  FILES=posix_randr simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c tetray cjson/cJSON
+  FILES=posix_randr simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c mmc cjson/cJSON
 else
-  FILES=posix_randr simpmesh tettracing mcx_utils tictoc tetray cjson/cJSON
+  FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON
 endif
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)

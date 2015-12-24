@@ -1,5 +1,5 @@
 100000000   # total photon (not used)
-12345678          # RNG Seed
+1648335518          # RNG Seed
 5.00 5.00 23.00  # source origin position (mm)
 0.00 0.00 -1.00  # initial direction
 0  8.3383e-09  3.2571e-11 # time(s): begin, end, step
