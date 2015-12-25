@@ -91,7 +91,7 @@ int main(int argc, char**argv){
 	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
 	    if(cfg.issaveseed)
-	        visit.photonseed=calloc(visit.detcount,sizeof(RandType));
+	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
 	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
 	}
 #ifdef _OPENMP
@@ -105,7 +105,7 @@ int main(int argc, char**argv){
 		visit.raytet=0.f;
 		visit.raytet0=0.f;
 		if(cfg.seed==SEED_FROM_FILE)
-		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i,ran1,&visit);
+		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i*RAND_BUF_LEN,ran1,&visit);
 		else
 		    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
@@ -130,7 +130,7 @@ int main(int argc, char**argv){
 	    if(threadid==0){
 		master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
 	        if(cfg.issaveseed)
-        	    master.photonseed=calloc(master.detcount,sizeof(RandType));
+        	    master.photonseed=calloc(master.detcount,(sizeof(RandType)*RAND_BUF_LEN));
             }
             #pragma omp barrier
             #pragma omp critical
@@ -138,8 +138,8 @@ int main(int argc, char**argv){
 		memcpy(master.partialpath+master.bufpos*visit.reclen,
 		       visit.partialpath,visit.bufpos*visit.reclen*sizeof(float));
                 if(cfg.issaveseed)
-                    memcpy((unsigned char*)master.photonseed+master.bufpos*sizeof(RandType),
-                            visit.photonseed,visit.bufpos*sizeof(RandType));
+                    memcpy((unsigned char*)master.photonseed+master.bufpos*(sizeof(RandType)*RAND_BUF_LEN),
+                            visit.photonseed,visit.bufpos*(sizeof(RandType)*RAND_BUF_LEN));
 		master.bufpos+=visit.bufpos;
             }
             #pragma omp barrier
@@ -178,7 +178,7 @@ int main(int argc, char**argv){
 	}
 	if(cfg.issavedet){
 		MMCDEBUG(&cfg,dlTime,(cfg.flog,"saving detected photons ..."));
-		mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,sizeof(RandType),&cfg);
+		mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),&cfg);
 		free(master.partialpath);
                 if(cfg.issaveseed && master.photonseed)
                     free(master.photonseed);

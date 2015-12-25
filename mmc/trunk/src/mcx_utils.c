@@ -116,6 +116,10 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->isextdet=0;
      cfg->srcdir.w=0.f;
 
+     cfg->tstart=0.f;
+     cfg->tstep=0.f;
+     cfg->tend=0.f;
+
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
@@ -183,7 +187,7 @@ void mcx_error(const int id,const char *msg,const char *file,const int linenum){
 }
 
 void mcx_assert(const int ret,const char *file,const int linenum){
-     if(!ret) mcx_error(ret,"assert error",file,linenum);
+     if(!ret) mcx_error(ret,"input error",file,linenum);
 }
 
 void mcx_readconfig(char *fname, mcconfig *cfg){
@@ -436,6 +440,9 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
                                     cfg->tstart,cfg->tend,cfg->tstep);
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
          MMC_ERROR(-9,"incorrect time gate settings");
+     }
+     if(cfg->tstep>cfg->tend-cfg->tstart){
+         cfg->tstep=cfg->tend-cfg->tstart;
      }
      gates=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
      /*if(cfg->maxgate>gates)*/

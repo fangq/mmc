@@ -100,6 +100,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 	mesh_init(&mesh);
 
+        memset(&master,0,sizeof(visitor));
+
 	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
             tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
 	    if (tmp == NULL) {
@@ -131,7 +133,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
             if(cfg.issaveseed)
-                visit.photonseed=calloc(visit.detcount,sizeof(RandType));
+                visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
 	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
         }
     #ifdef _OPENMP
@@ -150,7 +152,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		visit.raytet=0.f;
                 visit.raytet0=0.f;
                 if(cfg.seed==SEED_FROM_FILE)
-                   Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i,ran1,&visit);
+                   Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i*RAND_BUF_LEN,ran1,&visit);
                 else
                    Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
@@ -191,14 +193,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
 		    master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
                     if(nlhs>=3 && cfg.issaveseed){
-                        fielddim[0]=sizeof(RandType); fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
+                        fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
                         mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
                         master.photonseed = (unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0));
 		    }
 		}else{
 	            master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
                     if(cfg.issaveseed)
-                        master.photonseed=calloc(master.detcount,sizeof(RandType));
+                        master.photonseed=calloc(master.detcount,(sizeof(RandType)*RAND_BUF_LEN));
                 }
 	      }
               #pragma omp barrier
@@ -207,8 +209,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		memcpy(master.partialpath+master.bufpos*visit.reclen,
 		       visit.partialpath,visit.bufpos*visit.reclen*sizeof(float));
                 if(nlhs>=3 && cfg.issaveseed)
-                    memcpy((unsigned char*)master.photonseed+master.bufpos*sizeof(RandType),
-                            visit.photonseed,visit.bufpos*sizeof(RandType));
+                    memcpy((unsigned char*)master.photonseed+master.bufpos*(sizeof(RandType)*RAND_BUF_LEN),
+                            visit.photonseed,visit.bufpos*(sizeof(RandType)*RAND_BUF_LEN));
 		master.bufpos+=visit.bufpos;
               }
             }
@@ -480,7 +482,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             printf("mmc.seed=%d;\n",cfg->seed);
         }else{
 	    cfg->photonseed=malloc(arraydim[0]*arraydim[1]);
-            if(arraydim[0]!=sizeof(RandType))
+            if(arraydim[0]!=(sizeof(RandType)*RAND_BUF_LEN))
 		MEXERROR("the row number of cfg.seed does not match RNG seed byte-length");
             memcpy(cfg->photonseed,mxGetData(item),arraydim[0]*arraydim[1]);
             cfg->seed=SEED_FROM_FILE;
@@ -508,7 +510,10 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
          MEXERROR("cfg.nphoton must be a positive number");
      }
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
-         MEXERROR("incorrect time gate settings");
+         MEXERROR("incorrect time gate settings or missing tstart/tend/tstep fields");
+     }
+     if(cfg->tstep>cfg->tend-cfg->tstart){
+         cfg->tstep=cfg->tend-cfg->tstart;
      }
      if(ABS(cfg->srcdir.x*cfg->srcdir.x+cfg->srcdir.y*cfg->srcdir.y+cfg->srcdir.z*cfg->srcdir.z - 1.f)>1e-5)
          MEXERROR("field 'srcdir' must be a unitary vector");
@@ -523,7 +528,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 
      mesh->nvol=(float *)calloc(sizeof(float),mesh->nn);
      for(i=0;i<mesh->ne;i++){
-        if(mesh->type[i]==0)
+        if(mesh->type[i]<=0)
 		continue;
      	ee=(int *)(mesh->elem+i);
      	for(j=0;j<4;j++)
@@ -580,7 +585,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){
      printf("MMCLAB ERROR %d in unit %s:%d\n",id,filename,linenum);
-     mexErrMsgTxt("MMCLAB session aborted.");
+     mexErrMsgTxt(msg);
      //throw(msg);
      return id;
 }

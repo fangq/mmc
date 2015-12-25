@@ -736,8 +736,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	r.photonid=id;
 
         if(cfg->issavedet && cfg->issaveseed){
-                r.photonseed=(void*)calloc(1,sizeof(RandType));
-		memcpy(r.photonseed,(void *)ran, sizeof(RandType));
+                r.photonseed=(void*)calloc(1,(sizeof(RandType)*RAND_BUF_LEN));
+		memcpy(r.photonseed,(void *)ran, (sizeof(RandType)*RAND_BUF_LEN));
         }
 	tracercore=engines[0];
 	if(cfg->method>=0 && cfg->method<4)
@@ -878,12 +878,12 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    visit->partialpath=(float *)realloc(visit->partialpath,
 				visit->detcount*visit->reclen*sizeof(float));
 		    if(cfg->issaveseed)
-	                    visit->photonseed=realloc(visit->photonseed,visit->detcount*sizeof(RandType));
+	                    visit->photonseed=realloc(visit->photonseed,visit->detcount*(sizeof(RandType)*RAND_BUF_LEN));
 		}
 		visit->partialpath[offset]=exitdet;
 	        memcpy(visit->partialpath+offset+1,r.partialpath,(visit->reclen-1)*sizeof(float));
                 if(cfg->issaveseed)
-	            memcpy(visit->photonseed+visit->bufpos*sizeof(RandType),r.photonseed,sizeof(RandType));
+	            memcpy(visit->photonseed+visit->bufpos*(sizeof(RandType)*RAND_BUF_LEN),r.photonseed,(sizeof(RandType)*RAND_BUF_LEN));
 		visit->bufpos++;
 	}
 	free(r.partialpath);

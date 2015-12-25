@@ -29,7 +29,7 @@ planarsrc=1; % set to 1 to compare planar src, set to 0 for pencil beam
 inclusion=1; % set to 1 to add an inclusion in the domain
 
 cfg.nphoton=3e7;
-cfg.seed=27182818;
+cfg.seed=1648335518;
 if(~inclusion)
     [cfg.node,tmp,cfg.elem]=meshabox([0 0 0],[60 60 60], 2*sqrt(2), 2^3/6);
     cfg.elemprop=ones(size(cfg.elem,1),1);

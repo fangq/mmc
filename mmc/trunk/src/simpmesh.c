@@ -389,7 +389,6 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
 	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*
-
 	    for(i=0;i<4;i++){
             	ea=elems[out[i][0]]-1;
             	eb=elems[out[i][1]]-1;

@@ -37,9 +37,10 @@ addpath('../../matlab')
 %%-----------------------------------------------------------------
 %% create the common parameters for all 3 simulations
 %%-----------------------------------------------------------------
+clear cfg
 
 cfg.nphoton=3e7;
-cfg.seed=27182820;
+cfg.seed=1648335518;
 cfg.srcpos=[30.,30.,0];
 cfg.srcdir=[0 0 1];
 cfg.tstart=0;

@@ -17,7 +17,7 @@ addpath('../../matlab/');
 clear cfg newcfg
 
 cfg.nphoton=1e7;
-cfg.seed=27182818;
+cfg.seed=1648335518;
 [cfg.node,cfg.elem]=genT6mesh(0:2:60,0:2:60,0:2:60);
 cfg.elemprop=ones(size(cfg.elem,1),1);
 cfg.srcpos=[30.1,30.2,0];

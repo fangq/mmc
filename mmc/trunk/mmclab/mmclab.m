@@ -170,7 +170,7 @@ for i=1:len
     if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
-    if(~isfield(cfg(i),'isreoriented') || cfg(i).isreoriented==0)
+    if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
         cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
         cfg(i).isreoriented=1;
     end
@@ -239,21 +239,34 @@ for i=1:len
     end
     if(isnan(cfg(i).e0))  % widefield source
         if(~isfield(cfg(i),'srcparam1') || ~isfield(cfg(i),'srcparam2'))
-	        error('you must provide srcparam1 and srcparam2');
+	        error('for wide-field sources, you must provide srcparam1 and srcparam2');
         end
-	    srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
+        if(~isfield(cfg(i),'srctype'))
+            cfg(i).srctype='pencil';
+        end
+        srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
                'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
-	    sdom=mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]);
-	    isinside=ismember(round(sdom*1e10)*1e-10,round(cfg(i).node*1e10)*1e-10,'rows');
-	    if(all(~isinside))
+        sdom=mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]);
+        isinside=ismember(round(sdom*1e10)*1e-10,round(cfg(i).node*1e10)*1e-10,'rows');
+        if(all(~isinside))
 	        if(size(cfg(i).elem,2)==4)
                 cfg(i).elem(:,5)=1;
 	        end
 	        [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
 	        cfg(i).elemprop=cfg(i).elem(:,5);
-	        cfg(i).elem=cfg(i).elem(:,1:4);
+            cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            cfg(i).facenb=faceneighbors(cfg(i).elem);
+            cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
+            cfg(i).isreoriented=1;
         end
-        cfg(i).e0=-1;
+        if(strcmp(cfg(i).srctype,'pencil') || strcmp(cfg(i).srctype,'isotropic'))
+            cfg(i).e0=tsearchn(cfg(i).node,cfg(i).elem,cfg(i).srcpos);
+            if(isnan(cfg(i).e0))
+                cfg(i).e0=-1;
+            end
+        else
+            cfg(i).e0=-1;
+        end
     end
     if(~isfield(cfg(i),'elemprop'))
         error('cfg.elemprop field is missing');

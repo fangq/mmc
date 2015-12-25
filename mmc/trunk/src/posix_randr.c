@@ -30,13 +30,15 @@
 // transform into [0,1] random number
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
     double ran;
-    drand48_r(t,&ran);
+    ran=erand48(t);
     return (float)ran;
 }
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
-    unsigned short s[3], *si=(unsigned short *)n_seed;
-    s[0]=si[0]; s[1]=si[2]; s[2]=(INIT_MULT * (n_seed[0] ^ (n_seed[0] >> 30)) + idx) & 0xFFFF;
-    seed48_r(s, t);
+    unsigned short *si=(unsigned short *)n_seed;
+    t[0]=si[0]; t[1]=si[2]; t[2]=(INIT_MULT * (n_seed[0] ^ (n_seed[0] >> 30)) + idx) & 0xFFFF;
+    erand48(t);
+    erand48(t);
+    erand48(t);
 }
 __device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]){
 }

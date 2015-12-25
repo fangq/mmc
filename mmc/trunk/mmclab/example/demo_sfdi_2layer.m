@@ -66,7 +66,7 @@ cfg.elem=cfg.elem(:,1:4);
 %% other simulation information
 
 cfg.nphoton=3e6;
-cfg.seed=27182818;
+cfg.seed=1648335518;
 
 cfg.tstart=0;
 cfg.tend=5e-9;

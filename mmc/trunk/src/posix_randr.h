@@ -25,8 +25,8 @@
 
 #define MCX_RNG_NAME       "POSIX Multi-threaded RNG"
 
-#define RAND_BUF_LEN       1        //register arrays
-#define RAND_SEED_LEN      1
+#define RAND_BUF_LEN       3        //register arrays
+#define RAND_SEED_LEN      3
 
 typedef unsigned int uint;
 
@@ -34,7 +34,7 @@ typedef unsigned int uint;
   #include "drand48_r_libgw32c.h"
 #endif
 
-typedef struct drand48_data RandType;
+typedef unsigned short RandType;
 
 // transform into [0,1] random number
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]);
