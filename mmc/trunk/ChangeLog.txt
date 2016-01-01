@@ -2,6 +2,10 @@ Change Log
 
 == MMC 1.0-beta (v2016.1, Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
 
+2016/01/01 release 1.0-beta, also label as v2016.1 for time-based release strategy
+2015/12/31 fix crash caused by round-off errors in Havel SSE4 ray-tracer
+2015/12/25 replace drand48_r by erand48 for POSIX compliance
+2015/12/24 make sse target by default for mmc and mmclab
 2015/12/23 debugged replay demo script in mmclab, plot the sensitivity profile
 2015/12/20 update cJSON library to the latest version
 2015/12/16 add SFDI simulation examples and demo script 
