@@ -67,12 +67,15 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
 }
 
 void mesh_error(const char *msg){
+#pragma omp critical
+{
 #ifdef MCX_CONTAINER
         mmc_throw_exception(1,msg,__FILE__,__LINE__);
 #else
 	fprintf(stderr,"%s\n",msg);
         exit(1);
 #endif
+}
 }
 
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
@@ -91,7 +94,6 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	char fnode[MAX_PATH_LENGTH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
-		fprintf(stdout,"nodefile=%s\n",fnode);
 		mesh_error("can not open node file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->nn));
