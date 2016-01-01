@@ -23,7 +23,6 @@
 *******************************************************************************/
 
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
 #include "simpmesh.h"
 #include "tettracing.h"
@@ -65,8 +64,6 @@ int main(int argc, char**argv){
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
 
-	if(cfg.seed<0 && cfg.seed!=SEED_FROM_FILE)
-	    cfg.seed=time(NULL);
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg.issaveseed=0;
 #endif

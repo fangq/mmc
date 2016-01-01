@@ -173,6 +173,7 @@ void mcx_readconfig(char *fname, mcconfig *cfg);
 void mcx_writeconfig(char *fname, mcconfig *cfg);
 void mcx_initcfg(mcconfig *cfg);
 void mcx_clearcfg(mcconfig *cfg);
+void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
 void mcx_usage(char *exename);
 void mcx_loadvolume(char *filename,mcconfig *cfg);
