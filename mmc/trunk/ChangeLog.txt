@@ -1,6 +1,6 @@
 Change Log
 
-== MMC 1.0-beta (Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
+== MMC 1.0-beta (v2016.1, Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
 
 2015/12/23 debugged replay demo script in mmclab, plot the sensitivity profile
 2015/12/20 update cJSON library to the latest version
