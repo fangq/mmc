@@ -279,7 +279,7 @@ inline int havel_sse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d)
                 _mm_store_ss(&bary->y, _mm_mul_ss(detu, inv_det));
                 _mm_store_ss(&bary->z, _mm_mul_ss(detv, inv_det));
                 //_mm_store_ps(&pout->x, _mm_mul_ps(detp,_mm_shuffle_ps(inv_det, inv_det, 0)));
-                return 1;
+	        return (bary->x==bary->x); // when a photon is outside, bary->x=NaN
             }
         }
     }                   
@@ -430,7 +430,6 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  for(j=0;j<4;j++)
 #pragma omp atomic
 		    tracer->mesh->weight[ee[j]+tshift]+=barypout[j];
-
 		}
 		break;
 	   }
