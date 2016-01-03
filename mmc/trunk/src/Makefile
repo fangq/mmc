@@ -1,11 +1,14 @@
 ROOTDIR = ..
 BINARY=mmc
 
-PLATFORM = $(shell uname -s)
+FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON
+
+PLATFORM = $(shell uname -s)        
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-  FILES=posix_randr simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c mmc cjson/cJSON
-else
-  FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON
+  FILES+=drand48_r_libgw32c
+endif
+ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
+  FILES+=drand48_r_libgw32c
 endif
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)

@@ -99,6 +99,13 @@ int seed48_r (unsigned short int seed16v[3],struct drand48_data *buffer)
 
   return 0;
 }
+
+double erand48 (unsigned short int xsubi[3]){
+   double result;
+   (void) __erand48_r (xsubi, &__libc_drand48_data, &result);
+   return result;
+}
+   
 //weak_alias (__seed48_r, seed48_r)
 /*
 int main()

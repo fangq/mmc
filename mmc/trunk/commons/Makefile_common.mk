@@ -37,15 +37,24 @@ FASTMATH   := #-ffast-math
 ECHO	   := echo
 MKDIR      := mkdir
 
+ARCH = $(shell uname -m)
+ifeq ($(findstring x86_64,$(ARCH)), x86_64)
+     CCFLAGS+=-m64
+endif
+
 MKMEX      :=mex
 MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMPLIB)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile
 
 DLLFLAG=-fPIC
 
-ARCH = $(shell uname -m)
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
+    MKMEX      :=cmd //c mex.bat
+    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB)' $(FASTMATH)
+    DLLFLAG     =
+endif
+ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd //c mex.bat
     MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB)' $(FASTMATH)
     DLLFLAG     =

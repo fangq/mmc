@@ -65,3 +65,4 @@ int __drand48_iterate (unsigned short int xsubi[3], struct drand48_data *buffer 
 int __erand48_r (unsigned short int xsubi[3],struct drand48_data *buffer, double *result);
 int drand48_r (struct drand48_data *buffer, double *result);
 int seed48_r (unsigned short int seed16v[3],struct drand48_data *buffer);
+double erand48 ( unsigned short int xsubi[3]);
