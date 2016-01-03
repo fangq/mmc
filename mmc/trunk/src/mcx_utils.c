@@ -704,13 +704,6 @@ void mcx_validatecfg(mcconfig *cfg){
         cfg->ismomentum=0;
         cfg->issaveexit=0;
      }
-     if(cfg->seed==SEED_FROM_FILE && cfg->his.detected!=cfg->nphoton){
-        cfg->his.detected=0;
-	if(cfg->replayweight==NULL)
-	    MMC_ERROR(-2,"You must define 'replayweight' when you specify 'seed'.");
-	else
-	    MMC_ERROR(-2,"The dimension of the 'replayweight' field does not match the column number of the 'seed' field.");
-     }
 }
 
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
