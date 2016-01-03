@@ -12,7 +12,8 @@ ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
 endif
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-  EXTRALIB:=-static-gcc
+  EXTRALIB:=-static-libgcc -lgcc_eh
+  MEXLINKOPT:=$(EXTRALIB)
 endif
 
 DOXYCFG=mmcdoxy.cfg

@@ -43,7 +43,7 @@ ifeq ($(findstring x86_64,$(ARCH)), x86_64)
 endif
 
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMPLIB)' $(FASTMATH) -cxx -outdir $(BINDIR)
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile
 
 DLLFLAG=-fPIC
@@ -51,12 +51,12 @@ DLLFLAG=-fPIC
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
     MKMEX      :=cmd //c mex.bat
-    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB)' $(FASTMATH)
+    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH)
     DLLFLAG     =
 endif
 ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd //c mex.bat
-    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB)' $(FASTMATH)
+    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH)
     DLLFLAG     =
 endif
 
@@ -99,6 +99,7 @@ pnacl:	   EXTRALIB   :=
 pnacl:     INCLUDEDIR+= -I$(NACL_SDK_ROOT)/include/pnacl
 pnacl:     BINARY=libmmc-pnacl.a
 
+mex oct mexsse octsse:   EXTRALIB=
 mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
 mex oct mexsse octsse:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
 mex oct mexsse octsse:   BINDIR=../mmclab
