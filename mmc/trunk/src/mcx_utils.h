@@ -197,7 +197,7 @@ void mcx_version(mcconfig *cfg);
 #if defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER) || defined (HAVE_OCTAVE)
     int mexPrintf(const char * format, ... );
 #else
-    void mexPrintf(const char * format, ... );
+    int mexPrintf(const char * format, ... );
 #endif
 
 #define MMCDEBUG(cfg,debugflag,outputstr)  {\

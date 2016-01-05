@@ -39,7 +39,7 @@ MKDIR      := mkdir
 
 ARCH = $(shell uname -m)
 ifeq ($(findstring x86_64,$(ARCH)), x86_64)
-     CCFLAGS+=#-m64
+     CCFLAGS+=-m64
 endif
 
 MKMEX      :=mex
