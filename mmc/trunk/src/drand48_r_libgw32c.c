@@ -25,6 +25,8 @@
 
 #include "drand48_r_libgw32c.h"
 
+struct drand48_data __libc_drand48_data;
+
 int __drand48_iterate (unsigned short int xsubi[3], struct drand48_data *buffer )
 {
   uint64 X;

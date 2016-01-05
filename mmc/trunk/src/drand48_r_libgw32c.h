@@ -23,6 +23,9 @@
 \brief   Windows 32 port of drand48_r random number generator from libgw2c
 *******************************************************************************/
 
+#ifndef _MMC_POSIX_RAND_LIBGW32C_H
+#define _MMC_POSIX_RAND_LIBGW32C_H
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -60,9 +63,10 @@ struct drand48_data
 
 
 /* Global state for non-reentrant functions. */
-struct drand48_data __libc_drand48_data;
 int __drand48_iterate (unsigned short int xsubi[3], struct drand48_data *buffer );
 int __erand48_r (unsigned short int xsubi[3],struct drand48_data *buffer, double *result);
 int drand48_r (struct drand48_data *buffer, double *result);
 int seed48_r (unsigned short int seed16v[3],struct drand48_data *buffer);
 double erand48 ( unsigned short int xsubi[3]);
+
+#endif
