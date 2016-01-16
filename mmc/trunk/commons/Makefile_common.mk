@@ -43,7 +43,7 @@ ifeq ($(findstring x86_64,$(ARCH)), x86_64)
 endif
 
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS="$$LDFLAGS $(OPENMPLIB) $(MEXLINKOPT)" $(FASTMATH) -cxx -outdir $(BINDIR)
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile
 
 DLLFLAG=-fPIC
