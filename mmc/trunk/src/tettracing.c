@@ -372,7 +372,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  r->Eabsorb+=ww;
 		  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
 		}
-                tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn-1;
+                tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 
                 if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
@@ -423,7 +423,9 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		//if(cfg->debuglevel&dlBary)
 		//    fprintf(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
-		if(prop->mua>0.f){
+		if(!cfg->basisorder)
+		    tracer->mesh->weight[eid+tshift]+=ww;
+		else{
 		  T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
 		  _mm_store_ps(barypout,T);
 
