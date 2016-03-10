@@ -214,7 +214,8 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				if(prop->mua>0.f){
 				  ratio=r->Lmove/Lp0;
 				  r->Eabsorb+=ww;
-				  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
+				  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+				      ww/=prop->mua;
                         	  tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
 
                         	  if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
@@ -370,7 +371,8 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  if(cfg->outputtype!=otEnergy) ww/=prop->mua;
+		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+                     ww/=prop->mua;
 		}
                 tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 
@@ -550,7 +552,8 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
-			if(cfg->outputtype!=otEnergy) ww/=prop->mua;
+	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+                           ww/=prop->mua;
                         ww*=1.f/3.f;
 			for(i=0;i<3;i++)
 #pragma omp atomic
@@ -686,7 +689,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
 			int i;
-			if(cfg->outputtype!=otEnergy) ww/=prop->mua;
+	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+                           ww/=prop->mua;
                         ww*=1.f/3.f;
 			for(i=0;i<3;i++)
 #pragma omp atomic
