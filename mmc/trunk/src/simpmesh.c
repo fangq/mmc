@@ -698,10 +698,10 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
-	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otTaylor)){
+	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otTaylor || cfg->outputtype==otJscatter)){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
-            if(cfg->outputtype==otTaylor)
+            if(cfg->outputtype==otTaylor || cfg->outputtype==otJscatter)
                normalizor=1.f/cfg->nphoton; /*DELTA_MUA is not used in this mode*/
 
             for(i=0;i<cfg->maxgate;i++)
