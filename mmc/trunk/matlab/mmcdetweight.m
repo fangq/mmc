@@ -6,5 +6,6 @@ end
 detpt=detpt';
 detw=w0';
 for i=2:medianum
-    detw=detw.*exp(-prop(i,1)*detpt(:,i+1));
+    detw=detw.*exp(-prop(i,1)*detpt(:,i+medianum-1));
+end
 end

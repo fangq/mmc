@@ -777,7 +777,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         	  r.faceid=-1;
 	    }
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
-	            r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
+	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
@@ -815,14 +815,14 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
-			r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
+			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 		       fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+r.eid-1));
                        r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		       if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
-	            		r.partialpath[mesh->type[r.eid-1]]+=r.Lmove;
+	            		r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
@@ -875,8 +875,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		if(cfg->outputtype==otJscatter)
 			depositJscatter(&r,mesh,cfg,visit);
             if(cfg->ismomentum && mesh->type[r.eid-1]>0)
-                  r.partialpath[mesh->prop+mesh->type[r.eid-1]]+=mom;
-            r.partialpath[0]++;
+                  r.partialpath[2*mesh->prop-1+mesh->type[r.eid-1]]+=mom;
+            r.partialpath[mesh->type[r.eid-1]-1]++;
 	}
 	if(cfg->issavedet && exitdet>0){
 		int offset=visit->bufpos*visit->reclen;

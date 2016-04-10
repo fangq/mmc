@@ -85,7 +85,7 @@ int main(int argc, char**argv){
 #pragma omp parallel private(ran0,ran1,threadid)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
-	visit.reclen=(1+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
+	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
 	if(cfg.issavedet){
 	    if(cfg.issaveseed)
 	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
