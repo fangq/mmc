@@ -307,8 +307,13 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
            if(cfg->replaydet==0 || cfg->replaydet==(int)(ppath[i*his.colcount])){
                memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
                cfg->replayweight[cfg->nphoton]=1.f;
-               for(j=2;j<his.maxmedia+2;j++)
-                  cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
+               if(cfg->outputtype==otWP || cfg->outputtype==otWL){
+                  for(j=2;j<his.maxmedia+2;j++)
+                     cfg->replayweight[cfg->nphoton]*=expf(-(mesh->med[j-1].mua+mesh->med[j-1].mus)*ppath[i*his.colcount+j]*his.unitinmm);
+               }else{
+                  for(j=2;j<his.maxmedia+2;j++)
+                     cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
+               }
                cfg->nphoton++;
            }
 	free(ppath);
@@ -698,10 +703,10 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
-	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otTaylor || cfg->outputtype==otJscatter)){
+	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otTaylor || cfg->outputtype==otWP || cfg->outputtype==otWL)){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
-            if(cfg->outputtype==otTaylor || cfg->outputtype==otJscatter)
+            if(cfg->outputtype==otTaylor || cfg->outputtype==otWP  || cfg->outputtype==otWL)
                normalizor=1.f/cfg->nphoton; /*DELTA_MUA is not used in this mode*/
 
             for(i=0;i<cfg->maxgate;i++)

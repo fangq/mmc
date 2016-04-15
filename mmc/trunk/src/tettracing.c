@@ -872,8 +872,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
             mom=0.f;
 	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
-		if(cfg->outputtype==otJscatter)
-			depositJscatter(&r,mesh,cfg,visit);
+		if(cfg->outputtype==otWP)
+			save_scatter_events(&r,mesh,cfg,visit);
             if(cfg->ismomentum && mesh->type[r.eid-1]>0)
                   r.partialpath[2*mesh->prop-1+mesh->type[r.eid-1]]+=mom;
             r.partialpath[mesh->type[r.eid-1]-1]++;
@@ -1111,7 +1111,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 	}
 }
 
-void depositJscatter(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
+void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	float *baryp0=&(r->bary0.x);
 	int eid = r->eid-1;
 	int *ee = (int *)(mesh->elem+eid);
@@ -1119,11 +1119,11 @@ void depositJscatter(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	if(!cfg->basisorder){
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
 #pragma omp atomic
-		mesh->weight[eid+tshift]+=1*cfg->replayweight[r->photonid];
+		mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
 	}else{
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
 		for(i=0;i<4;i++)
 #pragma omp atomic
-			mesh->weight[ee[i]-1+tshift]+=1*cfg->replayweight[r->photonid]*baryp0[i];
+			mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
 	}
 }

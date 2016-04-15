@@ -450,7 +450,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
     }else if(strcmp(name,"outputtype")==0){
         int len=mxGetNumberOfElements(item);
-        const char *outputtype[]={"flux","fluence","energy","jacobian","taylor","scatter",""};
+        const char *outputtype[]={"flux","fluence","energy","jacobian","taylor","wp","wl",""};
         char outputstr[MAX_SESSION_LENGTH]={'\0'};
 
         if(!mxIsChar(item) || len==0)

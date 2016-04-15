@@ -84,7 +84,7 @@ void fixphoton(float3 *p,float3 *nodes, int *ee);
 float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
-void depositJscatter(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
+void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus
 extern "C"
