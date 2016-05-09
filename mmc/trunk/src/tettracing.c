@@ -998,11 +998,19 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		origin.x+=(cfg->srcparam1.x+v2.x)*0.5f;
 		origin.y+=(cfg->srcparam1.y+v2.y)*0.5f;
 		origin.z+=(cfg->srcparam1.z+v2.z)*0.5f;
-	}else if(cfg->srctype==stDisk){  // uniform disk distribution
+	}else if(cfg->srctype==stDisk || cfg->srctype==stGaussian){  // uniform disk and Gaussian beam
 		float sphi, cphi;
 		float phi=TWO_PI*rand_uniform01(ran);
 		sphi=sinf(phi);	cphi=cosf(phi);
-		float r0=sqrt(rand_uniform01(ran))*cfg->srcparam1.x;
+		float r0;
+		if(cfg->srctype==stDisk)
+		    r0=sqrt(rand_uniform01(ran))*cfg->srcparam1.x;
+		else if(fabs(r->focus) < 1e-5f || fabs(cfg->srcparam1.y) < 1e-5f)
+		    r0=sqrt(-log(rand_uniform01(ran)))*cfg->srcparam1.x;
+		else{
+		    float z0=cfg->srcparam1.x*cfg->srcparam1.x*M_PI/cfg->srcparam1.y; //Rayleigh range
+		    r0=sqrt(-log(rand_uniform01(ran))*(1.f+(r->focus*r->focus/(z0*z0))))*cfg->srcparam1.x;
+		}
 		if(cfg->srcdir.z>-1.f+EPS && cfg->srcdir.z<1.f-EPS){
 		    float tmp0=1.f-cfg->srcdir.z*cfg->srcdir.z;
 		    float tmp1=r0/sqrt(tmp0);
@@ -1036,7 +1044,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
                 if(cfg->srctype==stIsotropic)
                     if(r->eid>0)
                         return;
-	}else if(cfg->srctype==stGaussian){
+	}else if(cfg->srctype==stZGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sinf(ang);	cphi=cosf(ang);

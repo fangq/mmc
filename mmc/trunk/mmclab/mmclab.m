@@ -33,7 +33,15 @@ function varargout=mmclab(cfg,type)
 %     *cfg.tstep:       time-gate width of the simulation (in seconds)
 %     *cfg.tend:        ending time of the simulation (in second)
 %     *cfg.srcpos:      a 1 by 3 vector, the position of the source in grid unit
-%     *cfg.srcdir:      a 1 by 3 vector, specifying the incident vector
+%     *cfg.srcdir:      if defined as [vx, vy, vy], it specifies the incident vector
+%                       if defined as [vx, vy, vy, focus], the first 3 elements define
+%                       the incident vector; focus controls the convergence or 
+%                       divergence of the beam:
+%                       focus=0: collimated beam
+%                       focus<0: diverging beam from an imaginary src at c0-|focus|*[vx vy vz]
+%                       focus>0: converging beam, focusing to a point at c0+|focus|*[vx vy vz]
+%                       where c0 is the centroid of the source domain. Setting focus does 
+%                       not impact pencil/isotropic/cone sources.
 %     -cfg.facenb:      element face neighbohood list (calculated by faceneighbors())
 %     -cfg.evol:        element volume (calculated by elemvolume() with iso2mesh)
 %     -cfg.e0:          the element ID enclosing the source, if not defined,
@@ -64,12 +72,22 @@ function varargout=mmclab(cfg,type)
 %      cfg.nout:        [1.0] refractive index for medium type 0 (background)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
 %      cfg.roulettesize:[10] size of Russian roulette
-%      cfg.unitinmm:    defines the unit in the input mesh [1.0]
+%      cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions 
+%                       the default value is 1.0 (mm). For example, if the length unit is in cm, 
+%                       one should set unitinmm to 10.
 %      cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
 %                      'pencil' - default, pencil beam, no param needed
 %                      'isotropic' - isotropic source, no param needed
 %                      'cone' - uniform cone beam, srcparam1(1) is the half-angle in radian
-%                      'gaussian' - a collimated gaussian beam, srcparam1(1) specifies the waist radius (in voxels)
+%                      'gaussian' - a gaussian beam, srcparam1(1) specifies the waist radius 
+%                                (in default length unit); if one specifies a non-zero focal length
+%                                using cfg.srcdir, the gaussian beam can be converging to or 
+%                                diverging from the waist center, which is located at srcpos+focus*srcdir;
+%                                optionally, one can specify the wavelength lambda (in default length unit, mm), 
+%                                using srcparam1(2). This will rescale the Gaussian profile according 
+%                                to w(z)=w0*sqrt(1-(z/z0)^2), where w0 is the waist radius, z is the 
+%                                distance (in mm) to the waist center (focus), and z0 is the Rayleigh 
+%                                range (in mm), and z0 is related to w0 by z0=w0^2*pi/lambda
 %                      'planar' - a 3D quadrilateral uniform planar source, with three corners specified 
 %                                by srcpos, srcpos+srcparam1(1:3) and srcpos+srcparam2(1:3)
 %                      'pattern' - a 3D quadrilateral pattern illumination, same as above, except
@@ -84,7 +102,7 @@ function varargout=mmclab(cfg,type)
 %                      'arcsine' - similar to isotropic, except the zenith angle is uniform
 %                                distribution, rather than a sine distribution.
 %                      'disk' - a uniform disk source pointing along srcdir; the radius is 
-%                               set by srcparam1(1) (in grid unit)
+%                               set by srcparam1(1) (in default length unit)
 %                      'fourierx' - a general Fourier source, the parameters are 
 %                               srcparam1: [v1x,v1y,v1z,|v2|], srcparam2: [kx,ky,phi0,M]
 %                               normalized vectors satisfy: srcdir cross v1=v2
@@ -92,7 +110,8 @@ function varargout=mmclab(cfg,type)
 %                      'fourierx2d' - a general 2D Fourier basis, parameters
 %                               srcparam1: [v1x,v1y,v1z,|v2|], srcparam2: [kx,ky,phix,phiy]
 %                               the phase shift is phi{x,y}*2*pi
-%                      'zgaussian' - an angular gaussian beam, srcparam1(0) specifies the variance in the zenith angle
+%                      'zgaussian' - an angular gaussian beam, srcparam1(1) specifies the variance in  
+%                               the zenith angle
 %      cfg.{srcparam1,srcparam2}: 1x4 vectors, see cfg.srctype for details
 %      cfg.srcpattern: see cfg.srctype for details
 %      cfg.voidtime:   for wide-field sources, [1]-start timer at launch, 0-when entering
