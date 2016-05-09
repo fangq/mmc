@@ -55,6 +55,7 @@ if(strcmp(cfg.srctype,'isotropic'))
 end
 cfg.srcdir(1:3)=cfg.srcdir(1:3)/norm(cfg.srcdir(1:3));
 domainradius=min(meshbbx(2,:)-meshbbx(1,:))*0.25;
+domaindiagnoal=norm(meshbbx(2,:)-meshbbx(1,:));
 if(strcmp(cfg.srctype,'pencil'))
    warning(['for external pencil beams, you are highly recommended to set ' ...
        'cfg.e0=''>'', instead of using this script']); 
@@ -63,6 +64,9 @@ end
 if(strcmp(cfg.srctype,'pencil') || strcmp(cfg.srctype,'cone') || ...
         strcmp(cfg.srctype,'zgaussian')|| strcmp(cfg.srctype,'isotropic') || strcmp(cfg.srctype,'arcsine'))
     srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domainradius,3);
+    srcface=[1 2 3];
+elseif(strcmp(cfg.srctype,'gaussian'))
+    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domaindiagnoal*0.5,3);
     srcface=[1 2 3];
 elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         strcmp(cfg.srctype,'fourier') ||strcmp(cfg.srctype,'fourierx')||strcmp(cfg.srctype,'fourier2d'))
