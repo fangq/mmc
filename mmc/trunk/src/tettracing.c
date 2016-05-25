@@ -1115,7 +1115,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		fprintf(cfg->flog,"all tetrahedra (%d) labeled with -1 do not enclose the source!",mesh->srcelemlen);
 		fprintf(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
 		fprintf(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
-		mesh_error("initial element does not enclose the source!");
+		MESH_ERROR("initial element does not enclose the source!");
 	}
 }
 

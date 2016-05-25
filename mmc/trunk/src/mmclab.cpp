@@ -59,6 +59,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ncfg, nfields;
   int        fielddim[4];
   int        usewaitbar=1;
+  int        errorflag=0;
   const char       *outputtag[]={"data"};
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop;
@@ -88,9 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
       mexEvalString("close(mmclab_waitbar_handle);");
 
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
-    printf("Running simulations for configuration #%d ...\n", jstruct+1);
-
-    try{
+        printf("Running simulations for configuration #%d ...\n", jstruct+1);
         unsigned int ncomplete=0;
         double Eabsorb=0.0;
         float raytri=0.f,raytri0=0.f;;
@@ -127,7 +126,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
     /** \subsection ssimu Parallel photon transport simulation */
 
-#pragma omp parallel private(ran0,ran1,threadid)
+
+#pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
@@ -149,6 +149,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	/*launch photons*/
 	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri,raytri0)
 	for(i=0;i<cfg.nphoton;i++){
+            #pragma omp flush (errorflag)
+	    if(errorflag){
+		i=cfg.nphoton;
+		continue;
+	    }
+            try{
 		visit.raytet=0.f;
                 visit.raytet0=0.f;
                 if(cfg.seed==SEED_FROM_FILE)
@@ -177,12 +183,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
                     mcx_progressbar(ncomplete,&cfg);
 #endif
                 }
+	    }catch(const char *err){
+        	mexPrintf("Error from thread (%d): %s\n",threadid,err);
+		errorflag++;
+	    }catch(const std::exception &err){
+        	mexPrintf("C++ Error from thread (%d): %s\n",threadid,err.what());
+		errorflag++;
+	    }catch(...){
+        	mexPrintf("Unknown Exception from thread (%d)",threadid);
+		errorflag++;
+	    }
 	}
 
         #pragma omp atomic
                 master.totalweight += visit.totalweight;
 
-	if(cfg.issavedet){
+	if(cfg.issavedet && errorflag==0){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
@@ -221,6 +237,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 }
 
 	/** \subsection sreport Post simulation */
+    try{
 #ifdef MATLAB_MEX_FILE
 	if((cfg.debuglevel & dlProgress)){
 	    if(usewaitbar)
@@ -234,6 +251,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg.nphoton/dt,raytri,raytri0));
 
+#ifdef MATLAB_MEX_FILE
+        if((cfg.debuglevel & dlProgress))
+	   if(usewaitbar)
+             waitbar_destroy (hprop) ;
+#endif
+
 	tracer_clear(&tracer);
 	if(cfg.isnormalized && master.totalweight){
           cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight);
@@ -242,11 +265,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
-#ifdef MATLAB_MEX_FILE
-        if((cfg.debuglevel & dlProgress))
-	   if(usewaitbar)
-             waitbar_destroy (hprop) ;
-#endif
 	if(nlhs>=1){
     	    if(!cfg.basisorder)
 		fielddim[0]=mesh.ne;
@@ -257,15 +275,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
 	}
+        if(errorflag)
+            mexErrMsgTxt("MMCLAB Terminated due to exception!");
     }catch(const char *err){
-      tracer_clear(&tracer);
       mexPrintf("Error: %s\n",err);
     }catch(const std::exception &err){
       mexPrintf("C++ Error: %s\n",err.what());
-      tracer_clear(&tracer);
     }catch(...){
       mexPrintf("Unknown Exception");
-      tracer_clear(&tracer);
     }
 
     /** \subsection sclean End the simulation */
@@ -326,6 +343,9 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<3;j++)
           for(i=0;i<mesh->nn;i++)
              ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
+
+	fprintf(cfg->flog,"node[9733]=(%f %f %f)\n",mesh->node[9732].x,mesh->node[9732].y,mesh->node[9732].z);
+
         printf("mmc.nn=%d;\n",mesh->nn);
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
@@ -584,9 +604,8 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 }
 
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){
-     printf("MMCLAB ERROR %d in unit %s:%d\n",id,filename,linenum);
-     mexErrMsgTxt(msg);
-     //throw(msg);
+     printf("MMCLAB ERROR (%d): %s in unit %s:%d\n",id,msg,filename,linenum);
+     throw(msg);
      return id;
 }
 

@@ -51,6 +51,7 @@
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 #define DELTA_MUA  1e-4f
 
+#define MESH_ERROR(a)  mesh_error((a),__FILE__,__LINE__)
 
 /***************************************************************************//**
 \struct MMC_mesh simpmesh.h
@@ -112,7 +113,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg);
 void mesh_clear(tetmesh *mesh);
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);
 void mesh_build(tetmesh *mesh);
-void mesh_error(const char *msg);
+void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);

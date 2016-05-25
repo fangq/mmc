@@ -66,16 +66,13 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         }
 }
 
-void mesh_error(const char *msg){
-#pragma omp critical
-{
+void mesh_error(const char *msg,const char *file,const int linenum){
 #ifdef MCX_CONTAINER
-        mmc_throw_exception(1,msg,__FILE__,__LINE__);
+        mmc_throw_exception(1,msg,file,linenum);
 #else
-	fprintf(stderr,"%s\n",msg);
+	fprintf(stderr,"Mesh error: %s in unit %s line#%d\n",msg,file,linenum);
         exit(1);
 #endif
-}
 }
 
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
@@ -94,11 +91,11 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	char fnode[MAX_PATH_LENGTH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
-		mesh_error("can not open node file");
+		MESH_ERROR("can not open node file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->nn));
 	if(len!=2 || mesh->nn<=0){
-		mesh_error("node file has wrong format");
+		MESH_ERROR("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
 	if(cfg->basisorder) 
@@ -106,7 +103,7 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
-			mesh_error("node file has wrong format");
+			MESH_ERROR("node file has wrong format");
 	}
 	if(cfg->unitinmm!=1.f){
 	  for(i=0;i<mesh->nn;i++){
@@ -124,11 +121,11 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	char fmed[MAX_PATH_LENGTH];
 	mesh_filenames("prop_%s.dat",fmed,cfg);
 	if((fp=fopen(fmed,"rt"))==NULL){
-		mesh_error("can not open media property file");
+		MESH_ERROR("can not open media property file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->prop));
 	if(len!=2 || mesh->prop<=0){
-		mesh_error("property file has wrong format");
+		MESH_ERROR("property file has wrong format");
 	}
         /*when there is an external detector, reindex the property to medianum+1*/
 	mesh->med=(medium *)calloc(sizeof(medium),mesh->prop+1+cfg->isextdet);
@@ -150,7 +147,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	for(i=1;i<=mesh->prop;i++){
 		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->med[i].mua),&(mesh->med[i].mus),
 		                                   &(mesh->med[i].g),&(mesh->med[i].n))!=5)
-			mesh_error("property file has wrong format");
+			MESH_ERROR("property file has wrong format");
 		/*mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
 	}
 	fclose(fp);
@@ -164,11 +161,11 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	char felem[MAX_PATH_LENGTH];
 	mesh_filenames("elem_%s.dat",felem,cfg);
 	if((fp=fopen(felem,"rt"))==NULL){
-		mesh_error("can not open element file");
+		MESH_ERROR("can not open element file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
-		mesh_error("element file has wrong format");
+		MESH_ERROR("element file has wrong format");
 	}
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
@@ -178,7 +175,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
 		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
-			mesh_error("element file has wrong format");
+			MESH_ERROR("element file has wrong format");
         }
 	fclose(fp);
 	mesh_srcdetelem(mesh,cfg);
@@ -221,18 +218,18 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	char fvelem[MAX_PATH_LENGTH];
 	mesh_filenames("velem_%s.dat",fvelem,cfg);
 	if((fp=fopen(fvelem,"rt"))==NULL){
-		mesh_error("can not open element volume file");
+		MESH_ERROR("can not open element volume file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
-		mesh_error("mesh file has wrong format");
+		MESH_ERROR("mesh file has wrong format");
 	}
         mesh->evol=(float *)malloc(sizeof(float)*mesh->ne);
 	mesh->nvol=(float *)calloc(sizeof(float),mesh->nn);
 
 	for(i=0;i<mesh->ne;i++){
 		if(fscanf(fp,"%d %f",&tmp,mesh->evol+i)!=2)
-			mesh_error("mesh file has wrong format");
+			MESH_ERROR("mesh file has wrong format");
                 if(mesh->type[i]==0)
 			continue;
 		ee=(int *)(mesh->elem+i);
@@ -256,17 +253,17 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
-		mesh_error("can not open face-neighbor list file");
+		MESH_ERROR("can not open face-neighbor list file");
 	}
 	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
-		mesh_error("mesh file has wrong format");
+		MESH_ERROR("mesh file has wrong format");
 	}
 	mesh->facenb=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->facenb+i;
 		if(fscanf(fp,"%d %d %d %d",&(pe->x),&(pe->y),&(pe->z),&(pe->w))!=4)
-			mesh_error("face-neighbor list file has wrong format");
+			MESH_ERROR("face-neighbor list file has wrong format");
 	}
 	fclose(fp);
 }
@@ -275,22 +272,22 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
     history his;
     FILE *fp=fopen(cfg->seedfile,"rb");
     if(fp==NULL)
-        mesh_error("can not open the specified history file");
+        MESH_ERROR("can not open the specified history file");
     if(fread(&his,sizeof(history),1,fp)!=1)
-        mesh_error("error when reading the history file");
+        MESH_ERROR("error when reading the history file");
     if(his.savedphoton==0 || his.seedbyte==0){
         fclose(fp);
         return;
     }
     if(his.maxmedia!=mesh->prop)
-        mesh_error("the history file was generated with a different media setting");
+        MESH_ERROR("the history file was generated with a different media setting");
     if(fseek(fp,his.savedphoton*his.colcount*sizeof(float),SEEK_CUR))
-        mesh_error("illegal history file");
+        MESH_ERROR("illegal history file");
     cfg->photonseed=malloc(his.savedphoton*his.seedbyte);
     if(cfg->photonseed==NULL)
-        mesh_error("can not allocate memory");
+        MESH_ERROR("can not allocate memory");
     if(fread(cfg->photonseed,his.seedbyte,his.savedphoton,fp)!=his.savedphoton)
-        mesh_error("error when reading the seed data");
+        MESH_ERROR("error when reading the seed data");
     cfg->seed=SEED_FROM_FILE;
     cfg->nphoton=his.savedphoton;
 
@@ -300,7 +297,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
        cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));
        fseek(fp,sizeof(his),SEEK_SET);
        if(fread(ppath,his.colcount*sizeof(float),his.savedphoton,fp)!=his.savedphoton)
-           mesh_error("error when reading the seed data");
+           MESH_ERROR("error when reading the seed data");
 
        cfg->nphoton=0;
        for(i=0;i<his.savedphoton;i++)
@@ -389,7 +386,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    if(tracer->mesh!=NULL)
 		tracer_build(tracer);
 	    else
-	    	mesh_error("tracer is not associated with a mesh");
+	    	MESH_ERROR("tracer is not associated with a mesh");
 	}else if(cfg->srctype==stPencil && cfg->dim.x>0){
             int eid=cfg->dim.x-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
@@ -411,7 +408,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	           bary[0]/6.,bary[1]/6.,bary[2]/6.,bary[3]/6.);
 	    for(i=0;i<4;i++){
 	        if(bary[i]<0.f)
-		    mesh_error("initial element does not enclose the source!");
+		    MESH_ERROR("initial element does not enclose the source!");
 	        s+=bary[i];
 	    }
 	    for(i=0;i<4;i++){
@@ -435,7 +432,7 @@ void tracer_build(raytracer *tracer){
 
         if(tracer->mesh->node==NULL||tracer->mesh->elem==NULL||
 	   tracer->mesh->facenb==NULL||tracer->mesh->med==NULL)
-                mesh_error("mesh is missing");
+                MESH_ERROR("mesh is missing");
 
 	ne=tracer->mesh->ne;
 	nodes=tracer->mesh->node;
@@ -643,14 +640,14 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 
         if(cfg->outputformat==ofBin){
 		if((fp=fopen(fweight,"wb"))==NULL)
-         	        mesh_error("can not open weight file to write");
+         	        MESH_ERROR("can not open weight file to write");
 		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),mesh->nn*cfg->maxgate,fp)!=mesh->nn*cfg->maxgate)
-			mesh_error("fail to write binary weight file");
+			MESH_ERROR("fail to write binary weight file");
 		fclose(fp);
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){
-		mesh_error("can not open weight file to write");
+		MESH_ERROR("can not open weight file to write");
 	}
 	if(cfg->basisorder)
 	  for(i=0;i<cfg->maxgate;i++)
@@ -658,13 +655,13 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 		/*pn=mesh->node+j;
 		if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
 		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
-			mesh_error("can not write to weight file");
+			MESH_ERROR("can not write to weight file");
 	   }
 	else
 	  for(i=0;i<cfg->maxgate;i++)
 	   for(j=0;j<mesh->ne;j++){
 		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->ne+j])==0)
-			mesh_error("can not write to weight file");
+			MESH_ERROR("can not write to weight file");
 	   }
 	fclose(fp);
 }
@@ -678,7 +675,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
                 sprintf(fhistory,"%s.mch",cfg->session);
 
 	if((fp=fopen(fhistory,"wb"))==NULL){
-		mesh_error("can not open history file to write");
+		MESH_ERROR("can not open history file to write");
 	}
 	cfg->his.totalphoton=cfg->nphoton;
         cfg->his.unitinmm=cfg->unitinmm;
