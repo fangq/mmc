@@ -89,6 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
       mexEvalString("close(mmclab_waitbar_handle);");
 
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
+    try{
         printf("Running simulations for configuration #%d ...\n", jstruct+1);
         unsigned int ncomplete=0;
         double Eabsorb=0.0;
@@ -237,7 +238,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 }
 
 	/** \subsection sreport Post simulation */
-    try{
+
 #ifdef MATLAB_MEX_FILE
 	if((cfg.debuglevel & dlProgress)){
 	    if(usewaitbar)
