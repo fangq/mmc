@@ -18,6 +18,7 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
+cfg.unitinmm=0.02;
 
 % run the simulation
 

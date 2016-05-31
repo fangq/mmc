@@ -105,13 +105,6 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
 			MESH_ERROR("node file has wrong format");
 	}
-	if(cfg->unitinmm!=1.f){
-	  for(i=0;i<mesh->nn;i++){
-		mesh->node[i].x*=cfg->unitinmm;
-		mesh->node[i].y*=cfg->unitinmm;
-		mesh->node[i].z*=cfg->unitinmm;
-	  }
-	}
 	fclose(fp);
 }
 
@@ -151,6 +144,13 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 		/*mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
 	}
 	fclose(fp);
+
+        if(cfg->unitinmm!=1.f){
+           for(i=1;i<mesh->prop;i++){
+                   mesh->med[i].mus*=cfg->unitinmm;
+                   mesh->med[i].mua*=cfg->unitinmm;
+           }
+        }
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
 }
 
@@ -235,13 +235,6 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 		ee=(int *)(mesh->elem+i);
 		for(j=0;j<4;j++)
 			mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
-	}
-	if(cfg->unitinmm!=1.f){
-	  float unit3d=cfg->unitinmm*cfg->unitinmm*cfg->unitinmm;
-	  for(i=0;i<mesh->ne;i++)
-		mesh->evol[i]*=unit3d;
-	  for(i=0;i<mesh->nn;i++)
-		mesh->nvol[i]*=unit3d;
 	}
 	fclose(fp);
 }

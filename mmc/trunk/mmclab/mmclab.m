@@ -32,7 +32,7 @@ function varargout=mmclab(cfg,type)
 %     *cfg.tstart:      starting time of the simulation (in seconds)
 %     *cfg.tstep:       time-gate width of the simulation (in seconds)
 %     *cfg.tend:        ending time of the simulation (in second)
-%     *cfg.srcpos:      a 1 by 3 vector, the position of the source in grid unit
+%     *cfg.srcpos:      a 1 by 3 vector, the position of the source in mesh node length unit
 %     *cfg.srcdir:      if defined as [vx, vy, vy], it specifies the incident vector
 %                       if defined as [vx, vy, vy, focus], the first 3 elements define
 %                       the incident vector; focus controls the convergence or 
@@ -73,8 +73,8 @@ function varargout=mmclab(cfg,type)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
 %      cfg.roulettesize:[10] size of Russian roulette
 %      cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions 
-%                       the default value is 1.0 (mm). For example, if the length unit is in cm, 
-%                       one should set unitinmm to 10.
+%                       the default value is 1.0 (mm). For example, if the mesh node length unit is 
+%                       in cm, one should set unitinmm to 10.
 %      cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
 %                      'pencil' - default, pencil beam, no param needed
 %                      'isotropic' - isotropic source, no param needed
@@ -83,7 +83,7 @@ function varargout=mmclab(cfg,type)
 %                                (in default length unit); if one specifies a non-zero focal length
 %                                using cfg.srcdir, the gaussian beam can be converging to or 
 %                                diverging from the waist center, which is located at srcpos+focus*srcdir;
-%                                optionally, one can specify the wavelength lambda (in default length unit, mm), 
+%                                optionally, one can specify the wavelength lambda (in cfg.unitinmm mm), 
 %                                using srcparam1(2). This will rescale the Gaussian profile according 
 %                                to w(z)=w0*sqrt(1-(z/z0)^2), where w0 is the waist radius, z is the 
 %                                distance (in mm) to the waist center (focus), and z0 is the Rayleigh 
@@ -120,6 +120,10 @@ function varargout=mmclab(cfg,type)
 %      fields marked with * are required; options in [] are the default values
 %      fields marked with - are calculated if not given (can be faster if precomputed)
 %
+%      by default, mmc assumes the mesh and source position settings are all in mm unit.
+%      if the mesh coordinates/source positions are not in mm unit, one needs to define
+%      cfg.unitinmm  (in mm) to specify the actual length unit.
+%
 %    type: omit or 'omp' for multi-threading version; 'sse' for the SSE4 MMC,
 %          the SSE4 version is about 25% faster, but requires newer CPUs; 
 %          if type='prep' with a single output, mmclab returns ncfg only.
@@ -136,7 +140,7 @@ function varargout=mmclab(cfg,type)
 %            dimensions [size(cfg.prop,1)+1 saved-photon-num]. The first row
 %            is the ID(>0) of the detector that captures the photon; the second row
 %            is the number of scattering events of the exitting photon; the rest rows
-%            are the partial path lengths (in grid unit) traveling in medium 1 up 
+%            are the partial path lengths (in mesh length unit) traveling in medium 1 up 
 %            to the last. If you set cfg.unitinmm, you need to multiply the path-lengths
 %            to convert them to mm unit.
 %      ncfg: (optional), if given, mmclab returns the preprocessed cfg structure,

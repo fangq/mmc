@@ -344,9 +344,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<3;j++)
           for(i=0;i<mesh->nn;i++)
              ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
-
-	fprintf(cfg->flog,"node[9733]=(%f %f %f)\n",mesh->node[9732].x,mesh->node[9732].y,mesh->node[9732].z);
-
         printf("mmc.nn=%d;\n",mesh->nn);
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
@@ -567,20 +564,11 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
      if(cfg->unitinmm!=1.f){
-	float unit3d=cfg->unitinmm*cfg->unitinmm*cfg->unitinmm;
-	for(i=0;i<mesh->ne;i++)
-	      mesh->evol[i]*=unit3d;
-	for(i=0;i<mesh->nn;i++)
-	      mesh->nvol[i]*=unit3d;
         for(i=1;i<mesh->prop;i++){
 		mesh->med[i].mus*=cfg->unitinmm;
 		mesh->med[i].mua*=cfg->unitinmm;
         }
-	for(i=0;i<mesh->nn;i++){
-	      mesh->node[i].x*=cfg->unitinmm;
-	      mesh->node[i].y*=cfg->unitinmm;
-	      mesh->node[i].z*=cfg->unitinmm;
-	}
+        cfg->his.unitinmm=cfg->unitinmm;
      }
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
