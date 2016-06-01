@@ -1,6 +1,6 @@
 Change Log
 
-== MMC 1.0-RC1 (v2016.5, Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
+== MMC 1.0-RC1 (v2016.5, Hot Cocoa) beta release, Qianqian Fang <q.fang at neu.edu> ==
 2016-06-01 output partial path, scattering count, exit position/dir as subfield in 2nd output of mmclab
 2016-05-31 remove double correction of length unit in mmc and mmclab
 2016-05-25 elegantly terminate mmclab when exception is shown, print error unit and line numbers
