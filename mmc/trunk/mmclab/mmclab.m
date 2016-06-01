@@ -287,6 +287,8 @@ for i=1:len
             if(isnan(cfg(i).e0))
                 cfg(i).e0=-1;
             end
+        elseif(length(find(cfg(i).elemprop<0))==1)
+            cfg(i).e0=find(cfg(i).elemprop<0);
         else
             cfg(i).e0=-1;
         end

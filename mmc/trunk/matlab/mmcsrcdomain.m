@@ -68,6 +68,10 @@ if(strcmp(cfg.srctype,'pencil') || strcmp(cfg.srctype,'cone') || ...
 elseif(strcmp(cfg.srctype,'gaussian'))
     srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domaindiagnoal*0.5,3);
     srcface=[1 2 3];
+elseif(strcmp(cfg.srctype,'line') || strcmp(cfg.srctype,'slit'))
+    v0=cfg.srcpos+cfg.srcparam1(1:3)*0.5;
+    srcnode=orthdisk(v0,v0+cfg.srcdir(1:3),norm(cfg.srcparam1(1:3))*expansion,3,cfg.srcparam1(1:3));
+    srcface=[1 2 3];
 elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         strcmp(cfg.srctype,'fourier') ||strcmp(cfg.srctype,'fourierx')||strcmp(cfg.srctype,'fourier2d'))
     v0=cfg.srcpos(1:3);
@@ -82,7 +86,7 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2]*(expansion-1.0);
         srcface=[1 2 3;3 4 1];
     else
-        srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir(1:3),(max(norm(voff1),norm(voff2)))*2.0*expansion,3);
+        srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir(1:3),(max(norm(voff1),norm(voff2)))*2.0*expansion,3,v1+v2);
         srcface=[1 2 3];
     end
 elseif(strcmp(cfg.srctype,'disk'))

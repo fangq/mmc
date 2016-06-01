@@ -62,7 +62,7 @@ const char raytracing[]={'p','h','b','s','\0'};
 const char outputtype[]={'x','f','e','j','t','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
-    "pattern","fourier","arcsine","disk","fourierx","fourierx2d",""};
+    "pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
@@ -164,7 +164,7 @@ void mcx_savedata(float *dat,int len,mcconfig *cfg){
 
 void mcx_printlog(mcconfig *cfg, char *str){
      if(cfg->flog>0){ /*stdout is 1*/
-         fprintf(cfg->flog,"%s\n",str);
+         MMC_FPRINTF(cfg->flog,"%s\n",str);
      }
 }
 
@@ -182,9 +182,9 @@ void mcx_error(const int id,const char *msg,const char *file,const int linenum){
      mmc_throw_exception(id,msg,file,linenum);
 #else
      if(id==MMC_INFO)
-        fprintf(stdout,"%s\n",msg);
+        MMC_FPRINTF(stdout,"%s\n",msg);
      else
-        fprintf(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
+        MMC_FPRINTF(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
      exit(id);
 #endif
 }
@@ -228,10 +228,10 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
                 if(ptr && ptrold){
                    char *offs=(ptrold-jbuf>=50) ? ptrold-50 : jbuf;
                    while(offs<ptrold){
-                      fprintf(stderr,"%c",*offs);
+                      MMC_FPRINTF(stderr,"%c",*offs);
                       offs++;
                    }
-                   fprintf(stderr,"<error>%.50s\n",ptrold);
+                   MMC_FPRINTF(stderr,"<error>%.50s\n",ptrold);
                 }
                 free(jbuf);
                 MMC_ERROR(-9,"invalid JSON input file");
@@ -409,13 +409,13 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      char comment[MAX_PATH_LENGTH],*comm, srctypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
-     	fprintf(stdout,"Please specify the total number of photons: [1000000]\n\t");
+     	MMC_FPRINTF(stdout,"Please specify the total number of photons: [1000000]\n\t");
      MMC_ASSERT(fscanf(in,"%d", &(i) )==1); 
      if(cfg->nphoton==0) cfg->nphoton=i;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      
      if(in==stdin)
-     	fprintf(stdout,">> %d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
+     	MMC_FPRINTF(stdout,">> %d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
      if(cfg->seed==0x623F9A9E)
         MMC_ASSERT(fscanf(in,"%d", &(cfg->seed) )==1);
      else
@@ -423,12 +423,12 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,">> %d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
+     	MMC_FPRINTF(stdout,">> %d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,">> %f %f %f\nPlease specify the normal direction of the source: [0 0 1]\n\t",
+     	MMC_FPRINTF(stdout,">> %f %f %f\nPlease specify the normal direction of the source: [0 0 1]\n\t",
 	                            cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcdir.x),&(cfg->srcdir.y),&(cfg->srcdir.z)));
      comm=fgets(comment,MAX_PATH_LENGTH,in);
@@ -436,13 +436,13 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
          cfg->srcdir.w=dtmp;
 
      if(in==stdin)
-        fprintf(stdout,">> %f %f %f %f\nPlease specify the time gates in seconds (start end step) [0.0 1e-9 1e-10]\n\t",
+        MMC_FPRINTF(stdout,">> %f %f %f %f\nPlease specify the time gates in seconds (start end step) [0.0 1e-9 1e-10]\n\t",
 	                            cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z,cfg->srcdir.w);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->tstart),&(cfg->tend),&(cfg->tstep) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-        fprintf(stdout,">> %f %f %f\nPlease specify the mesh file key {node,elem,velem,facenb}_key.dat :\n\t",
+        MMC_FPRINTF(stdout,">> %f %f %f\nPlease specify the mesh file key {node,elem,velem,facenb}_key.dat :\n\t",
                                     cfg->tstart,cfg->tend,cfg->tstep);
      if(cfg->tstart>cfg->tend || cfg->tstep==0.f){
          MMC_ERROR(-9,"incorrect time gate settings");
@@ -466,23 +466,23 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,">> %s\nPlease specify the index to the tetrahedral element enclosing the source [start from 1]:\n\t",cfg->meshtag);
+     	MMC_FPRINTF(stdout,">> %s\nPlease specify the index to the tetrahedral element enclosing the source [start from 1]:\n\t",cfg->meshtag);
      MMC_ASSERT(fscanf(in,"%d", &(cfg->dim.x))==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,">> %d\nPlease specify the total number of detectors and detector diameter (in mm):\n\t",cfg->dim.x);
+     	MMC_FPRINTF(stdout,">> %d\nPlease specify the total number of detectors and detector diameter (in mm):\n\t",cfg->dim.x);
      MMC_ASSERT(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	fprintf(stdout,">> %d %f\n",cfg->detnum,cfg->detradius);
+     	MMC_FPRINTF(stdout,">> %d %f\n",cfg->detnum,cfg->detradius);
      cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
      if(cfg->issavedet)
         cfg->issavedet=(cfg->detpos>0);
      for(i=0;i<cfg->detnum;i++){
         if(in==stdin)
-		fprintf(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
+		MMC_FPRINTF(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
      	MMC_ASSERT(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
         comm=fgets(comment,MAX_PATH_LENGTH,in);
         if(comm!=NULL && sscanf(comm,"%f",&dtmp)==1)
@@ -491,11 +491,11 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
             cfg->detpos[i].w=cfg->detradius;
 
         if(in==stdin)
-		fprintf(stdout,">> %f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
+		MMC_FPRINTF(stdout,">> %f %f %f\n",cfg->detpos[i].x,cfg->detpos[i].y,cfg->detpos[i].z);
      }
 
      if(in==stdin)
-        fprintf(stdout,"Please specify the source type [pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d]:\n\t");
+        MMC_FPRINTF(stdout,"Please specify the source type [pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d|zgaussian|line|slit]:\n\t");
      if(fscanf(in,"%s", srctypestr)==1 && srctypestr[0]){
         srctype=mcx_keylookup(srctypestr,srctypeid);
 	if(srctype==-1)
@@ -504,20 +504,20 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
            comm=fgets(comment,MAX_PATH_LENGTH,in);
 	   cfg->srctype=srctype;
 	   if(in==stdin)
-                fprintf(stdout,">> %d\nPlease specify the source parameters set 1 (4 floating-points):\n\t",cfg->srctype);
+                MMC_FPRINTF(stdout,">> %d\nPlease specify the source parameters set 1 (4 floating-points):\n\t",cfg->srctype);
            MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->srcparam1.x),&(cfg->srcparam1.y),&(cfg->srcparam1.z),&(cfg->srcparam1.w))==4);
            comm=fgets(comment,MAX_PATH_LENGTH,in);
            if(in==stdin)
-		fprintf(stdout,">> %f %f %f %f\nPlease specify the source parameters set 2 (4 floating-points):\n\t",
+		MMC_FPRINTF(stdout,">> %f %f %f %f\nPlease specify the source parameters set 2 (4 floating-points):\n\t",
                        cfg->srcparam1.x,cfg->srcparam1.y,cfg->srcparam1.z,cfg->srcparam1.w);
            if(fscanf(in, "%f %f %f %f", &(cfg->srcparam2.x),&(cfg->srcparam2.y),&(cfg->srcparam2.z),&(cfg->srcparam2.w))==4){
                comm=fgets(comment,MAX_PATH_LENGTH,in);
                if(in==stdin)
-	            fprintf(stdout,">> %f %f %f %f\n",cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w);
+	            MMC_FPRINTF(stdout,">> %f %f %f %f\n",cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w);
                if(cfg->srctype==stPattern && cfg->srcparam1.w*cfg->srcparam2.w>0){
 		    char patternfile[MAX_PATH_LENGTH];
 		    FILE *fp;
-                    fprintf(stdout,"Please specify the pattern file name:\n\t");
+                    MMC_FPRINTF(stdout,"Please specify the pattern file name:\n\t");
 
 		    if(cfg->srcpattern) free(cfg->srcpattern);
 		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
@@ -539,21 +539,21 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
-     fprintf(out,"%d\n", (cfg->nphoton) ); 
-     fprintf(out,"%d\n", (cfg->seed) );
-     fprintf(out,"%f %f %f\n", (cfg->srcpos.x),(cfg->srcpos.y),(cfg->srcpos.z) );
-     fprintf(out,"%f %f %f\n", (cfg->srcdir.x),(cfg->srcdir.y),(cfg->srcdir.z) );
-     fprintf(out,"%f %f %f\n", (cfg->tstart),(cfg->tend),(cfg->tstep) );
-     fprintf(out,"%f %d %d %d\n", (cfg->steps.x),(cfg->dim.x),(cfg->crop0.x),(cfg->crop1.x));
-     fprintf(out,"%f %d %d %d\n", (cfg->steps.y),(cfg->dim.y),(cfg->crop0.y),(cfg->crop1.y));
-     fprintf(out,"%f %d %d %d\n", (cfg->steps.z),(cfg->dim.z),(cfg->crop0.z),(cfg->crop1.z));
-     fprintf(out,"%d", (cfg->medianum));
+     MMC_FPRINTF(out,"%d\n", (cfg->nphoton) ); 
+     MMC_FPRINTF(out,"%d\n", (cfg->seed) );
+     MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcpos.x),(cfg->srcpos.y),(cfg->srcpos.z) );
+     MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcdir.x),(cfg->srcdir.y),(cfg->srcdir.z) );
+     MMC_FPRINTF(out,"%f %f %f\n", (cfg->tstart),(cfg->tend),(cfg->tstep) );
+     MMC_FPRINTF(out,"%f %d %d %d\n", (cfg->steps.x),(cfg->dim.x),(cfg->crop0.x),(cfg->crop1.x));
+     MMC_FPRINTF(out,"%f %d %d %d\n", (cfg->steps.y),(cfg->dim.y),(cfg->crop0.y),(cfg->crop1.y));
+     MMC_FPRINTF(out,"%f %d %d %d\n", (cfg->steps.z),(cfg->dim.z),(cfg->crop0.z),(cfg->crop1.z));
+     MMC_FPRINTF(out,"%d", (cfg->medianum));
      for(i=0;i<cfg->medianum;i++){
-     	fprintf(out, "%f %f %f %f\n", (cfg->prop[i].mus),(cfg->prop[i].g),(cfg->prop[i].mua),(cfg->prop[i].n));
+     	MMC_FPRINTF(out, "%f %f %f %f\n", (cfg->prop[i].mus),(cfg->prop[i].g),(cfg->prop[i].mua),(cfg->prop[i].n));
      }
-     fprintf(out,"%d", (cfg->detnum));
+     MMC_FPRINTF(out,"%d", (cfg->detnum));
      for(i=0;i<cfg->detnum;i++){
-     	fprintf(out, "%f %f %f %f\n", (cfg->detpos[i].x),(cfg->detpos[i].y),(cfg->detpos[i].z),(cfg->detpos[i].w));
+     	MMC_FPRINTF(out, "%f %f %f %f\n", (cfg->detpos[i].x),(cfg->detpos[i].y),(cfg->detpos[i].z),(cfg->detpos[i].w));
      }
 }
 
@@ -603,12 +603,12 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
 
     if(percentage != oldmarker){
         oldmarker=percentage;
-    	for(j=0;j<colwidth;j++)     fprintf(stdout,"\b");
-    	fprintf(stdout,"Progress: [");
-    	for(j=0;j<percentage;j++)      fprintf(stdout,"=");
-    	fprintf(stdout,(percentage<colwidth-18) ? ">" : "=");
-    	for(j=percentage;j<colwidth-18;j++) fprintf(stdout," ");
-    	fprintf(stdout,"] %3d%%",percentage*100/(colwidth-18));
+    	for(j=0;j<colwidth;j++)     MMC_FPRINTF(stdout,"\b");
+    	MMC_FPRINTF(stdout,"Progress: [");
+    	for(j=0;j<percentage;j++)      MMC_FPRINTF(stdout,"=");
+    	MMC_FPRINTF(stdout,(percentage<colwidth-18) ? ">" : "=");
+    	for(j=percentage;j<colwidth-18;j++) MMC_FPRINTF(stdout," ");
+    	MMC_FPRINTF(stdout,"] %3d%%",percentage*100/(colwidth-18));
 	    fflush(stdout);
     }
 }
@@ -861,7 +861,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
           cfg->flog=fopen(logfile,"wt");
           if(cfg->flog==NULL){
 		cfg->flog=stdout;
-		fprintf(cfg->flog,"unable to save to log file, will print from stdout\n");
+		MMC_FPRINTF(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
      if((cfg->outputtype==otJacobian || cfg->outputtype==otTaylor) && cfg->seed!=SEED_FROM_FILE)

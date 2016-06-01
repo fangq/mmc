@@ -46,7 +46,8 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
-               stPattern, stFourier, stArcSin, stDisk, stFourierX, stFourier2D, stZGaussian};
+               stPattern, stFourier, stArcSin, stDisk, stFourierX, 
+               stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otTaylor, otWP, otWL};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 
@@ -99,7 +100,7 @@ typedef struct MMC_config{
 
 	float3 srcpos;    /**<src position in mm*/
 	float4 srcdir;    /**<src normal direction*/
-	int srctype;	  /**<src type: 0 - pencil beam, 1 - cone beam */
+	int srctype;	  /**<src type: 0 - pencil beam, 1 - isotropic ... */
 	float4 srcparam1;	/**<source parameters set 1*/
 	float4 srcparam2;	/**<source parameters set 2*/
 	float* srcpattern;	/**<source pattern*/

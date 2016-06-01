@@ -434,7 +434,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	printf("mmc.debuglevel='%s';\n",buf);
     }else if(strcmp(name,"srctype")==0){
         int len=mxGetNumberOfElements(item);
-        const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar","pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian",""};
+        const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar","pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
         char strtypestr[MAX_SESSION_LENGTH]={'\0'};
         if(!mxIsChar(item) || len==0)
              mexErrMsgTxt("the 'srctype' field must be a non-empty string");

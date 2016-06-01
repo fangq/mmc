@@ -116,16 +116,16 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		w[i]=pinner(&(r->vec),&pcrx,tracer->d+(eid)*6+i,tracer->m+(eid)*6+i);
 #endif
 	//exit(1);
-	if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"%d \n",eid);
+	if(cfg->debuglevel&dlTracing) MMC_FPRINTF(cfg->flog,"%d \n",eid);
 
 	r->pout.x=MMC_UNDEFINED;
 	for(i=0;i<4;i++){
-		//if(cfg->debuglevel&dlTracing) fprintf(cfg->flog,"testing face [%d]\n",i);
+		//if(cfg->debuglevel&dlTracing) MMC_FPRINTF(cfg->flog,"testing face [%d]\n",i);
 
 	        if(i>=2) w[fc[i][1]]=-w[fc[i][1]]; // can not go back
 		if(F32N(wi[fc[i][0]]) & F32N(wi[fc[i][1]]) & F32P(wi[fc[i][2]])){
 			// f_leave
-                        //if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
+                        //if(cfg->debuglevel&dlTracingExit) MMC_FPRINTF(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
 
                         Rv=1.f/(-w[fc[i][0]]-w[fc[i][1]]+w[fc[i][2]]);
                         baryout[nc[i][0]]=-w[fc[i][0]]*Rv;
@@ -137,7 +137,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				tracer->mesh->node+ee[nc[i][1]]-1,
 				tracer->mesh->node+ee[nc[i][2]]-1,&(r->pout));
 
-                        //if(cfg->debuglevel&dlTracingExit) fprintf(cfg->flog,"exit point %f %f %f\n",r->pout.x,r->pout.y,r->pout.z);
+                        //if(cfg->debuglevel&dlTracingExit) MMC_FPRINTF(cfg->flog,"exit point %f %f %f\n",r->pout.x,r->pout.y,r->pout.z);
 
 			Lp0=dist(&(r->p0),&(r->pout));
 			dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
@@ -195,7 +195,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 r->p0.x+=r->Lmove*r->vec.x;
                 r->p0.y+=r->Lmove*r->vec.y;
                 r->p0.z+=r->Lmove*r->vec.z;
-                //if(cfg->debuglevel&dlWeight) fprintf(cfg->flog,"update weight to %f and path end %d \n",r->weight,r->isend);
+                //if(cfg->debuglevel&dlWeight) MMC_FPRINTF(cfg->flog,"update weight to %f and path end %d \n",r->weight,r->isend);
 
 		if(!cfg->basisorder){
                         ww=currweight-r->weight;
@@ -205,7 +205,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
-	                if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f]\n",
+	                if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"Y [%f %f %f %f]\n",
         	              baryout[0],baryout[1],baryout[2],baryout[3]);
 
                 	if(Lp0>EPS){
@@ -218,7 +218,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				      ww/=prop->mua;
                         	  tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
 
-                        	  if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
+                        	  if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                         	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
 
 				  ww*=0.5f;
@@ -376,7 +376,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		}
                 tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 
-                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
+                if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
 	        T = _mm_mul_ps(T,_mm_set1_ps(r->Lmove));
@@ -387,7 +387,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		barypout[out[i][1]]=bary.y;
 		barypout[out[i][2]]=bary.z;
 		barypout[facemap[i]]=0.f;
-	        if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"Y [%f %f %f %f]\n",
+	        if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"Y [%f %f %f %f]\n",
         	      barypout[0],barypout[1],barypout[2],barypout[3]);
 
 		T=_mm_load_ps(barypout);        /* bary centric at pout */
@@ -395,7 +395,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		dlen=r->Lmove/bary.x;           /* normalized moving length */
 
-                if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
+                if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
 
 		if(r->isend)                    /* S is the bary centric for the photon after move */
@@ -403,7 +403,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		else
 		    S=T;
 		//if(cfg->debuglevel&dlBary) 
-		//    fprintf(cfg->flog,"old bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+		//    MMC_FPRINTF(cfg->flog,"old bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
 
 		_mm_store_ps(barypout,S);
 		if(nextenb && enb){
@@ -416,15 +416,15 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			    break;
 		    	}
 		      }
-		    //if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"[%d %d %d %d],[%d %d %d %d] - ",
+		    //if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"[%d %d %d %d],[%d %d %d %d] - ",
 		    //       ee[0],ee[1],ee[2],ee[3],nextenb[0],nextenb[1],nextenb[2],nextenb[3]);
-		    //if(cfg->debuglevel&dlBary) fprintf(cfg->flog,"[%f %f %f %f],[%f %f %f %f]\n",barypout[0],barypout[1],barypout[2],barypout[3],
+		    //if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"[%f %f %f %f],[%f %f %f %f]\n",barypout[0],barypout[1],barypout[2],barypout[3],
 		    //       barynext[0],barynext[1],barynext[2],barynext[3]);
 		}else
 		    _mm_store_ps(&(r->bary0.x),S);
 
 		//if(cfg->debuglevel&dlBary)
-		//    fprintf(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
+		//    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
 		if(!cfg->basisorder)
 		    tracer->mesh->weight[eid+tshift]+=ww;
 		else{
@@ -542,7 +542,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
         	r->photontimer+=r->Lmove*rc;
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
 	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
-        	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
+        	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
         	r->p0.x+=r->Lmove*r->vec.x;
@@ -678,7 +678,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
         	r->photontimer+=r->Lmove*rc;
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
 	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
-        	if(cfg->debuglevel&dlAccum) fprintf(cfg->flog,"A %f %f %f %e %d %e\n",
+        	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
 	        T = _mm_set1_ps(r->Lmove);
@@ -794,7 +794,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    /*when a photon enters the domain from the background*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
                         if(cfg->debuglevel&dlExit)
-			    fprintf(cfg->flog,"e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    MMC_FPRINTF(cfg->flog,"e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    	r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
                         if(!cfg->voidtime)
                             r.photontimer=0.f;
@@ -802,7 +802,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    /*when a photon exits the domain into the background*/
 		    if(mesh->type[oldeid-1] && mesh->type[r.eid-1]==0){
                         if(cfg->debuglevel&dlExit)
-		            fprintf(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+		            MMC_FPRINTF(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			        r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
 			if(!cfg->isextdet){
                             r.eid=0;
@@ -811,7 +811,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 //		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
-	    		fprintf(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
+	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -832,19 +832,19 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
-        		 fprintf(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(r.eid==0){
                        if(cfg->debuglevel&dlExit)
-        		 fprintf(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+        		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
                        if(cfg->issavedet && cfg->issaveexit){
                             memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);
                             memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3);
                        }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
-                         fprintf(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
-        		 fprintf(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
@@ -861,12 +861,12 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
-	    if(cfg->debuglevel&dlMove) fprintf(cfg->flog,"M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f)
 			r.weight*=cfg->roulettesize;
                         if(cfg->debuglevel&dlWeight)
-			    fprintf(cfg->flog,"Russian Roulette bumps r.weight to %f\n",r.weight);
+			    MMC_FPRINTF(cfg->flog,"Russian Roulette bumps r.weight to %f\n",r.weight);
 		else
 			break;
 	    }
@@ -938,19 +938,19 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
-              //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
 	  }else if(cfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
               vec_mult_add(pn,c0,-Icos,1.f,c0);
               vec_mult_add(pn,c0,tmp2,n1/n2,c0);
-              //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
+              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
 	  }
        }else{ /*total internal reflection*/
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
 	  *eid=*oldeid;
-          //if(cfg->debuglevel&dlReflect) fprintf(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
+          //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
        }
        tmp0=1.f/sqrt(vec_dot(c0,c0));
        vec_mult(c0,tmp0,c0);
@@ -1055,7 +1055,30 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
 		canfocus=0;
-	}
+	}else if(cfg->srctype==stLine || cfg->srctype==stSlit){
+	      float t=rand_uniform01(ran);
+	      r->p0.x+=t*cfg->srcparam1.x;
+	      r->p0.y+=t*cfg->srcparam1.y;
+	      r->p0.z+=t*cfg->srcparam1.z;
+
+              if(cfg->srctype==stLine){
+	              float s,p;
+		      t=1.f-2.f*rand_uniform01(ran);
+		      s=1.f-2.f*rand_uniform01(ran);
+		      p=sqrt(1.f-r->vec.x*r->vec.x-r->vec.y*r->vec.y)*(rand_uniform01(ran)>0.5f ? 1.f : -1.f);
+		      float3 vv;
+		      vv.x=r->vec.y*p-r->vec.z*s;
+		      vv.y=r->vec.z*t-r->vec.x*p;
+		      vv.z=r->vec.x*s-r->vec.y*t;
+		      r->vec=vv;
+		      //*((float3*)&(r->vec))=(float3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
+	      }
+              origin.x+=(cfg->srcparam1.x)*0.5f;
+              origin.y+=(cfg->srcparam1.y)*0.5f;
+              origin.z+=(cfg->srcparam1.z)*0.5f;
+              canfocus=(cfg->srctype==stSlit);
+        }
+
         if(canfocus && r->focus!=0.f){ // if beam focus is set, determine the incident angle
 	        float Rn2;
 	        origin.x+=r->focus*r->vec.x;
@@ -1112,9 +1135,19 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		}
 	}
 	if(is==mesh->srcelemlen){
-		fprintf(cfg->flog,"all tetrahedra (%d) labeled with -1 do not enclose the source!",mesh->srcelemlen);
-		fprintf(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
-		fprintf(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
+#pragma omp critical
+{
+		MMC_FPRINTF(cfg->flog,"all tetrahedra (%d) labeled with -1 do not enclose the source!\n",mesh->srcelemlen);
+		if(mesh->srcelemlen){
+		  int *elems=(int *)(mesh->elem+(mesh->srcelem[0])-1);
+		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[0],mesh->node[elems[0]-1].x,mesh->node[elems[0]-1].y,mesh->node[elems[0]-1].z);
+		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[1],mesh->node[elems[1]-1].x,mesh->node[elems[1]-1].y,mesh->node[elems[1]-1].z);
+		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[2],mesh->node[elems[2]-1].x,mesh->node[elems[2]-1].y,mesh->node[elems[2]-1].z);
+		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[3],mesh->node[elems[3]-1].x,mesh->node[elems[3]-1].y,mesh->node[elems[3]-1].z);
+		  MMC_FPRINTF(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
+		  MMC_FPRINTF(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
+		}
+}
 		MESH_ERROR("initial element does not enclose the source!");
 	}
 }
