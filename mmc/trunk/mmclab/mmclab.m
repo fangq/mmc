@@ -222,43 +222,7 @@ for i=1:len
     if((isnan(cfg(i).e0) && (isfield(cfg(i),'srctype') ...
            && strcmp(cfg(i).srctype,'pencil')) )|| ischar(cfg(i).e0))
         disp('searching initial element ...');
-        face=volface(cfg(i).elem);
-        [t,u,v,idx]=raytrace(cfg(i).srcpos,cfg(i).srcdir,cfg(i).node,face);
-        if(isempty(idx))
-            error('ray does not intersect with the mesh');
-        else
-            t=t(idx);
-            if(cfg(i).e0=='>')
-                idx1=find(t>=0);
-            elseif(cfg(i).e0=='<')
-                idx1=find(t<=0);
-            elseif(isnan(cfg(i).e0) || cfg(i).e0=='-')
-                idx1=1:length(t);
-            else
-                error('ray direction specifier is not recognized');
-            end
-            if(isempty(idx1))
-                error('no intersection is found along the ray direction');
-            end
-            t0=abs(t(idx1));
-            [tmin,loc]=min(t0);
-            faceidx=idx(idx1(loc));
-
-            % update source position
-            cfg(i).srcpos=cfg(i).srcpos+t(idx1(loc))*cfg(i).srcdir;
-
-            % find initial element id
-            felem=sort(face(faceidx,:));
-            f=cfg(i).elem;
-            f=[f(:,[1,2,3]);
-               f(:,[2,1,4]);
-               f(:,[1,3,4]);
-               f(:,[2,4,3])];
-            [tf,loc]=ismember(felem,sort(f,2),'rows');
-            loc=mod(loc,size(cfg(i).elem,1));
-            if(loc==0) loc=size(cfg(i).elem,1); end
-            cfg(i).e0=loc;
-        end
+        [cfg(i).srcpos,cfg(i).e0]=mmcraytrace(cfg(i).node,cfg(i).elem,cfg(i).srcpos,cfg(i).srcdir,cfg(i).e0);
     end
     if(isnan(cfg(i).e0))  % widefield source
         if(~isfield(cfg(i),'srcparam1') || ~isfield(cfg(i),'srcparam2'))
@@ -282,7 +246,8 @@ for i=1:len
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;
         end
-        if(strcmp(cfg(i).srctype,'pencil') || strcmp(cfg(i).srctype,'isotropic'))
+        if(strcmp(cfg(i).srctype,'pencil') || strcmp(cfg(i).srctype,'isotropic') ...
+	    || strcmp(cfg(i).srctype,'cone')   || strcmp(cfg(i).srctype,'zgaussian'))
             cfg(i).e0=tsearchn(cfg(i).node,cfg(i).elem,cfg(i).srcpos);
             if(isnan(cfg(i).e0))
                 cfg(i).e0=-1;
@@ -330,3 +295,4 @@ end
 if(nargout>=4)
   [varargout{3:end}]=deal(varargout{[end 3:end-1]});
 end
+

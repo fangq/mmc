@@ -18,7 +18,6 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
-cfg.unitinmm=0.02;
 
 % run the simulation
 
@@ -29,8 +28,6 @@ flux=mmclab(cfg);
 % if you have the SVN version of iso2mesh, use the next line to plot:
 % qmeshcut(cfg.elem(:,1:4),cfg.node(:,1:3),log10(abs(flux.data(:))),'y=30','linestyle','none');
 
-[cutpos,cutvalue,facedata]=qmeshcut(cfg.elem(:,1:4),cfg.node(:,1:3),log10(abs(flux.data(:))),'y=30');
-hcut=patch('Faces',facedata,'Vertices',cutpos,'FaceVertexCData',cutvalue,'facecolor','interp','linestyle','none');
+plotmesh([cfg.node(:,1:3),log10(abs(flux.data(1:size(cfg.node,1))))],cfg.elem,'y=30','facecolor','interp','linestyle','none')
 view([0 1 0]);
-set(gca,'dataaspectratio',[1 1 1]);
 colorbar;
