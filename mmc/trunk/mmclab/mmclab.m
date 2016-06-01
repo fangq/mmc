@@ -2,7 +2,7 @@ function varargout=mmclab(cfg,type)
 %
 %#############################################################################%
 %         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
-%          Copyright (c) 2010-2015 Qianqian Fang <q.fang at neu.edu>          %
+%          Copyright (c) 2010-2016 Qianqian Fang <q.fang at neu.edu>          %
 %                            http://mcx.space/mmc/                            %
 %                                                                             %
 %         Computational Imaging Laboratory (CIL) [http://fanglab.org]         %
@@ -15,6 +15,10 @@ function varargout=mmclab(cfg,type)
 %
 % Format:
 %    [flux,detphoton,ncfg,seeds]=mmclab(cfg,type);
+%          or
+%    flux=mmclab(cfg);
+%    newcfg=mmclab(cfg,'prep');
+%    [flux,detphoton,ncfg,seeds]=mmclab(cfg);
 %
 % Input:
 %    cfg: a struct, or struct array. Each element in cfg defines 

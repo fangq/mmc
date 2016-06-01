@@ -884,7 +884,7 @@ void mcx_usage(char *exename){
      printf("\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
-#          Copyright (c) 2010-2015 Qianqian Fang <q.fang at neu.edu>          #\n\
+#          Copyright (c) 2010-2016 Qianqian Fang <q.fang at neu.edu>          #\n\
 #                            http://mcx.space/mmc/                            #\n\
 #                                                                             #\n\
 #         Computational Imaging Laboratory (CIL) [http://fanglab.org]         #\n\

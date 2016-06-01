@@ -5,7 +5,7 @@
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.0-beta (v2016.1, Cotton Candy)
+Version: 1.0-RC1 (v2016.5, Cotton Candy)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------

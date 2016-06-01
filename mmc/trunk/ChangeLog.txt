@@ -1,5 +1,16 @@
 Change Log
 
+== MMC 1.0-RC1 (v2016.5, Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
+2016-05-31 support line and slit sources, fix srcdomain when cfg.srcdir is not orthogonal to the src plane
+2016-05-31 remove double correction of length unit in mmc and mmclab
+2016-05-25 elegantly terminate mmclab when exception is shown, print error unit and line numbers
+2016-05-09 add widefield gaussian source support
+2016-04-15 use mu_t for replay calculations for scattering Jacobian
+2016-04-10 save scattering events number for each media type
+2016-04-10 fix the bug in havel ray tracer, enable saving weighted scattering events number
+2016-03-10 fix bug in weight calculations when the output is jacobian
+2016-03-10 fix bug in basisorder for Havel raytracer
+
 == MMC 1.0-beta (v2016.1, Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
 
 2016/01/01 release 1.0-beta, also label as v2016.1 for time-based release strategy
