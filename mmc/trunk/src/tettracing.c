@@ -752,7 +752,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*initialize the photon parameters*/
         launchphoton(cfg, &r, mesh, ran, ran0);
-	r.partialpath[visit->reclen-2] = r.weight;
+	r.partialpath[visit->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
@@ -777,7 +777,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         	  r.faceid=-1;
 	    }
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
-	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
+	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
@@ -837,9 +837,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                        if(cfg->debuglevel&dlExit)
         		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
-                       if(cfg->issavedet && cfg->issaveexit){
-                            memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);
-                            memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3);
+                       if(cfg->issavedet && cfg->issaveexit){                                     /*when issaveexit is set to 1*/
+                            memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
+                            memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                        }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
@@ -874,9 +874,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
 		if(cfg->outputtype==otWP)
 			save_scatter_events(&r,mesh,cfg,visit);
-            if(cfg->ismomentum && mesh->type[r.eid-1]>0)
-                  r.partialpath[2*mesh->prop-1+mesh->type[r.eid-1]]+=mom;
-            r.partialpath[mesh->type[r.eid-1]-1]++;
+            if(cfg->ismomentum && mesh->type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
+                  r.partialpath[(mesh->prop<<1)-1+mesh->type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
+            r.partialpath[mesh->type[r.eid-1]-1]++;                          /*the first medianum block stores the scattering event counts*/
 	}
 	if(cfg->issavedet && exitdet>0){
 		int offset=visit->bufpos*visit->reclen;
