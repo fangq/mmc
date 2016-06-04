@@ -39,7 +39,7 @@ else
     if(nargin<3)
         w0=detp(:,end);
     end
-    detw=w0;
+    detw=w0(:);
     for i=1:medianum-1
         detw=detw.*exp(-prop(i+1,1)*detp(:,i+medianum));
     end
