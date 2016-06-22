@@ -37,6 +37,7 @@
 #define DET_PHOTON_BUF      100000
 #define SEED_FROM_FILE      -999
 #define MIN(a,b)            ((a)<(b)?(a):(b))
+#define MAX(a,b)            ((a)>(b)?(a):(b))
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
 

@@ -26,7 +26,7 @@ BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
 CCFLAGS    += -c -Wall -g -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
 INCLUDEDIR := $(MMCDIR)/src
-EXTRALIB   += -lm
+EXTRALIB   += -lm -lstdc++
 AROUTPUT   += -o
 MAKE       := make
 

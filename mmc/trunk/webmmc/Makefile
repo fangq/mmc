@@ -13,7 +13,7 @@
 # If NACL_SDK_ROOT is not set, then assume it can be found three directories up.
 #
 THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
-NACL_SDK_ROOT ?= $(abspath $(dir $(THIS_MAKEFILE))../..)
+NACL_SDK_ROOT ?= $(abspath $(dir $(THIS_MAKEFILE))../../../nacl)
 MMC_ROOT ?= ..
 
 # Project Build flags

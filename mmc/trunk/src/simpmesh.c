@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 #include <string.h>
+#include "highordermesh.h"
 
 #ifdef WIN32
          char pathsep='\\';
@@ -41,6 +42,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->prop=0;
 	mesh->node=NULL;
 	mesh->elem=NULL;
+	mesh->elem2=NULL;
 	mesh->srcelemlen=0;
 	mesh->srcelem=NULL;
 	mesh->detelemlen=0;
@@ -58,6 +60,8 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_init(mesh);
         mesh_loadnode(mesh,cfg);
         mesh_loadelem(mesh,cfg);
+	if(cfg->basisorder==2)
+	  mesh_10nodetet(mesh,cfg);
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
@@ -326,6 +330,10 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->elem){
 		free(mesh->elem);
 		mesh->elem=NULL;
+	}
+	if(mesh->elem2){
+		free(mesh->elem2);
+		mesh->elem2=NULL;
 	}
 	if(mesh->facenb){
 		free(mesh->facenb);

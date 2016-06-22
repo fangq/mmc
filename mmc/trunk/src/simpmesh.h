@@ -68,6 +68,7 @@ typedef struct MMC_mesh{
 	int prop;    /**< number of media */
 	float3 *node;/**< node coordinates */
 	int4 *elem;  /**< element indices */
+	int  *elem2; /**< second order element, storing the last 6 elements of a 10-node tet */
 	int  *srcelem;	/**< candidate list of elements containing the source*/
 	int  srcelemlen;	/**< length of the elements that may contain the source*/
 	int  *detelem;	/**< candidate list of elements containing a widefield detector*/
