@@ -32,12 +32,14 @@ __m128 int_coef;
 
 #define F32N(a) ((a) & 0x80000000)
 #define F32P(a) ((a) ^ 0x80000000)
+#define TETEDGE 6
 
 const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}}; /*node orders for each face, in clock-wise orders*/
 extern const int out[4][3]; /*defined in simpmesh.c, node orders for each face, in counter-clock-wise orders*/
 extern const int facemap[4];
 extern const int ifacemap[4];
+const int edgepair[TETEDGE][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
 
 const int faceorder[]={1,3,2,0,-1};
 const int ifaceorder[]={3,0,2,1};
@@ -81,10 +83,11 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	float3 pcrx={0.f},p1={0.f};
 	medium *prop;
 	int *ee;
+	int *ee2;
 	int i,tshift,eid,faceidx=-1;
 	float w[6],Rv,ww,currweight,dlen=0.f,rc; /*dlen is the physical distance*/
 	unsigned int *wi=(unsigned int*)w;
-        float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
+        float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x),barymid[4]={0.f,0.f,0.f,0.f};
 	float Lp0=0.f,ratio;
 
 	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
@@ -97,6 +100,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	vec_add(&(r->p0),&(r->vec),&p1);
 	vec_cross(&(r->p0),&p1,&pcrx);
 	ee=(int *)(tracer->mesh->elem+eid);
+        ee2=(int *)(tracer->mesh->elem2+eid*6);
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	rc=prop->n*R_C0;
         currweight=r->weight;
@@ -225,9 +229,20 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                		  for(i=0;i<4;i++)
+				  if(cfg->basisorder==2){
+                     		      for(i=0;i<4;i++)
+				          barymid[i] = ww*(baryp0[i]+baryout[i]);
+				      for(i=0;i<4;i++)
+#pragma omp atomic
+					  tracer->mesh->weight[ee[i]-1+tshift]+=(2.f*barymid[i]-1.f)*barymid[i];
+				      for(i=0;i<6;i++)
+#pragma omp atomic
+					  tracer->mesh->weight[ee2[i]-1+tshift]+=4.f*barymid[edgepair[i][0]]*barymid[edgepair[i][1]];
+				  }else{
+				      for(i=0;i<4;i++)
 #pragma omp atomic
                      			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+				  }
 				}
 				if(r->isend){
 					memcpy(baryp0,baryout,sizeof(float4));

@@ -46,7 +46,7 @@ void mesh_10nodetet(tetmesh * mesh,mcconfig *cfg){
 		         std::find(edgelist.begin(), edgelist.end(),edge);
 		     pos = std::distance( edgelist.begin(), edidx) ;
 		}
-                mesh->elem2[eid*TETEDGE+ed]= pos;
+                mesh->elem2[eid*TETEDGE+ed]= pos+1;
 	    }
 	pos=0;
 
