@@ -61,6 +61,9 @@ void mesh_10nodetet(tetmesh * mesh,mcconfig *cfg){
 	if(mesh->elem2==NULL)
 	    mesh->elem2=(int *)calloc(sizeof(int)*TETEDGE,mesh->ne);
 
+	mesh->nvol=(float *)realloc((void*)mesh->nvol,sizeof(float)*(mesh->nn+mesh->ne*TETEDGE));
+	memset(mesh->nvol+mesh->nn,0,sizeof(float)*mesh->ne*TETEDGE);
+
 	for (int eid=0;eid<mesh->ne;eid++)
 	    for(int ed=0; ed<TETEDGE; ed++){
 	        ee=(int*)(&mesh->elem[eid]);
@@ -75,12 +78,18 @@ void mesh_10nodetet(tetmesh * mesh,mcconfig *cfg){
 			Count+=1;// what about count?
                         mesh->elem2[eid*TETEDGE+ed]=Count;
 		}else{ // an existing edge was found in the hash table
-                    mesh->elem2[eid*TETEDGE+ed]=imap->second;
+                        mesh->elem2[eid*TETEDGE+ed]=imap->second;
                 }
+		mesh->nvol[mesh->elem2[eid*TETEDGE+ed]-1]+=mesh->evol[eid];
 	}
 	pos=0;
 
 	mesh->nn+=edgelist.size();
+	mesh->nvol=(float *)realloc((void*)mesh->nvol,sizeof(float)*(mesh->nn));
+	for(int i=0;i<oldnn;i++)
+		mesh->nvol[i]=-mesh->nvol[i];
+	for(int i=0;i<mesh->nn;i++)
+		mesh->nvol[i]*=0.2f;
 	mesh->node=(float3*)realloc((void*)mesh->node, sizeof(float3)*(mesh->nn));
         mesh->weight=(double *)realloc((void*)mesh->weight,sizeof(double)*mesh->nn*cfg->maxgate);
         memset(mesh->weight,0,sizeof(double)*mesh->nn*cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
