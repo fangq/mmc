@@ -1,7 +1,7 @@
 ROOTDIR = ..
 BINARY=mmc
 
-FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON highordermesh
+FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON highordermesh mmc_host
 
 PLATFORM = $(shell uname -s)        
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)

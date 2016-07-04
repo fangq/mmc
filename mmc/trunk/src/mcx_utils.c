@@ -148,7 +148,7 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->photonseed);
      if(cfg->replayweight)
         free(cfg->replayweight);
-     if(cfg->flog)
+     if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)
         fclose(cfg->flog);
      mcx_initcfg(cfg);
 }
@@ -206,7 +206,6 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
         if(strstr(fname,".json")!=NULL){
             char *jbuf;
             int len;
-            cJSON *jroot;
 
             fclose(fp);
             fp=fopen(fname,"rb");
@@ -217,25 +216,11 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
             if(fread(jbuf,len-1,1,fp)!=1)
                 MMC_ERROR(-2,"reading input file is terminated");
             jbuf[len-1]='\0';
-            jroot = cJSON_Parse(jbuf);
-            if(jroot){
-                mcx_loadjson(jroot,cfg);
-                cJSON_Delete(jroot);
-            }else{
-                char *ptrold, *ptr=(char*)cJSON_GetErrorPtr();
-                if(ptr) ptrold=strstr(jbuf,ptr);
-                fclose(fp);
-                if(ptr && ptrold){
-                   char *offs=(ptrold-jbuf>=50) ? ptrold-50 : jbuf;
-                   while(offs<ptrold){
-                      MMC_FPRINTF(stderr,"%c",*offs);
-                      offs++;
-                   }
-                   MMC_FPRINTF(stderr,"<error>%.50s\n",ptrold);
-                }
-                free(jbuf);
-                MMC_ERROR(-9,"invalid JSON input file");
-            }
+            if(mcx_loadfromjson(jbuf,cfg)){
+	        fclose(fp);
+		free(jbuf);
+	        MMC_ERROR(-9,"invalid JSON input file");
+	    }
             free(jbuf);
         }else{
 	    mcx_loadconfig(fp,cfg); 
@@ -247,6 +232,27 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
      }
 }
 
+int mcx_loadfromjson(char *jbuf,mcconfig *cfg){
+     cJSON *jroot;
+     jroot = cJSON_Parse(jbuf);
+     if(jroot){
+        mcx_loadjson(jroot,cfg);
+        cJSON_Delete(jroot);
+     }else{
+        char *ptrold, *ptr=(char*)cJSON_GetErrorPtr();
+        if(ptr) ptrold=strstr(jbuf,ptr);
+        if(ptr && ptrold){
+           char *offs=(ptrold-jbuf>=50) ? ptrold-50 : jbuf;
+           while(offs<ptrold){
+              MMC_FPRINTF(stderr,"%c",*offs);
+              offs++;
+           }
+           MMC_FPRINTF(stderr,"<error>%.50s\n",ptrold);
+        }
+        return 1;
+     }
+     return 0;
+}
 int mcx_loadjson(cJSON *root, mcconfig *cfg){
      int i;
      cJSON *Mesh, *Optode, *Forward, *Session, *tmp, *subitem;
