@@ -19,6 +19,7 @@ MMCDIR  ?= $(ROOTDIR)
 MMCSRC :=$(MMCDIR)/src
 
 CXX        := g++
+CXXFLAGS   := -std=c++11
 AR         := $(CC)
 BIN        := bin
 BUILT      := built
@@ -147,12 +148,12 @@ makedocdir:
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CXX) $(CCFLAGS) $(CXXFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 ##  Compile .cpp files ##
 %$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CXX) $(CCFLAGS) $(CXXFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 ##  Compile .c files  ##
 $(OBJDIR)/%$(OBJSUFFIX): %.c

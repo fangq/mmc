@@ -60,11 +60,11 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_init(mesh);
         mesh_loadnode(mesh,cfg);
         mesh_loadelem(mesh,cfg);
+        mesh_loadelemvol(mesh,cfg);
 	if(cfg->basisorder==2)
 	  mesh_10nodetet(mesh,cfg);
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
-        mesh_loadelemvol(mesh,cfg);
 	if(cfg->seed==SEED_FROM_FILE && cfg->seedfile[0]){
           mesh_loadseedfile(mesh,cfg);
         }
