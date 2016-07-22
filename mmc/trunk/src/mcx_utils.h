@@ -40,6 +40,7 @@
 #define MAX(a,b)            ((a)>(b)?(a):(b))
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
+#define MAX_DEVICE          256
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
@@ -162,6 +163,8 @@ typedef struct MMC_config{
 	void *photonseed;
 	float *replayweight;
         char seedfile[MAX_PATH_LENGTH];
+        char deviceid[MAX_DEVICE];
+        float workload[MAX_DEVICE];
 } mcconfig;
 
 #ifdef	__cplusplus
