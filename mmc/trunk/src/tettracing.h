@@ -85,6 +85,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,Ra
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
+void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
+
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus
 extern "C"
