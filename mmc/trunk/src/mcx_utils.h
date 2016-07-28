@@ -50,7 +50,7 @@ enum TMCMethod {mmMCX, mmMCML};
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
-enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otTaylor, otWP, otWL};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otTaylor, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 
 /***************************************************************************//**

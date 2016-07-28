@@ -203,7 +203,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         r->Eabsorb+=ww;
                         r->photontimer+=r->Lmove*rc;
                         tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
-                        if(cfg->mcmethod==mmMCX)
+                        if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
 
 #pragma omp atomic
 		 	    tracer->mesh->weight[eid+tshift]+=ww;
@@ -228,7 +228,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                                  if(cfg->mcmethod==mmMCX)
+                                  if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
                 		    for(i=0;i<4;i++)
 #pragma omp atomic
                      			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
@@ -431,7 +431,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		//if(cfg->debuglevel&dlBary)
 		//    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
-                if(cfg->mcmethod==mmMCX){
+                if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP){
 		  if(!cfg->basisorder)
 		    tracer->mesh->weight[eid+tshift]+=ww;
 		  else{
@@ -560,7 +560,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
         	r->p0.x+=r->Lmove*r->vec.x;
        		r->p0.y+=r->Lmove*r->vec.y;
         	r->p0.z+=r->Lmove*r->vec.z;
-                if(cfg->mcmethod==mmMCX){
+                if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP){
 		  if(!cfg->basisorder){
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
@@ -701,7 +701,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
-                if(cfg->mcmethod==mmMCX){
+                if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP){
 		  if(!cfg->basisorder){
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
@@ -1203,6 +1203,8 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
         r->weight*=prop->mus/(prop->mua+prop->mus);
 
         ww-=r->weight;
+	r->Eabsorb+=ww;
+
 	if(!cfg->basisorder){
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
 #pragma omp atomic
