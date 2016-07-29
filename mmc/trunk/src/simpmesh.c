@@ -692,7 +692,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
             if(cfg->outputtype==otWL || cfg->outputtype==otWP)
-               normalizor=1.f/cfg->nphoton; /*DELTA_MUA is not used in this mode*/
+               normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
 
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)

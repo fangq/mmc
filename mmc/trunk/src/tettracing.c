@@ -775,7 +775,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
-	kahany=r.weight-visit->kahanc;
+	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP))
+		kahany=cfg->replayweight[r.photonid]-visit->kahanc;	/* when replay mode, accumulate detected photon weight */
+	else
+		kahany=r.weight-visit->kahanc;
 	kahant=visit->totalweight + kahany;
 	visit->kahanc=(kahant - visit->totalweight) - kahany;
 	visit->totalweight=kahant;
