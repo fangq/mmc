@@ -187,7 +187,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                     currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
-		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		    currweight=r->Lmove;
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
@@ -363,7 +363,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                     currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
-		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		    currweight=r->Lmove;
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
@@ -542,7 +542,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                 currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
-	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		currweight=r->Lmove;
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
@@ -683,7 +683,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 #endif
                 currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
-	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		currweight=r->Lmove;
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;

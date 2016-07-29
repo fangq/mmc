@@ -878,7 +878,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		MMC_FPRINTF(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
-     if((cfg->outputtype==otJacobian || cfg->outputtype==otTaylor) && cfg->seed!=SEED_FROM_FILE)
+     if((cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP) && cfg->seed!=SEED_FROM_FILE)
          MMC_ERROR(-1,"Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
        if(isinteractive){
