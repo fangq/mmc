@@ -288,6 +288,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
        int i,j;
        float *ppath=(float*)malloc(his.savedphoton*his.colcount*sizeof(float));
        cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));
+       cfg->replaytime=(float*)malloc(his.savedphoton*sizeof(float));
        fseek(fp,sizeof(his),SEEK_SET);
        if(fread(ppath,his.colcount*sizeof(float),his.savedphoton,fp)!=his.savedphoton)
            MESH_ERROR("error when reading the seed data");
@@ -299,11 +300,15 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
                cfg->replayweight[cfg->nphoton]=1.f;
                for(j=2;j<his.maxmedia+2;j++)
                  cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
+               cfg->replaytime[cfg->nphoton]=0.f;
+               for(j=2;j<his.maxmedia+2;j++)
+                 cfg->replaytime[cfg->nphoton]+=mesh->med[j-1].n*ppath[i*his.colcount+j]*R_C0;
            cfg->nphoton++;
            }
 	free(ppath);
         cfg->photonseed=realloc(cfg->photonseed, cfg->nphoton*his.seedbyte);
         cfg->replayweight=(float*)realloc(cfg->replayweight, cfg->nphoton*sizeof(float));
+	cfg->replaytime=(float*)realloc(cfg->replaytime, cfg->nphoton*sizeof(float));
 	cfg->minenergy=0.f;
     }
     fclose(fp);

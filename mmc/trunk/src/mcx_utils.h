@@ -165,6 +165,7 @@ typedef struct MMC_config{
 	unsigned int checkpt[MAX_CHECKPOINT]; /**<a list of photon numbers at which a snapshot of the weights will be saved*/
 	void *photonseed;
 	float *replayweight;
+	float *replaytime;
         char seedfile[MAX_PATH_LENGTH];
 } mcconfig;
 

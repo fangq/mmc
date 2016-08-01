@@ -202,7 +202,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         ww=currweight-r->weight;
                         r->Eabsorb+=ww;
                         r->photontimer+=r->Lmove*rc;
-                        tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
+			if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+				tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
+			else
+                        	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
                         if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
 
 #pragma omp atomic
@@ -219,7 +222,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  r->Eabsorb+=ww;
 				  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
 				      ww/=prop->mua;
-                        	  tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
+				  if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+				      tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
+				  else
+                        	      tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
 
                         	  if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                         	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
@@ -380,7 +386,11 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                      ww/=prop->mua;
 		}
-                tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
+		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		else
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 
                 if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
@@ -552,8 +562,12 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
-	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
+		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		else
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
@@ -693,8 +707,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
-	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
+		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		else
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
@@ -1184,11 +1202,11 @@ void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	int *ee = (int *)(mesh->elem+eid);
     	int i,tshift;
 	if(!cfg->basisorder){
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
 #pragma omp atomic
 		mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
 	}else{
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
+		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
 		for(i=0;i<4;i++)
 #pragma omp atomic
 			mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];

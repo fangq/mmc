@@ -114,6 +114,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->photonseed=NULL;
      cfg->replaydet=0;
      cfg->replayweight=NULL;
+     cfg->replaytime=NULL;
      cfg->isextdet=0;
      cfg->srcdir.w=0.f;
 
@@ -150,6 +151,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->photonseed);
      if(cfg->replayweight)
         free(cfg->replayweight);
+     if(cfg->replaytime)
+        free(cfg->replaytime);
      if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)
         fclose(cfg->flog);
      mcx_initcfg(cfg);

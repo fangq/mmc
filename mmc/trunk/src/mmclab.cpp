@@ -516,6 +516,14 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	cfg->replayweight=(float *)malloc(cfg->his.detected*sizeof(float));
         memcpy(cfg->replayweight,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replayweight=%d;\n",cfg->his.detected);
+    }else if(strcmp(name,"replaytime")==0){
+	arraydim=mxGetDimensions(item);
+	if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'replaytime' field can not be empty");
+	cfg->his.detected=arraydim[0]*arraydim[1];
+	cfg->replaytime=(float *)malloc(cfg->his.detected*sizeof(float));
+        memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
+        printf("mmc.replaytime=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{
@@ -585,8 +593,10 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         cfg->his.detected=0;
 	if(cfg->replayweight==NULL)
 	    MEXERROR("You must define 'replayweight' when you specify 'seed'.");
+	else if(cfg->replaytime==NULL)
+	    MEXERROR("You must define 'replayweight' when you specify 'seed'.");
 	else
-	    MEXERROR("The dimension of the 'replayweight' field does not match the column number of the 'seed' field.");
+	    MEXERROR("The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
      }
      cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
