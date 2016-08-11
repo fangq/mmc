@@ -194,7 +194,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 }
 		r->slen-=r->Lmove*mus;
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
-		    currweight=r->Lmove*mus/r->slen0;
+		    if(r->slen0<EPS)
+			currweight=1;
+		    else
+			currweight=r->Lmove*mus/r->slen0;
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
 		}
@@ -380,7 +383,10 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 }
 		r->slen-=r->Lmove*mus;
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
-		    currweight=r->Lmove*mus/r->slen0;
+		    if(r->slen0<EPS)
+			currweight=1;
+		    else
+			currweight=r->Lmove*mus/r->slen0;
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
 		}
@@ -568,7 +574,10 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
             }
 	    r->slen-=r->Lmove*mus;
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
-		currweight=r->Lmove*mus/r->slen0;
+		if(r->slen0<EPS)
+		    currweight=1;
+		else
+		    currweight=r->Lmove*mus/r->slen0;
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
 	    }
@@ -718,7 +727,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             }
 	    r->slen-=r->Lmove*mus;
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
-		currweight=r->Lmove*mus/r->slen0;
+		if(r->slen0<EPS)
+		    currweight=1;
+		else
+		    currweight=r->Lmove*mus/r->slen0;
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
 	    }
