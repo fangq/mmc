@@ -575,7 +575,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      }
      /*make medianum+1 the same as medium 0*/
      if(cfg->isextdet){
-         mesh->med=(medium *)realloc(mesh->med, sizeof(medium)*mesh->prop+2);
+         mesh->med=(medium *)realloc(mesh->med, sizeof(medium)*(mesh->prop+2));
          memcpy(mesh->med+mesh->prop+1,mesh->med,sizeof(medium));
          for(i=0;i<mesh->ne;i++){
              if(mesh->type[i]==-2)
