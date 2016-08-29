@@ -411,8 +411,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         mesh->prop=arraydim[0]-1;
         if(mesh->med) free(mesh->med);
 	if(mesh->atte) free(mesh->atte);
-        mesh->med=(medium *)calloc(sizeof(medium),mesh->prop+1);
-	mesh->atte=(float *)calloc(sizeof(float),mesh->prop+1);
+        mesh->med=(medium *)calloc(sizeof(medium),mesh->prop+1+cfg->isextdet);
+	mesh->atte=(float *)calloc(sizeof(float),mesh->prop+1+cfg->isextdet);
         for(j=0;j<4;j++)
           for(i=0;i<=mesh->prop;i++)
              ((float *)(&mesh->med[i]))[j]=val[j*(mesh->prop+1)+i];
@@ -573,6 +573,15 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }
+     /*make medianum+1 the same as medium 0*/
+     if(cfg->isextdet){
+         memcpy(mesh->med+mesh->prop+1,mesh->med,sizeof(medium));
+         for(i=0;i<mesh->ne;i++){
+             if(mesh->type[i]==-2)
+                   mesh->type[i]=mesh->prop+1;
+         }
+     }
+
      if(cfg->issavedet && cfg->detnum==0) 
       	cfg->issavedet=0;
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
