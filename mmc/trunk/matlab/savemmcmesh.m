@@ -24,10 +24,6 @@ function savemmcmesh(key,node,elem,face,evol,facenb)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-if(nargin<4)
-  face=volface(elem(:,1:4)); % volface is part of iso2mesh toolbox,http://iso2mesh.sf.net
-end
-
 if(nargin<5)
   evol=elemvolume(node,elem(:,1:4));
 end
@@ -57,6 +53,9 @@ end
 
 if(nargin<6)
   facenb=faceneighbors(elem(:,1:4));
+  if(nargin<4)
+     face=faceneighbors(elem(:,1:4),'rowmajor');
+  end
 end
 
 if(~isempty(face))
