@@ -45,12 +45,12 @@
 
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
-                 'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','x','P','k','v','\0'};
+                 'd','r','S','J','e','U','R','l','L','I','o','u','C',
+                 'M','i','V','O','m','F','q','x','P','k','v','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--savedet",
-                 "--repeat","--save2pt","--minenergy",
+                 "--repeat","--save2pt","--fluxout","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
@@ -82,6 +82,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issavedet=0;
      cfg->respin=1;
      cfg->issave2pt=1;
+     cfg->fluxout=0;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
 #ifndef MMC_USE_SSE
@@ -349,6 +350,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
 
         if(!cfg->isreflect)   cfg->isreflect=FIND_JSON_KEY("DoMismatch","Session.DoMismatch",Session,cfg->isreflect,valueint);
         if(cfg->issave2pt)    cfg->issave2pt=FIND_JSON_KEY("DoSaveVolume","Session.DoSaveVolume",Session,cfg->issave2pt,valueint);
+	if(cfg->fluxout)      cfg->fluxout=FIND_JSON_KEY("DoSaveFluxOut","Session.DoSaveVolume",Session,cfg->issave2pt,valueint);
         if(cfg->isnormalized) cfg->isnormalized=FIND_JSON_KEY("DoNormalize","Session.DoNormalize",Session,cfg->isnormalized,valueint);
         if(!cfg->issavedet)   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
         if(!cfg->isspecular)  cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
@@ -791,6 +793,9 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'S':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->issave2pt),"bool");
 		     	        break;
+		     case 'J':
+				i=mcx_readarg(argc,argv,i,&(cfg->fluxout),"bool");
+				break;
                      case 'e':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->minenergy),"float");
                                 break;
@@ -911,6 +916,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
+ -J [0|1]      (--fluxout)     1 to save outgoing fluence on mesh surface,\n\
+                               0 do not save\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\

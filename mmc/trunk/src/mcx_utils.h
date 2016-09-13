@@ -141,6 +141,7 @@ typedef struct MMC_config{
 	char ismomentum;    /**<1 to save momentum transfer for detected photons, implies issavedet=1*/
 	char issaveexit;    /**<1 to save the exit position and vector of a detected photon, implies issavedet=1*/
 	char issave2pt;     /**<1 to save the 2-point distribution, 0 do not save*/
+	char fluxout;       /**<1 to save outgoing fluence on mesh surface, 0 do not save*/
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char issaveseed;    /**<1 save the seed for a detected photon, 0 do not save*/

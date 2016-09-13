@@ -38,6 +38,7 @@ const int ifacemap[]={1,2,0,3};
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
+	mesh->nf=0;
 	mesh->prop=0;
 	mesh->node=NULL;
 	mesh->elem=NULL;
@@ -241,7 +242,6 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
-	int outface=0;
 	int4 *pe;
 	char ffacenb[MAX_PATH_LENGTH];
 	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
@@ -258,11 +258,12 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 		pe=mesh->facenb+i;
 		if(fscanf(fp,"%d %d %d %d",&(pe->x),&(pe->y),&(pe->z),&(pe->w))!=4)
 			MESH_ERROR("face-neighbor list file has wrong format");
-		if(pe->x==0)	pe->x=--outface;
-		if(pe->y==0)	pe->y=--outface;
-		if(pe->z==0)	pe->z=--outface;
-		if(pe->w==0)	pe->w=--outface;
+		if(pe->x==0)	pe->x=-(++mesh->nf);
+		if(pe->y==0)	pe->y=-(++mesh->nf);
+		if(pe->z==0)	pe->z=-(++mesh->nf);
+		if(pe->w==0)	pe->w=-(++mesh->nf);
 	}
+//	fprintf(stdout,"Number of mesh surfaces are: %d\n",mesh->nf);
 	fclose(fp);
 }
 

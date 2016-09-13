@@ -65,6 +65,7 @@ related to an FEM mesh.
 typedef struct MMC_mesh{
 	int nn;      /**< number of nodes */
 	int ne;      /**< number of elements */
+	int nf;      /**< number of faces */
 	int prop;    /**< number of media */
 	float3 *node;/**< node coordinates */
 	int4 *elem;  /**< element indices */
