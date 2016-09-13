@@ -78,6 +78,7 @@ typedef struct MMC_mesh{
 	medium *med; /**< optical property of different media */
 	float *atte; /**< precomputed attenuation for each media */
 	double *weight;/**< volumetric fluence for all nodes at all time-gates */
+	double *fluxout;	/**< outgoing flux on surface triangles at all time-gates*/
 	float *evol; /**< volume of an element */
 	float *nvol; /**< veronio volume of a node */
 } tetmesh;
@@ -118,6 +119,7 @@ void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
+void mesh_savefluxout(tetmesh *mesh,mcconfig *cfg, float Etotal);
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg);
 void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg);
 

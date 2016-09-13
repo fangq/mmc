@@ -195,6 +195,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
                 if(cfg->issaveseed && master.photonseed)
                     free(master.photonseed);
 	}
+	if(cfg->fluxout)
+		mesh_savefluxout(mesh,cfg,master.totalweight);
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
 	return 0;

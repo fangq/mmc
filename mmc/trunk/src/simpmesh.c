@@ -51,6 +51,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->med=NULL;
 	mesh->atte=NULL;
 	mesh->weight=NULL;
+	mesh->fluxout=NULL;
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
 }
@@ -239,6 +240,7 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 }
+
 void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
@@ -263,6 +265,8 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 		if(pe->z==0)	pe->z=-(++mesh->nf);
 		if(pe->w==0)	pe->w=-(++mesh->nf);
 	}
+	if(cfg->fluxout)
+		mesh->fluxout=(double *)calloc(sizeof(double)*mesh->nf,cfg->maxgate);
 //	fprintf(stdout,"Number of mesh surfaces are: %d\n",mesh->nf);
 	fclose(fp);
 }
@@ -352,6 +356,10 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->weight){
 		free(mesh->weight);
 		mesh->weight=NULL;
+	}
+	if(mesh->fluxout){
+		free(mesh->fluxout);
+		mesh->fluxout=NULL;
 	}
         if(mesh->evol){
                 free(mesh->evol);
@@ -663,6 +671,41 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 			MESH_ERROR("can not write to weight file");
 	   }
 	fclose(fp);
+}
+
+void mesh_savefluxout(tetmesh *mesh,mcconfig *cfg, float Etotal){
+	FILE *fp;
+	int i,j;
+	char foutflux[MAX_PATH_LENGTH];
+	if(cfg->isnormalized){
+		float normalizor=1.0/Etotal;
+		for(i=0;i<cfg->maxgate;i++)
+               		for(j=0;j<mesh->nf;j++)
+                  		mesh->fluxout[i*mesh->nf+j]*=normalizor;
+	}
+
+        if(cfg->rootpath[0])
+                sprintf(foutflux,"%s%c%s_face.dat",cfg->rootpath,pathsep,cfg->session);
+        else
+                sprintf(foutflux,"%s_face.dat",cfg->session);
+
+	if(cfg->outputformat==ofBin){
+		if((fp=fopen(foutflux,"wb"))==NULL)
+         	        MESH_ERROR("can not open outgoing flux file to write");
+		if(fwrite((void*)mesh->fluxout,sizeof(mesh->fluxout[0]),mesh->nf*cfg->maxgate,fp)!=mesh->nf*cfg->maxgate)
+			MESH_ERROR("fail to write binary outgoing flux file");
+		fclose(fp);
+		return;
+	}
+
+	if((fp=fopen(foutflux,"wt"))==NULL)
+		MESH_ERROR("can not open outgoing flux file to write");
+	for(i=0;i<cfg->maxgate;i++){
+		for(j=0;j<mesh->nf;j++){
+			if(fprintf(fp,"%d\t%e\n",j+1,mesh->fluxout[i*mesh->nf+j])==0)
+				MESH_ERROR("can not write to outgoing flux file");
+	   	}
+	}
 }
 
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg){
