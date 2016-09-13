@@ -786,11 +786,11 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
 
-		    if(cfg->isreflect && (r.eid==0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
-			if(! (r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
+		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
+			if(! (r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
-	    	    if(r.eid==0) break;
+	    	    if(r.eid<=0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
                         if(cfg->debuglevel&dlExit)
@@ -831,9 +831,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         	    }
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
-        	    if(r.eid==0 && (cfg->debuglevel&dlMove))
+        	    if(r.eid<=0 && (cfg->debuglevel&dlMove))
         		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    if(r.eid==0){
+		    if(r.eid<=0){
                        if(cfg->debuglevel&dlExit)
         		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
@@ -843,9 +843,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                        }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
+	    	    else if(r.eid>0 && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    if(cfg->issavedet && r.eid==0){
+		    if(cfg->issavedet && r.eid<=0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
                           exitdet=oldeid;
