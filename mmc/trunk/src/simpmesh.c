@@ -677,12 +677,15 @@ void mesh_savefluxout(tetmesh *mesh,mcconfig *cfg, float Etotal){
 	FILE *fp;
 	int i,j;
 	char foutflux[MAX_PATH_LENGTH];
-	if(cfg->isnormalized){
-		float normalizor=1.0/Etotal;
-		for(i=0;i<cfg->maxgate;i++)
-               		for(j=0;j<mesh->nf;j++)
-                  		mesh->fluxout[i*mesh->nf+j]*=normalizor;
-	}
+
+	float normalizor=1.0;
+	if(cfg->isnormalized)
+		normalizor/=Etotal;
+	if(cfg->outputtype==otFlux)
+		normalizor/=cfg->tstep;
+	for(i=0;i<cfg->maxgate;i++)
+           	for(j=0;j<mesh->nf;j++)
+                	mesh->fluxout[i*mesh->nf+j]*=normalizor;
 
         if(cfg->rootpath[0])
                 sprintf(foutflux,"%s%c%s_face.dat",cfg->rootpath,pathsep,cfg->session);

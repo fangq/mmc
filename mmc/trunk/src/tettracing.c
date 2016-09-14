@@ -841,6 +841,15 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                             memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
                             memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                        }
+			if(cfg->fluxout && r.eid<0){							/*when enable saving outgoing flux*/
+				int tshift=MIN( ((int)((r.photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nf;
+				int index=tshift-r.eid-1;
+				if(index<cfg->maxgate*mesh->nf)
+					tracer->mesh->fluxout[index]+=r.weight;
+				else
+					fprintf(stdout,"%d\t%d\t%d\n",-r.eid,(int)((r.photontimer-cfg->tstart)*visit->rtstep),index);
+//				tracer->mesh->fluxout[-r.eid-1+tshift]+=r.weight;
+			}
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    else if(r.eid>0 && r.faceid!=-2  && cfg->debuglevel&dlEdge)
@@ -940,7 +949,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
-	  }else if(cfg->isspecular==2 && *eid==0){
+	  }else if(cfg->isspecular==2 && *eid<=0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
               vec_mult_add(pn,c0,-Icos,1.f,c0);
