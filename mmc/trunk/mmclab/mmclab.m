@@ -61,6 +61,7 @@ function varargout=mmclab(cfg,type)
 %                       to seed a photon (i.e. the "replay" mode)
 %      cfg.detpos:      an N by 4 array, each row specifying a detector: [x,y,z,radius]
 %      cfg.isreflect:   [1]-consider refractive index mismatch, 0-matched index
+%      cfg.fluxout:	[1]-to save outgoing flux on surface triangles, 0 do not save
 %      cfg.isnormalized:[1]-normalize the output flux to unitary source, 0-no reflection
 %      cfg.isspecular:  [1]-calculate specular reflection if source is outside
 %      cfg.ismomentum:  [0]-save momentum transfer for each detected photon

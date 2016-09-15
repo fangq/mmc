@@ -61,6 +61,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
+  const char	   *outputtag2[]={"data","facedata"};
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop;
 #endif
@@ -76,8 +77,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   nfields = mxGetNumberOfFields(prhs[0]);
   ncfg = mxGetNumberOfElements(prhs[0]);
 
-  if(nlhs>=1)
-      plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
+  if(nlhs>=1){
+      if(cfg.fluxout)
+          plhs[0] = mxCreateStructMatrix(ncfg,1,2,outputtag2);
+      else
+          plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
+  }
   if(nlhs>=2)
       plhs[1] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=3)
@@ -275,6 +280,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     	    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
+	    if(cfg.fluxout){
+		fielddim[0]=mesh.nf;
+		mxSetFieldByNumber(plhs[0],jstruct,1, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
+	        double *faceoutput = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,1));
+	        memcpy(faceoutput,mesh.fluxout,fielddim[0]*fielddim[1]*sizeof(double));
+	    }
 	}
         if(errorflag)
             mexErrMsgTxt("MMCLAB Terminated due to exception!");
@@ -309,6 +320,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,tstep)
     GET_ONE_FIELD(cfg,tend)
     GET_ONE_FIELD(cfg,isreflect)
+    GET_ONE_FIELD(cfg,fluxout)
     GET_ONE_FIELD(cfg,isspecular)
     GET_ONE_FIELD(cfg,ismomentum)
     GET_ONE_FIELD(cfg,issaveexit)
@@ -373,6 +385,10 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	if(arraydim[0]<=0 || arraydim[1]!=4)
             MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
         double *val=mxGetPr(item);
+	for(i=0;i<mesh->ne;i++)
+	  for(j=0;j<4;j++)
+	    if(val[j*mesh->ne+i]==0)
+	      val[j*mesh->ne+i]=-(++mesh->nf);
         mesh->ne=arraydim[0];
 	if(mesh->facenb) free(mesh->facenb);
         mesh->facenb=(int4 *)malloc(sizeof(int4)*mesh->ne);
@@ -380,6 +396,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
           for(i=0;i<mesh->ne;i++)
              ((int *)(&mesh->facenb[i]))[j]=val[j*mesh->ne+i];
         printf("mmc.facenb=%d;\n",mesh->ne);
+	printf("mmc.face=%d;\n",mesh->nf);
     }else if(strcmp(name,"evol")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -559,6 +576,11 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate);
      else
         mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate);
+
+     if(cfg->fluxout){
+	if(mesh->fluxout)	free(mesh->fluxout);
+	mesh->fluxout=(double*)calloc(mesh->nf*sizeof(double),cfg->maxgate);
+     }
 
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
