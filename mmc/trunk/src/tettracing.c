@@ -745,7 +745,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
 
 	/*initialize the photon parameters*/
+	do {
         launchphoton(cfg, &r, mesh, ran, ran0);
+	} while(r.weight < EPS);
 	r.partialpath[visit->reclen-2] = r.weight;
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
