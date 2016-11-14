@@ -1,5 +1,5 @@
 
-mua=0.005;
+mua=0.01;
 tstep=1e-10;
 gatenum=50;
 
@@ -24,3 +24,6 @@ facelabel=round(log10(cwfacedata+eps));
 
 figure(1);
 plotmesh(node,[face,facelabel])
+
+figure(2);
+plotmesh(node,log10(cwfacedata+eps));

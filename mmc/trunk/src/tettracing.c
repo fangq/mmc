@@ -844,10 +844,11 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			if(cfg->fluxout && r.eid<0){							/*when enable saving outgoing flux*/
 				int tshift=MIN( ((int)((r.photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nf;
 				int index=tshift-r.eid-1;
-				if(index<cfg->maxgate*mesh->nf)
+//				if(index<cfg->maxgate*mesh->nf)
+				if(r.eid >= -mesh->nf)
 					tracer->mesh->fluxout[index]+=r.weight;
 				else
-					fprintf(stdout,"%d\t%d\t%d\n",-r.eid,(int)((r.photontimer-cfg->tstart)*visit->rtstep),index);
+					fprintf(stdout,"%d\t%d\n",-r.eid,(int)((r.photontimer-cfg->tstart)*visit->rtstep));
 //				tracer->mesh->fluxout[-r.eid-1+tshift]+=r.weight;
 			}
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
