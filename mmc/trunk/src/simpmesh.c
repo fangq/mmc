@@ -231,7 +231,7 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	for(i=0;i<mesh->ne;i++){
 		if(fscanf(fp,"%d %f",&tmp,mesh->evol+i)!=2)
 			mesh_error("mesh file has wrong format");
-                if(mesh->type[i]==0)
+                if(mesh->type[i]<=0)
 			continue;
 		ee=(int *)(mesh->elem+i);
 		for(j=0;j<4;j++)
