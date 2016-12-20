@@ -573,6 +573,16 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }
+     /*make medianum+1 the same as medium 0*/
+     if(cfg->isextdet){
+         mesh->med=(medium *)realloc(mesh->med, sizeof(medium)*(mesh->prop+2));
+         memcpy(mesh->med+mesh->prop+1,mesh->med,sizeof(medium));
+         for(i=0;i<mesh->ne;i++){
+             if(mesh->type[i]==-2)
+                   mesh->type[i]=mesh->prop+1;
+         }
+     }
+
      if(cfg->issavedet && cfg->detnum==0) 
       	cfg->issavedet=0;
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
