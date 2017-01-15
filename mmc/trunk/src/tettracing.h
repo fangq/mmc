@@ -47,6 +47,7 @@ typedef struct MMC_ray{
 	int nexteid;
 	float weight;
 	float photontimer;
+	float slen0;
 	float slen;
 	float Lmove;
 	double Eabsorb;
