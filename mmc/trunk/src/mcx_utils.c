@@ -708,9 +708,12 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         MMC_ERROR(-2,"the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
-     if(cfg->issavedet && cfg->detnum==0) 
-      	cfg->issavedet=0;
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
+}
+
+void mcx_prep(mcconfig *cfg){
+     if(cfg->issavedet && cfg->detnum==0 && cfg->isextdet==0) 
+      	cfg->issavedet=0;
      if(cfg->issavedet==0){
         cfg->ismomentum=0;
         cfg->issaveexit=0;

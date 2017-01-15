@@ -582,7 +582,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }
-     if(cfg->issavedet && cfg->detnum==0) 
+     if(cfg->issavedet && cfg->detnum==0 && cfg->isextdet==0) 
       	cfg->issavedet=0;
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
      if(cfg->issavedet==0){

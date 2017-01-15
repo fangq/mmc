@@ -195,6 +195,7 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg);
 int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
+void mcx_prep(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
   #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
