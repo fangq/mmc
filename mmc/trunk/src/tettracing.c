@@ -82,7 +82,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	medium *prop;
 	int *ee;
 	int i,tshift,eid,faceidx=-1;
-	float w[6],Rv,ww,currweight,dlen=0.f,rc; /*dlen is the physical distance*/
+	float w[6],Rv,ww,currweight,dlen=0.f,rc,mus; /*dlen is the physical distance*/
 	unsigned int *wi=(unsigned int*)w;
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
 	float Lp0=0.f,ratio;
@@ -100,6 +100,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	rc=prop->n*R_C0;
         currweight=r->weight;
+	mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
 #ifdef MMC_USE_SSE
 	{
@@ -140,7 +141,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         //if(cfg->debuglevel&dlTracingExit) MMC_FPRINTF(cfg->flog,"exit point %f %f %f\n",r->pout.x,r->pout.y,r->pout.z);
 
 			Lp0=dist(&(r->p0),&(r->pout));
-			dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
+			dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 			faceidx=i;
 			r->faceid=faceorder[i];
 
@@ -171,13 +172,13 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
-
+                if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-		r->weight*=expf(-prop->mua*r->Lmove);
+	           r->weight*=expf(-prop->mua*r->Lmove);
 #else
-		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	           r->weight*=fast_expf9(-prop->mua*r->Lmove);
 #endif
-
+                }
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
@@ -186,12 +187,20 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                     currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
-		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		    currweight=r->Lmove;
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
                 }
-		r->slen-=r->Lmove*prop->mus;
+		r->slen-=r->Lmove*mus;
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
+		    if(r->slen0<EPS)
+			currweight=1;
+		    else
+			currweight=r->Lmove*mus/r->slen0;
+		    currweight*=cfg->replayweight[r->photonid];
+		    currweight+=r->weight;
+		}
                 r->p0.x+=r->Lmove*r->vec.x;
                 r->p0.y+=r->Lmove*r->vec.y;
                 r->p0.z+=r->Lmove*r->vec.z;
@@ -201,9 +210,13 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         ww=currweight-r->weight;
                         r->Eabsorb+=ww;
                         r->photontimer+=r->Lmove*rc;
-                        tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
+			if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+				tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
+			else
+                        	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
+                        if(cfg->mcmethod==mmMCX)
 #pragma omp atomic
-			tracer->mesh->weight[eid+tshift]+=ww;
+		 	    tracer->mesh->weight[eid+tshift]+=ww;
 		}else{
 	                if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"Y [%f %f %f %f]\n",
         	              baryout[0],baryout[1],baryout[2],baryout[3]);
@@ -216,7 +229,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  r->Eabsorb+=ww;
 				  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
 				      ww/=prop->mua;
-                        	  tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
+				  if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+				      tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
+				  else
+                        	      tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
 
                         	  if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                         	     r->p0.x-(r->Lmove*0.5f)*r->vec.x,r->p0.y-(r->Lmove*0.5f)*r->vec.y,r->p0.z-(r->Lmove*0.5f)*r->vec.z,ww,eid+1,dlen);
@@ -225,7 +241,8 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                		  for(i=0;i<4;i++)
+                                  if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
+                		    for(i=0;i<4;i++)
 #pragma omp atomic
                      			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
 				}
@@ -246,7 +263,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				}
 			}
 		}
-		if(r->faceid==-2)
+	        if(r->faceid==-2)
 		   return 0.f;
         }
 	return r->slen;
@@ -291,7 +308,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
 	float barypout[4] __attribute__ ((aligned(16)));
-	float rc,currweight,dlen,ww,Lp0;
+	float rc,currweight,dlen,ww,Lp0,mus;
 	int i,j,k,tshift,*enb=NULL,*nextenb=NULL,eid;
 	__m128 O,T,S;
 
@@ -307,6 +324,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	rc=prop->n*R_C0;
         currweight=r->weight;
+        mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
@@ -317,7 +335,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	   if(havel_sse4(tracer->m+eid*12+i*3,&bary,O,T)){
 
 		r->faceid=faceorder[i];
-	   	dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
+	   	dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 		Lp0=bary.x;
 		r->isend=(Lp0>dlen);
 		r->Lmove=((r->isend) ? dlen : Lp0);
@@ -343,12 +361,13 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
+                if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-		r->weight*=expf(-prop->mua*r->Lmove);
+		   r->weight*=expf(-prop->mua*r->Lmove);
 #else
-		r->weight*=fast_expf9(-prop->mua*r->Lmove);
+		   r->weight*=fast_expf9(-prop->mua*r->Lmove);
 #endif
-
+                }
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
@@ -357,12 +376,20 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                     currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
-		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		    currweight=r->Lmove;
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
                 }
-		r->slen-=r->Lmove*prop->mus;
+		r->slen-=r->Lmove*mus;
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
+		    if(r->slen0<EPS)
+			currweight=1;
+		    else
+			currweight=r->Lmove*mus/r->slen0;
+		    currweight*=cfg->replayweight[r->photonid];
+		    currweight+=r->weight;
+		}
 	        if(bary.x==0.f){
 			break;
 		}
@@ -374,7 +401,11 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                      ww/=prop->mua;
 		}
-                tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
+		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		else
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 
                 if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
@@ -425,15 +456,17 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		//if(cfg->debuglevel&dlBary)
 		//    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
-		if(!cfg->basisorder)
+                if(cfg->mcmethod==mmMCX){
+		  if(!cfg->basisorder)
 		    tracer->mesh->weight[eid+tshift]+=ww;
-		else{
-		  T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
-		  _mm_store_ps(barypout,T);
+		  else{
+		    T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
+		    _mm_store_ps(barypout,T);
 
-		  for(j=0;j<4;j++)
+		    for(j=0;j<4;j++)
 #pragma omp atomic
-		    tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+		       tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+		  }
 		}
 		break;
 	   }
@@ -498,12 +531,15 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	}*/
 	if(r->faceid>=0){
 	    medium *prop;
-	    int *ee=(int *)(tracer->mesh->elem+eid);;
+	    int *ee=(int *)(tracer->mesh->elem+eid);
+	    float mus;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    rc=prop->n*R_C0;
             currweight=r->weight;
 
-	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
+            mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
+
+	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
@@ -516,12 +552,13 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
+            if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-	    r->weight*=expf(-prop->mua*r->Lmove);
+	       r->weight*=expf(-prop->mua*r->Lmove);
 #else
-	    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	       r->weight*=fast_expf9(-prop->mua*r->Lmove);
 #endif
-
+            }
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
@@ -530,34 +567,48 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 #endif
                 currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
-	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		currweight=r->Lmove;
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
             }
-	    r->slen-=r->Lmove*prop->mus;
+	    r->slen-=r->Lmove*mus;
+	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
+		if(r->slen0<EPS)
+		    currweight=1;
+		else
+		    currweight=r->Lmove*mus/r->slen0;
+		currweight*=cfg->replayweight[r->photonid];
+		currweight+=r->weight;
+	    }
 	    if(bary.x>=0.f){
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
-	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
+		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		else
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
         	r->p0.x+=r->Lmove*r->vec.x;
        		r->p0.y+=r->Lmove*r->vec.y;
         	r->p0.z+=r->Lmove*r->vec.z;
-		if(!cfg->basisorder){
+                if(cfg->mcmethod==mmMCX){
+		  if(!cfg->basisorder){
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
-		}else{
+		  }else{
 	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                            ww/=prop->mua;
                         ww*=1.f/3.f;
 			for(i=0;i<3;i++)
 #pragma omp atomic
 				tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+		  }
 		}
 	    }
 	}
@@ -625,9 +676,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid);;
+	    float mus;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    rc=prop->n*R_C0;
             currweight=r->weight;
+            mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
             enb=(int *)(tracer->mesh->facenb+eid);
             r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
@@ -635,7 +688,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
-	    dlen=(prop->mus <= EPS) ? R_MIN_MUS : r->slen/prop->mus;
+	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
@@ -652,12 +705,13 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
+            if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-	    r->weight*=expf(-prop->mua*r->Lmove);
+	       r->weight*=expf(-prop->mua*r->Lmove);
 #else
-	    r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	       r->weight*=fast_expf9(-prop->mua*r->Lmove);
 #endif
-
+            }
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
@@ -666,28 +720,41 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 #endif
                 currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
-	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otTaylor){
+	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
 		currweight=r->Lmove;
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
             }
-	    r->slen-=r->Lmove*prop->mus;
+	    r->slen-=r->Lmove*mus;
+	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
+		if(r->slen0<EPS)
+		    currweight=1;
+		else
+		    currweight=r->Lmove*mus/r->slen0;
+		currweight*=cfg->replayweight[r->photonid];
+		currweight+=r->weight;
+	    }
 	    if(bary.x>=0.f){
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*
-	             (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
+		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		else
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
-		if(!cfg->basisorder){
+                if(cfg->mcmethod==mmMCX){
+		  if(!cfg->basisorder){
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
-		}else{
+		  }else{
 			int i;
 	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                            ww/=prop->mua;
@@ -695,6 +762,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			for(i=0;i<3;i++)
 #pragma omp atomic
 				tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+		  }
 		}
 	    }
 	}
@@ -731,7 +799,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
 
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
@@ -756,7 +824,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
-	kahany=r.weight-visit->kahanc;
+	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP))
+		kahany=cfg->replayweight[r.photonid]-visit->kahanc;	/* when replay mode, accumulate detected photon weight */
+	else
+		kahany=r.weight-visit->kahanc;
 	kahant=visit->totalweight + kahany;
 	visit->kahanc=(kahant - visit->totalweight) - kahany;
 	visit->totalweight=kahant;
@@ -871,9 +942,12 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
             mom=0.f;
-	    r.slen=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
-		if(cfg->outputtype==otWP)
-			save_scatter_events(&r,mesh,cfg,visit);
+	    r.slen0=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
+	    r.slen=r.slen0;
+            if(cfg->mcmethod!=mmMCX)
+                  albedoweight(&r,mesh,cfg,visit);
+//	    if(cfg->outputtype==otWP)
+//                save_scatter_events(&r,mesh,cfg,visit);
             if(cfg->ismomentum && mesh->type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
                   r.partialpath[(mesh->prop<<1)-1+mesh->type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
             r.partialpath[mesh->type[r.eid-1]-1]++;                          /*the first medianum block stores the scattering event counts*/
@@ -1160,13 +1234,38 @@ void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	int *ee = (int *)(mesh->elem+eid);
     	int i,tshift;
 	if(!cfg->basisorder){
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
 #pragma omp atomic
 		mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
+	}else{
+		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
+		for(i=0;i<4;i++)
+#pragma omp atomic
+			mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
+	}
+}
+
+void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
+	float *baryp0=&(r->bary0.x);
+	int eid = r->eid-1;
+	int *ee = (int *)(mesh->elem+eid);
+    	int i,tshift;
+	medium * prop=mesh->med+(mesh->type[eid]);
+        float ww=r->weight;
+
+        r->weight*=prop->mus/(prop->mua+prop->mus);
+
+        ww-=r->weight;
+	r->Eabsorb+=ww;
+
+	if(!cfg->basisorder){
+		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+#pragma omp atomic
+		mesh->weight[eid+tshift]+=ww;
 	}else{
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
 		for(i=0;i<4;i++)
 #pragma omp atomic
-			mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
+			mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
 	}
 }

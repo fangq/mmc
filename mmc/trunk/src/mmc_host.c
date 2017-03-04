@@ -65,6 +65,7 @@ int mmc_cleanup(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         return 0;
 }
 int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
+        mcx_prep(cfg);
 	tracer_init(tracer,mesh,cfg->method);
 	tracer_prep(tracer,cfg);
         return 0;

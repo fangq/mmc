@@ -46,7 +46,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','m','F','q','x','P','k','v','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--savedet",
@@ -55,7 +55,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
-                 "--replaydet","--voidtime","--version",""};
+                 "--replaydet","--voidtime","--version","--mc",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -114,12 +114,15 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->photonseed=NULL;
      cfg->replaydet=0;
      cfg->replayweight=NULL;
+     cfg->replaytime=NULL;
      cfg->isextdet=0;
      cfg->srcdir.w=0.f;
 
      cfg->tstart=0.f;
      cfg->tstep=0.f;
      cfg->tend=0.f;
+
+     cfg->mcmethod=mmMCX;
 
      memset(&(cfg->his),0,sizeof(history));
      cfg->his.version=1;
@@ -148,6 +151,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->photonseed);
      if(cfg->replayweight)
         free(cfg->replayweight);
+     if(cfg->replaytime)
+        free(cfg->replaytime);
      if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)
         fclose(cfg->flog);
      mcx_initcfg(cfg);
@@ -709,9 +714,12 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         MMC_ERROR(-2,"the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
-     if(cfg->issavedet && cfg->detnum==0) 
-      	cfg->issavedet=0;
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
+}
+
+void mcx_prep(mcconfig *cfg){
+     if(cfg->issavedet && cfg->detnum==0 && cfg->isextdet==0) 
+      	cfg->issavedet=0;
      if(cfg->issavedet==0){
         cfg->ismomentum=0;
         cfg->issaveexit=0;
@@ -775,8 +783,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->issavedet),"bool");
 		     	        break;
 		     case 'm':
-		                i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");
-				if (cfg->ismomentum) cfg->issavedet=1;
+		                i=mcx_readarg(argc,argv,i,&(cfg->mcmethod),"int");
 				break;
 		     case 'x':
 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveexit),"bool");
@@ -862,6 +869,13 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                      case 'k':
                                 i=mcx_readarg(argc,argv,i,&(cfg->voidtime),"int");
                                 break;
+                     case '-':  /*additional verbose parameters*/
+                                if(strcmp(argv[i]+2,"momentum")){
+		                     i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");
+                                     if (cfg->ismomentum) cfg->issavedet=1;
+                                }else
+                                     MMC_FPRINTF(cfg->flog,"unknown verbose option: --%s\n",argv[i]+2);
+                                break;
                      default:
 				MMC_ERROR(-1,"unsupported command line option");
 		}
@@ -876,7 +890,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		MMC_FPRINTF(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
-     if((cfg->outputtype==otJacobian || cfg->outputtype==otTaylor) && cfg->seed!=SEED_FROM_FILE)
+     if((cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP) && cfg->seed!=SEED_FROM_FILE)
          MMC_ERROR(-1,"Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
        if(isinteractive){
@@ -921,7 +935,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
- -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
+ -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC\n\
+    [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
