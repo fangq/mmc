@@ -57,7 +57,7 @@ ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
 endif
 ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
-    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    MKMEXOPT    =-f mexopts_cygwin64_gcc.bat COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
     DLLFLAG     =
 endif
 

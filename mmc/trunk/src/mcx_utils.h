@@ -46,10 +46,12 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
                   dlProgress=2048,dlExit=4096};
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
+enum TMCMethod {mmMCX, mmMCML};
+
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
-enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otTaylor, otWP, otWL};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 
 /***************************************************************************//**
@@ -149,10 +151,13 @@ typedef struct MMC_config{
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
         char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
         char outputformat;  /**<'ascii' output is text, 'bin': binary, 'json': regular json, 'ubjson': universal binary json*/
+
+	int  mcmethod;      /**<0 use MCX-styled MC (micro-Beer-Lambert law), 1 use MCML-styled MC (Albedo-Weight)*/
+
 	float roulettesize; /**<number of roulette for termination*/
         float minenergy;    /**<minimum energy to propagate photon*/
 	float nout;         /**<refractive index for the domain outside the mesh*/
-        int isextdet;      /**<if 1, there is external wide-field detector (marked by -2 in the mesh)*/
+        int isextdet;       /**<if 1, there is external wide-field detector (marked by -2 in the mesh)*/
         FILE *flog;         /**<stream handle to print log information*/
         char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
@@ -161,6 +166,7 @@ typedef struct MMC_config{
 	unsigned int checkpt[MAX_CHECKPOINT]; /**<a list of photon numbers at which a snapshot of the weights will be saved*/
 	void *photonseed;
 	float *replayweight;
+	float *replaytime;
         char seedfile[MAX_PATH_LENGTH];
 } mcconfig;
 
@@ -190,6 +196,7 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg);
 int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
+void mcx_prep(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
   #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
@@ -215,7 +222,8 @@ int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 #ifdef __cplusplus
 extern "C"
 #endif
-  int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+  int  mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+  void mcx_matlab_flush(void);
 #endif
 
 

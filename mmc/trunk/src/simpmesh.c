@@ -288,10 +288,11 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
     cfg->seed=SEED_FROM_FILE;
     cfg->nphoton=his.savedphoton;
 
-    if(cfg->outputtype==otJacobian || cfg->outputtype==otTaylor || cfg->replaydet>0){
+    if(cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP || cfg->replaydet>0){
        int i,j;
        float *ppath=(float*)malloc(his.savedphoton*his.colcount*sizeof(float));
        cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));
+       cfg->replaytime=(float*)malloc(his.savedphoton*sizeof(float));
        fseek(fp,sizeof(his),SEEK_SET);
        if(fread(ppath,his.colcount*sizeof(float),his.savedphoton,fp)!=his.savedphoton)
            MESH_ERROR("error when reading the seed data");
@@ -301,18 +302,17 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
            if(cfg->replaydet==0 || cfg->replaydet==(int)(ppath[i*his.colcount])){
                memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
                cfg->replayweight[cfg->nphoton]=1.f;
-               if(cfg->outputtype==otWP || cfg->outputtype==otWL){
-                  for(j=2;j<his.maxmedia+2;j++)
-                     cfg->replayweight[cfg->nphoton]*=expf(-(mesh->med[j-1].mua+mesh->med[j-1].mus)*ppath[i*his.colcount+j]*his.unitinmm);
-               }else{
-                  for(j=2;j<his.maxmedia+2;j++)
-                     cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
-               }
-               cfg->nphoton++;
+               for(j=2;j<his.maxmedia+2;j++)
+                 cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
+               cfg->replaytime[cfg->nphoton]=0.f;
+               for(j=2;j<his.maxmedia+2;j++)
+                 cfg->replaytime[cfg->nphoton]+=mesh->med[j-1].n*ppath[i*his.colcount+j]*R_C0;
+           cfg->nphoton++;
            }
 	free(ppath);
         cfg->photonseed=realloc(cfg->photonseed, cfg->nphoton*his.seedbyte);
         cfg->replayweight=(float*)realloc(cfg->replayweight, cfg->nphoton*sizeof(float));
+	cfg->replaytime=(float*)realloc(cfg->replaytime, cfg->nphoton*sizeof(float));
 	cfg->minenergy=0.f;
     }
     fclose(fp);
@@ -701,11 +701,11 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
-	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otTaylor || cfg->outputtype==otWP || cfg->outputtype==otWL)){
+	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
-            if(cfg->outputtype==otTaylor || cfg->outputtype==otWP  || cfg->outputtype==otWL)
-               normalizor=1.f/cfg->nphoton; /*DELTA_MUA is not used in this mode*/
+            if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+               normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
 
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
