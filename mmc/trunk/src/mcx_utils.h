@@ -214,7 +214,8 @@ int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 #ifdef __cplusplus
 extern "C"
 #endif
-  int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+  int  mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum);
+  void mcx_matlab_flush(void);
 #endif
 
 

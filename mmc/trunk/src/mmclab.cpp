@@ -611,3 +611,11 @@ extern "C" int mmc_throw_exception(const int id, const char *msg, const char *fi
 void mmclab_usage(){
      printf("Usage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
 }
+
+extern "C" void mcx_matlab_flush(){
+#ifndef MATLAB_MEX_FILE
+	mexEvalString("fflush(stdout);");
+#else
+	mexEvalString("pause(.0001);");
+#endif
+}
