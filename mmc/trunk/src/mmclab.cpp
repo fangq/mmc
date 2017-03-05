@@ -358,6 +358,18 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
           for(i=0;i<mesh->ne;i++)
              ((int *)(&mesh->elem[i]))[j]=val[j*mesh->ne+i];
         printf("mmc.ne=%d;\n",mesh->ne);
+    }else if(strcmp(name,"elem2")==0){
+        arraydim=mxGetDimensions(item);
+	if(arraydim[0]<=0 || arraydim[1]!=6)
+            MEXERROR("the 'elem2' field must have 6 columns (e1,e2,e3,e4,e5,e6)");
+        double *val=mxGetPr(item);
+        mesh->ne=arraydim[0];
+	if(mesh->elem2) free(mesh->elem2);
+        mesh->elem2=(int *)calloc(sizeof(int)*6,mesh->ne);
+        for(j=0;j<6;j++)
+          for(i=0;i<mesh->ne;i++)
+             mesh->elem2[i*6+j]=val[j*mesh->ne+i];
+        printf("mmc.elem2=<%d>;\n",mesh->ne);
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -532,7 +544,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 }
 
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
-     int i,j,*ee;
+     int i,j,*ee,*ee2;
      if(cfg->nphoton<=0){
          MEXERROR("cfg.nphoton must be a positive number");
      }
@@ -557,9 +569,21 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      for(i=0;i<mesh->ne;i++){
         if(mesh->type[i]<=0)
 		continue;
-     	ee=(int *)(mesh->elem+i);
-     	for(j=0;j<4;j++)
+
+	if(cfg->basisorder==2){
+	    ee =(int *)(mesh->elem+i);
+	    ee2=(int *)(mesh->elem2+i*6);
+     	    for(j=0;j<4;j++)
+     	   	mesh->nvol[ee[j]-1]+=-mesh->evol[i]*0.05f;
+     	    for(j=0;j<6;j++){
+	        if(i==1) printf("%d\n",ee2[j]);
+     	   	mesh->nvol[ee2[j]-1]+=mesh->evol[i]*0.20f;
+	    }
+	}else{
+            ee=(int *)(mesh->elem+i);
+     	    for(j=0;j<4;j++)
      	   	mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
+	}
      }
      if(mesh->weight)
         free(mesh->weight);

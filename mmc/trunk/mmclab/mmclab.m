@@ -194,8 +194,25 @@ for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
         error('cfg.node or cfg.elem is missing');
     end
+    if(~isfield(cfg(i),'basisorder') ||isempty(cfg(i).basisorder) )
+        cfg(i).basisorder=1;
+    end
     if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
+    end
+    if(cfg(i).basisorder==2)
+        if(~isfield(cfg(i),'elemprop') && size(cfg(i).elem,2)>10)
+            cfg(i).elemprop=cfg(i).elem(:,11);
+            cfg(i).elem2=cfg(i).elem(:,5:10);
+            cfg(i).elem =cfg(i).elem(:,1:4);
+        end
+        if(~isfield(cfg(i),'elem2') && size(cfg(i).elem,2)<10)
+            [newnode,cfg(i).elem2]=highordertet(cfg(i).node,cfg(i).elem(:,1:4),cfg(i).basisorder);
+            cfg(i).elem2=cfg(i).elem2+size(cfg(i).node,1);
+            cfg(i).node=[cfg(i).node; newnode];
+        end
+    elseif(cfg(i).basisorder>2)
+        error('basisorder higher than 2 is not supported');
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
         cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
@@ -298,8 +315,17 @@ end
 
 if(mmcout>=2)
   for i=1:length(varargout{2})
+      newdetp=struct;
+      if(cfg(i).basisorder==2)
+          newdetp.elem2=cfg(i).elem2;
+          newdetp.node=cfg(i).node;
+      end
       medianum=size(cfg(i).prop,1)-1;
       detp=varargout{2}(i).data;
+      if(isempty(detp))
+          newdetpstruct(i)=newdetp;
+          continue;
+      end
       col=size(detp);
       newdetp.detid=int32(detp(1,:))';
       newdetp.nscat=int32(detp(2:medianum+1,:))';    % 1st medianum block is num of scattering

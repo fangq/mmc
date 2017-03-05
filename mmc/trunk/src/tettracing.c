@@ -258,7 +258,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                                       if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
 				          for(i=0;i<4;i++)
 #pragma omp atomic
-                     			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+                     			  tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
 				  }
 				}
 				if(r->isend){
