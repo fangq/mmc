@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 #include <string.h>
+#include <sys/stat.h>
 #include "highordermesh.h"
 
 #ifdef WIN32
@@ -61,8 +62,10 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_loadnode(mesh,cfg);
         mesh_loadelem(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
-	if(cfg->basisorder==2)
+	if(cfg->basisorder==2){
 	  mesh_10nodetet(mesh,cfg);
+          mesh_save10nodetet(mesh,cfg);
+	}
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
 	if(cfg->seed==SEED_FROM_FILE && cfg->seedfile[0]){
@@ -761,3 +764,36 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	}
 	return normalizor;
 }
+
+void mesh_save10nodetet(tetmesh *mesh, mcconfig *cfg){
+     FILE *fp;
+     struct stat buf;
+     char fname[MAX_PATH_LENGTH];
+     int i;
+
+     mesh_filenames("node2_%s.dat",fname,cfg);
+     if(stat(fname,&buf)){
+         if((fp=fopen(fname,"wt"))==NULL){
+	     fprintf(cfg->flog,"WARNING: can not save 2nd-order node file for post processing.\n");
+         }else{
+             fprintf(fp,"1\t%d\n",mesh->nn);
+             for (i=0; i<mesh->nn; i++)
+                 fprintf(fp, "%d\t%.10e\t%.10e\t%.10e\n",i+1,mesh->node[i].x,mesh->node[i].y,mesh->node[i].z);
+             fclose(fp);
+         }
+     }
+
+     mesh_filenames("elem2_%s.dat",fname,cfg);
+     if(stat(fname,&buf)){
+         if((fp=fopen(fname,"wt"))==NULL){
+	     fprintf(cfg->flog,"WARNING: can not save 2nd-order elem file for post processing.\n");
+         }else{
+             fprintf(fp,"1\t%d\n",mesh->ne);
+             for (i=0; i<mesh->ne; i++)
+                 fprintf(fp, "%d\t%d\t%d\t%d\t%d\t%d\t%d\n",i+1,mesh->elem2[i*6],mesh->elem2[i*6+1],mesh->elem2[i*6+2],
+	                 mesh->elem2[i*6+3],mesh->elem2[i*6+4],mesh->elem2[i*6+5]);
+             fclose(fp);
+         }
+     }
+}
+
