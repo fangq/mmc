@@ -10,7 +10,8 @@ function [Ja, newcfg]=mmcjmua(cfg,detp,seeds,detnum)
 %
 % input:
 %     cfg: the simulation configuration structure used for the initial MC simulation by mmclab
-%	  detp: detector readings from the initial MC simulation
+%	  detp: detector readings from the initial MC simulation, must be a
+%	        structure (supported after MMC v2016.4)
 %     seeds: detected photon seeds from the initial MC simulation
 %     detnum: the detector number whose detected photons will be replayed
 %
@@ -40,7 +41,7 @@ newcfg.seed=seeds.data(:,detp.detid==newcfg.replaydet);
 detp.data=detp.data(:,detp.detid==newcfg.replaydet);
 
 % calculate the detected photon weight and arrival time
-newcfg.replayweight=mmcdetweight(detp,newcfg.prop);
+newcfg.replayweight=mmcdetweight(detp.data,newcfg.prop);
 newcfg.replaytime=mmcdettime(detp.data,newcfg.prop);
 
 % specify output type
