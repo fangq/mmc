@@ -819,9 +819,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
 
 	/*initialize the photon parameters*/
-	do{
         launchphoton(cfg, &r, mesh, ran, ran0);
-	} while(r.weight<EPS);
 	r.partialpath[visit->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
@@ -1042,17 +1040,19 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		if(r->eid>0)
 		      return;
 	}else if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
-		float rx=rand_uniform01(ran);
-		float ry=rand_uniform01(ran);
-		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
-		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
-		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
-		r->weight=1.f;
-		if(cfg->srctype==stPattern){
+               do{
+		  float rx=rand_uniform01(ran);
+		  float ry=rand_uniform01(ran);
+		  r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
+		  r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
+		  r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
+		  r->weight=1.f;
+		  if(cfg->srctype==stPattern){
 			r->weight=cfg->srcpattern[MIN( (int)(ry*cfg->srcparam2.w), (int)cfg->srcparam2.w-1 )*(int)(cfg->srcparam1.w)+MIN( (int)(rx*cfg->srcparam1.w), (int)cfg->srcparam1.w-1 )];
-		}else if(cfg->srctype==stFourier){
+		  }else if(cfg->srctype==stFourier){
 			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
-		}
+		  }
+                }while(r->weight<EPS);
 		origin.x+=(cfg->srcparam1.x+cfg->srcparam2.x)*0.5f;
 		origin.y+=(cfg->srcparam1.y+cfg->srcparam2.y)*0.5f;
 		origin.z+=(cfg->srcparam1.z+cfg->srcparam2.z)*0.5f;
