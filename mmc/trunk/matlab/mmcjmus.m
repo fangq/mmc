@@ -10,7 +10,7 @@ function [Jmus, Jmua]=mmcjmus(cfg,detp,seeds,detnum)
 %
 % input:
 %     cfg: the simulation configuration structure used for the initial MC simulation by mmclab
-%	  detp: detector readings from the initial MC simulation
+%     detp: detector readings from the initial MC simulation
 %     seeds: detected photon seeds from the initial MC simulation
 %     detnum: the detector number whose detected photons will be replayed
 %
@@ -63,9 +63,8 @@ jacob.data=jacob.data./repmat(musmap(:),1,size(jacob.data,2));
 jacob.data(musmap<0)=0;
 
 % validate if the replay is successful
-detp.data=detp.data(:,detp.detid==newcfg.replaydet);
 
-if(all(ismember(round(detp.data'*1e10)*1e-10,round(detp2.data'*1e10)*1e-10,'rows')))
+if(all(ismember(round(detp2.data'*1e10)*1e-10,round(detp.data'*1e10)*1e-10,'rows')))
 	%disp('replay is successful :-)');
 	Jmus=Jmua+jacob.data;
 else
