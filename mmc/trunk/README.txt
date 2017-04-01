@@ -5,7 +5,7 @@
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.0-RC1 (v2016.5, Hot Cocoa)
+Version: 1.0-RC2 (v2017.3, Haw Flakes)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------
@@ -104,10 +104,11 @@ and for Fedora/Redhat based GNU/Linux systems, you can type
 To compile the binary with multi-threaded computing via OpenMP, 
 your gcc version should be at least 4.0. To compile the binary 
 supporting SSE4 instructions, gcc version should be at least 
-4.3.4. For windows users, you should install MinGW with a later 
-version of gcc [3]. You should also install LibGW32C library [4] 
-and copy the missing header files from GnuWin32\include\glibc
-to MinGW\include when you compile the code (these files typically include
+4.3.4. For windows users, you should install Cygwin64 [3]. During the 
+installation, please select mingw64-x86_64-gcc and make packages.
+You should also install LibGW32C library [4] and copy the missing 
+header files from GnuWin32\include\glibc to C:\cygwin64\usr\include
+when you compile the code (these files typically include
 ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
 and sys/ttydefaults.h). For Mac OS X users, you need to install the
 mp-gcc4.x series from MacPorts and use the instructions below to compile
@@ -116,16 +117,23 @@ the MMC source code.
 To compile the program, you should first navigate into the mmc/src folder,
 and type
 
-  make release
+  make
 
-this will compile a single-threaded, optimized binary under mmc/src/bin
-folder. Other "make" options include
+this will create a fully optimized, multi-threaded and SSE4 enabled 
+mmc executable, located under the mmc/bin/ folder.
+
+Other compilation options include
 
   make omp      # this compiles a multi-threaded binary using OpenMP
+  make release  # create a single-threaded optimized binary
   make prof     # this makes a binary to produce profiling info for gprof
   make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
   make ssemath  # this uses SSE4 for both vector operations and math functions
-  make          # this produces an non-optimized binary with debugging symbols
+
+if you want to generate a portable binary that does not require external 
+library files, you may use (only works for Linux and Windows with gcc)
+
+  make EXTRALIB="-static -lm" # similar to "make", except the binary includes all libraries
 
 if you wish to build the mmc mex file to be used in matlab, you should run
 
@@ -211,12 +219,13 @@ where possible parameters include (the first item in [] is the default value)
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
- -m [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
+ -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC
+    [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
- -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit
-                               J - Jacobian (replay mode),   T - approximated
-                               Jacobian (replay mode only)
+ -O [X|XFEJLP] (--outputtype)  X - fluence-rate, F - fluence, E -energy deposit
+                               J - Jacobian, L - weighted path length, P - 
+                               weighted scattering count (J,L,P: replay mode)
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'
  -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
@@ -228,8 +237,8 @@ where possible parameters include (the first item in [] is the default value)
                                the detected photon; the replay mode can be used
                                to calculate the Jacobian
  -P [0|int]    (--replaydet)   replay only the detected photons from a given 
-                               detector (det ID starts from 1), used with -E 
- -M [P|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
+                               detector (det ID starts from 1), use with -E 
+ -M [H|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
 			       H - Havel's SSE4 ray-tracing algorithm
 			       B - partial Badouel's method (used by TIM-OS)
@@ -417,12 +426,12 @@ where it expects you to double check.
 
 IV. Plotting the Results
 
-As described above, MMC produces a flux/fluence output file as
+As described above, MMC produces a fluence-rate output file as
 "session-id".dat. By default, this file contains the normalized,
-i.e. under unitary source, flux at each node of the mesh. The detailed
+i.e. under unitary source, fluence at each node of the mesh. The detailed
 interpretation of the output data can be found in [6]. If multiple 
 time-windows are defined, the output file will contain
-multiple blocks of data, with each block being the flux distribution
+multiple blocks of data, with each block being the fluence distribution
 at each node at the center point of each time-window. The total
 number of blocks equals to the total time-gate number.
 
@@ -493,7 +502,7 @@ In you are a user, please use our mmc-users mailing list to post
 questions or share experience regarding MMC. The mailing lists can be
 found from this link:
 
- http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/Portal
+ http://mcx.space/#community
 
 -------------------------------------------------------------------------------
 
@@ -615,7 +624,7 @@ VIII.  Reference
 
 [1] http://iso2mesh.sf.net  -- an image-based surface/volumetric mesh generator
 [2] http://mcx.sf.net       -- Monte Carlo eXtreme: a GPU-accelerated MC code
-[3] http://sourceforge.net/projects/mingw/files/GCC%20Version%204/
+[3] https://cygwin.com/setup-x86_64.exe
 [4] http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html
 [5] http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath
 [6] http://mcx.sf.net/cgi-bin/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data

@@ -7,7 +7,7 @@ Address: Qianqian Fang
          Northeastern University
          212A Lake Hall
          360 Huntington Ave, Boston, MA 02115, USA
-         Office:   503 Holmes Hall
+         Office:   223 ISEC
          Phone[O]: 617-373-3829
 URL: http://fanglab.org
 Email: <q.fang at neu.edu>
