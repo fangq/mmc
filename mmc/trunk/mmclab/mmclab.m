@@ -5,7 +5,7 @@ function varargout=mmclab(cfg,type)
 %          Copyright (c) 2010-2017 Qianqian Fang <q.fang at neu.edu>          %
 %                            http://mcx.space/#mmc                            %
 %                                                                             %
-%Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
+% Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
 %            Department of Bioengineering, Northeastern University            %
 %                                                                             %
 %               Research funded by NIH/NIGMS grant R01-GM114365               %
@@ -130,7 +130,7 @@ function varargout=mmclab(cfg,type)
 %== Output control ==
 %      cfg.issaveexit:  [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
 %      cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
-%      cfg.outputtype:  'fluence' - output fluence-rate
+%      cfg.outputtype:  'flux' - output fluence-rate
 %                       'fluence' - fluence, 
 %                       'energy' - energy deposit, 
 %                       'jacobian' - mua Jacobian (replay mode)
