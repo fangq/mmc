@@ -3,9 +3,9 @@ BINARY=mmc_sfmt
 
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-  FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c mmc mmc_host cjson/cJSON
+  FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c mmc mmc_host cjson/cJSON highordermesh
 else
-  FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc mmc mmc_host cjson/cJSON
+  FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc mmc mmc_host cjson/cJSON highordermesh
 endif
 
 #ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)

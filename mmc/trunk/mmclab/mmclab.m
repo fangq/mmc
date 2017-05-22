@@ -200,6 +200,10 @@ for i=1:len
     if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
+    if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
+        cfg(i).elem(:,1:4)=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+        cfg(i).isreoriented=1;
+    end
     if(cfg(i).basisorder==2)
         if(~isfield(cfg(i),'elemprop') && size(cfg(i).elem,2)>10)
             cfg(i).elemprop=cfg(i).elem(:,11);
@@ -213,10 +217,6 @@ for i=1:len
         end
     elseif(cfg(i).basisorder>2)
         error('basisorder higher than 2 is not supported');
-    end
-    if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
-        cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
-        cfg(i).isreoriented=1;
     end
     if(~isfield(cfg(i),'facenb') || isempty(cfg(i).facenb))
         cfg(i).facenb=faceneighbors(cfg(i).elem);
