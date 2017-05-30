@@ -910,10 +910,10 @@ void mcx_usage(char *exename){
      printf("\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
-#          Copyright (c) 2010-2016 Qianqian Fang <q.fang at neu.edu>          #\n\
-#                            http://mcx.space/mmc/                            #\n\
+#          Copyright (c) 2010-2017 Qianqian Fang <q.fang at neu.edu>          #\n\
+#                            http://mcx.space/#mmc                            #\n\
 #                                                                             #\n\
-#         Computational Imaging Laboratory (CIL) [http://fanglab.org]         #\n\
+#Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
 #            Department of Bioengineering, Northeastern University            #\n\
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
@@ -923,42 +923,51 @@ $Rev::       $ Last $Date::                       $ by $Author::              $\
 \n\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
- -i 	       (--interactive) interactive mode\n\
- -s sessionid  (--session)     a string used to tag all output file names\n\
- -f config     (--input)       read config from a file\n\
+\n\
+== Required option ==\n\
+ -f config     (--input)       read an input file in .inp or .json format\n\
+\n\
+== MC options ==\n\
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
- -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
+ -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC\n\
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
+ -u [1.|float] (--unitinmm)    define the mesh data length unit in mm\n\
+ -E [1648335518|int|mch](--seed) set random-number-generator seed;\n\
+                               if an mch file is followed, MMC \"replays\" \n\
+                               the detected photons; the replay mode can be used\n\
+                               to calculate the mua/mus Jacobian matrices\n\
+ -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
+                               detector (det ID starts from 1), use with -E \n\
+ -M [%c|PHBS]  (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+                               P - Plucker-coordinate ray-tracing algorithm\n\
+			       H - Havel's SSE4 ray-tracing algorithm\n\
+			       B - partial Badouel's method (used by TIM-OS)\n\
+			       S - branch-less Badouel's method with SSE\n\
+ -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
+ -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
+ -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
+\n\
+== Output options ==\n\
+ -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
+                               J - Jacobian, L - weighted path length, P -\n\
+                               weighted scattering count (J,L,P: replay mode)\n\
+ -s sessionid  (--session)     a string used to tag all output file names\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
- -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC\n\
-    [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save\n\
- -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant\n\
- -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
- -O [X|XFEJT]  (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
-                               J - Jacobian (replay mode),   T - approximated\n\
-                               Jacobian (replay mode only)\n\
- -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
- -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh\n\
+\n\
+== User IO options ==\n\
+ -i 	       (--interactive) interactive mode\n\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
- -E [0|int|mch](--seed)        set random-number-generator seed;\n\
-                               if an mch file is followed, MMC will \"replay\" \n\
-                               the detected photon; the replay mode can be used\n\
-                               to calculate the Jacobian\n\
- -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
-                               detector (det ID starts from 1), use with -E \n\
- -M [%c|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
-                               P - Plucker-coordinate ray-tracing algorithm\n\
-			       H - Havel's SSE4 ray-tracing algorithm\n\
-			       B - partial Badouel's method (used by TIM-OS)\n\
-			       S - branch-less Badouel's method with SSE\n\
+\n\
+== Debug options ==\n\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
  -D [''|MCBWDIOXATRPE]         1 M  photon movement info\n\
@@ -975,7 +984,11 @@ where possible parameters include (the first item in [] is the default value)\n\
                             2048 P  show progress bar\n\
                             4096 E  exit photon info\n\
       combine multiple items by using a string, or add selected numbers together\n\
-example:\n\
+\n\
+== Additional options ==\n\
+ --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
+\n\
+== Example ==\n\
        %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,
 #ifdef MMC_USE_SSE
 'H',

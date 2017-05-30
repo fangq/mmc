@@ -1,6 +1,21 @@
 Change Log
 
-== MMC 1.0-RC1 (v2016.5, Hot Cocoa) beta release, Qianqian Fang <q.fang at neu.edu> ==
+== MMC 1.0-RC2 (v2017.3, Haw Flakes) RC release, Qianqian Fang <q.fang at neu.edu> ==
+
+2017-03-30 [26fd658] fix a bug when replaying photons from multiple detectors
+2017-03-30 [c4a87df] avoid launching photons with 0 weight (for pattern with 0 values)
+2017-03-30 [c2e0e3c] function for calculating tpsf curve with detp data
+2017-03-04 [1eaed5f] flush printing message in mmclab
+2017-01-15 [b9b98c2] fix a bug that prevent external detector from detecting photons
+2016-11-05 [0d988d8] including mexopts file for compiling mmclab on windows
+2016-08-29 [f8101f6] resize mesh->med before use for widefield det
+2016-08-29 [1f6451f] make mmclab support widefield detectors
+2016-08-01 [d935226] implement time-dependent Jacobian under "replay" mode
+2016-07-24 [d11dde5] add MCML like MC for validation and replay
+2016-07-03 [b767e87] modular mmc main function, better interface with other programs
+2016-06-08 [2458363] autobuild support for windows
+
+== MMC 1.0-RC1 (v2016.5, Hot Cocoa) RC release, Qianqian Fang <q.fang at neu.edu> ==
 2016-06-01 output partial path, scattering count, exit position/dir as subfield in 2nd output of mmclab
 2016-05-31 remove double correction of length unit in mmc and mmclab
 2016-05-25 elegantly terminate mmclab when exception is shown, print error unit and line numbers
@@ -34,7 +49,7 @@ Change Log
 2015/02/06 initial implementation of mesh-retessellation based MMC for wide-field simulations
 2014/06/05 add Colin27 brain atlas example
 
-== MMC 0.9.5 (Wasabi Peas) stable release, Qianqian Fang <fangq at nmr.mgh.harvard.edu> ==
+== MMC 0.9.5 (Wasabi Peas) stable release, Qianqian Fang <q.fang at neu.edu> ==
 
 2013/12/22 WebMMC skeleton uploaded, allowing MMC to run inside a web browser
 2013/12/20 output static or dynamic libraries (libmmc.a/libmmc.so)
@@ -50,7 +65,7 @@ Change Log
 2012/01/25 support isotropic source, reading source types from JSON input
 
 
-== MMC 0.9.0 (Banana Pudding) stable release, Qianqian Fang <fangq at nmr.mgh.harvard.edu> ==
+== MMC 0.9.0 (Banana Pudding) stable release, Qianqian Fang <q.fang at neu.edu> ==
 
 2011/12/19 final release of 0.9.0
 2011/12/19 fix a critical bug in the Havel ray-tracer, all SSE4 binaries are effected
@@ -62,7 +77,7 @@ Change Log
 2011/08/24 fix an SFMT bug when initializing RNG seeds in multiple parallel threads
 
 
-== MMC 0.8.0 (Snow Cone) stable release, Qianqian Fang <fangq at nmr.mgh.harvard.edu> ==
+== MMC 0.8.0 (Snow Cone) stable release, Qianqian Fang <q.fang at neu.edu> ==
 
 2011/06/17 final release of 0.8.0
 2011/04/23 sync private dev branch to trunk, publish v0.8.pre in the SVN
@@ -84,7 +99,7 @@ Change Log
 2010/11/14 branch mmc source code for SSE implementation
 
 
-== MMC 0.4.0 (Pecan Pie) stable release, Qianqian Fang <fangq at nmr.mgh.harvard.edu> ==
+== MMC 0.4.0 (Pecan Pie) stable release, Qianqian Fang <q.fang at neu.edu> ==
 
 2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C, add documentation
 2010/12/13 fixed negative time difference by promoting time counter from int to long
@@ -98,7 +113,7 @@ Change Log
 2010/08/29 initial Windows support using MinGW and Libgw32c
 
 
-== MMC 0.2 (Cheese Cake) stable release, Qianqian Fang <fangq at nmr.mgh.harvard.edu> ==
+== MMC 0.2 (Cheese Cake) stable release, Qianqian Fang <q.fang at neu.edu> ==
 
 2010/08/29 first public release of MMC - v0.2
 2010/08/28 update examples to use iso2mesh 1.0 and MCX 0.4.9 options, remove unused input file format
