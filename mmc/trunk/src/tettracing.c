@@ -336,6 +336,8 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	medium *prop;
 	int *ee=(int *)(tracer->mesh->elem+eid);
+        int *ee2=(int *)(tracer->mesh->elem2+eid*6);
+
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	rc=prop->n*R_C0;
         currweight=r->weight;
@@ -477,10 +479,19 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		  else{
 		    T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
 		    _mm_store_ps(barypout,T);
-
-		    for(j=0;j<4;j++)
+		    if(cfg->basisorder==2){
+		        for(j=0;j<4;j++)
 #pragma omp atomic
-		       tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+			    tracer->mesh->weight[ee[j]-1+tshift]+=(2.f*barypout[j]-1.f)*barypout[j];
+		        for(j=0;j<6;j++)
+#pragma omp atomic
+			    tracer->mesh->weight[ee2[j]-1+tshift]+=4.f*barypout[edgepair[j][0]]*barypout[edgepair[j][1]];
+		    }else{
+                        if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
+		            for(j=0;j<4;j++)
+#pragma omp atomic
+     			        tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+		    }
 		  }
 		}
 		break;

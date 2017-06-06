@@ -19,7 +19,7 @@ cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='T';
 cfg.basisorder=2;
-cfg.method='P';
+%cfg.method='P';
 
 % run the simulation
 
