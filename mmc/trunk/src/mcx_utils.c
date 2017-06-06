@@ -46,7 +46,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--savedet",
@@ -55,7 +55,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
-                 "--replaydet","--voidtime","--version","--mc",""};
+                 "--replaydet","--voidtime","--version","--mc","--atomic",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -117,6 +117,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->replaytime=NULL;
      cfg->isextdet=0;
      cfg->srcdir.w=0.f;
+     cfg->isatomic=1;
 
      cfg->tstart=0.f;
      cfg->tstep=0.f;
@@ -660,7 +661,8 @@ int mcx_remap(char *opt){
     while(shortopt[i]!='\0'){
 	if(strcmp(opt,fullopt[i])==0){
 		opt[1]=shortopt[i];
-		opt[2]='\0';
+		if(shortopt[i]!='-')
+		    opt[2]='\0';
 		return 0;
 	}
 	i++;
@@ -870,9 +872,11 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                 i=mcx_readarg(argc,argv,i,&(cfg->voidtime),"int");
                                 break;
                      case '-':  /*additional verbose parameters*/
-                                if(strcmp(argv[i]+2,"momentum")){
+                                if(strcmp(argv[i]+2,"momentum")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");
                                      if (cfg->ismomentum) cfg->issavedet=1;
+                                }else if(strcmp(argv[i]+2,"atomic")==0){
+		                     i=mcx_readarg(argc,argv,i,&(cfg->isatomic),"bool");
                                 }else
                                      MMC_FPRINTF(cfg->flog,"unknown verbose option: --%s\n",argv[i]+2);
                                 break;
