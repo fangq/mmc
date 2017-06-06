@@ -40,7 +40,13 @@ else
         w0=detp(:,end);
     end
     detw=w0(:);
-    for i=1:medianum-1
-        detw=detw.*exp(-prop(i+1,1)*detp(:,i+medianum));
+    if(size(detp,2)>=2*medianum+1)
+        for i=1:medianum-1
+            detw=detw.*exp(-prop(i+1,1)*detp(:,i+medianum));
+        end
+    else
+        for i=1:medianum-1
+            detw=detw.*exp(-prop(i+1,1)*detp(:,i+2));
+        end
     end
 end
