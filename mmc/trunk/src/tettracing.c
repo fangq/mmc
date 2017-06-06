@@ -214,9 +214,13 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
 			else
                         	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
-                        if(cfg->mcmethod==mmMCX)
+                        if(cfg->mcmethod==mmMCX){
+                            if(cfg->isatomic)
 #pragma omp atomic
-		 	    tracer->mesh->weight[eid+tshift]+=ww;
+		 	        tracer->mesh->weight[eid+tshift]+=ww;
+                            else
+                                tracer->mesh->weight[eid+tshift]+=ww;
+                        }
 		}else{
 	                if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"Y [%f %f %f %f]\n",
         	              baryout[0],baryout[1],baryout[2],baryout[3]);
@@ -241,10 +245,15 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                                  if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP)
-                		    for(i=0;i<4;i++)
+                                  if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP){
+                                    if(cfg->isatomic)
+                		      for(i=0;i<4;i++)
 #pragma omp atomic
                      			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+                                    else
+                                      for(i=0;i<4;i++)
+                                        tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+                                  }
 				}
 				if(r->isend){
 					memcpy(baryp0,baryout,sizeof(float4));
@@ -463,9 +472,13 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		    T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
 		    _mm_store_ps(barypout,T);
 
-		    for(j=0;j<4;j++)
+                    if(cfg->isatomic)
+		        for(j=0;j<4;j++)
 #pragma omp atomic
-		       tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+		            tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+                    else
+                        for(j=0;j<4;j++)
+                            tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
 		  }
 		}
 		break;
@@ -599,15 +612,22 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
         	r->p0.z+=r->Lmove*r->vec.z;
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
+                     if(cfg->isatomic)
 #pragma omp atomic
 			tracer->mesh->weight[eid+tshift]+=ww;
+                     else
+                        tracer->mesh->weight[eid+tshift]+=ww;
 		  }else{
 	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                            ww/=prop->mua;
                         ww*=1.f/3.f;
-			for(i=0;i<3;i++)
+                        if(cfg->isatomic)
+			   for(i=0;i<3;i++)
 #pragma omp atomic
 				tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+                        else
+                           for(i=0;i<3;i++)
+                                tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
 		  }
 		}
 	    }
@@ -752,16 +772,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	        _mm_store_ps(&(r->p0.x),T);
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
+                        if(cfg->isatomic)
 #pragma omp atomic
-			tracer->mesh->weight[eid+tshift]+=ww;
+			    tracer->mesh->weight[eid+tshift]+=ww;
+                        else
+                            tracer->mesh->weight[eid+tshift]+=ww;
 		  }else{
 			int i;
 	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                            ww/=prop->mua;
                         ww*=1.f/3.f;
-			for(i=0;i<3;i++)
+                        if(cfg->isatomic)
+			    for(i=0;i<3;i++)
 #pragma omp atomic
 				tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+                        else
+                            for(i=0;i<3;i++)
+                                tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
 		  }
 		}
 	    }
@@ -1237,13 +1264,20 @@ void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
     	int i,tshift;
 	if(!cfg->basisorder){
 		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+                if(cfg->isatomic)
 #pragma omp atomic
-		mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
+		    mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
+                else
+                    mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
 	}else{
 		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
-		for(i=0;i<4;i++)
+                if(cfg->isatomic)
+		    for(i=0;i<4;i++)
 #pragma omp atomic
 			mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
+                else
+                    for(i=0;i<4;i++)
+                        mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
 	}
 }
 
@@ -1262,12 +1296,19 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 
 	if(!cfg->basisorder){
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+                if(cfg->isatomic)
 #pragma omp atomic
-		mesh->weight[eid+tshift]+=ww;
+		    mesh->weight[eid+tshift]+=ww;
+                else
+                    mesh->weight[eid+tshift]+=ww;
 	}else{
 		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
-		for(i=0;i<4;i++)
+                if(cfg->isatomic)
+		    for(i=0;i<4;i++)
 #pragma omp atomic
 			mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
+                else
+                    for(i=0;i<4;i++)
+                        mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
 	}
 }
