@@ -577,7 +577,6 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      	    for(j=0;j<4;j++)
      	   	mesh->nvol[ee[j]-1]+=-mesh->evol[i]*0.05f;
      	    for(j=0;j<6;j++){
-	        if(i==1) printf("%d\n",ee2[j]);
      	   	mesh->nvol[ee2[j]-1]+=mesh->evol[i]*0.20f;
 	    }
 	}else{

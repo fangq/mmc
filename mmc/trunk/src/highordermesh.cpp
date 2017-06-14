@@ -87,8 +87,8 @@ void mesh_10nodetet(tetmesh * mesh,mcconfig *cfg){
 	mesh->nn+=edgelist.size();
 	mesh->nvol=(float *)realloc((void*)mesh->nvol,sizeof(float)*(mesh->nn));
 	for(int i=0;i<oldnn;i++)
-		mesh->nvol[i]=-mesh->nvol[i];
-	for(int i=0;i<mesh->nn;i++)
+		mesh->nvol[i]=-mesh->nvol[i]*0.05f;
+	for(int i=oldnn;i<mesh->nn;i++)
 		mesh->nvol[i]*=0.2f;
 	mesh->node=(float3*)realloc((void*)mesh->node, sizeof(float3)*(mesh->nn));
         mesh->weight=(double *)realloc((void*)mesh->weight,sizeof(double)*mesh->nn*cfg->maxgate);

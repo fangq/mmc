@@ -702,7 +702,8 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
-	int *ee;
+	int *ee=NULL,*ee2=NULL;
+	const float avgfactor[]={1.f, 0.25f, 0.1f};
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
@@ -727,7 +728,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
               for(j=0;j<mesh->nn;j++)
-        	if(mesh->nvol[j]>0.f)
+        	if(fabs(mesh->nvol[j])>EPS)
                    mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
@@ -736,9 +737,15 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	      for(j=0;j<cfg->maxgate;j++)
 		for(k=0;k<4;k++)
 		   energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
+              if(cfg->basisorder==2){
+	        ee2=(int *)(mesh->elem2+i*6);
+	        for(j=0;j<cfg->maxgate;j++)
+		  for(k=0;k<6;k++)
+		   energyelem+=mesh->weight[j*mesh->nn+ee2[k]-1]; /*1/4 factor is absorbed two lines below*/
+	      }
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
-	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
+	    normalizor=Eabsorb/(Etotal*energydeposit*avgfactor[(int)cfg->basisorder]); /*scaling factor*/
 	    if(cfg->outputtype==otFlux)
                normalizor/=cfg->tstep;
             for(i=0;i<cfg->maxgate;i++)

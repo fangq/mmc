@@ -20,6 +20,7 @@ cfg.tstep=5e-9;
 cfg.debuglevel='TP';
 cfg.basisorder=2;
 cfg.isatomic=1; % set to 0 to disable atomic to gain speed
+cfg.isnormalized=1;
 %cfg.method='P';
 
 
