@@ -40,6 +40,7 @@ function [srcnode,srcface]=mmcsrcdomain(cfg,meshbbx,varargin)
 
 opt=varargin2struct(varargin{:});
 expansion=jsonopt('Expansion',1.1,opt); 
+rotateangle=jsonopt('Rotate',0.0,opt); 
 
 if(~isstruct(cfg))
    error('input cfg must be a struct');
@@ -61,20 +62,18 @@ if(strcmp(cfg.srctype,'pencil'))
        'cfg.e0=''>'', instead of using this script']); 
 end
 
+vperp=cross(cfg.srcdir(1:3),rand(1,3));
+
 if(strcmp(cfg.srctype,'pencil') || strcmp(cfg.srctype,'cone') || ...
         strcmp(cfg.srctype,'zgaussian')|| strcmp(cfg.srctype,'isotropic') || strcmp(cfg.srctype,'arcsine'))
-    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domainradius,3);
+    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domainradius,3,vperp,rotateangle);
     srcface=[1 2 3];
 elseif(strcmp(cfg.srctype,'gaussian'))
-    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domaindiagnoal*0.5,3);
+    srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),domaindiagnoal*0.5,3,vperp,rotateangle);
     srcface=[1 2 3];
 elseif(strcmp(cfg.srctype,'line') || strcmp(cfg.srctype,'slit'))
     v0=cfg.srcpos+cfg.srcparam1(1:3)*0.5;
-    if(abs(cfg.srcparam1(1:3)*cfg.srcdir(1:3)')<1e-7)
-        srcnode=orthdisk(v0,v0+cfg.srcdir(1:3),norm(cfg.srcparam1(1:3))*expansion,3);
-    else
-        srcnode=orthdisk(v0,v0+cfg.srcdir(1:3),norm(cfg.srcparam1(1:3))*expansion,3,cfg.srcparam1(1:3));
-    end
+    srcnode=orthdisk(v0,v0+cfg.srcdir(1:3),norm(cfg.srcparam1(1:3))*expansion,3,cfg.srcparam1(1:3));
     srcface=[1 2 3];
 elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         strcmp(cfg.srctype,'fourier') ||strcmp(cfg.srctype,'fourierx')||strcmp(cfg.srctype,'fourier2d'))
@@ -90,11 +89,7 @@ elseif(strcmp(cfg.srctype,'planar') || strcmp(cfg.srctype,'pattern') || ...
         srcnode=[v0; v0+v1; v0+v1+v2; v0+v2]+[-voff1; voff2; voff1; -voff2]*(expansion-1.0);
         srcface=[1 2 3;3 4 1];
     else
-        if(abs(cfg.srcdir(1:3)*(v1(:)+v2(:)))<1e-7)
-            srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir(1:3),(max(norm(voff1),norm(voff2)))*2.0*expansion,3);
-        else
-            srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir(1:3),(max(norm(voff1),norm(voff2)))*2.0*expansion,3,v1+v2);
-        end
+        srcnode=orthdisk(cfg.srcpos+voff1,cfg.srcpos+voff1+cfg.srcdir(1:3),(max(norm(voff1),norm(voff2)))*2.0*expansion,3,v1+v2,rotateangle);
         srcface=[1 2 3];
     end
 elseif(strcmp(cfg.srctype,'disk'))
@@ -102,7 +97,7 @@ elseif(strcmp(cfg.srctype,'disk'))
         srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),cfg.srcparam1(1)*expansion,jsonopt('CircleDiv',100,opt));
         srcface=delaunay(srcnode(:,1),srcnode(:,2));
     else
-        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),(cfg.srcparam1(1)*2.0)*expansion,3);
+        srcnode=orthdisk(cfg.srcpos,cfg.srcpos+cfg.srcdir(1:3),(cfg.srcparam1(1)*2.0)*expansion,3,vperp,rotateangle);
         srcface=[1 2 3];
     end
 else
