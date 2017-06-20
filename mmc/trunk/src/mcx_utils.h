@@ -161,6 +161,7 @@ typedef struct MMC_config{
         FILE *flog;         /**<stream handle to print log information*/
         char rootpath[MAX_PATH_LENGTH]; /**<a string to specify the root folder of the simulation*/
         unsigned int debuglevel; /**<a flag to control the printing of the debug information*/
+        int debugphoton; /**<if negative, print debug info for all photons, otherwise, only print for the selected one*/
 	float unitinmm;     /**<define the length unit in mm*/
 	history his;        /**<header info of the history file*/
 	unsigned int checkpt[MAX_CHECKPOINT]; /**<a list of photon numbers at which a snapshot of the weights will be saved*/

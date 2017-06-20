@@ -77,7 +77,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         unsigned int i;
         float raytri=0.f,raytri0=0.f;
-        unsigned int threadid=0,ncomplete=0,t0,dt;
+        unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel;
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
 
 	t0=StartTimer();
@@ -87,6 +87,13 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 #endif
         dt=GetTimeMillis();
         MMCDEBUG(cfg,dlTime,(cfg->flog,"seed=%u\nsimulating ... ",cfg->seed));
+        if(cfg->debugphoton>=0){
+            debuglevel=cfg->debuglevel;
+            cfg->debuglevel &= 0xFFFFEA00;
+#ifdef _OPENMP
+            omp_set_num_threads(1);
+#endif
+        }
 
 	/***************************************************************************//**
 	The master thread then spawn multiple work-threads depending on your
@@ -119,12 +126,18 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	for(i=0;i<cfg->nphoton;i++){
 		visit.raytet=0.f;
 		visit.raytet0=0.f;
+                if(i==cfg->debugphoton)
+                    cfg->debuglevel = debuglevel;
+
 		if(cfg->seed==SEED_FROM_FILE)
 		    Eabsorb+=onephoton(i,tracer,mesh,cfg,((RandType *)cfg->photonseed)+i*RAND_BUF_LEN,ran1,&visit);
 		else
 		    Eabsorb+=onephoton(i,tracer,mesh,cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
 		raytri0+=visit.raytet0;
+
+                if(i==cfg->debugphoton)
+                    cfg->debuglevel &= 0xFFFFEA00;
 
 		#pragma omp atomic
 		   ncomplete++;

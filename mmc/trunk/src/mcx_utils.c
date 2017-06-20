@@ -46,7 +46,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--savedet",
@@ -55,7 +55,8 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--printgpu","--root","--unitinmm","--continuity",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
-                 "--replaydet","--voidtime","--version","--mc","--atomic",""};
+                 "--replaydet","--voidtime","--version","--mc","--atomic",
+                 "--debugphoton", ""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -118,6 +119,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->isextdet=0;
      cfg->srcdir.w=0.f;
      cfg->isatomic=1;
+     cfg->debugphoton=-1;
 
      cfg->tstart=0.f;
      cfg->tstep=0.f;
@@ -877,6 +879,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                      if (cfg->ismomentum) cfg->issavedet=1;
                                 }else if(strcmp(argv[i]+2,"atomic")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->isatomic),"bool");
+                                }else if(strcmp(argv[i]+2,"debugphoton")==0){
+		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
                                 }else
                                      MMC_FPRINTF(cfg->flog,"unknown verbose option: --%s\n",argv[i]+2);
                                 break;
@@ -952,6 +956,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
+ --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
 \n\
 == Output options ==\n\
  -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
@@ -988,6 +993,8 @@ where possible parameters include (the first item in [] is the default value)\n\
                             2048 P  show progress bar\n\
                             4096 E  exit photon info\n\
       combine multiple items by using a string, or add selected numbers together\n\
+ --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
+                               a single photon, followed by its index (start 0)\n\
 \n\
 == Additional options ==\n\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
