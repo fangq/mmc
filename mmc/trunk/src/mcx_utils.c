@@ -264,8 +264,10 @@ int mcx_loadfromjson(char *jbuf,mcconfig *cfg){
 int mcx_loadjson(cJSON *root, mcconfig *cfg){
      int i;
      cJSON *Mesh, *Optode, *Forward, *Session, *tmp, *subitem;
-     char comment[MAX_PATH_LENGTH];
+
      Mesh    = cJSON_GetObjectItem(root,"Mesh");
+     if(!Mesh)
+         Mesh    = cJSON_GetObjectItem(root,"Domain");
      Optode  = cJSON_GetObjectItem(root,"Optode");
      Session = cJSON_GetObjectItem(root,"Session");
      Forward = cJSON_GetObjectItem(root,"Forward");
@@ -273,14 +275,6 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      if(Mesh){
         strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_PATH_LENGTH);
         cfg->dim.x=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
-        if(cfg->rootpath[0]){
-#ifdef WIN32
-           sprintf(comment,"%s\\%s",cfg->rootpath,cfg->meshtag);
-#else
-           sprintf(comment,"%s/%s",cfg->rootpath,cfg->meshtag);
-#endif
-           strncpy(cfg->meshtag,comment,MAX_PATH_LENGTH);
-        }
         cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
      }
      if(Optode){
