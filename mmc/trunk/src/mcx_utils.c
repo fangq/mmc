@@ -52,7 +52,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--gategroup","--reflect","--debug","--savedet",
                  "--repeat","--save2pt","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
-                 "--printgpu","--root","--unitinmm","--continuity",
+                 "--printgpu","--root","--unitinmm","--basisorder",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
@@ -609,9 +609,11 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
 
 #ifndef MCX_CONTAINER
   #ifdef TIOCGWINSZ
-    struct winsize ttys;
+    struct winsize ttys={0,0,0,0};
     ioctl(0, TIOCGWINSZ, &ttys);
     colwidth=ttys.ws_col;
+    if(colwidth==0)
+          colwidth=79;
   #endif
 #endif
 
@@ -744,6 +746,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      	    if(argv[i][0]=='-'){
 		if(argv[i][1]=='-'){
 			if(mcx_remap(argv[i])){
+                                MMC_FPRINTF(cfg->flog,"option: %s\n",argv[i]);
 				MMC_ERROR(-2,"unsupported verbose option");
 			}
 		}
@@ -884,8 +887,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                 }else
                                      MMC_FPRINTF(cfg->flog,"unknown verbose option: --%s\n",argv[i]+2);
                                 break;
-                     default:
+                     default:{
+                                MMC_FPRINTF(cfg->flog,"option: %s\n",argv[i]);
 				MMC_ERROR(-1,"unsupported command line option");
+                    }
 		}
 	    }
 	    i++;
