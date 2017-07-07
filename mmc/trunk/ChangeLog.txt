@@ -1,5 +1,19 @@
 Change Log
 
+== MMC 1.0-RC3 (v2017.7, Haw Flakes-Update 1) RC release, Qianqian Fang <q.fang at neu.edu> ==
+
+2017-07-03 [dd50986] fix rootpath handling, move MeshID and InitElem to Domain section
+2017-07-02 [d315be8] fix basisorder verbose flag,fix terminal width initial value
+2017-06-20 [0fb129d] support rotation angle in expanded src domain
+2017-06-20 [04485b3] add --debugphoton flag to print debug info for selected photon ID
+2017-06-06 [c076f68] add flag --atomic to select use or not use atomic operations
+2017-06-06 [a797230] support older version of MATLAB
+2017-05-30 [74be9ef] support mcx detpt and old mmc output format
+2017-05-27 [10c8a27] avoid static TLS error in matlab by linking with libiomp5 instead of libgomp
+2017-04-01 [588bd00] update replay testing statement
+2017-03-31 [20b2906] add musmap for nodal based Jacobian (validated for homo media)
+2017-03-30 [d646b4f] avoid launching 0-energy photons, improved upon c4a87df
+
 == MMC 1.0-RC2 (v2017.3, Haw Flakes) RC release, Qianqian Fang <q.fang at neu.edu> ==
 
 2017-03-30 [26fd658] fix a bug when replaying photons from multiple detectors

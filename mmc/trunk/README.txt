@@ -5,7 +5,7 @@
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.0-RC2 (v2017.3, Haw Flakes)
+Version: 1.0-RC3 (v2017.4, Haw Flakes)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------
@@ -207,42 +207,52 @@ The full command line options of MMC include the following:
 <pre>
 usage: mmc <param1> <param2> ...
 where possible parameters include (the first item in [] is the default value)
- -i 	       (--interactive) interactive mode
- -s sessionid  (--session)     a string used to tag all output file names
- -f config     (--input)       read config from a file
+
+== Required option ==
+ -f config     (--input)       read an input file in .inp or .json format
+
+== MC options ==
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
- -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
+ -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC
+ -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
+ -u [1.|float] (--unitinmm)    define the mesh data length unit in mm
+ -E [1648335518|int|mch](--seed) set random-number-generator seed;
+                               if an mch file is followed, MMC "replays" 
+                               the detected photons; the replay mode can be used
+                               to calculate the mua/mus Jacobian matrices
+ -P [0|int]    (--replaydet)   replay only the detected photons from a given 
+                               detector (det ID starts from 1), use with -E 
+ -M [H|PHBS]  (--method)      choose ray-tracing algorithm (only use 1 letter)
+                               P - Plucker-coordinate ray-tracing algorithm
+			       H - Havel's SSE4 ray-tracing algorithm
+			       B - partial Badouel's method (used by TIM-OS)
+			       S - branch-less Badouel's method with SSE
+ -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
+ -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
+ -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
+ --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones
+
+== Output options ==
+ -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit
+                               J - Jacobian, L - weighted path length, P -
+                               weighted scattering count (J,L,P: replay mode)
+ -s sessionid  (--session)     a string used to tag all output file names
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
- -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC
-    [0|1]      (--momentum)    1 to save photon momentum transfer,0 not to save
- -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
- -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
- -O [X|XFEJLP] (--outputtype)  X - fluence-rate, F - fluence, E -energy deposit
-                               J - Jacobian, L - weighted path length, P - 
-                               weighted scattering count (J,L,P: replay mode)
- -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'
- -u [1.|float] (--unitinmm)    define the length unit in mm for the mesh
+
+== User IO options ==
+ -i 	       (--interactive) interactive mode
  -h            (--help)        print this message
  -v            (--version)     print MMC version information
  -l            (--log)         print messages to a log file instead
- -E [0|int|mch](--seed)        set random-number-generator seed;
-                               if an mch file is followed, MMC will "replay" 
-                               the detected photon; the replay mode can be used
-                               to calculate the Jacobian
- -P [0|int]    (--replaydet)   replay only the detected photons from a given 
-                               detector (det ID starts from 1), use with -E 
- -M [H|PHBS]   (--method)      choose ray-tracing algorithm (only use 1 letter)
-                               P - Plucker-coordinate ray-tracing algorithm
-			       H - Havel's SSE4 ray-tracing algorithm
-			       B - partial Badouel's method (used by TIM-OS)
-			       S - branch-less Badouel's method with SSE
+
+== Debug options ==
  -D [0|int]    (--debug)       print debug information (you can use an integer
   or                           or a string by combining the following flags)
  -D [''|MCBWDIOXATRPE]         1 M  photon movement info
@@ -259,7 +269,13 @@ where possible parameters include (the first item in [] is the default value)
                             2048 P  show progress bar
                             4096 E  exit photon info
       combine multiple items by using a string, or add selected numbers together
-example:
+ --debugphoton [-1|int]        to print the debug info specified by -D only for
+                               a single photon, followed by its index (start 0)
+
+== Additional options ==
+ --momentum     [0|1]          1 to save photon momentum transfer,0 not to save
+
+== Example ==
        mmc -n 1000000 -f input.inp -s test -b 0 -D TP
 </pre>
 
@@ -338,7 +354,7 @@ A sample JSON input file can be found under the examples/onecube
 folder. The same file, onecube.json, is also shown below:
 
  {
-    "Mesh": {
+    "Domain": {
 	"MeshID": "onecube",
 	"InitElem": 3
     },
@@ -377,7 +393,7 @@ folder. The same file, onecube.json, is also shown below:
     }
  }
 
-A JSON input file requires 4 root objects, namely "Mesh", "Session", "Forward" 
+A JSON input file requires 4 root objects, namely "Domain", "Session", "Forward" 
 and "Optode". Each object is a data structure providing information
 as indicated by its name. Each object can contain various sub-fields. 
 The orders of the fields in the same level are flexible. For each field, 
@@ -398,7 +414,7 @@ recommended. In the alternative format, you can use
 to represent any parameter directly in the root level. For example
 
  {
-    "Mesh.MeshID": "onecube",
+    "Domain.MeshID": "onecube",
     "Session.ID": "onecube",
     ...
  }

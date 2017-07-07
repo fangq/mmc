@@ -130,6 +130,7 @@ function varargout=mmclab(cfg,type)
 %== Output control ==
 %      cfg.issaveexit:  [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
 %      cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
+%      cfg.isatomic:    [1]-use atomic operations for saving fluence, 0-no atomic operations
 %      cfg.outputtype:  'flux' - output fluence-rate
 %                       'fluence' - fluence, 
 %                       'energy' - energy deposit, 
@@ -137,6 +138,7 @@ function varargout=mmclab(cfg,type)
 %                       'wl'- weighted path lengths to build mua Jacobian (replay mode)
 %                       'wp'- weighted scattering counts to build mus Jacobian (replay mode)
 %      cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space
+%      cfg.debugphoton: print the photon movement debug info only for a specified photon ID
 %
 %      fields marked with * are required; options in [] are the default values
 %      fields marked with - are calculated if not given (can be faster if precomputed)

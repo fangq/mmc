@@ -1,5 +1,5 @@
 {
-    "Mesh": {
+    "Domain": {
 	"MeshID": "cube",
 	"InitElem": 4497
     },

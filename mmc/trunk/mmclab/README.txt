@@ -2,7 +2,7 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.0-RC2, v2017.3
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.0-RC3, v2017.7
 *URL: http://mcx.sf.net/cgi-bin/index.cgi?MMC/Doc/MMCLAB
 
 <toc>
