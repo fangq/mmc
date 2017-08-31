@@ -1076,6 +1076,9 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		  r->weight=1.f;
 		  if(cfg->srctype==stPattern){
 			r->weight=cfg->srcpattern[MIN( (int)(ry*cfg->srcparam2.w), (int)cfg->srcparam2.w-1 )*(int)(cfg->srcparam1.w)+MIN( (int)(rx*cfg->srcparam1.w), (int)cfg->srcparam1.w-1 )];
+			if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP)){
+				cfg->replayweight[r->photonid] *= r->weight;
+			}
 		  }else if(cfg->srctype==stFourier){
 			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
 		  }
