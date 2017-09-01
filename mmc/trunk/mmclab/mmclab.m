@@ -244,34 +244,34 @@ for i=1:len
         cfg(i).e0=tsearchn(cfg(i).node,cfg(i).elem,cfg(i).srcpos);
     end
     if((isnan(cfg(i).e0) && (isfield(cfg(i),'srctype') ...
-           && strcmp(cfg(i).srctype,'pencil')) )|| ischar(cfg(i).e0))
+            && strcmp(cfg(i).srctype,'pencil')) )|| ischar(cfg(i).e0))
         disp('searching initial element ...');
         [cfg(i).srcpos,cfg(i).e0]=mmcraytrace(cfg(i).node,cfg(i).elem,cfg(i).srcpos,cfg(i).srcdir,cfg(i).e0);
     end
     if(isnan(cfg(i).e0))  % widefield source
         if(~isfield(cfg(i),'srcparam1') || ~isfield(cfg(i),'srcparam2'))
-	        error('for wide-field sources, you must provide srcparam1 and srcparam2');
+            error('for wide-field sources, you must provide srcparam1 and srcparam2');
         end
         if(~isfield(cfg(i),'srctype'))
             cfg(i).srctype='pencil';
         end
         srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
-               'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
+            'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
         sdom=mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]);
         isinside=ismember(round(sdom*1e10)*1e-10,round(cfg(i).node*1e10)*1e-10,'rows');
         if(all(~isinside))
-	        if(size(cfg(i).elem,2)==4)
+            if(size(cfg(i).elem,2)==4)
                 cfg(i).elem(:,5)=1;
-	        end
-	        [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
-	        cfg(i).elemprop=cfg(i).elem(:,5);
+            end
+            [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
+            cfg(i).elemprop=cfg(i).elem(:,5);
             cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;
         end
         if(strcmp(cfg(i).srctype,'pencil') || strcmp(cfg(i).srctype,'isotropic') ...
-	    || strcmp(cfg(i).srctype,'cone')   || strcmp(cfg(i).srctype,'zgaussian'))
+                || strcmp(cfg(i).srctype,'cone')   || strcmp(cfg(i).srctype,'zgaussian'))
             cfg(i).e0=tsearchn(cfg(i).node,cfg(i).elem,cfg(i).srcpos);
             if(isnan(cfg(i).e0))
                 cfg(i).e0=-1;
@@ -295,7 +295,7 @@ end
 
 % must do a fflush, otherwise octave buffers the output until complete
 if(exist('OCTAVE_VERSION'))
-   fflush(stdout);
+    fflush(stdout);
 end
 
 mmcout=nargout;
@@ -305,40 +305,43 @@ if(nargout>=3)
 end
 
 if(nargin<2)
-  [varargout{1:mmcout}]=mmc(cfg);
+    [varargout{1:mmcout}]=mmc(cfg);
 elseif(strcmp(type,'omp'))
-  [varargout{1:mmcout}]=mmc(cfg);
+    [varargout{1:mmcout}]=mmc(cfg);
 elseif(strcmp(type,'sse'))
-  [varargout{1:mmcout}]=mmc_sse(cfg);
+    [varargout{1:mmcout}]=mmc_sse(cfg);
 elseif(strcmp(type,'prep') && nargout==1)
-  varargout{1}=cfg;
+    varargout{1}=cfg;
 else
-  error('type is not recognized');
+    error('type is not recognized');
 end
 
 if(mmcout>=2)
-  for i=1:length(varargout{2})
-      medianum=size(cfg(i).prop,1)-1;
-      detp=varargout{2}(i).data;
-      col=size(detp);
-      newdetp.detid=int32(detp(1,:))';
-      newdetp.nscat=int32(detp(2:medianum+1,:))';    % 1st medianum block is num of scattering
-      newdetp.ppath=detp(medianum+2:2*medianum+1,:)';% 2nd medianum block is partial path
-      if(isfield(cfg(i),'ismomentum') && cfg(i).ismomentum)
-         newdetp.mom=detp(2*medianum+2:3*medianum+1,:)'; % 3rd medianum block is the momentum transfer
-      end
-      if(isfield(cfg(i),'issaveexit') && cfg(i).issaveexit)
-         newdetp.p=detp(end-6:end-4,:)';             %columns 7-5 from the right store the exit positions*/
-         newdetp.v=detp(end-3:end-1,:)';	     %columns 4-2 from the right store the exit dirs*/
-      end
-      newdetp.w0=detp(end,:)';  % last column is the initial packet weight
-      newdetp.data=detp;      % enable this line for compatibility
-      newdetpstruct(i)=newdetp;
-  end
-  varargout{2}=newdetpstruct;
+    for i=1:length(varargout{2})
+        if(cfg(i).issaveexit~=2)
+            medianum=size(cfg(i).prop,1)-1;
+            detp=varargout{2}(i).data;
+            newdetp.detid=int32(detp(1,:))';
+            newdetp.nscat=int32(detp(2:medianum+1,:))';    % 1st medianum block is num of scattering
+            newdetp.ppath=detp(medianum+2:2*medianum+1,:)';% 2nd medianum block is partial path
+            if(isfield(cfg(i),'ismomentum') && cfg(i).ismomentum)
+                newdetp.mom=detp(2*medianum+2:3*medianum+1,:)'; % 3rd medianum block is the momentum transfer
+            end
+            if(isfield(cfg(i),'issaveexit') && cfg(i).issaveexit)
+                newdetp.p=detp(end-6:end-4,:)';             %columns 7-5 from the right store the exit positions*/
+                newdetp.v=detp(end-3:end-1,:)';	     %columns 4-2 from the right store the exit dirs*/
+            end
+            newdetp.w0=detp(end,:)';  % last column is the initial packet weight
+            newdetp.data=detp;      % enable this line for compatibility
+        else
+            newdetpstruct(i)=varargout{2}(i).data;
+        end
+        newdetpstruct(i)=newdetp;
+    end
+    varargout{2}=newdetpstruct;
 end
 
 if(nargout>=4)
-  [varargout{3:end}]=deal(varargout{[end 3:end-1]});
+    [varargout{3:end}]=deal(varargout{[end 3:end-1]});
 end
 

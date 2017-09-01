@@ -208,8 +208,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	      if(threadid==0){
 		if(nlhs>=2){
 		    if(cfg.issaveexit==2){
-			fielddim[0]=cfg.detparam1.w; fielddim[1]=cfg.detparam2.w; fielddim[2]=cfg.maxgate; fielddim[3]=0;
-			mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+			fielddim[0]=(size_t)cfg.detparam1.w; fielddim[1]=(size_t)cfg.detparam2.w; fielddim[2]=(size_t)cfg.maxgate; fielddim[3]=0;
+printf("%d %d %d\n",(size_t)cfg.detparam1.w,(size_t)cfg.detparam2.w,(size_t)cfg.maxgate);
+			mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(3,fielddim,mxSINGLE_CLASS,mxREAL));
 			detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
 			master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
 		    }
@@ -285,8 +286,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
 	}
-	if(nlhs>=2 && cfg.issaveexit==2)
-	    mesh_getdetimage(detmap,master.partialpath,master.bufpos,&cfg,&mesh);
+	if(nlhs>=2 && cfg.issaveexit==2){
+	    float *detimage=(float*)calloc((size_t)cfg.detparam1.w*(size_t)cfg.detparam2.w*(size_t)cfg.maxgate,sizeof(float));
+printf("%d %d %d\n",(size_t)cfg.detparam1.w,(size_t)cfg.detparam2.w,(size_t)cfg.maxgate);
+printf("Get Image");
+	    mesh_getdetimage(detimage,master.partialpath,master.bufpos,&cfg,&mesh);
+	    memcpy(detmap,detimage,cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate*sizeof(float));
+	    free(detimage);	detimage = NULL;
+	}
         if(errorflag)
             mexErrMsgTxt("MMCLAB Terminated due to exception!");
     }catch(const char *err){
