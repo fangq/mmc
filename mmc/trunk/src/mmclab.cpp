@@ -206,9 +206,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             if(master.detcount>0){
 	      if(threadid==0){
 		if(nlhs>=2){
-	            fielddim[0]=visit.reclen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
-    		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
-		    master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+		    if(cfg.issaveexit==2){
+			fielddim[0]=cfg.detparam1.w; fielddim[1]=cfg.detparam2.w; fielddim[2]=cfg.maxgate; fielddim[3]=0;
+			mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+			detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+			master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
+		    }
+		    else{
+	            	fielddim[0]=visit.reclen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0;
+    		    	mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+		    	master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+		    }
                     if(nlhs>=3 && cfg.issaveseed){
                         fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
                         mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
@@ -276,6 +284,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
 	}
+	if(nlhs>=2 && cfg.issaveexit==2)
+	    mesh_getdetimage(detmap,master.partialpath,master.bufpos,cfg,mesh);
         if(errorflag)
             mexErrMsgTxt("MMCLAB Terminated due to exception!");
     }catch(const char *err){
@@ -332,6 +342,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_VEC3_FIELD(cfg,steps)
     GET_VEC4_FIELD(cfg,srcparam1)
     GET_VEC4_FIELD(cfg,srcparam2)
+    GET_VEC4_FIELD(cfg,detparam1)
+    GET_VEC4_FIELD(cfg,detparam2)
     else if(strcmp(name,"e0")==0){
         double *val=mxGetPr(item);
 	cfg->dim.x=val[0];

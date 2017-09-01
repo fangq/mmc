@@ -688,9 +688,8 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	fclose(fp);
 }
 
-// function for accumulating detected photons and saving in the form of time-resolved 2D images
-void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg, tetmesh *mesh){
-	// the value of cfg->issaveexit is 2 under this mode
+void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh){
+
 	int colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+6+2;
 	float x0=cfg->detpos[0].x;
 	float y0=cfg->detpos[0].y;
@@ -699,8 +698,7 @@ void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mccon
 	int xsize=cfg->detparam1.w;
 	int ysize=cfg->detparam2.w;
 	int i,j,xindex,yindex,ntg,offset;
-	float *detmap;
-	detmap=(float *)calloc(xsize*ysize*cfg->maxgate,sizeof(float));
+
 	float xloc, yloc, weight, path;
 	for(i=0; i<count; i++){
 		path = 0;
@@ -721,6 +719,10 @@ void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mccon
 		offset = ntg*xsize*ysize;
 		detmap[offset+yindex*xsize+xindex] += weight;
 	}
+}
+
+// function for accumulating detected photons and saving in the form of time-resolved 2D images
+void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	
 	FILE *fp;
 	char fhistory[MAX_PATH_LENGTH];
@@ -731,10 +733,8 @@ void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mccon
 	if((fp=fopen(fhistory,"wb"))==NULL){
 		MESH_ERROR("can not open detector image file to write");
 	}
-	fwrite(detmap,sizeof(float),xsize*ysize*cfg->maxgate,fp);
+	fwrite(detmap,sizeof(float),cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,fp);
 	fclose(fp);
-
-	free(detmap);
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
