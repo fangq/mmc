@@ -57,7 +57,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mxArray    *tmp;
   int        ifield, jstruct;
   int        ncfg, nfields;
-  int        fielddim[4];
+  size_t     fielddim[4];
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
@@ -296,9 +296,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh){
     const char *name=mxGetFieldNameByNumber(root,idx);
-    const int *arraydim;
+    const size_t *arraydim;
     char *jsonshapes=NULL;
     int i,j;
+    size_t k;
 
     if(strcmp(name,"nphoton")==0 && cfg->photonseed!=NULL)
 	return;
@@ -466,8 +467,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         double *val=mxGetPr(item);
         if(cfg->srcpattern) free(cfg->srcpattern);
         cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*sizeof(float));
-        for(i=0;i<arraydim[0]*arraydim[1];i++)
-             cfg->srcpattern[i]=val[i];
+        for(k=0;k<arraydim[0]*arraydim[1];k++)
+             cfg->srcpattern[k]=val[k];
         printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
     }else if(strcmp(name,"outputtype")==0){
         int len=mxGetNumberOfElements(item);
