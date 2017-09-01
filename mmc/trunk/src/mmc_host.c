@@ -204,7 +204,10 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	}
 	if(cfg->issavedet){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving detected photons ..."));
-		mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg);
+		if(cfg->issaveexit==1)
+			mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg);
+		else if(cfg->issaveexit==2)
+			mesh_savedetimage(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg,mesh);
 		free(master.partialpath);
                 if(cfg->issaveseed && master.photonseed)
                     free(master.photonseed);
