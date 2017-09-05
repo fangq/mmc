@@ -320,6 +320,9 @@ if(mmcout>=2)
   for i=1:length(varargout{2})
       medianum=size(cfg(i).prop,1)-1;
       detp=varargout{2}(i).data;
+      if(isempty(detp))
+          continue;
+      end
       col=size(detp);
       newdetp.detid=int32(detp(1,:))';
       newdetp.nscat=int32(detp(2:medianum+1,:))';    % 1st medianum block is num of scattering
@@ -335,7 +338,9 @@ if(mmcout>=2)
       newdetp.data=detp;      % enable this line for compatibility
       newdetpstruct(i)=newdetp;
   end
-  varargout{2}=newdetpstruct;
+  if(exist('newdetpstruct','var'))
+      varargout{2}=newdetpstruct;
+  end
 end
 
 if(nargout>=4)
