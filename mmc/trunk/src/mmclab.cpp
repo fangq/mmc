@@ -628,7 +628,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 	else
 	    MEXERROR("The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
      }
-     cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
+     // cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
      cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+1;
 }

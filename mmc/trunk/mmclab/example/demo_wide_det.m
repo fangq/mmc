@@ -31,9 +31,13 @@ cfg.tstart = 0;
 cfg.tend = 2e-9;
 cfg.tstep = 4e-11;
 
-cfg.nphoton = 1e5;
+cfg.nphoton = 1e6;
 cfg.seed = 12345678;
 cfg.debuglevel = 'TP';
 cfg.issaveexit = 2;
 
 [flux,detp,~,~]=mmclab(cfg);
+
+figure;
+imagesc(sum(detp.data,3)');
+axis equal;

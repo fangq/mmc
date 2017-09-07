@@ -333,10 +333,10 @@ if(mmcout>=2)
             end
             newdetp.w0=detp(end,:)';  % last column is the initial packet weight
             newdetp.data=detp;      % enable this line for compatibility
+            newdetpstruct(i)=newdetp;
         else
-            newdetpstruct(i)=varargout{2}(i).data;
+            newdetpstruct(i)=varargout{2}(i);
         end
-        newdetpstruct(i)=newdetp;
     end
     varargout{2}=newdetpstruct;
 end
