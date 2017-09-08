@@ -120,6 +120,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg);
 void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh);
 void mesh_savedetimage(float *detmap, mcconfig *cfg);
+float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg);
 void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);

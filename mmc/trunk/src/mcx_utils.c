@@ -142,6 +142,7 @@ void mcx_initcfg(mcconfig *cfg){
 	
      memset(&(cfg->detparam1),0,sizeof(float4));
      memset(&(cfg->detparam2),0,sizeof(float4));
+     cfg->detpattern=NULL;
 }
 
 void mcx_clearcfg(mcconfig *cfg){
@@ -153,6 +154,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->vol);
      if(cfg->srcpattern)
         free(cfg->srcpattern);
+     if(cfg->detpattern)
+        free(cfg->detpattern);
      if(cfg->photonseed)
         free(cfg->photonseed);
      if(cfg->replayweight)
@@ -526,17 +529,16 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
                if(in==stdin)
 	            MMC_FPRINTF(stdout,">> %f %f %f %f\n",cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w);
                if(cfg->srctype==stPattern && cfg->srcparam1.w*cfg->srcparam2.w>0){
-		    char patternfile[MAX_PATH_LENGTH];
+		    char srcpatternfile[MAX_PATH_LENGTH];
 		    FILE *fp;
-                    MMC_FPRINTF(stdout,"Please specify the pattern file name:\n\t");
+		    if(in==stdin)	MMC_FPRINTF(stdout,"Please specify the source pattern file name:\n\t");
 
 		    if(cfg->srcpattern) free(cfg->srcpattern);
 		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
-		    MMC_ASSERT(fscanf(in, "%s", patternfile)==1);
+		    MMC_ASSERT(fscanf(in, "%s", srcpatternfile)==1);
 		    comm=fgets(comment,MAX_PATH_LENGTH,in);
-		    fp=fopen(patternfile,"rb");
-		    if(fp==NULL)
-			MMC_ERROR(-6,"pattern file can not be opened");
+		    fp=fopen(srcpatternfile,"rb");
+		    if(fp==NULL)	MMC_ERROR(-6,"source pattern file can not be opened");
 		    MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w,sizeof(float),fp)==sizeof(float));
 		    fclose(fp);
 		}
@@ -551,9 +553,23 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 		            MMC_FPRINTF(stdout,">> %f %f %f %f\nPlease specify the detector parameters set 2 (4 floating-points):\n\t",
 		                   cfg->detparam1.x,cfg->detparam1.y,cfg->detparam1.z,cfg->detparam1.w);
 			MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->detparam2.x),&(cfg->detparam2.y),&(cfg->detparam2.z),&(cfg->detparam2.w))==4);
-		            comm=fgets(comment,MAX_PATH_LENGTH,in);
+		    comm=fgets(comment,MAX_PATH_LENGTH,in);
 			if(in==stdin)
 			        MMC_FPRINTF(stdout,">> %f %f %f %f\n",cfg->detparam2.x,cfg->detparam2.y,cfg->detparam2.z,cfg->detparam2.w);
+			// only load detection pattern under replay mode
+			if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP) && cfg->detparam1.w*cfg->detparam2.w>0){
+				if(in==stdin)	MMC_FPRINTF(stdout,"Please specify the detector pattern file name:\n\t");
+				char detpatternfile[MAX_PATH_LENGTH];
+		    	FILE *fp;
+				if(cfg->detpattern) free(cfg->detpattern);
+		    	cfg->detpattern=(float*)calloc((cfg->detparam1.w*cfg->detparam2.w),sizeof(float));
+				MMC_ASSERT(fscanf(in, "%s", detpatternfile)==1);
+				comm=fgets(comment,MAX_PATH_LENGTH,in);
+				fp=fopen(detpatternfile,"rb");
+		    	if(fp==NULL)	MMC_ERROR(-6,"detector pattern file can not be opened");
+		    	MMC_ASSERT(fread(cfg->detpattern,cfg->detparam1.w*cfg->detparam2.w,sizeof(float),fp)==sizeof(float));
+		    	fclose(fp);
+			}
 		}
 	}else
 	   return;
