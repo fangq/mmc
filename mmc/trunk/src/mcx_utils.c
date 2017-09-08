@@ -528,7 +528,8 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
                if(cfg->srctype==stPattern && cfg->srcparam1.w*cfg->srcparam2.w>0){
 		    char patternfile[MAX_PATH_LENGTH];
 		    FILE *fp;
-                    MMC_FPRINTF(stdout,"Please specify the pattern file name:\n\t");
+		    if(in==stdin)
+                    	MMC_FPRINTF(stdout,"Please specify the pattern file name:\n\t");
 
 		    if(cfg->srcpattern) free(cfg->srcpattern);
 		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
