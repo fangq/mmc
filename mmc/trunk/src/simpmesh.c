@@ -192,6 +192,7 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
 		if(mesh->type[i]==-2){	/*number of elements in the initial candidate list*/
 			mesh->detelemlen++;
 			cfg->isextdet=1;
+			cfg->detnum=0;	// when detecting wide-field detectors, suppress point detectors
                 }
 	}
 	/*Record the index of inital elements to initiate source search*/
@@ -678,13 +679,62 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	if(cfg->issaveseed && seeds!=NULL){
 	   cfg->his.seedbyte=seedbyte;
         }
-        cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+3; /*column count=maxmedia+3*/
+        cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+3*/
 
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
 	if(cfg->issaveseed && seeds!=NULL)
            fwrite(seeds,seedbyte,count,fp);
 	fclose(fp);
+}
+
+// function for accumulating detected photons and saving in the form of time-resolved 2D images
+void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg, tetmesh *mesh){
+	// the value of cfg->issaveexit is 2 under this mode
+	int colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+6+2;
+	float x0=cfg->detpos[0].x;
+	float y0=cfg->detpos[0].y;
+	float xrange=cfg->detparam1.x+cfg->detparam2.x; 
+	float yrange=cfg->detparam1.y+cfg->detparam2.y;
+	int xsize=cfg->detparam1.w;
+	int ysize=cfg->detparam2.w;
+	int i,j,xindex,yindex,ntg,offset;
+	float *detmap;
+	detmap=(float *)calloc(xsize*ysize*cfg->maxgate,sizeof(float));
+	float xloc, yloc, weight, path;
+	for(i=0; i<count; i++){
+		path = 0;
+		weight = ppath[(i+1)*colcount-1];
+		for(j=1;j<=cfg->his.maxmedia;j++){
+			path += ppath[i*colcount+1+cfg->his.maxmedia]*mesh->med[j].n;
+			weight *= expf(-ppath[i*colcount+1+cfg->his.maxmedia]*mesh->med[j].mua*cfg->unitinmm);
+		}
+		ntg = (int) path*R_C0/cfg->tstep;
+		if(ntg>cfg->maxgate-1)
+			ntg = cfg->maxgate-1;
+		xloc = ppath[(i+1)*colcount-7];
+		yloc = ppath[(i+1)*colcount-6];
+		xindex = (xloc-x0)/xrange*xsize;
+		if(xindex<0 || xindex>xsize-1) continue;
+		yindex = (yloc-y0)/yrange*ysize;
+		if(yindex<0 || yindex>ysize-1) continue;
+		offset = ntg*xsize*ysize;
+		detmap[offset+yindex*xsize+xindex] += weight;
+	}
+	
+	FILE *fp;
+	char fhistory[MAX_PATH_LENGTH];
+        if(cfg->rootpath[0])
+                sprintf(fhistory,"%s%c%s.img",cfg->rootpath,pathsep,cfg->session);
+        else
+                sprintf(fhistory,"%s.img",cfg->session);
+	if((fp=fopen(fhistory,"wb"))==NULL){
+		MESH_ERROR("can not open detector image file to write");
+	}
+	fwrite(detmap,sizeof(float),xsize*ysize*cfg->maxgate,fp);
+	fclose(fp);
+
+	free(detmap);
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/

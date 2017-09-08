@@ -125,6 +125,8 @@ typedef struct MMC_config{
 
 	medium *prop;     /**<optical property mapping table*/
 	float4 *detpos;   /**<detector positions and radius, overwrite detradius*/
+	float4 detparam1;	/**<parameters set 1 for wide-field detector*/
+	float4 detparam2;	/**<parameters set 2 for wide-feild detector*/
 	float  minstep;   /**<accumulation step size*/
 
 	int maxgate;        /**<simultaneous recording gates*/
@@ -142,6 +144,7 @@ typedef struct MMC_config{
 	char issavedet;     /**<1 to count all photons hits the detectors*/
 	char ismomentum;    /**<1 to save momentum transfer for detected photons, implies issavedet=1*/
 	char issaveexit;    /**<1 to save the exit position and vector of a detected photon, implies issavedet=1*/
+			    /**<2 to save accumulated photon weight in frames of images*/
 	char issave2pt;     /**<1 to save the 2-point distribution, 0 do not save*/
 	char isgpuinfo;     /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;    /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/

@@ -139,6 +139,9 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->srcpattern=NULL;
      cfg->voidtime=1;
      memset(cfg->checkpt,0,sizeof(unsigned int)*MAX_CHECKPOINT);
+	
+     memset(&(cfg->detparam1),0,sizeof(float4));
+     memset(&(cfg->detparam2),0,sizeof(float4));
 }
 
 void mcx_clearcfg(mcconfig *cfg){
@@ -538,6 +541,20 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 		    fclose(fp);
 		}
 	    }
+		if(cfg->detnum==1 && cfg->detpos[0].w==0.0){
+		// only one detector and its radius is 0, indicates that we are using a wide-field detector
+			if(in==stdin)
+				MMC_FPRINTF(stdout,">> \nPlease specify the detector parameters set 1 (4 floating-points):\n\t");
+			MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->detparam1.x),&(cfg->detparam1.y),&(cfg->detparam1.z),&(cfg->detparam1.w))==4);
+			comm=fgets(comment,MAX_PATH_LENGTH,in);
+			if(in==stdin)
+		            MMC_FPRINTF(stdout,">> %f %f %f %f\nPlease specify the detector parameters set 2 (4 floating-points):\n\t",
+		                   cfg->detparam1.x,cfg->detparam1.y,cfg->detparam1.z,cfg->detparam1.w);
+			MMC_ASSERT(fscanf(in, "%f %f %f %f", &(cfg->detparam2.x),&(cfg->detparam2.y),&(cfg->detparam2.z),&(cfg->detparam2.w))==4);
+		            comm=fgets(comment,MAX_PATH_LENGTH,in);
+			if(in==stdin)
+			        MMC_FPRINTF(stdout,">> %f %f %f %f\n",cfg->detparam2.x,cfg->detparam2.y,cfg->detparam2.z,cfg->detparam2.w);
+		}
 	}else
 	   return;
      }else
