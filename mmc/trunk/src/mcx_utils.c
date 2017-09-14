@@ -60,7 +60,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
-const char outputtype[]={'x','f','e','j','t','\0'};
+const char outputtype[]={'x','f','e','j','l','p','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
     "pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
@@ -532,7 +532,6 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 		    char srcpatternfile[MAX_PATH_LENGTH];
 		    FILE *fp;
 		    if(in==stdin)	MMC_FPRINTF(stdout,"Please specify the source pattern file name:\n\t");
-
 		    if(cfg->srcpattern) free(cfg->srcpattern);
 		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
 		    MMC_ASSERT(fscanf(in, "%s", srcpatternfile)==1);
