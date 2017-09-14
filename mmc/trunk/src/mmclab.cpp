@@ -40,6 +40,12 @@
 #define MAX(a,b)  ((a)>(b)?(a):(b))
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)
 
+#if (! defined MX_API_VER) || (MX_API_VER < 0x07300000)
+	typedef int dimtype;
+#else
+	typedef size_t dimtype;
+#endif
+
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh);
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh);
 void mmclab_usage();
@@ -58,7 +64,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mxArray    *tmp;
   int        ifield, jstruct;
   int        ncfg, nfields;
-  size_t     fielddim[4];
+  dimtype     fielddim[4];
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
@@ -311,10 +317,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh){
     const char *name=mxGetFieldNameByNumber(root,idx);
-    const size_t *arraydim;
+    const dimtype *arraydim;
     char *jsonshapes=NULL;
     int i,j;
-    size_t k;
+    dimtype k;
 
     if(strcmp(name,"nphoton")==0 && cfg->photonseed!=NULL)
 	return;
