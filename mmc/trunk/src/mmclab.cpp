@@ -40,6 +40,12 @@
 #define MAX(a,b)  ((a)>(b)?(a):(b))
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)
 
+#if (! defined MX_API_VER) || (MX_API_VER < 0x07300000)
+	typedef int dimtype;
+#else
+	typedef size_t dimtype;
+#endif
+
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh);
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh);
 void mmclab_usage();
@@ -53,11 +59,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
   unsigned int threadid=0,t0,dt;
+  float* detmap;
 
   mxArray    *tmp;
   int        ifield, jstruct;
   int        ncfg, nfields;
-  size_t     fielddim[4];
+  dimtype     fielddim[4];
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
@@ -206,9 +213,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             if(master.detcount>0){
 	      if(threadid==0){
 		if(nlhs>=2){
-	            fielddim[0]=visit.reclen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
-    		    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
-		    master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+		    if(cfg.issaveexit==2){
+			fielddim[0]=cfg.detparam1.w; fielddim[1]=cfg.detparam2.w; fielddim[2]=cfg.maxgate; fielddim[3]=0;
+			mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(3,fielddim,mxSINGLE_CLASS,mxREAL));
+			detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+			master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
+		    }
+		    else{
+	            	fielddim[0]=visit.reclen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0;
+    		    	mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+		    	master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+		    }
                     if(nlhs>=3 && cfg.issaveseed){
                         fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
                         mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
@@ -276,6 +291,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
 	}
+	if(nlhs>=2 && cfg.issaveexit==2){
+	    float *detimage=(float*)calloc(cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
+	    mesh_getdetimage(detimage,master.partialpath,master.bufpos,&cfg,&mesh);
+	    memcpy(detmap,detimage,cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate*sizeof(float));
+	    free(detimage);	detimage = NULL;
+	}
         if(errorflag)
             mexErrMsgTxt("MMCLAB Terminated due to exception!");
     }catch(const char *err){
@@ -296,10 +317,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh){
     const char *name=mxGetFieldNameByNumber(root,idx);
-    const size_t *arraydim;
+    const dimtype *arraydim;
     char *jsonshapes=NULL;
     int i,j;
-    size_t k;
+    dimtype k;
 
     if(strcmp(name,"nphoton")==0 && cfg->photonseed!=NULL)
 	return;
@@ -333,6 +354,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_VEC3_FIELD(cfg,steps)
     GET_VEC4_FIELD(cfg,srcparam1)
     GET_VEC4_FIELD(cfg,srcparam2)
+    GET_VEC4_FIELD(cfg,detparam1)
+    GET_VEC4_FIELD(cfg,detparam2)
     else if(strcmp(name,"e0")==0){
         double *val=mxGetPr(item);
 	cfg->dim.x=val[0];
@@ -611,7 +634,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 	else
 	    MEXERROR("The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
      }
-     cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
+     // cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
      cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+1;
 }

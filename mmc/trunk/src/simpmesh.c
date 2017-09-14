@@ -292,13 +292,18 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
        cfg->replaytime=(float*)malloc(his.savedphoton*sizeof(float));
        fseek(fp,sizeof(his),SEEK_SET);
        if(fread(ppath,his.colcount*sizeof(float),his.savedphoton,fp)!=his.savedphoton)
-           MESH_ERROR("error when reading the seed data");
+           MESH_ERROR("error when reading the partial path data");
 
        cfg->nphoton=0;
        for(i=0;i<his.savedphoton;i++)
            if(cfg->replaydet==0 || cfg->replaydet==(int)(ppath[i*his.colcount])){
                memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
-               cfg->replayweight[cfg->nphoton]=1.f;
+		// replay with wide-field detection pattern, the partial path has to contain photon exit information
+		if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
+		    cfg->replayweight[cfg->nphoton]=mesh_getdetweight(i,his.colcount,ppath,cfg);
+		}else{
+               	    cfg->replayweight[cfg->nphoton]=ppath[(i+1)*his.colcount-1];
+		}
                for(j=2;j<his.maxmedia+2;j++)
                  cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
                cfg->replaytime[cfg->nphoton]=0.f;
@@ -688,9 +693,8 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	fclose(fp);
 }
 
-// function for accumulating detected photons and saving in the form of time-resolved 2D images
-void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg, tetmesh *mesh){
-	// the value of cfg->issaveexit is 2 under this mode
+void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh){
+	// cfg->issaveexit is 2 for this mode
 	int colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+6+2;
 	float x0=cfg->detpos[0].x;
 	float y0=cfg->detpos[0].y;
@@ -699,8 +703,7 @@ void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mccon
 	int xsize=cfg->detparam1.w;
 	int ysize=cfg->detparam2.w;
 	int i,j,xindex,yindex,ntg,offset;
-	float *detmap;
-	detmap=(float *)calloc(xsize*ysize*cfg->maxgate,sizeof(float));
+
 	float xloc, yloc, weight, path;
 	for(i=0; i<count; i++){
 		path = 0;
@@ -721,6 +724,10 @@ void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mccon
 		offset = ntg*xsize*ysize;
 		detmap[offset+yindex*xsize+xindex] += weight;
 	}
+}
+
+// function for accumulating detected photons and saving in the form of time-resolved 2D images
+void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	
 	FILE *fp;
 	char fhistory[MAX_PATH_LENGTH];
@@ -731,10 +738,25 @@ void mesh_savedetimage(float *ppath, void *seeds, int count, int seedbyte, mccon
 	if((fp=fopen(fhistory,"wb"))==NULL){
 		MESH_ERROR("can not open detector image file to write");
 	}
-	fwrite(detmap,sizeof(float),xsize*ysize*cfg->maxgate,fp);
+	fwrite(detmap,sizeof(float),cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,fp);
 	fclose(fp);
+}
 
-	free(detmap);
+float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg){
+	
+	float x0=cfg->detpos[0].x;
+	float y0=cfg->detpos[0].y;
+	float xrange=cfg->detparam1.x+cfg->detparam2.x; 
+	float yrange=cfg->detparam1.y+cfg->detparam2.y;
+	int xsize=cfg->detparam1.w;
+	int ysize=cfg->detparam2.w;
+	float xloc=ppath[(photonid+1)*colcount-7];
+	float yloc=ppath[(photonid+1)*colcount-6];
+	int xindex = (xloc-x0)/xrange*xsize;
+	int yindex = (yloc-y0)/yrange*ysize;
+	if(xindex<0 || xindex>xsize-1 || yindex<0 || yindex>ysize-1)
+		MESH_ERROR("photon location not within the detection plane");
+	return cfg->detpattern[yindex*xsize+xindex];
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/

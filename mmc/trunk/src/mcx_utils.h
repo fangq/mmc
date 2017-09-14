@@ -127,12 +127,14 @@ typedef struct MMC_config{
 	float4 *detpos;   /**<detector positions and radius, overwrite detradius*/
 	float4 detparam1;	/**<parameters set 1 for wide-field detector*/
 	float4 detparam2;	/**<parameters set 2 for wide-feild detector*/
+	float* detpattern;	/**<detector pattern*/
 	float  minstep;   /**<accumulation step size*/
 
 	int maxgate;        /**<simultaneous recording gates*/
 	int respin;         /**<number of repeatitions*/
 	int printnum;       /**<number of printed threads (for debugging)*/
-        int replaydet;      /**<the detector id for which to replay the detected photons, start from 1*/
+        int replaydet;      /**<the detector id for which to replay the detected photons, start from 1
+				0 for wide-field detection pattern*/
 
 	unsigned char *vol; /**<pointer to the volume*/
 	char session[MAX_SESSION_LENGTH]; /**<session id, a string*/
