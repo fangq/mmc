@@ -78,7 +78,10 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         unsigned int i;
         float raytri=0.f,raytri0=0.f;
         unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel;
-	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL};
+
+	master.totalweight=(double *)calloc(cfg->srcnum,cfg->detnum);
+	master.kahanc=(double *)calloc(cfg->srcnum,cfg->detnum);
 
 	t0=StartTimer();
 	
@@ -109,8 +112,11 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
+        int pairid;
+	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
+	visit.totalweight=(double *)calloc(cfg->srcnum,cfg->detnum);
+	visit.kahanc=(double *)calloc(cfg->srcnum,cfg->detnum);
 	if(cfg->issavedet){
 	    if(cfg->issaveseed)
 	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -148,8 +154,12 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			mesh_saveweightat(mesh,cfg,i+1);
 	}
 
+	for(pairid=0; pairid<cfg->srcnum*cfg->detnum; pairid++)
 	#pragma omp atomic
-		master.totalweight += visit.totalweight;
+		master.totalweight[pairid] += visit.totalweight[pairid];
+
+	free(visit.totalweight);
+	free(visit.kahanc);
 
 	if(cfg->issavedet){
 	    #pragma omp atomic
@@ -190,9 +200,14 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
 	if(cfg->isnormalized){
-          cfg->his.normalizer=mesh_normalize(mesh,cfg,Eabsorb,master.totalweight);
+	  int srcid, detid, pairid;
+	  for(srcid=0; srcid<cfg->srcnum; srcid++)
+	    for(detid=0; detid<cfg->detnum; detid++){
+	      pairid=srcid*cfg->detnum+detid;
+              cfg->his.normalizer=mesh_normalize(mesh,cfg,Eabsorb,master.totalweight[pairid],pairid);
+	    }
           fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg->his.normalizer);
+		master.totalweight[0],100.f*Eabsorb/master.totalweight[0],cfg->his.normalizer);
 	}
 	if(cfg->issave2pt){
 		switch(cfg->outputtype){
@@ -217,6 +232,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
+	free(master.totalweight);
+	free(master.kahanc);
 	return 0;
 }
 

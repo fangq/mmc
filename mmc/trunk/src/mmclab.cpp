@@ -54,7 +54,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -134,11 +134,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
     /** \subsection ssimu Parallel photon transport simulation */
 
+	master.totalweight=(double *)calloc(cfg.srcnum,cfg.detnum);
+	master.kahanc=(double *)calloc(cfg.srcnum,cfg.detnum);
 
 #pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
 {
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
+        int pairid;
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+	visit.totalweight=(double *)calloc(cfg.srcnum,cfg.detnum);
+	visit.kahanc=(double *)calloc(cfg.srcnum,cfg.detnum);
+
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -203,8 +209,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    }
 	}
 
+        for(pairid=0; pairid<cfg.srcnum*cfg.detnum; pairid++)
         #pragma omp atomic
-                master.totalweight += visit.totalweight;
+                master.totalweight[pairid] += visit.totalweight[pairid];
+
+        free(visit.totalweight);
+        free(visit.kahanc);
 
 	if(cfg.issavedet && errorflag==0){
 	    #pragma omp atomic
@@ -274,10 +284,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #endif
 
 	tracer_clear(&tracer);
-	if(cfg.isnormalized && master.totalweight){
-          cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight);
+	if(cfg.isnormalized && master.totalweight[0]){
+          int srcid, detid, pairid;
+          for(srcid=0; srcid<cfg.srcnum; srcid++)
+            for(detid=0; detid<cfg.detnum; detid++){
+              pairid=srcid*cfg.detnum+detid;
+              cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[pairid],pairid);
+            }
 	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg.his.normalizer);
+		master.totalweight[0],100.f*Eabsorb/master.totalweight[0],cfg.his.normalizer);
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
@@ -306,6 +321,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     }catch(...){
       mexPrintf("Unknown Exception");
     }
+
+    free(master.totalweight);
+    free(master.kahanc);
 
     /** \subsection sclean End the simulation */
     mesh_clear(&mesh);
@@ -351,6 +369,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,mcmethod)
     GET_VEC3_FIELD(cfg,srcpos)
     GET_VEC34_FIELD(cfg,srcdir)
+    GET_ONE_FIELD(cfg,srcnum)
     GET_VEC3_FIELD(cfg,steps)
     GET_VEC4_FIELD(cfg,srcparam1)
     GET_VEC4_FIELD(cfg,srcparam2)
@@ -550,6 +569,14 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	cfg->replaytime=(float *)malloc(cfg->his.detected*sizeof(float));
         memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replaytime=%d;\n",cfg->his.detected);
+    }else if(strcmp(name,"replaydetweight")==0){
+        arraydim=mxGetDimensions(item);
+	if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'replayweight' field can not be empty");
+	cfg->his.detected=arraydim[0]*arraydim[1];
+	cfg->replaydetweight=(float *)malloc((cfg->his.detected<<1)*sizeof(float));
+        memcpy(cfg->replaydetweight,mxGetData(item),(cfg->his.detected<<1)*sizeof(float));
+        printf("mmc.replaydetweight=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{
@@ -590,10 +617,12 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->weight)
         free(mesh->weight);
 
-     if(!cfg->basisorder)
-        mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate);
-     else
-        mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate);
+     if(cfg->basisorder){
+	 if(cfg->outputtype==otWL || cfg->outputtype==otWP)
+	    mesh->weight=(double *)calloc(sizeof(double)*mesh->nn*cfg->srcnum*cfg->detnum,cfg->maxgate);
+	 else
+	    mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
+     }
 
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");

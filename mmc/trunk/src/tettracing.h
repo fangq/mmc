@@ -53,6 +53,8 @@ typedef struct MMC_ray{
 	double Eabsorb;
 	unsigned int photonid;
 	float *partialpath;
+	float *srcweight;
+	float *detweight;
         void  *photonseed;
 	float focus;
 } ray;
@@ -72,8 +74,8 @@ typedef struct MMC_visitor{
 	int   reclen;
 	float *partialpath;
 	void  *photonseed;
-	double totalweight;
-	double kahanc;
+	double *totalweight;
+	double *kahanc;
 } visitor;
 
 #ifdef	__cplusplus

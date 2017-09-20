@@ -85,6 +85,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
+     cfg->srcnum=1;
 #ifndef MMC_USE_SSE
      cfg->method=0;
 #else
@@ -143,6 +144,7 @@ void mcx_initcfg(mcconfig *cfg){
      memset(&(cfg->detparam1),0,sizeof(float4));
      memset(&(cfg->detparam2),0,sizeof(float4));
      cfg->detpattern=NULL;
+     cfg->replaydetweight=NULL;
 }
 
 void mcx_clearcfg(mcconfig *cfg){
@@ -162,6 +164,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->replayweight);
      if(cfg->replaytime)
         free(cfg->replaytime);
+     if(cfg->replaydetweight)
+        free(cfg->replaydetweight);
      if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)
         fclose(cfg->flog);
      mcx_initcfg(cfg);
@@ -291,6 +295,8 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
               cfg->srcpos.x=subitem->child->valuedouble;
               cfg->srcpos.y=subitem->child->next->valuedouble;
               cfg->srcpos.z=subitem->child->next->next->valuedouble;
+	      if(subitem->child->next->next->next)
+	         cfg->srcnum=subitem->child->next->next->next->valuedouble;
            }
            subitem=FIND_JSON_OBJ("Dir","Optode.Source.Dir",src);
            if(subitem){
@@ -418,7 +424,7 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 }
 
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
-     int i,gates,srctype,itmp;
+     int i,gates,srctype,itmp,detcount;
      float dtmp;
      char comment[MAX_PATH_LENGTH],*comm, srctypestr[MAX_SESSION_LENGTH]={'\0'};
      
@@ -440,6 +446,8 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      	MMC_FPRINTF(stdout,">> %d\nPlease specify the position of the source: [10 10 5]\n\t",cfg->seed);
      MMC_ASSERT(fscanf(in,"%f %f %f", &(cfg->srcpos.x),&(cfg->srcpos.y),&(cfg->srcpos.z) )==3);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
+     if(comm!=NULL && sscanf(comm,"%d",&itmp)==1)
+         cfg->srcnum=itmp;
 
      if(in==stdin)
      	MMC_FPRINTF(stdout,">> %f %f %f\nPlease specify the normal direction of the source: [0 0 1]\n\t",
@@ -494,7 +502,11 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      cfg->detpos=(float4*)malloc(sizeof(float4)*cfg->detnum);
      if(cfg->issavedet)
         cfg->issavedet=(cfg->detpos>0);
-     for(i=0;i<cfg->detnum;i++){
+     if(cfg->detradius<=0.f && (cfg->outputtype==otWL || cfg->outputtype==otWP))
+        detcount=1;
+     else
+	detcount=cfg->detnum;
+     for(i=0;i<detcount;i++){
         if(in==stdin)
 		MMC_FPRINTF(stdout,"Please define detector #%d: x,y,z (in mm): [5 5 5 1]\n\t",i);
      	MMC_ASSERT(fscanf(in, "%f %f %f", &(cfg->detpos[i].x),&(cfg->detpos[i].y),&(cfg->detpos[i].z))==3);
@@ -534,16 +546,16 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 		    if(in==stdin)
                     	MMC_FPRINTF(stdout,"Please specify the source pattern file name:\n\t");
 		    if(cfg->srcpattern) free(cfg->srcpattern);
-		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
+		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w*cfg->srcnum),sizeof(float));
 		    MMC_ASSERT(fscanf(in, "%s", srcpatternfile)==1);
 		    comm=fgets(comment,MAX_PATH_LENGTH,in);
 		    fp=fopen(srcpatternfile,"rb");
 		    if(fp==NULL)	MMC_ERROR(-6,"source pattern file can not be opened");
-		    MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w,sizeof(float),fp)==sizeof(float));
+		    MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w*cfg->srcnum,sizeof(float),fp)==sizeof(float));
 		    fclose(fp);
 		}
 	    }
-		if(cfg->detnum==1 && cfg->detpos[0].w==0.0){
+		if(cfg->detpos[0].w<=0.0f){
 		// only one detector and its radius is 0, indicates that we are using a wide-field detector
 			if(in==stdin)
 				MMC_FPRINTF(stdout,">> \nPlease specify the detector parameters set 1 (4 floating-points):\n\t");
@@ -562,12 +574,12 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 				char detpatternfile[MAX_PATH_LENGTH];
 		    	FILE *fp;
 				if(cfg->detpattern) free(cfg->detpattern);
-		    	cfg->detpattern=(float*)calloc((cfg->detparam1.w*cfg->detparam2.w),sizeof(float));
+		    	cfg->detpattern=(float*)calloc((cfg->detparam1.w*cfg->detparam2.w*cfg->detnum),sizeof(float));
 				MMC_ASSERT(fscanf(in, "%s", detpatternfile)==1);
 				comm=fgets(comment,MAX_PATH_LENGTH,in);
 				fp=fopen(detpatternfile,"rb");
 		    	if(fp==NULL)	MMC_ERROR(-6,"detector pattern file can not be opened");
-		    	MMC_ASSERT(fread(cfg->detpattern,cfg->detparam1.w*cfg->detparam2.w,sizeof(float),fp)==sizeof(float));
+		    	MMC_ASSERT(fread(cfg->detpattern,cfg->detparam1.w*cfg->detparam2.w*cfg->detnum,sizeof(float),fp)==sizeof(float));
 		    	fclose(fp);
 			}
 		}

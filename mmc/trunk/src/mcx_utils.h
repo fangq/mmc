@@ -103,6 +103,7 @@ typedef struct MMC_config{
 	float3 srcpos;    /**<src position in mm*/
 	float4 srcdir;    /**<src normal direction*/
 	int srctype;	  /**<src type: 0 - pencil beam, 1 - isotropic ... */
+	int srcnum;       /**<pattern src number, for pattern-pattern replay */
 	float4 srcparam1;	/**<source parameters set 1*/
 	float4 srcparam2;	/**<source parameters set 2*/
 	float* srcpattern;	/**<source pattern*/
@@ -173,6 +174,7 @@ typedef struct MMC_config{
 	void *photonseed;
 	float *replayweight;
 	float *replaytime;
+	float *replaydetweight;
         char seedfile[MAX_PATH_LENGTH];
 } mcconfig;
 
