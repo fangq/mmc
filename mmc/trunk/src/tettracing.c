@@ -245,7 +245,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                                  if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP){
+                                  if(cfg->mcmethod==mmMCX){
                                     if(cfg->isatomic)
                 		      for(i=0;i<4;i++)
 #pragma omp atomic
