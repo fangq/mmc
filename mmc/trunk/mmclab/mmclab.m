@@ -318,7 +318,7 @@ end
 
 if(mmcout>=2)
     for i=1:length(varargout{2})
-        if(cfg(i).issaveexit~=2)
+        if(~isfield(cfg(i),'issaveexit') || cfg(i).issaveexit~=2)
             medianum=size(cfg(i).prop,1)-1;
             detp=varargout{2}(i).data;
             if(isempty(detp))
