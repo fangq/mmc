@@ -709,8 +709,8 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 		path = 0;
 		weight = ppath[(i+1)*colcount-1];
 		for(j=1;j<=cfg->his.maxmedia;j++){
-			path += ppath[i*colcount+1+cfg->his.maxmedia]*mesh->med[j].n;
-			weight *= expf(-ppath[i*colcount+1+cfg->his.maxmedia]*mesh->med[j].mua*cfg->unitinmm);
+			path += ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].n;
+			weight *= expf(-ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].mua*cfg->unitinmm);
 		}
 		ntg = (int) path*R_C0/cfg->tstep;
 		if(ntg>cfg->maxgate-1)
