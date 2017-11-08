@@ -1005,8 +1005,6 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    r.slen=r.slen0;
             if(cfg->mcmethod!=mmMCX)
                   albedoweight(&r,mesh,cfg,visit);
-//	    if(cfg->outputtype==otWP)
-//                save_scatter_events(&r,mesh,cfg,visit);
             if(cfg->ismomentum && mesh->type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
                   r.partialpath[(mesh->prop<<1)-1+mesh->type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
             r.partialpath[mesh->type[r.eid-1]-1]++;                          /*the first medianum block stores the scattering event counts*/
@@ -1303,30 +1301,6 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		}
 }
 		MESH_ERROR("initial element does not enclose the source!");
-	}
-}
-
-void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
-	float *baryp0=&(r->bary0.x);
-	int eid = r->eid-1;
-	int *ee = (int *)(mesh->elem+eid);
-    	int i,tshift;
-	if(!cfg->basisorder){
-		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
-                if(cfg->isatomic)
-#pragma omp atomic
-		    mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
-                else
-                    mesh->weight[eid+tshift]+=cfg->replayweight[r->photonid];
-	}else{
-		tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
-                if(cfg->isatomic)
-		    for(i=0;i<4;i++)
-#pragma omp atomic
-			mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
-                else
-                    for(i=0;i<4;i++)
-                        mesh->weight[ee[i]-1+tshift]+=cfg->replayweight[r->photonid]*baryp0[i];
 	}
 }
 
