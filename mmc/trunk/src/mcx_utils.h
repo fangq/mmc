@@ -101,6 +101,7 @@ typedef struct MMC_config{
         int nblocksize;   /**<thread block size*/
 	int nthread;      /**<num of total threads, multiple of 128*/
 	int seed;         /**<random number generator seed*/
+	int e0;           /**<initial element id*/
 
 	float3 srcpos;    /**<src position in mm*/
 	float4 srcdir;    /**<src normal direction*/

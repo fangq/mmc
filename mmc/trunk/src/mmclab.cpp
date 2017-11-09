@@ -358,8 +358,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_VEC4_FIELD(cfg,detparam2)
     else if(strcmp(name,"e0")==0){
         double *val=mxGetPr(item);
-	cfg->dim.x=val[0];
-        printf("mmc.e0=%d;\n",cfg->dim.x);
+	cfg->e0=val[0];
+        printf("mmc.e0=%d;\n",cfg->e0);
     }else if(strcmp(name,"node")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]!=3)

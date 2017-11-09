@@ -138,12 +138,12 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
         cfg->crop0.y=cfg->dim.y*cfg->dim.x;
 	cfg->crop0.z=cfg->dim.y*cfg->dim.x*cfg->dim.z;
 
-	if(cfg->basisorder){
-	  if(cfg->outputdomain==odMesh)
-	      mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
-	  else
+	if(cfg->outputdomain==odGrid)
 	      mesh->weight=(double *)calloc(sizeof(double)*cfg->crop0.z,cfg->maxgate);
-        }
+        else if(cfg->basisorder)
+	      mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
+	else if(cfg->basisorder==0)
+	      mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 }
 
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
@@ -425,8 +425,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		tracer_build(tracer);
 	    else
 	    	MESH_ERROR("tracer is not associated with a mesh");
-	}else if(cfg->srctype==stPencil && cfg->dim.x>0){
-            int eid=cfg->dim.x-1;
+	}else if(cfg->srctype==stPencil && cfg->e0>0){
+            int eid=cfg->e0-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
 	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
@@ -818,12 +818,6 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
             for(i=0;i<datalen;i++)
 	      for(j=0;j<cfg->maxgate;j++)
 	         energydeposit+=mesh->weight[j*datalen+i];
-
-            for(i=0;i<datalen;i++){
-	      energyelem=mesh->nmin.w*mesh->nmin.w*mesh->nmin.w*mesh->med[mesh->type[i]].mua;
-              for(j=0;j<cfg->maxgate;j++)
-        	mesh->weight[j*datalen+i]/=energyelem;
-	    }
             normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 	  }
 	else{
