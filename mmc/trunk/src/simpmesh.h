@@ -50,6 +50,9 @@
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 #define DELTA_MUA  1e-4f
+#define VERY_BIG   1e30f
+#define MIN(a,b)  ((a)<(b)?(a):(b))
+#define MAX(a,b)  ((a)>(b)?(a):(b))
 
 #define MESH_ERROR(a)  mesh_error((a),__FILE__,__LINE__)
 
@@ -79,6 +82,8 @@ typedef struct MMC_mesh{
 	double *weight;/**< volumetric fluence for all nodes at all time-gates */
 	float *evol; /**< volume of an element */
 	float *nvol; /**< veronio volume of a node */
+	float4 nmin;
+	float4 nmax;
 } tetmesh;
 
 /***************************************************************************//**

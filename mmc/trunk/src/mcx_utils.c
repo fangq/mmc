@@ -46,7 +46,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','-','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-','-','\0'};
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--savedet",
@@ -56,7 +56,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton", ""};
+                 "--debugphoton", "--outputdomain",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
 const char raytracing[]={'p','h','b','s','\0'};
@@ -120,6 +120,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->srcdir.w=0.f;
      cfg->isatomic=1;
      cfg->debugphoton=-1;
+     cfg->outputdomain=odMesh;
 
      cfg->tstart=0.f;
      cfg->tstep=0.f;
@@ -909,6 +910,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                      if (cfg->ismomentum) cfg->issavedet=1;
                                 }else if(strcmp(argv[i]+2,"atomic")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->isatomic),"bool");
+                                }else if(strcmp(argv[i]+2,"outputdomain")==0){
+		                     i=mcx_readarg(argc,argv,i,&(cfg->outputdomain),"int");
                                 }else if(strcmp(argv[i]+2,"debugphoton")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
                                 }else

@@ -649,6 +649,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	float Lp0=0.f,rc,currweight,dlen,ww;
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
+	__m128i P;
 
 	r->p0.w=1.f;
 	r->vec.w=0.f;
@@ -755,17 +756,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		currweight+=r->weight;
 	    }
 	    if(bary.x>=0.f){
+	        int framelen=(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		if(cfg->outputdomain==odGrid)
+		    framelen=cfg->crop0.z;
 		ww=currweight-r->weight;
 		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
 
 		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
-			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*framelen;
 		else
-                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*framelen;
 
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
+
+		if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+		   ww/=prop->mua;
 
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
@@ -775,12 +782,33 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                         if(cfg->isatomic)
 #pragma omp atomic
 			    tracer->mesh->weight[eid+tshift]+=ww;
-                        else
+                        else{
+			  if(cfg->outputdomain==odMesh){
                             tracer->mesh->weight[eid+tshift]+=ww;
+			  }else{
+			    float dstep, segloss;
+			    int4 idx;
+			    int i, seg=(int)(r->Lmove+0.5f);
+			    seg=(seg<<1);
+			    dstep=r->Lmove/seg;
+#ifdef __INTEL_COMPILER
+	                    segloss=expf(-prop->mua*dstep);
+#else
+	                    segloss=fast_expf9(-prop->mua*dstep);
+#endif
+			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
+			    S =  _mm_add_ps(S, _mm_set1_ps(dstep*0.5f)); /*starting point*/
+                            for(i=0; i< seg; i++){
+				P =_mm_cvttps_epi32(S);
+				_mm_store_si128((__m128i *)&(idx.x),P);
+				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.z+tshift]+=(1.f-segloss)*currweight;
+				currweight*=segloss;
+			        S = _mm_add_ps(S, T);
+                            }
+			  }
+			}
 		  }else{
 			int i;
-	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
-                           ww/=prop->mua;
                         ww*=1.f/3.f;
                         if(cfg->isatomic)
 			    for(i=0;i<3;i++)
@@ -1262,7 +1290,7 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	float *baryp0=&(r->bary0.x);
 	int eid = r->eid-1;
 	int *ee = (int *)(mesh->elem+eid);
-    	int i,tshift;
+    	int i,tshift, datalen=(cfg->outputdomain) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);;
 	medium * prop=mesh->med+(mesh->type[eid]);
         float ww=r->weight;
 
@@ -1271,15 +1299,18 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
         ww-=r->weight;
 	r->Eabsorb+=ww;
 
-	if(!cfg->basisorder){
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*datalen;
+
+        if(cfg->outputdomain==odGrid){
+	
+	}else{
+	    if(!cfg->basisorder){
                 if(cfg->isatomic)
 #pragma omp atomic
 		    mesh->weight[eid+tshift]+=ww;
                 else
                     mesh->weight[eid+tshift]+=ww;
-	}else{
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
+	    }else{
                 if(cfg->isatomic)
 		    for(i=0;i<4;i++)
 #pragma omp atomic
@@ -1287,5 +1318,6 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
                 else
                     for(i=0;i<4;i++)
                         mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
+            }
 	}
 }

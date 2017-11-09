@@ -52,6 +52,14 @@ void mesh_init(tetmesh *mesh){
 	mesh->weight=NULL;
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
+        mesh->nmin.x=VERY_BIG;
+	mesh->nmin.y=VERY_BIG;
+	mesh->nmin.z=VERY_BIG;
+	mesh->nmin.w=1.f;
+        mesh->nmax.x=-VERY_BIG;
+	mesh->nmax.y=-VERY_BIG;
+	mesh->nmax.z=-VERY_BIG;
+	mesh->nmax.w=1.f;
 }
 
 void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
@@ -98,14 +106,44 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 		MESH_ERROR("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
-	if(cfg->basisorder) 
-	   mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
-
+        mesh->nmin.x=VERY_BIG;
+	mesh->nmin.y=VERY_BIG;
+	mesh->nmin.z=VERY_BIG;
+        mesh->nmax.x=-VERY_BIG;
+	mesh->nmax.y=-VERY_BIG;
+	mesh->nmax.z=-VERY_BIG;
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
 			MESH_ERROR("node file has wrong format");
 	}
 	fclose(fp);
+	for(i=0;i<mesh->nn;i++){
+		mesh->nmin.x=MIN(mesh->node[i].x, mesh->nmin.x);
+		mesh->nmin.y=MIN(mesh->node[i].y, mesh->nmin.y);
+		mesh->nmin.z=MIN(mesh->node[i].z, mesh->nmin.z);
+		mesh->nmax.x=MAX(mesh->node[i].x, mesh->nmax.x);
+		mesh->nmax.y=MAX(mesh->node[i].y, mesh->nmax.y);
+		mesh->nmax.z=MAX(mesh->node[i].z, mesh->nmax.z);
+	}
+        mesh->nmin.x-=EPS;
+	mesh->nmin.y-=EPS;
+	mesh->nmin.z-=EPS;
+        mesh->nmax.x+=EPS;
+	mesh->nmax.y+=EPS;
+	mesh->nmax.z+=EPS;
+	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->unitinmm)+1;
+	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->unitinmm)+1;
+	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->unitinmm)+1;
+	cfg->crop0.x=cfg->dim.x;
+        cfg->crop0.y=cfg->dim.y*cfg->dim.x;
+	cfg->crop0.z=cfg->dim.y*cfg->dim.x*cfg->dim.z;
+
+	if(cfg->basisorder){
+	  if(cfg->outputdomain==odMesh)
+	      mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
+	  else
+	      mesh->weight=(double *)calloc(sizeof(double)*cfg->crop0.z,cfg->maxgate);
+        }
 }
 
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
@@ -170,6 +208,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
+	  if(cfg->outputdomain==odMesh)
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
@@ -630,7 +669,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int i,j;
+	int i,j, datalen=(cfg->outputdomain) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
                 sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
@@ -640,7 +679,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         if(cfg->outputformat==ofBin){
 		if((fp=fopen(fweight,"wb"))==NULL)
          	        MESH_ERROR("can not open weight file to write");
-		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),mesh->nn*cfg->maxgate,fp)!=mesh->nn*cfg->maxgate)
+		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),datalen*cfg->maxgate,fp)!=datalen*cfg->maxgate)
 			MESH_ERROR("fail to write binary weight file");
 		fclose(fp);
 		return;
@@ -648,20 +687,11 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	if((fp=fopen(fweight,"wt"))==NULL){
 		MESH_ERROR("can not open weight file to write");
 	}
-	if(cfg->basisorder)
-	  for(i=0;i<cfg->maxgate;i++)
-	   for(j=0;j<mesh->nn;j++){
-		/*pn=mesh->node+j;
-		if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
-		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
+	for(i=0;i<cfg->maxgate;i++)
+	    for(j=0;j<datalen;j++){
+		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
 			MESH_ERROR("can not write to weight file");
-	   }
-	else
-	  for(i=0;i<cfg->maxgate;i++)
-	   for(j=0;j<mesh->ne;j++){
-		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->ne+j])==0)
-			MESH_ERROR("can not write to weight file");
-	   }
+	}
 	fclose(fp);
 }
 
@@ -764,9 +794,9 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
+        int datalen=(cfg->outputdomain) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
-            int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
             if(cfg->outputtype==otWL || cfg->outputtype==otWP)
                normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
@@ -777,7 +807,6 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
            return normalizor;
         }
 	if(cfg->outputtype==otEnergy){
-            int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             normalizor=1.f/cfg->nphoton;
             
             for(i=0;i<cfg->maxgate;i++)
@@ -785,11 +814,24 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
                   mesh->weight[i*datalen+j]*=normalizor;
 	    return normalizor;
         }
-	if(cfg->basisorder){
+	if(cfg->outputdomain==odGrid){
+            for(i=0;i<datalen;i++)
+	      for(j=0;j<cfg->maxgate;j++)
+	         energydeposit+=mesh->weight[j*datalen+i];
+
+            for(i=0;i<datalen;i++){
+	      energyelem=mesh->nmin.w*mesh->nmin.w*mesh->nmin.w*mesh->med[mesh->type[i]].mua;
+              for(j=0;j<cfg->maxgate;j++)
+        	mesh->weight[j*datalen+i]/=energyelem;
+	    }
+            normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
+	  }
+	else{
+	  if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
-              for(j=0;j<mesh->nn;j++)
+              for(j=0;j<datalen;j++)
         	if(mesh->nvol[j]>0.f)
-                   mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
+                   mesh->weight[i*datalen+j]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
 	      ee=(int *)(mesh->elem+i);
@@ -800,28 +842,24 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
 	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
-	    if(cfg->outputtype==otFlux)
-               normalizor/=cfg->tstep;
-            for(i=0;i<cfg->maxgate;i++)
-               for(j=0;j<mesh->nn;j++)
-		  mesh->weight[i*mesh->nn+j]*=normalizor;
-	}else{
-            for(i=0;i<mesh->ne;i++)
+	  }else{
+            for(i=0;i<datalen;i++)
 	      for(j=0;j<cfg->maxgate;j++)
-	         energydeposit+=mesh->weight[j*mesh->ne+i];
+	         energydeposit+=mesh->weight[j*datalen+i];
 
-            for(i=0;i<mesh->ne;i++){
+            for(i=0;i<datalen;i++){
 	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]].mua;
               for(j=0;j<cfg->maxgate;j++)
-        	mesh->weight[j*mesh->ne+i]/=energyelem;
+        	mesh->weight[j*datalen+i]/=energyelem;
 	    }
             normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
-            if(cfg->outputtype==otFlux)
+	  }
+	}
+	if(cfg->outputtype==otFlux)
                normalizor/=cfg->tstep;
 
-            for(i=0;i<cfg->maxgate;i++)
-               for(j=0;j<mesh->ne;j++)
-                  mesh->weight[i*mesh->ne+j]*=normalizor;
-	}
+	for(i=0;i<cfg->maxgate;i++)
+	    for(j=0;j<datalen;j++)
+	        mesh->weight[i*datalen+j]*=normalizor;
 	return normalizor;
 }

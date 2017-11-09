@@ -52,6 +52,8 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
+enum TOutputDomain {odMesh, odGrid};
+
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -153,6 +155,7 @@ typedef struct MMC_config{
 	char issaveseed;    /**<1 save the seed for a detected photon, 0 do not save*/
 	char isatomic;      /**<1 use atomic operations for weight accumulation, 0 do not use*/
 	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
+	char outputdomain;  /**<0-mesh, 1 grid*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
         char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
         char outputformat;  /**<'ascii' output is text, 'bin': binary, 'json': regular json, 'ubjson': universal binary json*/
