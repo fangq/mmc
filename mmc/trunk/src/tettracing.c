@@ -787,8 +787,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                             tracer->mesh->weight[eid+tshift]+=ww;
 			  }else{
 			    float dstep, segloss;
-			    int4 idx;
-			    int i, seg=(int)(r->Lmove+0.5f);
+			    int4 idx __attribute__ ((aligned(16)));
+			    int i, seg=(int)(r->Lmove+0.5f)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
 #ifdef __INTEL_COMPILER
@@ -797,11 +797,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	                    segloss=fast_expf9(-prop->mua*dstep);
 #endif
 			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
-			    S =  _mm_add_ps(S, _mm_set1_ps(dstep*0.5f)); /*starting point*/
+			    S =  _mm_add_ps(S, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
                             for(i=0; i< seg; i++){
-				P =_mm_cvttps_epi32(S);
+				P =_mm_cvtps_epi32(S);
 				_mm_store_si128((__m128i *)&(idx.x),P);
-				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.z+tshift]+=(1.f-segloss)*currweight;
+				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=(1.f-segloss)*currweight;
 				currweight*=segloss;
 			        S = _mm_add_ps(S, T);
                             }
