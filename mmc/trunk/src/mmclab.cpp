@@ -282,14 +282,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
 	if(nlhs>=1){
-    	    if(!cfg.basisorder)
-		fielddim[0]=mesh.ne;
-	    else
-		fielddim[0]=mesh.nn;
+	    int datalen=(cfg.outputdomain==odGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
+            fielddim[0]=datalen;
 	    fielddim[1]=cfg.maxgate; fielddim[2]=0; fielddim[3]=0; 
-    	    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
+	    if(cfg.outputdomain==odGrid){
+		fielddim[0]=cfg.dim.x;
+		fielddim[1]=cfg.dim.y; 
+		fielddim[2]=cfg.dim.z; 
+		fielddim[3]=cfg.maxgate; 
+	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,fielddim,mxDOUBLE_CLASS,mxREAL));
+	    }else{
+    	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
+	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
-	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
+	    memcpy(output,mesh.weight,datalen*cfg.maxgate*sizeof(double));
 	}
 	if(nlhs>=2 && cfg.issaveexit==2){
 	    float *detimage=(float*)calloc(cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
@@ -338,6 +344,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,isatomic)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
+    GET_ONE_FIELD(cfg,outputdomain)
     GET_ONE_FIELD(cfg,method)
     GET_ONE_FIELD(cfg,roulettesize)
     GET_ONE_FIELD(cfg,nout)
@@ -558,7 +565,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 }
 
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
-     int i,j,*ee;
+     int i,j,*ee,datalen;
      if(cfg->nphoton<=0){
          MEXERROR("cfg.nphoton must be a positive number");
      }
@@ -590,21 +597,22 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->weight)
         free(mesh->weight);
 
-     if(!cfg->basisorder)
-        mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate);
-     else
-        mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate);
+     if(cfg->outputdomain==odGrid)
+	mesh_createdualmesh(mesh,cfg);
+
+     datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+     mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
 
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
-     if(cfg->unitinmm!=1.f){
+     if(cfg->outputdomain==odMesh && cfg->unitinmm!=1.f){
         for(i=1;i<mesh->prop;i++){
 		mesh->med[i].mus*=cfg->unitinmm;
 		mesh->med[i].mua*=cfg->unitinmm;
         }
-        cfg->his.unitinmm=cfg->unitinmm;
      }
+     cfg->his.unitinmm=cfg->unitinmm;
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }

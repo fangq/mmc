@@ -95,7 +95,7 @@ void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i;
+	int tmp,len,i,datalen;
 	char fnode[MAX_PATH_LENGTH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
@@ -106,17 +106,26 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 		MESH_ERROR("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
+	for(i=0;i<mesh->nn;i++){
+		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
+			MESH_ERROR("node file has wrong format");
+	}
+	fclose(fp);
+        if(cfg->outputdomain==odGrid)
+	        mesh_createdualmesh(mesh,cfg);
+	datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
+}
+
+void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
+        int i;
         mesh->nmin.x=VERY_BIG;
 	mesh->nmin.y=VERY_BIG;
 	mesh->nmin.z=VERY_BIG;
         mesh->nmax.x=-VERY_BIG;
 	mesh->nmax.y=-VERY_BIG;
 	mesh->nmax.z=-VERY_BIG;
-	for(i=0;i<mesh->nn;i++){
-		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
-			MESH_ERROR("node file has wrong format");
-	}
-	fclose(fp);
+
 	for(i=0;i<mesh->nn;i++){
 		mesh->nmin.x=MIN(mesh->node[i].x, mesh->nmin.x);
 		mesh->nmin.y=MIN(mesh->node[i].y, mesh->nmin.y);
@@ -131,19 +140,14 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
         mesh->nmax.x+=EPS;
 	mesh->nmax.y+=EPS;
 	mesh->nmax.z+=EPS;
+
 	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->unitinmm)+1;
 	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->unitinmm)+1;
 	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->unitinmm)+1;
+
 	cfg->crop0.x=cfg->dim.x;
         cfg->crop0.y=cfg->dim.y*cfg->dim.x;
 	cfg->crop0.z=cfg->dim.y*cfg->dim.x*cfg->dim.z;
-
-	if(cfg->outputdomain==odGrid)
-	      mesh->weight=(double *)calloc(sizeof(double)*cfg->crop0.z,cfg->maxgate);
-        else if(cfg->basisorder)
-	      mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
-	else if(cfg->basisorder==0)
-	      mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 }
 
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
@@ -183,7 +187,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 
-        if(cfg->unitinmm!=1.f){
+        if(cfg->outputdomain==odMesh && cfg->unitinmm!=1.f){
            for(i=1;i<mesh->prop;i++){
                    mesh->med[i].mus*=cfg->unitinmm;
                    mesh->med[i].mua*=cfg->unitinmm;
@@ -455,6 +459,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		    cfg->dim.y=ifacemap[i]+1;
 	    }
 	}
+	if(cfg->outputdomain==odGrid)
+	    cfg->method=rtBLBadouel;
 }
 
 void tracer_build(raytracer *tracer){
@@ -669,7 +675,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int i,j, datalen=(cfg->outputdomain) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	int i,j, datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
                 sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
@@ -707,7 +713,9 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 		MESH_ERROR("can not open history file to write");
 	}
 	cfg->his.totalphoton=cfg->nphoton;
-        cfg->his.unitinmm=cfg->unitinmm;
+	cfg->his.unitinmm=1.f;
+        if(cfg->outputdomain==odMesh)
+	    cfg->his.unitinmm=cfg->unitinmm;
         cfg->his.detected=count;
 	cfg->his.savedphoton=count;
 	cfg->his.detnum=cfg->detnum;
@@ -733,6 +741,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 	int xsize=cfg->detparam1.w;
 	int ysize=cfg->detparam2.w;
 	int i,j,xindex,yindex,ntg,offset;
+	float unitinmm=(cfg->outputdomain==odMesh)? cfg->his.unitinmm : 1.f;
 
 	float xloc, yloc, weight, path;
 	for(i=0; i<count; i++){
@@ -740,7 +749,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 		weight = ppath[(i+1)*colcount-1];
 		for(j=1;j<=cfg->his.maxmedia;j++){
 			path += ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].n;
-			weight *= expf(-ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].mua*cfg->unitinmm);
+			weight *= expf(-ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].mua*unitinmm);
 		}
 		ntg = (int) path*R_C0/cfg->tstep;
 		if(ntg>cfg->maxgate-1)
@@ -792,9 +801,9 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
-	float energydeposit=0.f, energyelem,normalizor;
+	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
-        int datalen=(cfg->outputdomain) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+        int datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
@@ -815,12 +824,13 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	    return normalizor;
         }
 	if(cfg->outputdomain==odGrid){
-            for(i=0;i<datalen;i++)
-	      for(j=0;j<cfg->maxgate;j++)
+            for(j=0;j<cfg->maxgate;j++)
+               for(i=0;i<datalen;i++){
+		if(mesh->weight[j*datalen+i]!=mesh->weight[j*datalen+i]) printf("nan at [%d %d]\n",j,i);
 	         energydeposit+=mesh->weight[j*datalen+i];
-            normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
-	  }
-	else{
+	       }
+            normalizor=Eabsorb/(Etotal*energydeposit*cfg->unitinmm*cfg->unitinmm*cfg->unitinmm); /*scaling factor*/
+	}else{
 	  if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
               for(j=0;j<datalen;j++)

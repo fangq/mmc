@@ -646,7 +646,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,rc,currweight,dlen,ww;
+	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
 	__m128i P;
@@ -728,11 +728,13 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    }
             if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-	       r->weight*=expf(-prop->mua*r->Lmove);
+	       totalloss=expf(-prop->mua*r->Lmove);
 #else
-	       r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	       totalloss=fast_expf9(-prop->mua*r->Lmove);
 #endif
+               r->weight*=totalloss;
             }
+	    totalloss=1.f-totalloss;
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
@@ -760,7 +762,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		if(cfg->outputdomain==odGrid)
 		    framelen=cfg->crop0.z;
 		ww=currweight-r->weight;
-		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
 
 		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
@@ -771,24 +772,27 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
-		if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
-		   ww/=prop->mua;
+		if(prop->mua>0.f){
+		  r->Eabsorb+=ww;
+		  if(cfg->outputdomain==odMesh && (cfg->outputtype==otFlux || cfg->outputtype==otJacobian))
+                     ww/=prop->mua;
+		}
 
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
+		     if(cfg->outputdomain==odMesh){
                         if(cfg->isatomic)
 #pragma omp atomic
 			    tracer->mesh->weight[eid+tshift]+=ww;
-                        else{
-			  if(cfg->outputdomain==odMesh){
+                        else
                             tracer->mesh->weight[eid+tshift]+=ww;
-			  }else{
-			    float dstep, segloss;
+                     }else{
+			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
-			    int i, seg=(int)(r->Lmove+0.5f)+1;
+			    int i, seg=(int)(r->Lmove)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
 #ifdef __INTEL_COMPILER
@@ -797,15 +801,20 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	                    segloss=fast_expf9(-prop->mua*dstep);
 #endif
 			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
-			    S =  _mm_add_ps(S, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
+			    O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
+			    S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
+			    dstep=1.f/cfg->unitinmm;
+			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
+			    w0=ww;
                             for(i=0; i< seg; i++){
-				P =_mm_cvtps_epi32(S);
+				P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
 				_mm_store_si128((__m128i *)&(idx.x),P);
-				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=(1.f-segloss)*currweight;
-				currweight*=segloss;
+				if(idx.x<0 || idx.y<0 || idx.z<0 || idx.x>=cfg->dim.x|| idx.z>=cfg->dim.z|| idx.z>=cfg->dim.z)
+				   printf("bad idx: [%d %d %d]\n",idx.x,idx.y,idx.z);
+				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
+				w0*=segloss;
 			        S = _mm_add_ps(S, T);
                             }
-			  }
 			}
 		  }else{
 			int i;
