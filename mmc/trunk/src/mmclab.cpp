@@ -265,7 +265,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg.nphoton/dt,raytri,raytri0));
+        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg.nphoton/dt,raytri,raytri0,raytri/dt));
 
 #ifdef MATLAB_MEX_FILE
         if((cfg.debuglevel & dlProgress))
@@ -289,7 +289,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		fielddim[0]=cfg.dim.x;
 		fielddim[1]=cfg.dim.y; 
 		fielddim[2]=cfg.dim.z; 
-		fielddim[3]=cfg.maxgate; 
+		fielddim[3]=cfg.maxgate;
 	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,fielddim,mxDOUBLE_CLASS,mxREAL));
 	    }else{
     	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
@@ -597,9 +597,11 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->weight)
         free(mesh->weight);
 
-     if(cfg->outputdomain==odGrid)
+     if(cfg->outputdomain==odGrid){
 	mesh_createdualmesh(mesh,cfg);
-
+        cfg->method=rtBLBadouel;
+	cfg->basisorder=0;
+     }
      datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
      mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
 

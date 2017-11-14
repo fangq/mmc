@@ -455,12 +455,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    }
 	    for(i=0;i<4;i++){
 	        bary[i]/=s;
-		if(bary[i]<1e-5f)
-		    cfg->dim.y=ifacemap[i]+1;
 	    }
 	}
-	if(cfg->outputdomain==odGrid)
-	    cfg->method=rtBLBadouel;
 }
 
 void tracer_build(raytracer *tracer){

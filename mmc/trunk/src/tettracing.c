@@ -781,6 +781,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
+
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
 		     if(cfg->outputdomain==odMesh){
@@ -809,8 +810,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                             for(i=0; i< seg; i++){
 				P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
 				_mm_store_si128((__m128i *)&(idx.x),P);
-				if(idx.x<0 || idx.y<0 || idx.z<0 || idx.x>=cfg->dim.x|| idx.z>=cfg->dim.z|| idx.z>=cfg->dim.z)
-				   printf("bad idx: [%d %d %d]\n",idx.x,idx.y,idx.z);
 				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
 				w0*=segloss;
 			        S = _mm_add_ps(S, T);

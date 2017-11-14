@@ -1,14 +1,8 @@
 sessionid='cube';
 
 addpath('../../matlab/');
-%[node,elem]=genT5mesh(0:2:60,0:2:60,0:2:60);
 
-[no,fc]=meshabox([0 0 0], [60 60 60], 100);
-[no,fc]=removeisolatednode(no,fc);
-
-ISO2MESH_TETGENOPT='-YY'
-
-[node,elem]=s2m(no,fc,1,100);
+[node,elem]=meshgrid6(0:60:60,0:60:60,0:60:60);
 
 elem(:,1:4)=meshreorient(node,elem(:,1:4));
 
