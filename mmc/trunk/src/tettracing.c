@@ -774,7 +774,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  if(cfg->outputdomain==odMesh && (cfg->outputtype==otFlux || cfg->outputtype==otJacobian))
+		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                      ww/=prop->mua;
 		}
 
