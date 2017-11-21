@@ -111,7 +111,7 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg);
 
 void mesh_clear(tetmesh *mesh);
-float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);
+float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, int pair);
 void mesh_build(tetmesh *mesh);
 void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);
@@ -120,7 +120,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg);
 void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh);
 void mesh_savedetimage(float *detmap, mcconfig *cfg);
-float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg);
+int mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg);
 void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);

@@ -78,7 +78,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         unsigned int i;
         float raytri=0.f,raytri0=0.f;
         unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel;
-	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL};
 
 	t0=StartTimer();
 	
@@ -109,8 +109,17 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
+	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
+	int idx;
+	// replay mode AND wide-field detection pattern(s)
+	if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+           visit.totalweight=(double*)calloc(cfg->detnum,sizeof(double));
+           visit.kahanc=(double*)calloc(cfg->detnum,sizeof(double));
+        }else{
+           visit.totalweight=(double*)calloc(1,sizeof(double));
+           visit.kahanc=(double*)calloc(1,sizeof(double));
+        }
 	if(cfg->issavedet){
 	    if(cfg->issaveseed)
 	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -148,8 +157,12 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			mesh_saveweightat(mesh,cfg,i+1);
 	}
 
+	for(idx=0; idx<cfg->detnum; idx++)
 	#pragma omp atomic
-		master.totalweight += visit.totalweight;
+		master.totalweight[idx] += visit.totalweight[idx];
+	
+	free(visit.totalweight);
+	free(visit.kahanc);
 
 	if(cfg->issavedet){
 	    #pragma omp atomic
@@ -190,9 +203,16 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
 	if(cfg->isnormalized){
-          cfg->his.normalizer=mesh_normalize(mesh,cfg,Eabsorb,master.totalweight);
-          fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg->his.normalizer);
+	  int idx;
+	  if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+	      for(idx=0; idx<cfg->detnum; idx++){
+	          cfg->his.normalizer=mesh_normalize(mesh,cfg,Eabsorb,master.totalweight[idx],idx);
+	      }
+	  }else{
+              cfg->his.normalizer=mesh_normalize(mesh,cfg,Eabsorb,master.totalweight[0],0);
+              fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+		      master.totalweight[0],100.f*Eabsorb/master.totalweight[0],cfg->his.normalizer);
+          }
 	}
 	if(cfg->issave2pt){
 		switch(cfg->outputtype){
@@ -216,7 +236,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			free(master.photonseed);
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
-
+	
+	free(master.totalweight);
+	free(master.kahanc);
 	return 0;
 }
 

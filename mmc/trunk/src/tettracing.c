@@ -465,7 +465,30 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		//if(cfg->debuglevel&dlBary)
 		//    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
-                if(cfg->mcmethod==mmMCX){
+		// replay mode with wide-field detection
+		if(cfg->mcmethod==mmMCX){
+                if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+			int pshift = (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne)*cfg->maxgate;
+			int offset, idx;
+			for(idx=0;idx<cfg->detnum;idx++){
+				offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+				ww *= cfg->detpattern[offset];
+				if(!cfg->basisorder)
+		    			tracer->mesh->weight[eid+tshift+pshift*idx]+=ww;
+				else{
+					T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
+		    			_mm_store_ps(barypout,T);
+					if(cfg->isatomic)
+		        		  for(j=0;j<4;j++)
+#pragma omp atomic
+		            		    tracer->mesh->weight[ee[j]-1+tshift+pshift*idx]+=barypout[j];
+                    			else
+                        		  for(j=0;j<4;j++)
+                            		    tracer->mesh->weight[ee[j]-1+tshift+pshift*idx]+=barypout[j];
+				}
+			}
+		}
+		else{
 		  if(!cfg->basisorder)
 		    tracer->mesh->weight[eid+tshift]+=ww;
 		  else{
@@ -480,6 +503,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         for(j=0;j<4;j++)
                             tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
 		  }
+		}
 		}
 		break;
 	   }
@@ -825,7 +849,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
         float mom;
-	float kahany, kahant;
+	double kahany, kahant;
 	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
 
 	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
@@ -851,13 +875,32 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
-	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP))
-		kahany=cfg->replayweight[r.photonid]-visit->kahanc;	/* when replay mode, accumulate detected photon weight */
-	else
-		kahany=r.weight-visit->kahanc;
-	kahant=visit->totalweight + kahany;
-	visit->kahanc=(kahant - visit->totalweight) - kahany;
-	visit->totalweight=kahant;
+	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP)){
+	/* when replay mode, accumulate detected photon weight */
+		if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
+		/* wide-field detection */
+			int offset, idx;
+			for(idx=0; idx<cfg->detnum; idx++){
+				offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r.photonid];
+				kahany=cfg->replayweight[r.photonid]*cfg->detpattern[offset]-visit->kahanc[idx];
+				kahant=visit->totalweight[idx] + kahany;
+				visit->kahanc[idx]=(kahant - visit->totalweight[idx]) - kahany;
+				visit->totalweight[idx]=kahant;
+			}
+		}else{
+		/* normal detection*/
+			kahany=cfg->replayweight[r.photonid]-visit->kahanc[0];
+			kahant=visit->totalweight[0] + kahany;
+			visit->kahanc[0]=(kahant - visit->totalweight[0]) - kahany;
+			visit->totalweight[0]=kahant;
+		}
+	}else{
+	/* non-replay mode*/
+		kahany=r.weight-visit->kahanc[0];
+		kahant=visit->totalweight[0] + kahany;
+		visit->kahanc[0]=(kahant - visit->totalweight[0]) - kahany;
+		visit->totalweight[0]=kahant;
+	}
 
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };

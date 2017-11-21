@@ -72,8 +72,8 @@ typedef struct MMC_visitor{
 	int   reclen;
 	float *partialpath;
 	void  *photonseed;
-	double totalweight;
-	double kahanc;
+	double *totalweight;
+	double *kahanc;
 } visitor;
 
 #ifdef	__cplusplus

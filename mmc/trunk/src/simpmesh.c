@@ -98,8 +98,14 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 		MESH_ERROR("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
-	if(cfg->basisorder) 
-	   mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
+	if(cfg->basisorder){
+	   // replay mode AND wide-field detection pattern(s)
+	   if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+	       mesh->weight=(double *)calloc(sizeof(double)*mesh->nn*cfg->detnum,cfg->maxgate);
+	   }else{
+	       mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
+	   }
+	}
 
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
@@ -169,8 +175,14 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	}
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
-	if(!cfg->basisorder)
-	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
+	if(!cfg->basisorder){
+	   // replay mode AND wide-field detection pattern(s)
+	   if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+	       mesh->weight=(double *)calloc(sizeof(double)*mesh->ne*cfg->detnum,cfg->maxgate);
+	   }else{
+	       mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
+	   }
+	}
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i;
@@ -290,6 +302,9 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
        float *ppath=(float*)malloc(his.savedphoton*his.colcount*sizeof(float));
        cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));
        cfg->replaytime=(float*)malloc(his.savedphoton*sizeof(float));
+       if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
+           cfg->replaydetidx=(int*)malloc(his.savedphoton*sizeof(float));
+       }
        fseek(fp,sizeof(his),SEEK_SET);
        if(fread(ppath,his.colcount*sizeof(float),his.savedphoton,fp)!=his.savedphoton)
            MESH_ERROR("error when reading the partial path data");
@@ -300,7 +315,8 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
                memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
 		// replay with wide-field detection pattern, the partial path has to contain photon exit information
 		if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
-		    cfg->replayweight[cfg->nphoton]=mesh_getdetweight(i,his.colcount,ppath,cfg);
+		    cfg->replayweight[cfg->nphoton]=1;
+                    cfg->replaydetidx[cfg->nphoton]=mesh_getdetweight(i,his.colcount,ppath,cfg);
 		}else{
                	    cfg->replayweight[cfg->nphoton]=ppath[(i+1)*his.colcount-1];
 		}
@@ -648,6 +664,35 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	if((fp=fopen(fweight,"wt"))==NULL){
 		MESH_ERROR("can not open weight file to write");
 	}
+	// replay mode with wide-field detection, currently do not support binary format
+	if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+		int k, shift;
+		if(cfg->basisorder){
+		    shift = mesh->nn*cfg->maxgate;
+		    for(k=0;k<cfg->detnum;k++){
+		      for(i=0;i<cfg->maxgate;i++){
+		        for(j=0;j<mesh->nn;j++){
+		          if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[k*shift+i*mesh->nn+j])==0)
+		            MESH_ERROR("can not write to weight file");
+		        }
+		      }
+		    }
+		}
+		else{
+		    shift = mesh->ne*cfg->maxgate;
+		    for(k=0;k<cfg->detnum;k++){
+		      for(i=0;i<cfg->maxgate;i++){
+		        for(j=0;j<mesh->ne;j++){
+		          if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[k*shift+i*mesh->ne+j])==0)
+		            MESH_ERROR("can not write to weight file");
+		        }
+		      }
+		    }
+		}
+		fclose(fp);
+		return;
+	}
+	// normal mode
 	if(cfg->basisorder)
 	  for(i=0;i<cfg->maxgate;i++)
 	   for(j=0;j<mesh->nn;j++){
@@ -742,7 +787,7 @@ void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	fclose(fp);
 }
 
-float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg){
+int mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg){
 	
 	float x0=cfg->detpos[0].x;
 	float y0=cfg->detpos[0].y;
@@ -756,24 +801,25 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
 	int yindex = (yloc-y0)/yrange*ysize;
 	if(xindex<0 || xindex>xsize-1 || yindex<0 || yindex>ysize-1)
 		MESH_ERROR("photon location not within the detection plane");
-	return cfg->detpattern[yindex*xsize+xindex];
+	return (yindex*xsize+xindex);
 }
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
-float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
+float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, int pair){
         int i,j,k;
 	float energydeposit=0.f, energyelem,normalizor;
 	int *ee;
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
+	    int offset=pair*datalen*cfg->maxgate;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
             if(cfg->outputtype==otWL || cfg->outputtype==otWP)
                normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
 
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
-                  mesh->weight[i*datalen+j]*=normalizor;
+                  mesh->weight[i*datalen+j+offset]*=normalizor;
            return normalizor;
         }
 	if(cfg->outputtype==otEnergy){
