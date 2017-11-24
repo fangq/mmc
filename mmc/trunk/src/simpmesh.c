@@ -111,9 +111,9 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 			MESH_ERROR("node file has wrong format");
 	}
 	fclose(fp);
-        if(cfg->outputdomain==odGrid)
+        if(cfg->method==rtBLBadouelGrid)
 	        mesh_createdualmesh(mesh,cfg);
-	datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
 }
 
@@ -187,7 +187,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 
-        if(cfg->outputdomain==odMesh && cfg->unitinmm!=1.f){
+        if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
            for(i=1;i<mesh->prop;i++){
                    mesh->med[i].mus*=cfg->unitinmm;
                    mesh->med[i].mua*=cfg->unitinmm;
@@ -212,7 +212,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
-	  if(cfg->outputdomain==odMesh)
+	  if(cfg->method==rtBLBadouel)
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
@@ -537,7 +537,7 @@ void tracer_build(raytracer *tracer){
 #endif
 			}
                 }
-	}else if(tracer->method==rtBLBadouel){
+	}else if(tracer->method==rtBLBadouel || tracer->method==rtBLBadouelGrid){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f},vN={0.f};
 
@@ -671,7 +671,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int i,j, datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
                 sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
@@ -710,7 +710,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	}
 	cfg->his.totalphoton=cfg->nphoton;
 	cfg->his.unitinmm=1.f;
-        if(cfg->outputdomain==odMesh)
+        if(cfg->method!=rtBLBadouelGrid)
 	    cfg->his.unitinmm=cfg->unitinmm;
         cfg->his.detected=count;
 	cfg->his.savedphoton=count;
@@ -737,7 +737,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 	int xsize=cfg->detparam1.w;
 	int ysize=cfg->detparam2.w;
 	int i,j,xindex,yindex,ntg,offset;
-	float unitinmm=(cfg->outputdomain==odMesh)? cfg->his.unitinmm : 1.f;
+	float unitinmm=(cfg->method!=rtBLBadouelGrid)? cfg->his.unitinmm : 1.f;
 
 	float xloc, yloc, weight, path;
 	for(i=0; i<count; i++){
@@ -799,7 +799,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
 	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
-        int datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+        int datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
@@ -818,7 +818,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
                   mesh->weight[i*datalen+j]*=normalizor;
 	    return normalizor;
         }
-	if(cfg->outputdomain==odGrid){
+	if(cfg->method==rtBLBadouelGrid){
             normalizor=1.0/(Etotal*cfg->unitinmm*cfg->unitinmm*cfg->unitinmm); /*scaling factor*/
 	}else{
 	  if(cfg->basisorder){

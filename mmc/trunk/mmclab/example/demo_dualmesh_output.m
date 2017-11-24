@@ -51,7 +51,7 @@ fbox=volface(ebox);
 
 ISO2MESH_TETGENOPT='-Y -A'
 [cfgs(1).node,cfgs(1).elem]=surf2mesh(no,fc,[0 0 0],[60.1 60.1 60.1],1,100,[1,1,1;30 30 30]);
-cfgs(1).outputdomain=1;
+cfgs(1).method='grid';
 
 
 clear ISO2MESH_TETGENOPT
@@ -65,7 +65,7 @@ nfull=[no;fixednodes];
 [cfgs(2).node,cfgs(2).elem,face2]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,2,[30 30 30],[],[1 1 1 1 1 1 1 1]);
 [cfgs(2).node,cfgs(2).elem]=sortmesh(srcpos,cfgs(2).node,cfgs(2).elem,1:4);
 cfgs(2).elem(:,5)=cfgs(2).elem(:,5)+1;
-cfgs(2).outputdomain=0;
+cfgs(2).method='havel';
 
 phimmc=mmclab(cfgs);
 

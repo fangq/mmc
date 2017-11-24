@@ -282,10 +282,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
 	if(nlhs>=1){
-	    int datalen=(cfg.outputdomain==odGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
+	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
             fielddim[0]=datalen;
 	    fielddim[1]=cfg.maxgate; fielddim[2]=0; fielddim[3]=0; 
-	    if(cfg.outputdomain==odGrid){
+	    if(cfg.method==rtBLBadouelGrid){
 		fielddim[0]=cfg.dim.x;
 		fielddim[1]=cfg.dim.y; 
 		fielddim[2]=cfg.dim.z; 
@@ -344,8 +344,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,isatomic)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
-    GET_ONE_FIELD(cfg,outputdomain)
-    GET_ONE_FIELD(cfg,method)
     GET_ONE_FIELD(cfg,roulettesize)
     GET_ONE_FIELD(cfg,nout)
     GET_ONE_FIELD(cfg,isref3)
@@ -500,6 +498,22 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(k=0;k<arraydim[0]*arraydim[1];k++)
              cfg->srcpattern[k]=val[k];
         printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
+    }else if(strcmp(name,"method")==0){
+        int len=mxGetNumberOfElements(item);
+        const char *methods[]={"plucker","havel","badouel","elem","grid",""};
+        char methodstr[MAX_SESSION_LENGTH]={'\0'};
+
+        if(!mxIsChar(item) || len==0)
+             mexErrMsgTxt("the 'method' field must be a non-empty string");
+	if(len>MAX_SESSION_LENGTH)
+	     mexErrMsgTxt("the 'method' field is too long");
+        int status = mxGetString(item, methodstr, MAX_SESSION_LENGTH);
+        if (status != 0)
+             mexWarnMsgTxt("not enough space. string is truncated.");
+        cfg->method=mcx_keylookup(methodstr,methods);
+        if(cfg->method==-1)
+             mexErrMsgTxt("the specified method is not supported");
+	printf("mmc.method='%s';\n",methodstr);
     }else if(strcmp(name,"outputtype")==0){
         int len=mxGetNumberOfElements(item);
         const char *outputtype[]={"flux","fluence","energy","jacobian","wl","wp",""};
@@ -597,18 +611,17 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(mesh->weight)
         free(mesh->weight);
 
-     if(cfg->outputdomain==odGrid){
+     if(cfg->method==rtBLBadouelGrid){
 	mesh_createdualmesh(mesh,cfg);
-        cfg->method=rtBLBadouel;
 	cfg->basisorder=0;
      }
-     datalen=(cfg->outputdomain==odGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+     datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
      mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
 
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
-     if(cfg->outputdomain==odMesh && cfg->unitinmm!=1.f){
+     if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
         for(i=1;i<mesh->prop;i++){
 		mesh->med[i].mus*=cfg->unitinmm;
 		mesh->med[i].mua*=cfg->unitinmm;

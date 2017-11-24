@@ -56,10 +56,10 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton", "--outputdomain",""};
+                 "--debugphoton",""};
 
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
-const char raytracing[]={'p','h','b','s','\0'};
+const char raytracing[]={'p','h','b','s','g','\0'};
 const char outputtype[]={'x','f','e','j','l','p','\0'};
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
@@ -121,7 +121,6 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->srcdir.w=0.f;
      cfg->isatomic=1;
      cfg->debugphoton=-1;
-     cfg->outputdomain=odMesh;
 
      cfg->tstart=0.f;
      cfg->tstep=0.f;
@@ -751,8 +750,7 @@ void mcx_validatecfg(mcconfig *cfg){
 
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE)
         cfg->seed=time(NULL);
-     if(cfg->outputdomain==odGrid){
-        cfg->method=rtBLBadouel;
+     if(cfg->method==rtBLBadouelGrid){
 	cfg->basisorder=0;
      }
 }
@@ -916,8 +914,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                      if (cfg->ismomentum) cfg->issavedet=1;
                                 }else if(strcmp(argv[i]+2,"atomic")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->isatomic),"bool");
-                                }else if(strcmp(argv[i]+2,"outputdomain")==0){
-		                     i=mcx_readarg(argc,argv,i,&(cfg->outputdomain),"int");
                                 }else if(strcmp(argv[i]+2,"debugphoton")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
                                 }else
@@ -989,11 +985,12 @@ where possible parameters include (the first item in [] is the default value)\n\
                                to calculate the mua/mus Jacobian matrices\n\
  -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
                                detector (det ID starts from 1), use with -E \n\
- -M [%c|PHBS]  (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+ -M [%c|PHBSG] (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
 			       B - partial Badouel's method (used by TIM-OS)\n\
 			       S - branch-less Badouel's method with SSE\n\
+			       G - dual-mesh MMC with grid output\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\

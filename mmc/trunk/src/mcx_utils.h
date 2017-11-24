@@ -44,7 +44,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
 
-enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
+enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};
 enum TMCMethod {mmMCX, mmMCML};
 
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
@@ -156,7 +156,6 @@ typedef struct MMC_config{
 	char issaveseed;    /**<1 save the seed for a detected photon, 0 do not save*/
 	char isatomic;      /**<1 use atomic operations for weight accumulation, 0 do not use*/
 	char method;        /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
-	char outputdomain;  /**<0-mesh, 1 grid*/
 	char basisorder;    /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
         char outputtype;    /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
         char outputformat;  /**<'ascii' output is text, 'bin': binary, 'json': regular json, 'ubjson': universal binary json*/
