@@ -813,19 +813,13 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         }
 	if(cfg->outputtype==otEnergy){
             normalizor=1.f/cfg->nphoton;
-            
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
                   mesh->weight[i*datalen+j]*=normalizor;
 	    return normalizor;
         }
 	if(cfg->outputdomain==odGrid){
-            for(j=0;j<cfg->maxgate;j++)
-               for(i=0;i<datalen;i++){
-		if(mesh->weight[j*datalen+i]!=mesh->weight[j*datalen+i]) printf("nan at [%d %d]\n",j,i);
-	         energydeposit+=mesh->weight[j*datalen+i];
-	       }
-            normalizor=Eabsorb/(Etotal*energydeposit*cfg->unitinmm*cfg->unitinmm*cfg->unitinmm); /*scaling factor*/
+            normalizor=1.0/(Etotal*cfg->unitinmm*cfg->unitinmm*cfg->unitinmm); /*scaling factor*/
 	}else{
 	  if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
