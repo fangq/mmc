@@ -5,12 +5,12 @@
 0.0 2e-9 2e-9       # time-gates(s): start, end, step
 replaywide          # volume ('uchar' format)
 -1                  # initial eid
-1 0                 # detector number and radius (mm)
+2 0                 # detector number and radius (mm)
 10.0 10.0 20.1 0.0	# detector 1 position (mm)
 pattern
 40.0 0.0 0.0 40     # source param1
 0.0 40.0 0.0 40     # source param2
-pattern1.pat        # source pattern
+pattern0.pat        # source pattern
 40.0 0.0 0.0 40     # detector param1
 0.0 40.0 0.0 40     # detector param2
-pattern2.pat        # detector pattern
+pattern3.pat        # detector pattern

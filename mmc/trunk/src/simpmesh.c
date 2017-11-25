@@ -204,7 +204,6 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
 		if(mesh->type[i]==-2){	/*number of elements in the initial candidate list*/
 			mesh->detelemlen++;
 			cfg->isextdet=1;
-			cfg->detnum=0;	// when detecting wide-field detectors, suppress point detectors
                 }
 	}
 	/*Record the index of inital elements to initiate source search*/

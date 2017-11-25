@@ -472,11 +472,10 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			int offset, idx;
 			for(idx=0;idx<cfg->detnum;idx++){
 				offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
-				ww *= cfg->detpattern[offset];
 				if(!cfg->basisorder)
-		    			tracer->mesh->weight[eid+tshift+pshift*idx]+=ww;
+		    			tracer->mesh->weight[eid+tshift+pshift*idx] += ww*cfg->detpattern[offset];
 				else{
-					T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
+					T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*cfg->detpattern[offset]*0.5f));
 		    			_mm_store_ps(barypout,T);
 					if(cfg->isatomic)
 		        		  for(j=0;j<4;j++)
@@ -988,7 +987,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
-                       if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
+			/* detnum now can represent the number of wide-field detection patterns, no need to set the number to 0*/
+                       if(cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
                           exitdet=oldeid;
                        }else
 		         for(i=0;i<cfg->detnum;i++){

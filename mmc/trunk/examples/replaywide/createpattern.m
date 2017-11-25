@@ -21,3 +21,8 @@ fclose(fid);
 fid=fopen('pattern2.pat','wb','ieee-le');
 fwrite(fid,pat2','float');
 fclose(fid);
+
+fid=fopen('pattern3.pat','wb','ieee-le');
+fwrite(fid,pat1','float');
+fwrite(fid,pat2','float');
+fclose(fid);

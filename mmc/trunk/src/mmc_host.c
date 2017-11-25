@@ -79,6 +79,13 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         float raytri=0.f,raytri0=0.f;
         unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel;
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL};
+	if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+           master.totalweight=(double*)calloc(cfg->detnum,sizeof(double));
+           master.kahanc=(double*)calloc(cfg->detnum,sizeof(double));
+        }else{
+           master.totalweight=(double*)calloc(1,sizeof(double));
+           master.kahanc=(double*)calloc(1,sizeof(double));
+        }
 
 	t0=StartTimer();
 	
@@ -157,9 +164,14 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			mesh_saveweightat(mesh,cfg,i+1);
 	}
 
-	for(idx=0; idx<cfg->detnum; idx++)
-	#pragma omp atomic
-		master.totalweight[idx] += visit.totalweight[idx];
+	if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+		for(idx=0; idx<cfg->detnum; idx++)
+		#pragma omp atomic
+			master.totalweight[idx] += visit.totalweight[idx];
+	}else{
+		#pragma omp atomic
+		master.totalweight[0] += visit.totalweight[0];
+	}
 	
 	free(visit.totalweight);
 	free(visit.kahanc);
@@ -201,7 +213,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg->nphoton/dt,raytri,raytri0));
         if(cfg->issavedet)
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
-
 	if(cfg->isnormalized){
 	  int idx;
 	  if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
