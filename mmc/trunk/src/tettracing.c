@@ -215,11 +215,24 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			else
                         	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
                         if(cfg->mcmethod==mmMCX){
-                            if(cfg->isatomic)
-#pragma omp atomic
-		 	        tracer->mesh->weight[eid+tshift]+=ww;
-                            else
-                                tracer->mesh->weight[eid+tshift]+=ww;
+				if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+					int pshift = tracer->mesh->ne*cfg->maxgate;
+					int offset, idx;
+					for(idx=0;idx<cfg->detnum;idx++){
+						offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+						if(cfg->isatomic)
+							#pragma omp atomic
+			 	        		tracer->mesh->weight[eid+tshift+pshift*idx] += ww*cfg->detpattern[offset];
+						else
+							tracer->mesh->weight[eid+tshift+pshift*idx] += ww*cfg->detpattern[offset];
+					}
+				}else{
+		                    if(cfg->isatomic)
+					#pragma omp atomic
+			 	        tracer->mesh->weight[eid+tshift]+=ww;
+		                    else
+		                        tracer->mesh->weight[eid+tshift]+=ww;
+				}
                         }
 		}else{
 	                if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"Y [%f %f %f %f]\n",
@@ -245,14 +258,29 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				  if(r->isend)
                   		    for(i=0;i<4;i++)
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
-                                  if(cfg->mcmethod==mmMCX && cfg->outputtype!=otWP){
-                                    if(cfg->isatomic)
-                		      for(i=0;i<4;i++)
-#pragma omp atomic
-                     			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
-                                    else
-                                      for(i=0;i<4;i++)
-                                        tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+                                  if(cfg->mcmethod==mmMCX){
+				    if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+					int pshift = tracer->mesh->nn*cfg->maxgate;
+					int offset, idx;
+					for(idx=0;idx<cfg->detnum;idx++){
+						offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+						if(cfg->isatomic)
+		        		      		for(i=0;i<4;i++)
+							#pragma omp atomic
+		             					tracer->mesh->weight[ee[i]-1+tshift+pshift*idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
+		                            	else
+		                              		for(i=0;i<4;i++)
+		                                		tracer->mesh->weight[ee[i]-1+tshift+pshift*idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
+					}
+				    }else{
+		                            if(cfg->isatomic)
+		        		      for(i=0;i<4;i++)
+						#pragma omp atomic
+		             			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+		                            else
+		                              for(i=0;i<4;i++)
+		                                tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+				    }
                                   }
 				}
 				if(r->isend){
