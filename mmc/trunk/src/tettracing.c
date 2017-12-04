@@ -216,15 +216,15 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
             if(cfg->mcmethod==mmMCX){
                 if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
-                    int pshift = tracer->mesh->ne*cfg->maxgate;
+                    int pshift = (tshift+eid)*cfg->detnum;
                     int offset, idx;
                     for(idx=0;idx<cfg->detnum;idx++){
                         offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
                         if(cfg->isatomic)
 #pragma omp atomic
-                            tracer->mesh->weight[eid+tshift+pshift*idx] += ww*cfg->detpattern[offset];
+                            tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                         else
-                            tracer->mesh->weight[eid+tshift+pshift*idx] += ww*cfg->detpattern[offset];
+                            tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                     }
                 }else{
                     if(cfg->isatomic)
@@ -260,17 +260,26 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                             baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
                     if(cfg->mcmethod==mmMCX){
                         if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
-                            int pshift = tracer->mesh->nn*cfg->maxgate;
+                            int pshift;
                             int offset, idx;
-                            for(idx=0;idx<cfg->detnum;idx++){
-                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
-                                if(cfg->isatomic)
-                                    for(i=0;i<4;i++)
+
+                            if(cfg->isatomic){
+                                for(i=0;i<4;i++){
+                                    pshift = (ee[i]-1+tshift)*cfg->detnum;
+                                    for(idx=0;idx<cfg->detnum;idx++){
+                                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
 #pragma omp atomic
-                                        tracer->mesh->weight[ee[i]-1+tshift+pshift*idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
-                                else
-                                    for(i=0;i<4;i++)
-                                        tracer->mesh->weight[ee[i]-1+tshift+pshift*idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
+                                        tracer->mesh->weight[pshift+idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
+                                    }
+                                }
+                            }else{
+                                for(i=0;i<4;i++){
+                                    pshift = (ee[i]-1+tshift)*cfg->detnum;
+                                    for(idx=0;idx<cfg->detnum;idx++){
+                                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                        tracer->mesh->weight[pshift+idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
+                                    }
+                                }
                             }
                         }else{
                             if(cfg->isatomic)
@@ -496,22 +505,27 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 // replay mode with wide-field detection
                 if(cfg->mcmethod==mmMCX){
                     if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
-                        int pshift = (cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne)*cfg->maxgate;
+                        int pshift;
                         int offset, idx;
-                        for(idx=0;idx<cfg->detnum;idx++){
-                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
-                            if(!cfg->basisorder)
-                                tracer->mesh->weight[eid+tshift+pshift*idx] += ww*cfg->detpattern[offset];
-                            else{
-                                T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*cfg->detpattern[offset]*0.5f));
-                                _mm_store_ps(barypout,T);
-                                if(cfg->isatomic)
-                                    for(j=0;j<4;j++)
+                        if(!cfg->basisorder){
+                            pshift = (tshift+eid)*cfg->detnum;
+                            for(idx=0;idx<cfg->detnum;idx++){
+                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                            }
+                        }else{
+                            for(j=0;j<4;j++){
+                                pshift = (ee[j]-1+tshift)*cfg->detnum;
+                                for(idx=0;idx<cfg->detnum;idx++){
+                                    offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                    T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*cfg->detpattern[offset]*0.5f));
+                                    _mm_store_ps(barypout,T);
+                                    if(cfg->isatomic)
 #pragma omp atomic
-                                        tracer->mesh->weight[ee[j]-1+tshift+pshift*idx]+=barypout[j];
-                                else
-                                    for(j=0;j<4;j++)
-                                        tracer->mesh->weight[ee[j]-1+tshift+pshift*idx]+=barypout[j];
+                                        tracer->mesh->weight[pshift+idx] += barypout[j];
+                                    else
+                                        tracer->mesh->weight[pshift+idx] += barypout[j];
+                                }
                             }
                         }
                     }

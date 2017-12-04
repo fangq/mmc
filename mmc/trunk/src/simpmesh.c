@@ -667,22 +667,22 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
     if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
         int k, shift;
         if(cfg->basisorder){
-            shift = mesh->nn*cfg->maxgate;
-            for(k=0;k<cfg->detnum;k++){
-                for(i=0;i<cfg->maxgate;i++){
-                    for(j=0;j<mesh->nn;j++){
-                        if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[k*shift+i*mesh->nn+j])==0)
+            shift = mesh->nn*cfg->detnum;
+            for(i=0;i<cfg->maxgate;i++){
+                for(j=0;j<mesh->nn;j++){
+                    for(k=0;k<cfg->detnum;k++){
+                        if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[shift*i+cfg->detnum*j+k])==0)
                             MESH_ERROR("can not write to weight file");
                     }
                 }
             }
         }
         else{
-            shift = mesh->ne*cfg->maxgate;
-            for(k=0;k<cfg->detnum;k++){
-                for(i=0;i<cfg->maxgate;i++){
-                    for(j=0;j<mesh->ne;j++){
-                        if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[k*shift+i*mesh->ne+j])==0)
+            shift = mesh->ne*cfg->detnum;
+            for(i=0;i<cfg->maxgate;i++){
+                for(j=0;j<mesh->ne;j++){
+                    for(k=0;k<cfg->detnum;k++){
+                        if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[shift*i+cfg->detnum*j+k])==0)
                             MESH_ERROR("can not write to weight file");
                     }
                 }
@@ -811,14 +811,13 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
     
     if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
         int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
-        int offset=pair*datalen*cfg->maxgate;
         float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
         if(cfg->outputtype==otWL || cfg->outputtype==otWP)
             normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
         
         for(i=0;i<cfg->maxgate;i++)
             for(j=0;j<datalen;j++)
-                mesh->weight[i*datalen+j+offset]*=normalizor;
+                mesh->weight[(i*datalen+j)*cfg->detnum+pair]*=normalizor;
         return normalizor;
     }
     if(cfg->outputtype==otEnergy){
