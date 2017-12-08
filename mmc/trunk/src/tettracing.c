@@ -467,7 +467,11 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		//    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder)
-		    tracer->mesh->weight[eid+tshift]+=ww;
+		  	if(cfg->isatomic)
+#pragma omp atomic
+		    	tracer->mesh->weight[eid+tshift]+=ww;
+			else
+				tracer->mesh->weight[eid+tshift]+=ww;
 		  else{
 		    T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
 		    _mm_store_ps(barypout,T);
