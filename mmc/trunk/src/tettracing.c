@@ -706,9 +706,9 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                                 offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
                                 if(cfg->isatomic)
 #pragma omp atomic
-                                    tracer->mesh->weight[pshift+idx] += ww;
+                                    tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                                 else
-                                    tracer->mesh->weight[pshift+idx] += ww;
+                                    tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                             }
                         }
                     }
@@ -896,9 +896,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                                 offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
                                 if(cfg->isatomic)
 #pragma omp atomic
-                                    tracer->mesh->weight[pshift+idx]+=ww;
+                                    tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                                 else
-                                    tracer->mesh->weight[pshift+idx]+=ww;
+                                    tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                             }
                         }
                     }
