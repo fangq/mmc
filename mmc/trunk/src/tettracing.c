@@ -511,7 +511,11 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                             pshift = (tshift+eid)*cfg->detnum;
                             for(idx=0;idx<cfg->detnum;idx++){
                                 offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
-                                tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                                if(cfg->isatomic)
+#pragma omp atomic
+                                    tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                                else
+                                    tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
                             }
                         }else{
                             for(j=0;j<4;j++){
@@ -530,8 +534,13 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         }
                     }
                     else{
-                        if(!cfg->basisorder)
-                            tracer->mesh->weight[eid+tshift]+=ww;
+                        if(!cfg->basisorder){
+                            if(cfg->isatomic)
+#pragma omp atomic
+                                tracer->mesh->weight[eid+tshift]+=ww;
+                            else
+                                tracer->mesh->weight[eid+tshift]+=ww;
+                        }
                         else{
                             T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*0.5f));
                             _mm_store_ps(barypout,T);
@@ -669,13 +678,41 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
             else
                 tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
                 
-                if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
-                        r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
+            if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
+                    r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
                 
-                r->p0.x+=r->Lmove*r->vec.x;
-                r->p0.y+=r->Lmove*r->vec.y;
-                r->p0.z+=r->Lmove*r->vec.z;
-                if(cfg->mcmethod==mmMCX){
+            r->p0.x+=r->Lmove*r->vec.x;
+            r->p0.y+=r->Lmove*r->vec.y;
+            r->p0.z+=r->Lmove*r->vec.z;
+            if(cfg->mcmethod==mmMCX){
+                if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+                    int pshift;
+                    int offset, idx;
+                    if(!cfg->basisorder){
+                        pshift = (tshift+eid)*cfg->detnum;
+                        for(idx=0; idx<cfg->detnum; idx++){
+                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                            if(cfg->isatomic)
+#pragma omp atomic
+                                tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                            else
+                                tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                        }
+                    }else{
+                        ww*=1.f/3.f;
+                        for(i=0; i<3; i++){
+                            pshift = (ee[out[faceidx][i]]-1+tshift)*cfg->detnum;
+                            for(idx=0; idx<cfg->detnum; idx++){
+                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                if(cfg->isatomic)
+#pragma omp atomic
+                                    tracer->mesh->weight[pshift+idx] += ww;
+                                else
+                                    tracer->mesh->weight[pshift+idx] += ww;
+                            }
+                        }
+                    }
+                }else{
                     if(!cfg->basisorder){
                         if(cfg->isatomic)
 #pragma omp atomic
@@ -695,6 +732,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                                 tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
                     }
                 }
+            }
         }
     }
     visit->raytet++;
@@ -829,13 +867,42 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             else
                 tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
                 
-                if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
+            if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
                         r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
-                
-                T = _mm_set1_ps(r->Lmove);
-                T = _mm_add_ps(S, _mm_mul_ps(O, T));
-                _mm_store_ps(&(r->p0.x),T);
-                if(cfg->mcmethod==mmMCX){
+            
+            T = _mm_set1_ps(r->Lmove);
+            T = _mm_add_ps(S, _mm_mul_ps(O, T));
+            _mm_store_ps(&(r->p0.x),T);
+            if(cfg->mcmethod==mmMCX){
+                int i;
+                if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
+                    int pshift;
+                    int offset, idx;
+                    if(!cfg->basisorder){
+                        pshift = (tshift+eid)*cfg->detnum;
+                        for(idx=0; idx<cfg->detnum; idx++){
+                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                            if(cfg->isatomic)
+#pragma omp atomic
+                                tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                            else
+                                tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
+                        }
+                    }else{
+                        ww*=1.f/3.f;
+                        for(i=0; i<3; i++){
+                            pshift = (ee[out[faceidx][i]]-1+tshift)*cfg->detnum;
+                            for(idx=0; idx<cfg->detnum; idx++){
+                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                if(cfg->isatomic)
+#pragma omp atomic
+                                    tracer->mesh->weight[pshift+idx]+=ww;
+                                else
+                                    tracer->mesh->weight[pshift+idx]+=ww;
+                            }
+                        }
+                    }
+                }else{
                     if(!cfg->basisorder){
                         if(cfg->isatomic)
 #pragma omp atomic
@@ -843,7 +910,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                         else
                             tracer->mesh->weight[eid+tshift]+=ww;
                     }else{
-                        int i;
                         if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
                             ww/=prop->mua;
                         ww*=1.f/3.f;
@@ -856,6 +922,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                                 tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
                     }
                 }
+            }
         }
     }
     visit->raytet++;
