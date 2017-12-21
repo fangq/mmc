@@ -815,9 +815,14 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
         if(cfg->outputtype==otWL || cfg->outputtype==otWP)
             normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
         
-        for(i=0;i<cfg->maxgate;i++)
-            for(j=0;j<datalen;j++)
-                mesh->weight[(i*datalen+j)*cfg->detnum+pair]*=normalizor;
+        for(i=0;i<cfg->maxgate;i++){
+            for(j=0;j<datalen;j++){
+                if(cfg->detpattern != NULL)
+                    mesh->weight[(i*datalen+j)*cfg->detnum+pair]*=normalizor;
+                else
+                    mesh->weight[i*datalen+j]*=normalizor;
+            }
+        }
         return normalizor;
     }
     if(cfg->outputtype==otEnergy){
