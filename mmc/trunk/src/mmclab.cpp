@@ -2,14 +2,29 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
 **          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
 **  \section slicense License
 **          GPL v3, see LICENSE.txt for details
+*******************************************************************************/
+
+/***************************************************************************//**
+\file    mmclab.cpp
+
+@brief   mex function for MMCLAB
 *******************************************************************************/
 
 #include <stdio.h>
@@ -27,28 +42,42 @@
 #include "tettracing.h"
 #include "waitmex/waitmex.c"
 
-
+//! Macro to read the 1st scalar cfg member
 #define GET_1ST_FIELD(x,y)  if(strcmp(name,#y)==0) {double *val=mxGetPr(item);x->y=val[0];printf("mmc.%s=%g;\n",#y,(float)(x->y));}
+
+//! Macro to read one scalar cfg member
 #define GET_ONE_FIELD(x,y)  else GET_1ST_FIELD(x,y)
+
+//! Macro to read one 3-element vector member of cfg
 #define GET_VEC3_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];\
                                  printf("mmc.%s=[%g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z));}
+
+//! Macro to read one 3- or 4-element vector member of cfg
 #define GET_VEC34_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];if(mxGetNumberOfElements(item)==4) u->v.w=val[3];\
                                  printf("mmc.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
+
+//! Macro to read one 4-element vector member of cfg
 #define GET_VEC4_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];u->v.w=val[3];\
                                  printf("mmc.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
-#define ABS(a)    ((a)<0?-(a):(a))
-#define MAX(a,b)  ((a)>(b)?(a):(b))
-#define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)
+#define ABS(a)    ((a)<0?-(a):(a))                        //! Macro to calculate the absolute value
+#define MAX(a,b)  ((a)>(b)?(a):(b))                       //! Macro to calculate the max of two floating points
+#define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
 
 #if (! defined MX_API_VER) || (MX_API_VER < 0x07300000)
-	typedef int dimtype;
+	typedef int dimtype;                              //! MATLAB before 2017 uses int as the dimension array
 #else
-	typedef size_t dimtype;
+	typedef size_t dimtype;                           //! MATLAB after 2017 uses size_t as the dimension array
 #endif
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh);
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh);
 void mmclab_usage();
+
+/** @brief Mex function for the MMC host function for MATLAB/Octave
+ *  This is the master function to interface all MMC features inside MATLAB.
+ *  In MMCLAB, all inputs are read from the cfg structure, which contains all
+ *  simuation parameters and data.
+ */
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
@@ -72,17 +101,30 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   waitbar    *hprop;
 #endif
 
+  /**
+   * If no input is given for this function, it prints help information and return.
+   */
   if (nrhs==0){
      mmclab_usage();
      return;
   }
+
+  /**
+   * If a structure is passed to this function, a simulation will be launched.
+   */
   printf("Launching MMCLAB - Mesh-based Monte Carlo for MATLAB & GNU Octave ...\n");
   if (!mxIsStruct(prhs[0]))
      MEXERROR("Input must be a structure.");
 
+  /**
+   * Find out information about input and output.
+   */
   nfields = mxGetNumberOfFields(prhs[0]);
   ncfg = mxGetNumberOfElements(prhs[0]);
 
+  /**
+   * The function can return 1-3 outputs (i.e. the LHS)
+   */
   if(nlhs>=1)
       plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=2)
@@ -95,13 +137,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   else
       mexEvalString("close(mmclab_waitbar_handle);");
 
+  /**
+   * Loop over each element of the struct if it is an array, each element is a simulation
+   */
   for (jstruct = 0; jstruct < ncfg; jstruct++) {  /* how many configs */
+
+    /** Enclose all simulation calls inside a try/catch construct for exception handling */
     try{
         printf("Running simulations for configuration #%d ...\n", jstruct+1);
         unsigned int ncomplete=0;
         double Eabsorb=0.0;
         float raytri=0.f,raytri0=0.f;;
 
+        /** Initialize cfg with default values first */
 	t0=StartTimer();
 	mcx_initcfg(&cfg);
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
@@ -109,6 +157,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
         memset(&master,0,sizeof(visitor));
 
+        /** Read each struct element from input and set value to the cfg configuration */
 	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
             tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
 	    if (tmp == NULL) {
@@ -117,13 +166,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    mmc_set_field(prhs[0],tmp,ifield,&cfg,&mesh);
 	}
 	mexEvalString("pause(.001);");
-	cfg.issave2pt=(nlhs>=1);
-	cfg.issavedet=(nlhs>=2);
-	cfg.issaveseed=(nlhs>=3);
+	
+        /** Overwite the output flags using the number of output present */
+	cfg.issave2pt=(nlhs>=1);  /** save fluence rate to the 1st output if present */
+	cfg.issavedet=(nlhs>=2);  /** save detected photon data to the 2nd output if present */
+	cfg.issaveseed=(nlhs>=3); /** save detected photon seeds to the 3rd output if present */
+
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
         cfg.issaveseed=0;
 #endif
 	mesh_srcdetelem(&mesh,&cfg);
+	
+	/** Validate all input fields, and warn incompatible inputs */
 	mmc_validate_config(&cfg,&mesh);
 
 	tracer_init(&tracer,&mesh,cfg.method);
@@ -134,7 +188,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
     /** \subsection ssimu Parallel photon transport simulation */
 
-
+    /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
 #pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
@@ -206,6 +260,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
         #pragma omp atomic
                 master.totalweight += visit.totalweight;
 
+        /** If no error is detected, generat all output data */
 	if(cfg.issavedet && errorflag==0){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
@@ -267,6 +322,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
         MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg.nphoton/dt,raytri,raytri0));
 
+    /** Clear up simulation data structures by calling the destructors */
+
 #ifdef MATLAB_MEX_FILE
         if((cfg.debuglevel & dlProgress))
 	   if(usewaitbar)
@@ -314,6 +371,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   return;
 }
 
+/** 
+ * @brief Function to parse one subfield of the input structure
+ *
+ * This function reads in all necessary information from the cfg input structure.
+ * it can handle single scalar inputs, short vectors (3-4 elem), strings and arrays.
+ *
+ * @param[in] root: the cfg input data structure
+ * @param[in] item: the current element of the cfg input data structure
+ * @param[in] idx: the index of the current element (starting from 0)
+ * @param[out] cfg: the simulation configuration structure to store all input read from the parameters
+ * @param[out] mesh: the mesh data structure
+ */
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh){
     const char *name=mxGetFieldNameByNumber(root,idx);
@@ -557,6 +626,15 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }
 }
 
+/** 
+ * @brief Validate all input fields, and warn incompatible inputs
+ *
+ * Perform self-checking and raise exceptions or warnings when input error is detected
+ *
+ * @param[in,out] cfg: the simulation configuration structure
+ * @param[out] mesh: the mesh data structure
+ */
+
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      int i,j,*ee;
      if(cfg->nphoton<=0){
@@ -639,15 +717,32 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+1;
 }
 
+/**
+ * @brief Error reporting function in the mex function, equivallent to mcx_error in binary mode
+ *
+ * @param[in] id: a single integer for the types of the error
+ * @param[in] msg: the error message string
+ * @param[in] filename: the unit file name where this error is raised
+ * @param[in] linenum: the line number in the file where this error is raised
+ */
+
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){
      printf("MMCLAB ERROR (%d): %s in unit %s:%d\n",id,msg,filename,linenum);
      throw(msg);
      return id;
 }
 
+/**
+ * @brief Print a brief help information if nothing is provided
+ */
+
 void mmclab_usage(){
      printf("Usage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
 }
+
+/**
+ * @brief Force matlab refresh the command window to print all buffered messages
+ */
 
 extern "C" void mcx_matlab_flush(){
 #ifndef MATLAB_MEX_FILE

@@ -2,15 +2,20 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Pluker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
-**  \li \c (\b Fang2009) Qianqian Fang and David A. Boas, 
-**          <a href="http://www.opticsinfobase.org/abstract.cfm?uri=oe-17-22-20178">
-**          "Monte Carlo Simulation of Photon Migration in 3D Turbid Media Accelerated 
-**          by Graphics Processing Units,"</a> Optics Express, 17(22) 20178-20190 (2009).
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
 **  \section slicense License
 **          GPL v3, see LICENSE.txt for details
@@ -37,6 +42,16 @@ necessary data structures. This include the command line options (cfg),
 tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 *******************************************************************************/
 
+/** 
+ * \brief Initialize simulation configuration structure cfg using command line options
+ * 
+ * \param[out] cfg: the simulation configuration structure
+ * \param[in] mesh: the mesh data structure
+ * \param[in] tracer: the ray-tracer data structure
+ * \param[in] argc: total number of command line option strings
+ * \param[in] argv: command line option string array
+ */
+
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv){
         mcx_initcfg(cfg);
         mcx_parsecmd(argc,argv,cfg);
@@ -44,6 +59,17 @@ int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, 
 	mesh_init_from_cfg(mesh,cfg);
         return 0;
 }
+
+/** 
+ * \brief Initialize simulation configuration structure cfg using a JSON input file
+ * 
+ * \param[out] cfg: the simulation configuration structure
+ * \param[in] mesh: the mesh data structure
+ * \param[in] tracer: the ray-tracer data structure
+ * \param[in] jcfg: JSON data structure parsed from the input file
+ * \param[in] jmesh: JSON data structure parsed from the mesh data
+ */
+
 int mmc_init_from_json(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, char *jcfg, char *jmesh){
         mcx_initcfg(cfg);
 	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from JSON ... "));
@@ -52,24 +78,62 @@ int mmc_init_from_json(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, char *jc
 	tracer_init(tracer,mesh,cfg->method);
         return 0;
 }
+
+/** 
+ * \brief Rest simulation related data structures
+ * 
+ * \param[out] cfg: the simulation configuration structure
+ * \param[out] mesh: the mesh data structure
+ * \param[out] tracer: the ray-tracer data structure
+ */
+
 int mmc_reset(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	mmc_cleanup(cfg,mesh,tracer);
 	mcx_initcfg(cfg);
 	mesh_init(mesh);
         return 0;
 }
+
+/** 
+ * \brief Clear simulation related data structures
+ * 
+ * \param[out] cfg: the simulation configuration structure
+ * \param[out] mesh: the mesh data structure
+ * \param[out] tracer: the ray-tracer data structure
+ */
+
 int mmc_cleanup(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	tracer_clear(tracer);
 	mesh_clear(mesh);
         mcx_clearcfg(cfg);
         return 0;
 }
+
+/** 
+ * \brief Peprocessing simulation settings and data for simulation
+ * 
+ * \param[out] cfg: the simulation configuration structure
+ * \param[out] mesh: the mesh data structure
+ * \param[out] tracer: the ray-tracer data structure
+ */
+
 int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         mcx_prep(cfg);
 	tracer_init(tracer,mesh,cfg->method);
 	tracer_prep(tracer,cfg);
         return 0;
 }
+
+/** 
+ * \brief Main function to launch MMC photon simulation
+ *
+ * This is the main loop of the Monte Carlo photon simulation. This function
+ * run a complete photon simulation session based on one set of user input.
+ * 
+ * \param[out] cfg: the simulation configuration structure
+ * \param[out] mesh: the mesh data structure
+ * \param[out] tracer: the ray-tracer data structure
+ */
 
 int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         double Eabsorb=0.0;

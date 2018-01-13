@@ -1,63 +1,175 @@
-/*******************************************************************************
-**  Mesh-based Monte Carlo (MMC)
+/***************************************************************************//**
+**  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  Author: Qianqian Fang <q.fang at neu.edu>
+**  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
-**  Reference:
-**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Pluker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
+**  \section sref Reference:
+**  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
-**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, 17(22) 20178-20190 (2009)
-**
-**  License: GPL v3, see LICENSE.txt for details
-**
+**  \section slicense License
+**          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
 /***************************************************************************//**
 \file    tettracing.c
 
-\brief   Core unit for Plucker-coordinate-based ray-tracing
+\brief   Core unit for mash-based photon transport using ray tracing algorithms
 *******************************************************************************/
 
 #include <string.h>
 #include <stdlib.h>
 #include "tettracing.h"
 
+/**<  Macro to enable SSE4 based ray-tracers */
+
 #ifdef MMC_USE_SSE
 #include <smmintrin.h>
-__m128 int_coef;
+__m128 int_coef;                            /**<  a global variable used for SSE4 ray-tracers */
 #endif
 
-#define F32N(a) ((a) & 0x80000000)
-#define F32P(a) ((a) ^ 0x80000000)
+#define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
+#define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
+
+/** 
+ * \brief Tetrahedron face edge indices
+ *
+ * fc[4] points to the 4 facets of a tetrahedron, with each
+ * triangular face made of 3 directed edges. The numbers [0-5] are the
+ * local indices of the edge, defined by 
+ * 0:[0->1], 1:[0->2], 2: [0->3], 3:[1->2], 4:[1->3], 5:[2->3]
+ * where the pair in [] are the local nodes forming the edge
+ * 
+ */
 
 const int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
-const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}}; /*node orders for each face, in clock-wise orders*/
-extern const int out[4][3]; /*defined in simpmesh.c, node orders for each face, in counter-clock-wise orders*/
+
+/** 
+ * \brief Tetrahedron faces, in clock-wise orders, represented using local node indices
+ *
+ * node-connectivity, i.e. nc[4] points to the 4 facets of a tetrahedron, with each
+ * triangular face made of 3 nodes. The numbers [0-4] are the
+ * local node indices (starting from 0). The order of the nodes
+ * are in clock-wise orders.
+ */
+
+const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+
+/** 
+ * \brief Tetrahedron faces, in counter-clock-wise orders, represented using local node indices
+ *
+ * out is like nc[] but with counter-clock-wise orientation. this makes
+ * the normal vec of each face pointing outwards.
+ */
+
+extern const int out[4][3];     /**< defined in simpmesh.c, node orders for each face, in counter-clock-wise orders*/
+
+/** 
+ * \brief The local index of the node with an opposite face to the i-th face defined in nc[][]
+ *
+ * nc[i] <-> node[facemap[i]]
+ * the 1st face of this tet, i.e. nc[0]={3,0,1}, is opposite to the 3rd node
+ * the 2nd face of this tet, i.e. nc[1]={3,1,2}, is opposite to the 1st node
+ * etc.
+ */
+
 extern const int facemap[4];
+
+/** 
+ * \brief Inverse mapping between the local index of the node and the corresponding opposite face in nc[]'s order
+ *
+ * nc[ifacemap[i]] <-> node[i]
+ * the 1st node of this tet is in opposite to the 2nd face, i.e. nc[1]={3,1,2}
+ * the 2nd node of this tet is in opposite to the 3rd face, i.e. nc[1]={2,0,3}
+ * etc.
+ */
+
 extern const int ifacemap[4];
 
+/** 
+ * \brief Index mapping from the i-th face-neighbors (facenb) to the face defined in nc[][]
+ *
+ * facenb[i] <-> nc[faceorder[i]]
+ * the 1st tet neighbor shares the 2nd face of this tet, i.e. nc[1]={3,1,2}
+ * the 2nd tet neighbor shares the 4th face of this tet, i.e. nc[3]={1,0,2}
+ * etc.
+ */
+
 const int faceorder[]={1,3,2,0,-1};
+
+/** 
+ * \brief Index mapping from the i-th face defined in nc[][] to the face-neighbor (facenb) face orders
+ *
+ * nc[ifaceorder[i]] <-> facenb[i]
+ * nc[0], made of nodes {3,0,1}, is the face connecting to the 4th neighbor (facenb[3]),
+ * nc[1], made of nodes {3,1,2}, is the face connecting to the 1st neighbor (facenb[0]),
+ * etc.
+ */
+
 const int ifaceorder[]={3,0,2,1};
+
+/** 
+ * \brief A mapping from SSE4 mask output to the face index
+ */
+
 const char maskmap[16]={4,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3};
+
+/** 
+ * \brief function to linearly interpolate between 3 3D points (p1,p2,p3) using weight (w)
+ * 
+ * pout=p1*w1+p2*w2+p3*w3
+ * \param[in] w: weight vector
+ * \param[in] p1: 1st point
+ * \param[in] p2: 2nd point
+ * \param[in] p3: 3rd point
+ * \param[out] pout: output 3D position
+ */
 
 inline void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
 	pout->x=w->x*p1->x+w->y*p2->x+w->z*p3->x;
 	pout->y=w->x*p1->y+w->y*p2->y+w->z*p3->y;
 	pout->z=w->x*p1->z+w->y*p2->z+w->z*p3->z;
 }
+
+/** 
+ * \brief function to linearly interpolate between 3 3D points (p1,p2,p3) using scalar weight (w)
+ * 
+ * pout=p1*w1+p2*w2+p3*w3
+ * \param[in] w1: weight for p1
+ * \param[in] w2: weight for p2
+ * \param[in] w3: weight for p3
+ * \param[in] p1: 1st point
+ * \param[in] p2: 2nd point
+ * \param[in] p3: 3rd point
+ * \param[out] pout: output 3D position
+ */
+
 inline void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout){
         pout->x=w1*p1->x+w2*p2->x+w3*p3->x;
         pout->y=w1*p1->y+w2*p2->y+w3*p3->y;
         pout->z=w1*p1->z+w2*p2->z+w3*p3->z;
 }
 
-/*
-  when a photon is crossing a vertex or edge, (slightly) pull the
-  photon toward the center of the element and try again
-*/
+/** 
+ * \brief Function to deal with ray-edge/ray-vertex intersections
+ * 
+ * when a photon is crossing a vertex or edge, (slightly) pull the
+ * photon toward the center of the element and try again
+ *
+ * \param[in,out] p: current photon position
+ * \param[in] nodes: pointer to the 4 nodes of the tet
+ * \param[in] ee: indices of the 4 nodes ee=elem[eid]
+ */
 
 void fixphoton(float3 *p,float3 *nodes, int *ee){
         float3 c0={0.f,0.f,0.f};
@@ -70,11 +182,17 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
         p->z+=(c0.z*0.25f-p->z)*FIX_PHOTON;
 }
 
-/*
-  p0 and p1 ony determine the direction, slen determines the length
-  so, how long is the vector p0->p1 does not matter. infact, the longer
-  the less round off error when computing the Plucker coordinates.
-*/
+/** 
+ * \brief Plucker-coordinate based ray-tracer to advance photon by one step
+ * 
+ * this function uses Plucker-coordinate based ray-triangle intersection 
+ * tests to advance photon by one step, see Fang2010.
+ *
+ * \param[in,out] r: the current ray
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
 
 float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
@@ -285,6 +403,19 @@ inline __m128 rcp_nr(const __m128 a){
     return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
 }
 
+
+/** 
+ * \brief Havel-based SSE4 ray-triangle intersection test
+ * 
+ * this function uses Havel-based algorithm to test if a ray intersects
+ * with a triangle see Fang2012.
+ *
+ * \param[in] vecN: the normal of the face
+ * \param[out] bary: output the Barycentric coordinates of the intersection point
+ * \param[in] o: current ray origin
+ * \param[out] d: current ray direction
+ */
+
 inline int havel_sse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d){
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
@@ -312,6 +443,18 @@ inline int havel_sse4(float3 *vecN, float3 *bary, const __m128 o,const __m128 d)
     }                   
     return 0;
 }
+
+/** 
+ * \brief Havel-based SSE4 ray-tracer to advance photon by one step
+ * 
+ * this function uses Havel-based SSE4 ray-triangle intersection 
+ * tests to advance photon by one step, see Fang2012.
+ *
+ * \param[in,out] r: the current ray
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
 
 float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
@@ -497,6 +640,20 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	return r->slen;
 }
 
+/** 
+ * \brief Badouel-based SSE4 ray-tracer to advance photon by one step
+ * 
+ * this function uses Badouel-based SSE4 ray-triangle intersection 
+ * tests to advance photon by one step, see Fang2012. Both Badouel and 
+ * Branch-less Badouel algorithms do not calculate the Barycentric coordinates
+ * and can only store energy loss using 0-th order basis function.
+ *
+ * \param[in,out] r: the current ray
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
+
 float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
@@ -647,6 +804,21 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	return r->slen;
 }
 
+/** 
+ * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
+ * 
+ * this function uses Branch-less Badouel-based SSE4 ray-triangle intersection 
+ * tests to advance photon by one step, see Fang2012. Both Badouel and 
+ * Branch-less Badouel algorithms do not calculate the Barycentric coordinates
+ * and can only store energy loss using 0-th order basis function. This function
+ * is the fastest among the 4 ray-tracers.
+ *
+ * \param[in,out] r: the current ray
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
+
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
@@ -682,6 +854,20 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	S = _mm_add_ps(S, _mm_mul_ps(Ny,O));
 	O = _mm_set1_ps(r->vec.z);
 	S = _mm_add_ps(S, _mm_mul_ps(Nz,O));
+/** 
+ * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
+ * 
+ * this function uses Branch-less Badouel-based SSE4 ray-triangle intersection 
+ * tests to advance photon by one step, see Fang2012. Both Badouel and 
+ * Branch-less Badouel algorithms do not calculate the Barycentric coordinates
+ * and can only store energy loss using 0-th order basis function. This function
+ * is the fastest among the 4 ray-tracers.
+ *
+ * \param[in,out] r: the current ray
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
 
 	//T = _mm_mul_ps(T, rcp_nr(S));
 	T = _mm_div_ps(T, S);
@@ -809,6 +995,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 }
 #else
 
+/** 
+ * Havel, Badouel and Branch-less Badouel-based SSE4 ray-tracer require to compile
+ * with SSE4 only. Give an error if not compiled with SSE.
+ */
+
+
 float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
 	return MMC_UNDEFINED;
@@ -822,6 +1014,21 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	return MMC_UNDEFINED;
 }
 #endif
+
+/**
+ * @brief The core Monte Carlo function simulating a single photon (!!!Important!!!)
+ *
+ * This is the core Monte Carlo simulation function. It simulates the life-time
+ * of a single photon packet, from launching to termination.
+ *
+ * \param[in] id: the linear index of the current photon, starting from 0.
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] mesh: the mesh data structure
+ * \param[in,out] ran: the random number generator states
+ * \param[in,out] ran0: the additional random number generator states
+ * \param[in,out] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
 
 float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 RandType *ran, RandType *ran0, visitor *visit){
@@ -1002,6 +1209,21 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	return r.Eabsorb;
 }
 
+/**
+ * @brief Calculate the reflection/transmission of a ray at an interface
+ *
+ * This function handles the reflection and transmission events at an interface
+ * where the refractive indices mismatch.
+ *
+ * \param[in,out] cfg: simulation configuration structure
+ * \param[in] c0: the current direction vector of the ray
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] oldeid: the index of the element the photon moves away from
+ * \param[in] eid: the index of the element the photon about to move into
+ * \param[in] faceid: index of the face through which the photon reflects/transmits
+ * \param[in,out] ran: the random number generator states
+ */
+
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm;
@@ -1059,6 +1281,18 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
        vec_mult(c0,tmp0,c0);
        return 1.f;
 }
+
+/**
+ * @brief Launch a new photon
+ *
+ * This function launch a new photon using one of the dozen supported source forms.
+ *
+ * \param[in,out] cfg: simulation configuration structure
+ * \param[in,out] r: the current ray
+ * \param[in] mesh: the mesh data structure
+ * \param[in,out] ran: the random number generator states
+ * \param[in,out] ran0: the additional random number generator states
+ */
 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
         int canfocus=1;
@@ -1261,6 +1495,17 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		MESH_ERROR("initial element does not enclose the source!");
 	}
 }
+
+/**
+ * @brief Deal with absorption using MCML-like algorithm (albedo-weight MC)
+ *
+ * This function performs MCML-like absorption calculations
+ *
+ * \param[in,out] r: the current ray
+ * \param[in] mesh: the mesh data structure
+ * \param[in,out] cfg: simulation configuration structure
+ * \param[out] visit: statistics counters of this thread
+ */
 
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	float *baryp0=&(r->bary0.x);

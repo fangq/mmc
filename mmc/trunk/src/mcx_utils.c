@@ -1,25 +1,30 @@
-/*******************************************************************************
-**  Mesh-based Monte Carlo (MMC) -- this unit was ported from MCX
+/***************************************************************************//**
+**  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
-**  Author: Qianqian Fang <q.fang at neu.edu>
+**  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
-**  Reference:
-**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
+**  \section sref Reference:
+**  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
-**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, 17(22) 20178-20190 (2009)
-**
-**  License: GPL v3, see LICENSE.txt for details
-**
+**  \section slicense License
+**          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
 /***************************************************************************//**
 \file    mcx_utils.c
 
-\brief   mcconfiguration and command line option processing unit
+\brief   MC simulation settings and command line option processing unit
 *******************************************************************************/
 
 #include <stdio.h>
@@ -31,22 +36,45 @@
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
 
+/**
+ * Macro to load JSON keys
+ */
+
 #define FIND_JSON_KEY(id,idfull,parent,fallback,val) \
                     ((tmp=cJSON_GetObjectItem(parent,id))==0 ? \
                                 ((tmp=cJSON_GetObjectItem(root,idfull))==0 ? fallback : tmp->val) \
                      : tmp->val)
+
+/**
+ * Macro to load JSON object
+ */
 
 #define FIND_JSON_OBJ(id,idfull,parent) \
                     ((tmp=cJSON_GetObjectItem(parent,id))==0 ? \
                                 ((tmp=cJSON_GetObjectItem(root,idfull))==0 ? NULL : tmp) \
                      : tmp)
 
+/**
+ * Macro to include unit name and line number in the error message
+ */
 #define MMC_ASSERT(id)   mcx_assert(id,__FILE__,__LINE__)
 
+
+/**
+ * Short command line options
+ * If a short command line option is '-' that means it only has long/verbose option.
+ * Array terminates with '\0'.
+ */
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
                  'i','V','O','-','F','q','x','P','k','v','m','-','-','\0'};
+		 
+/**
+ * Long command line options
+ * The length of this array must match the length of shortopt[], terminates with ""
+ */
+
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--savedet",
@@ -58,12 +86,59 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
                  "--debugphoton", ""};
 
+/**
+ * Debug flags
+ * R: debug random number generator
+ * M: record photon movement and trajectory
+ * P: show progress bar
+ */
+
 const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'};
+
+/**
+ * Selecting mesh-based ray-tracing algorithm:
+ * p: Plucker-based ray-tracer, see Fang2010
+ * h: Havel-based SSE4 ray-tracer, see Fang2012
+ * b: Badouel ray-tracing algorithm, see Fang2011
+ * s: branch-less Badouel SSE4 ray-tracer, see Fang2011
+ */
+
 const char raytracing[]={'p','h','b','s','\0'};
+
+/**
+ * Output data types
+ * x: fluence rate
+ * f: fluence
+ * e: energy deposit
+ * j: jacobian for mua
+ * p: scattering counts for computing Jacobians for mus
+ */
+
 const char outputtype[]={'x','f','e','j','l','p','\0'};
+
+/**
+ * Output file format
+ * mc2: binary mc2 format to store fluence volume data
+ * nii: output fluence in nii format
+ * hdr: output volume in Analyze hdr/img format
+ * ubj: output volume in unversal binary json format (not implemented)
+ */
+
 const char *outputformat[]={"ascii","bin","json","ubjson",""};
+
+/**
+ * Source type specifier
+ * User can specify the source type using a string
+ */
+
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
     "pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
+
+/**
+ * @brief Initializing the simulation configuration with default values
+ *
+ * Constructor of the simulation configuration, initializing all field to default values
+ */
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
@@ -75,7 +150,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->nphoton=0;
      cfg->nthread=0;
      cfg->seed=0x623F9A9E;
-     cfg->isrowmajor=0; /* default is matlab array*/
+     cfg->isrowmajor=0;      /* not needed */
      cfg->maxgate=1;
      cfg->isreflect=1;
      cfg->isref3=1;
@@ -145,6 +220,12 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->detpattern=NULL;
 }
 
+/**
+ * @brief Clearing the simulation configuration data structure
+ *
+ * Destructor of the simulation configuration, delete all dynamically allocated members
+ */
+
 void mcx_clearcfg(mcconfig *cfg){
      if(cfg->medianum)
      	free(cfg->prop);
@@ -167,6 +248,14 @@ void mcx_clearcfg(mcconfig *cfg){
      mcx_initcfg(cfg);
 }
 
+/**
+ * @brief Save volumetric output (fluence etc) to mc2 format binary file
+ *
+ * @param[in] dat: volumetric data to be saved
+ * @param[in] len: total byte length of the data to be saved
+ * @param[in] cfg: simulation configuration
+ */
+
 void mcx_savedata(float *dat,int len,mcconfig *cfg){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
@@ -176,11 +265,26 @@ void mcx_savedata(float *dat,int len,mcconfig *cfg){
      fclose(fp);
 }
 
+/**
+ * @brief Print a message to the console or a log file
+ *
+ * @param[in] cfg: simulation configuration
+ * @param[in] str: a string to be printed
+ */
+
 void mcx_printlog(mcconfig *cfg, char *str){
      if(cfg->flog>0){ /*stdout is 1*/
          MMC_FPRINTF(cfg->flog,"%s\n",str);
      }
 }
+
+/**
+ * @brief Normalize the solution by multiplying a scaling factor
+ *
+ * @param[in,out] field: volumetric data before normalization
+ * @param[in] scale: the scaling factor (or normalization factor) to be applied
+ * @param[in] fieldlen: the length (floating point) of elements in the volume
+ */
 
 void mcx_normalize(float field[], float scale, int fieldlen){
      int i;
@@ -188,6 +292,15 @@ void mcx_normalize(float field[], float scale, int fieldlen){
          field[i]*=scale;
      }
 }
+
+/**
+ * @brief Error reporting function
+ *
+ * @param[in] id: a single integer for the types of the error
+ * @param[in] msg: the error message string
+ * @param[in] file: the unit file name where this error is raised
+ * @param[in] linenum: the line number in the file where this error is raised
+ */
 
 void mcx_error(const int id,const char *msg,const char *file,const int linenum){
 #pragma omp critical
@@ -204,9 +317,24 @@ void mcx_error(const int id,const char *msg,const char *file,const int linenum){
 }
 }
 
+/**
+ * @brief Function to test return value and raise an error
+ *
+ * @param[in] ret: function return value, non-zero means an error
+ * @param[in] file: the unit file name where this error is raised
+ * @param[in] linenum: the line number in the file where this error is raised
+ */
+
 void mcx_assert(const int ret,const char *file,const int linenum){
      if(!ret) mcx_error(ret,"input error",file,linenum);
 }
+
+/**
+ * @brief Read simulation settings from a configuration file (.inp or .json)
+ *
+ * @param[in] fname: the name of the input file (.inp or .json)
+ * @param[in] cfg: simulation configuration
+ */
 
 void mcx_readconfig(char *fname, mcconfig *cfg){
      if(fname[0]==0){
@@ -246,6 +374,15 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
      }
 }
 
+/**
+ * @brief Load a .json input file into memory
+ *
+ * This function loads a JSON file using cJSON
+ *
+ * @param[out] jbuf: json data structure pointer
+ * @param[in] cfg: simulation configuration
+ */
+
 int mcx_loadfromjson(char *jbuf,mcconfig *cfg){
      cJSON *jroot;
      jroot = cJSON_Parse(jbuf);
@@ -267,6 +404,16 @@ int mcx_loadfromjson(char *jbuf,mcconfig *cfg){
      }
      return 0;
 }
+
+/**
+ * @brief Load user inputs from a .json input file
+ *
+ * This function loads user input from a JSON format in a .json extension
+ *
+ * @param[out] root: json data structure pointer
+ * @param[in] cfg: simulation configuration
+ */
+
 int mcx_loadjson(cJSON *root, mcconfig *cfg){
      int i;
      cJSON *Mesh, *Optode, *Forward, *Session, *tmp, *subitem;
@@ -406,6 +553,13 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      return 0;
 }
 
+/**
+ * @brief Write simulation settings to an inp file
+ *
+ * @param[in] fname: the name of the output file
+ * @param[in] cfg: simulation configuration
+ */
+
 void mcx_writeconfig(char *fname, mcconfig *cfg){
      if(fname[0]==0)
      	mcx_saveconfig(stdout,cfg);
@@ -416,6 +570,15 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 	fclose(fp);
      }
 }
+
+/**
+ * @brief Load user inputs from a .inp input file
+ *
+ * This function loads user input from a simple text input format in a .inp extension
+ *
+ * @param[in] in: file handle to the .inp file
+ * @param[in] cfg: simulation configuration
+ */
 
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates,srctype,itmp;
@@ -577,6 +740,13 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
         return;
 }
 
+/**
+ * @brief Save simulation settings to an inp file
+ *
+ * @param[in] out: handle to the output file
+ * @param[in] cfg: simulation configuration
+ */
+
 void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
@@ -598,6 +768,13 @@ void mcx_saveconfig(FILE *out, mcconfig *cfg){
      }
 }
 
+/**
+ * @brief Load media index data volume (.bin or .vol) to the memory (not used in MMC)
+ *
+ * @param[in] filename: file name to the binary volume data (support 1,2 and 4 bytes per voxel)
+ * @param[in] cfg: simulation configuration
+ */
+
 void mcx_loadvolume(char *filename,mcconfig *cfg){
      int datalen,res;
      FILE *fp=fopen(filename,"rb");
@@ -617,6 +794,16 @@ void mcx_loadvolume(char *filename,mcconfig *cfg){
      }
 }
 
+/**
+ * @brief Parse the debug flag in the letter format
+ *
+ * The debug flag following the -D can be either a string format, or numerical format.
+ * This function converts the string debug flags into number format
+ *
+ * @param[in] debugopt: string following the -D parameter
+ * @return debugflag: the numerical format of the debug flag
+ */
+
 int mcx_parsedebugopt(char *debugopt){
     char *c=debugopt,*p;
     int debuglevel=0;
@@ -629,6 +816,15 @@ int mcx_parsedebugopt(char *debugopt){
     }
     return debuglevel;
 }
+
+/**
+ * @brief Print a progress bar
+ *
+ * When -D P is specified, this function prints and update a progress bar.
+ *
+ * @param[in] n: the number of completed photons
+ * @param[in] cfg: simulation configuration
+ */
 
 void mcx_progressbar(unsigned int n, mcconfig *cfg){
     unsigned int percentage, j,colwidth=79;
@@ -662,6 +858,18 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
     }
 }
 
+/**
+ * @brief Function to read a single parameter value followed by a command line option
+ *
+ * This function reads different types of parameter values following a command line option.
+ *
+ * @param[in] argc: the number of total command line parameters
+ * @param[in] argv: the pointer to all command line options
+ * @param[in] id: which parameter to be parsed
+ * @param[out] output: the pointer to which the parsed value to be written
+ * @param[in] type: the type of data support char, int, float, string, bytenumlist, floatlist
+ */
+
 int mcx_readarg(int argc, char *argv[], int id, void *output,const char *type){
      /*
          when a binary option is given without a following number (0~1), 
@@ -687,6 +895,15 @@ int mcx_readarg(int argc, char *argv[], int id, void *output,const char *type){
      }
      return id+1;
 }
+
+/**
+ * @brief Test if a long command line option is supported
+ *
+ * This function returns 1 if a long option is found, and 0 otherwise
+ *
+ * @param[in] opt: the long command line option string
+ */
+
 int mcx_remap(char *opt){
     int i=0;
     while(shortopt[i]!='\0'){
@@ -700,6 +917,15 @@ int mcx_remap(char *opt){
     }
     return 1;
 }
+
+/**
+ * @brief Look up a single character in a string
+ *
+ * @param[in] key: character to be looked up
+ * @param[out] index: the dictionary string where the char is searched
+ * @return if found, return 0; otherwise, return 1
+ */
+
 int mcx_lookupindex(char *key, const char *index){
     int i=0;
     while(index[i]!='\0'){
@@ -711,6 +937,15 @@ int mcx_lookupindex(char *key, const char *index){
     }
     return 1;
 }
+
+/**
+ * @brief Look up a string in a string list and return the index
+ *
+ * @param[in] key: string to be looked up
+ * @param[out] table: the dictionary where the string is searched
+ * @return if found, return the index of the string in the dictionary, otherwise -1.
+ */
+
 int mcx_keylookup(char *key, const char *table[]){
     int i=0;
     while(key[i]){
@@ -727,6 +962,14 @@ int mcx_keylookup(char *key, const char *table[]){
     }
     return -1;
 }
+
+/** 
+ * @brief Validate all input fields, and warn incompatible inputs
+ *
+ * Perform self-checking and raise exceptions or warnings when input error is detected
+ *
+ * @param[in,out] cfg: the simulation configuration structure
+ */
 
 void mcx_validatecfg(mcconfig *cfg){
      if(cfg->nphoton<=0){
@@ -750,6 +993,14 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
 }
 
+/**
+ * @brief Preprocess configuration and set option dependency
+ *
+ * This function preprocess the user input and set dependent flags
+ *
+ * @param[in,out] cfg: simulation configuration
+ */
+
 void mcx_prep(mcconfig *cfg){
      if(cfg->issavedet && cfg->detnum==0 && cfg->isextdet==0) 
       	cfg->issavedet=0;
@@ -758,6 +1009,16 @@ void mcx_prep(mcconfig *cfg){
         cfg->issaveexit=0;
      }
 }
+
+/**
+ * @brief Main function to read user command line options
+ *
+ * This function process user command line inputs and parse all short and long options.
+ *
+ * @param[in] argc: the number of total command line parameters
+ * @param[in] argv: the pointer to all command line options
+ * @param[in] cfg: simulation configuration
+ */
 
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      int i=1,isinteractive=1,issavelog=0;
@@ -942,15 +1203,27 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      mcx_validatecfg(cfg);
 }
 
+/**
+ * @brief Print MCX software version
+ *
+ * @param[in] cfg: simulation configuration
+ */
+
 void mcx_version(mcconfig *cfg){
     MMC_ERROR(MMC_INFO,"MMC $Rev::      $");
 }
+
+/**
+ * @brief Print MCX help information
+ *
+ * @param[in] exename: path and name of the mcx executable
+ */
 
 void mcx_usage(char *exename){
      printf("\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
-#          Copyright (c) 2010-2017 Qianqian Fang <q.fang at neu.edu>          #\n\
+#          Copyright (c) 2010-2018 Qianqian Fang <q.fang at neu.edu>          #\n\
 #                            http://mcx.space/#mmc                            #\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\

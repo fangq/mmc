@@ -1,18 +1,24 @@
-/*******************************************************************************
-**  Mesh-based Monte Carlo (MMC)
+/***************************************************************************//**
+**  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  Author: Qianqian Fang <q.fang at neu.edu>
+**  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
-**  Reference:
-**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
+**  \section sref Reference:
+**  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
-**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, 17(22) 20178-20190 (2009)
-**
-**  License: GPL v3, see LICENSE.txt for details
-**
+**  \section slicense License
+**          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
 /***************************************************************************//**
@@ -26,14 +32,50 @@
 #include <string.h>
 
 #ifdef WIN32
-         char pathsep='\\';
+         char pathsep='\\';  /**< path separator on Windows */
 #else
-         char pathsep='/';
+         char pathsep='/';   /**< path separator on Linux/Unix/OSX */
 #endif
 
+/** 
+ * \brief Tetrahedron faces, in counter-clock-wise orders, represented using local node indices
+ *
+ * node-connectivity, i.e. nc[4] points to the 4 facets of a tetrahedron, with each
+ * triangular face made of 3 nodes. The numbers [0-4] are the
+ * local node indices (starting from 0). The order of the nodes
+ * are in counter-clock-wise orders.
+ */
+
 const int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+
+/** 
+ * \brief The local index of the node with an opposite face to the i-th face defined in nc[][]
+ *
+ * nc[i] <-> node[facemap[i]]
+ * the 1st face of this tet, i.e. nc[0]={3,0,1}, is opposite to the 3rd node
+ * the 2nd face of this tet, i.e. nc[1]={3,1,2}, is opposite to the 1st node
+ * etc.
+ */
+
 const int facemap[]={2,0,1,3};
+
+/** 
+ * \brief Inverse mapping between the local index of the node and the corresponding opposite face in nc[]'s order
+ *
+ * nc[ifacemap[i]] <-> node[i]
+ * the 1st node of this tet is in opposite to the 2nd face, i.e. nc[1]={3,1,2}
+ * the 2nd node of this tet is in opposite to the 3rd face, i.e. nc[1]={2,0,3}
+ * etc.
+ */
+
 const int ifacemap[]={1,2,0,3};
+
+/**
+ * @brief Initializing the mesh data structure with default values
+ *
+ * Constructor of the mesh object, initializing all field to default values
+ */
+
 
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
@@ -54,6 +96,12 @@ void mesh_init(tetmesh *mesh){
 	mesh->nvol=NULL;
 }
 
+/**
+ * @brief Loading user-specified mesh data
+ *
+ * Loading node, element etc from files into memory
+ */
+
 void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_init(mesh);
         mesh_loadnode(mesh,cfg);
@@ -66,6 +114,14 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         }
 }
 
+/**
+ * @brief Error-handling in mesh operations
+ *
+ * @param[in] msg: the error message string
+ * @param[in] file: the unit file name where this error is raised
+ * @param[in] linenum: the line number in the file where this error is raised
+ */
+
 void mesh_error(const char *msg,const char *file,const int linenum){
 #ifdef MCX_CONTAINER
         mmc_throw_exception(1,msg,file,linenum);
@@ -74,6 +130,14 @@ void mesh_error(const char *msg,const char *file,const int linenum){
         exit(1);
 #endif
 }
+
+/**
+ * @brief Construct a full mesh file name using cfg session and root path
+ *
+ * @param[in] format: a format string to form the file name
+ * @param[in] foutput: pointer to the output string buffer
+ * @param[in] cfg: the simulation configuration structure
+ */
 
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
@@ -84,6 +148,13 @@ void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 	else
 		sprintf(foutput,"%s",filename);
 }
+
+/**
+ * @brief Load node file and initialize the related mesh properties
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
 
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
@@ -107,6 +178,13 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 }
+
+/**
+ * @brief Load optical property file and initialize the related mesh properties
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
 
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
@@ -154,6 +232,13 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
 }
 
+/**
+ * @brief Load element file and initialize the related mesh properties
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
@@ -180,6 +265,13 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 	mesh_srcdetelem(mesh,cfg);
 }
+
+/**
+ * @brief Identify wide-field source and detector-related elements (type=-1 for source, type=-2 for det)
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
 
 void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
 	int i;
@@ -213,6 +305,13 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
 	}
 }
 
+/**
+ * @brief Load tet element volume file and initialize the related mesh properties
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,*ee;
@@ -239,6 +338,14 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 }
+
+/**
+ * @brief Load face-neightbor element list and initialize the related mesh properties
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
 void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
@@ -261,6 +368,13 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 }
+
+/**
+ * @brief Load previously saved photon seeds from an .mch file for replay
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
 
 void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
     history his;
@@ -320,6 +434,13 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
     fclose(fp);
 }
 
+/**
+ * @brief Clearing the mesh data structure
+ *
+ * Destructor of the mesh data structure, delete all dynamically allocated members
+ */
+
+
 void mesh_clear(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
@@ -371,6 +492,20 @@ void mesh_clear(tetmesh *mesh){
 	}
 }
 
+
+/**
+ * @brief Initialize a data structure storing all pre-computed ray-tracing related data
+ *
+ * the pre-computed ray-tracing data include 
+ * d: the vector of the 6 edges
+ * m: the cross-product of the end-nodes of the 6-edges n1 x n2
+ * n: the normal vector of the 4 facets, pointing outwards
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ * @param[in] pmesh: the mesh object
+ * @param[in] methodid: the ray-tracing algorithm to be used
+ */
+
 void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
 	tracer->d=NULL;
 	tracer->m=NULL;
@@ -379,6 +514,16 @@ void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
 	tracer->method=methodid;
 	tracer_build(tracer);
 }
+
+/**
+ * @brief Preparing for the ray-tracing calculations
+ *
+ * This function build the ray-tracing precomputed data and test if the initial
+ * element (e0) encloses the photon launch position.
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ * @param[in] cfg: the simulation configuration structure
+ */
 
 void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	if(tracer->n==NULL && tracer->m==NULL && tracer->d==NULL){
@@ -417,6 +562,17 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    }
 	}
 }
+
+/**
+ * @brief Pre-computed ray-tracing related data
+ *
+ * the pre-computed ray-tracing data include 
+ * d: the vector of the 6 edges: edge[i]=[ni1,ni2]: d[i]=ni2 - ni1
+ * m: the cross-product of the end-nodes of the 6-edges: edge[i]=[ni1,ni2]: m[i]=ni1 x ni2
+ * n: the normal vector of the 4 facets, pointing outwards
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ */
 
 void tracer_build(raytracer *tracer){
 	int ne,i,j;
@@ -528,6 +684,14 @@ void tracer_build(raytracer *tracer){
 	}
 }
 
+/**
+ * @brief Clear the ray-tracing data structure
+ *
+ * Deconstructor of the ray-tracing data structure
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ */
+ 
 void tracer_clear(raytracer *tracer){
 	if(tracer->d) {
 		free(tracer->d);
@@ -544,6 +708,18 @@ void tracer_clear(raytracer *tracer){
 	tracer->mesh=NULL;
 }
 
+/**
+ * @brief Performing one scattering event of the photon
+ *
+ * This function updates the direction of the photon by performing a scattering calculation
+ *
+ * @param[in] g: anisotropy g
+ * @param[out] dir: current ray direction vector
+ * @param[out] ran: random number generator states
+ * @param[out] ran0: additional random number generator states
+ * @param[out] cfg: the simulation configuration
+ * @param[out] pmom: buffer to store momentum transfer data if needed
+ */
 
 float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg, float *pmom){
 
@@ -611,6 +787,18 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
     return nextslen;
 }
 
+/**
+ * @brief Save a snapshot of the simulation output
+ *
+ * save snapshot of the simulation output during a lengthy simulation
+ * the snapshots are specified by a set of "check-points", i.e. the index 
+ * of the photons that being completed.
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration
+ * @param[in] id: the index of the current photon
+ */
+
 void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 	char sess[MAX_SESSION_LENGTH];
 	int i,found=0;
@@ -627,6 +815,14 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 	mesh_saveweight(mesh,cfg);
 	memcpy(cfg->session,sess,MAX_SESSION_LENGTH);
 }
+
+
+/**
+ * @brief Save the fluence output to a file
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration
+ */
 
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
@@ -665,6 +861,16 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 }
 
+/**
+ * @brief Save detected photon data into an .mch history file
+ *
+ * @param[in] ppath: buffer points to the detected photon data (partial-path, det id, etc)
+ * @param[in] seeds: buffer points to the detected photon seeds
+ * @param[in] count: how many photons are detected
+ * @param[in] seedbyte: how many bytes per detected photon seed
+ * @param[in] cfg: the simulation configuration
+ */
+
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg){
 	FILE *fp;
 	char fhistory[MAX_PATH_LENGTH];
@@ -692,6 +898,21 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
            fwrite(seeds,seedbyte,count,fp);
 	fclose(fp);
 }
+
+
+/**
+ * @brief Save binned detected photon data over an area-detector as time-resolved 2D images
+ *
+ * When an area detector is used (such as a CCD), storing all detected photons can generate
+ * a huge output file. This can be mitigated by accumulate the data first to a rasterized 
+ * detector grid, and then save only the integrated data.
+ *
+ * @param[out] detmap: buffer points to the output detector data array
+ * @param[in] ppath: buffer points to the detected photon data (partial-path, det id, etc)
+ * @param[in] count: how many photons are detected
+ * @param[in] cfg: the simulation configuration
+ * @param[in] mesh: the mesh object 
+ */
 
 void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh){
 	// cfg->issaveexit is 2 for this mode
@@ -726,7 +947,15 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 	}
 }
 
-// function for accumulating detected photons and saving in the form of time-resolved 2D images
+/**
+ * @brief Save binned detected photon data over an area-detector
+ *
+ * function for saving binned detected photon data into time-resolved 2D images
+ *
+ * @param[in] detmap: buffer points to the output detector data array
+ * @param[in] cfg: the simulation configuration
+ */
+
 void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	
 	FILE *fp;
@@ -741,6 +970,18 @@ void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	fwrite(detmap,sizeof(float),cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,fp);
 	fclose(fp);
 }
+
+/**
+ * @brief Recompute the detected photon weight from the partial-pathlengths
+ *
+ * This function currently does not consider the final transmission coeff before
+ * the photon being detected.
+ *
+ * @param[in] photonid: index of the detected photon
+ * @param[in] colcount: how many 4-byte records per detected photon
+ * @param[in] ppath: buffer points to the detected photon data (partial-path, det id, etc)
+ * @param[in] cfg: the simulation configuration
+ */
 
 float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg){
 	
@@ -758,6 +999,19 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
 		MESH_ERROR("photon location not within the detection plane");
 	return cfg->detpattern[yindex*xsize+xindex];
 }
+
+/**
+ * @brief Function to normalize the fluence and remove influence from photon number and volume
+ *
+ * This function outputs the Green's function from the raw simulation data. This needs
+ * to divide the total simulated photon energy, normalize the volumes of each node/elem,
+ * and consider the length unit and time-gates
+ *
+ * @param[in] mesh: the mesh object 
+ * @param[in] cfg: the simulation configuration
+ * @param[in] Eabsorb: total absorbed energy from ray-tracing accummulation
+ * @param[in] Etotal: total launched energy, equal to photon number if not pattern-source
+ */
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){

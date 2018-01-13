@@ -1,20 +1,24 @@
-/*******************************************************************************
-**  Mesh-based Monte Carlo (MMC)
+/***************************************************************************//**
+**  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  Author: Qianqian Fang <q.fang at neu.edu>
+**  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
-**  Reference:
-**  (Fang2010) Qianqian Fang, "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates," Biomed. Opt. Express, 1(1) 165-175 (2010)
+**  \section sref Reference:
+**  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
-**  (Fang2009) Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**          Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**          Units," Optics Express, 17(22) 20178-20190 (2009)
-**
-**  simpmesh.c: basic vector math and mesh operations
-**
-**  License: GPL v3, see LICENSE.txt for details
-**
+**  \section slicense License
+**          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
 /***************************************************************************//**
@@ -63,22 +67,22 @@ related to an FEM mesh.
 *******************************************************************************/   
 
 typedef struct MMC_mesh{
-	int nn;      /**< number of nodes */
-	int ne;      /**< number of elements */
-	int prop;    /**< number of media */
-	float3 *node;/**< node coordinates */
-	int4 *elem;  /**< element indices */
-	int  *srcelem;	/**< candidate list of elements containing the source*/
-	int  srcelemlen;	/**< length of the elements that may contain the source*/
-	int  *detelem;	/**< candidate list of elements containing a widefield detector*/
-	int  detelemlen;	/**< length of the elements that may contain the detector*/
-	int  *type;  /**< element-based media index */
-	int4 *facenb;/**< face neighbors, idx of the element sharing a face */
-	medium *med; /**< optical property of different media */
-	float *atte; /**< precomputed attenuation for each media */
-	double *weight;/**< volumetric fluence for all nodes at all time-gates */
-	float *evol; /**< volume of an element */
-	float *nvol; /**< veronio volume of a node */
+	int nn;                /**< number of nodes */
+	int ne;                /**< number of elements */
+	int prop;              /**< number of media */
+	float3 *node;          /**< node coordinates */
+	int4 *elem;            /**< element indices */
+	int  *srcelem;	       /**< candidate list of elements containing the source*/
+	int  srcelemlen;       /**< length of the elements that may contain the source*/
+	int  *detelem;	       /**< candidate list of elements containing a widefield detector*/
+	int  detelemlen;       /**< length of the elements that may contain the detector*/
+	int  *type;            /**< element-based media index */
+	int4 *facenb;          /**< face neighbors, idx of the element sharing a face */
+	medium *med;           /**< optical property of different media */
+	float *atte;           /**< precomputed attenuation for each media */
+	double *weight;        /**< volumetric fluence for all nodes at all time-gates */
+	float *evol;           /**< volume of an element */
+	float *nvol;           /**< veronio volume of a node */
 } tetmesh;
 
 /***************************************************************************//**
@@ -92,11 +96,11 @@ moment vectors for each edge in a tetrahedron.
 *******************************************************************************/   
 
 typedef struct MMC_raytracer{
-	tetmesh *mesh;/**< link to the mesh structure */
-	char method;  /**< 1 for Plucker-based ray-tracing, 0 for Havel */
-	float3 *d;    /**< precomputed data: for Pluckers, this is displacement */
-	float3 *m;    /**< precomputed data: for Pluckers, this is moment */
-	float3 *n;    /**< precomputed data: for Pluckers, face norm */
+	tetmesh *mesh;          /**< link to the mesh structure */
+	char method;            /**< 1 for Plucker-based ray-tracing, 0 for Havel */
+	float3 *d;              /**< precomputed data: for Pluckers, this is displacement */
+	float3 *m;              /**< precomputed data: for Pluckers, this is moment */
+	float3 *n;              /**< precomputed data: for Pluckers, face norm */
 } raytracer;
 #ifdef	__cplusplus
 extern "C" {

@@ -1,15 +1,24 @@
-/*******************************************************************************
+/***************************************************************************//**
+**  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
-**  Monte Carlo eXtreme (MCX)  - GPU accelerated Monte Carlo 3D photon migration
-**  Author: Qianqian Fang <q.fang at neu.edu>
+**  \author Qianqian Fang <q.fang at neu.edu>
+**  \copyright Qianqian Fang, 2010-2018
 **
-**  Reference (Fang2009):
-**        Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon 
-**        Migration in 3D Turbid Media Accelerated by Graphics Processing 
-**        Units," Optics Express, vol. 17, issue 22, pp. 20178-20190 (2009)
+**  \section sref Reference:
+**  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          Biomed. Opt. Express 3(12), 3223-3230 (2012)
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
 **
-**  License: GNU General Public License v3, see LICENSE.txt for details
-**
+**  \section slicense License
+**          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
 /***************************************************************************//**
@@ -29,6 +38,12 @@
 static cl_ulong timerStart, timerStop;
 cl_event kernelevent;
 
+/**
+ * @brief OpenCL timing function using clGetEventProfilingInfo
+ *
+ * Use OpenCL events to query elapsed time in ms between two events
+ */
+
 unsigned int GetTimeMillis () {
   float elapsedTime;
   clGetEventProfilingInfo(kernelevent, CL_PROFILING_COMMAND_START,
@@ -39,17 +54,27 @@ unsigned int GetTimeMillis () {
   return (unsigned int)(elapsedTime);
 }
 
+/**
+ * @brief Start OpenCL timer
+ */
+
 unsigned int StartTimer () {
   return 0;
 }
 
-#else
+#else                          /**< use CUDA time functions */
 
 #include <cuda.h>
 #include <driver_types.h>
 #include <cuda_runtime_api.h>
 /* use CUDA timer */
 static cudaEvent_t timerStart, timerStop;
+
+/**
+ * @brief CUDA timing function using cudaEventElapsedTime
+ *
+ * Use CUDA events to query elapsed time in ms between two events
+ */
 
 unsigned int GetTimeMillis () {
   float elapsedTime;
@@ -58,6 +83,10 @@ unsigned int GetTimeMillis () {
   cudaEventElapsedTime(&elapsedTime, timerStart, timerStop);
   return (unsigned int)(elapsedTime);
 }
+
+/**
+ * @brief Start CUDA timer
+ */
 
 unsigned int StartTimer () {
   cudaEventCreate(&timerStart);
@@ -69,7 +98,7 @@ unsigned int StartTimer () {
 
 #endif
 
-#else
+#else                          /**< use host OS time functions */
 
 static unsigned int timerRes;
 #ifndef MSVC
@@ -78,6 +107,13 @@ static unsigned int timerRes;
 #include <string.h>
 void SetupMillisTimer(void) {}
 void CleanupMillisTimer(void) {}
+
+/**
+ * @brief Unix timing function using gettimeofday
+ *
+ * Use gettimeofday to query elapsed time in us between two events
+ */
+
 unsigned long GetTime (void) {
   struct timeval tv;
   timerRes = 1000;
@@ -86,9 +122,19 @@ unsigned long GetTime (void) {
   temp+=tv.tv_sec*1000000;
   return temp;
 }
+
+/**
+ * @brief Convert us timer output to ms
+ */
+
 unsigned int GetTimeMillis () {
   return (unsigned int)(GetTime ()/1000);
 }
+
+/**
+ * @brief Start UNIX timer
+ */
+
 unsigned int StartTimer () {
    return GetTimeMillis();
 }
@@ -96,11 +142,12 @@ unsigned int StartTimer () {
 #else
 #include <windows.h>
 #include <stdio.h>
-/*
- * GetTime --
+
+/**
+ * @brief Windows timing function using QueryPerformanceCounter
  *
- *      Returns the curent time (from some uninteresting origin) in usecs
- *      based on the performance counters.
+ * Retrieves the current value of the performance counter, which is a high 
+ * resolution (<1us) time stamp that can be used for time-interval measurements.
  */
 
 unsigned long GetTime(void)
@@ -132,12 +179,14 @@ unsigned int GetTimeMillis(void) {
   return (unsigned int)timeGetTime();
 }
 
-/*
+/**
+  @brief Set timer resolution to milliseconds
   By default in 2000/XP, the timeGetTime call is set to some resolution
   between 10-15 ms query for the range of value periods and then set timer
   to the lowest possible.  Note: MUST make call to corresponding
   CleanupMillisTimer
 */
+
 void SetupMillisTimer(void) {
 
   TIMECAPS timeCaps;
@@ -150,10 +199,20 @@ void SetupMillisTimer(void) {
     fprintf(stderr,"(* Set timer resolution to %d ms. *)\n",timeCaps.wPeriodMin);
   }
 }
+
+/**
+  @brief Start system timer
+*/
+
 unsigned int StartTimer () {
    SetupMillisTimer();
    return 0;
 }
+
+/**
+  @brief Reset system timer
+*/
+
 void CleanupMillisTimer(void) {
   if (timeEndPeriod(timerRes) == TIMERR_NOCANDO) {
     fprintf(stderr,"WARNING: bad return value of call to timeEndPeriod.\n");
