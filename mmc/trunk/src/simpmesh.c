@@ -95,6 +95,14 @@ void mesh_init(tetmesh *mesh){
 	mesh->weight=NULL;
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
+        mesh->nmin.x=VERY_BIG;
+	mesh->nmin.y=VERY_BIG;
+	mesh->nmin.z=VERY_BIG;
+	mesh->nmin.w=1.f;
+        mesh->nmax.x=-VERY_BIG;
+	mesh->nmax.y=-VERY_BIG;
+	mesh->nmax.z=-VERY_BIG;
+	mesh->nmax.w=1.f;
 }
 
 /**
@@ -159,7 +167,7 @@ void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i;
+	int tmp,len,i,datalen;
 	char fnode[MAX_PATH_LENGTH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
@@ -170,14 +178,48 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 		MESH_ERROR("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
-	if(cfg->basisorder) 
-	   mesh->weight=(double *)calloc(sizeof(double)*mesh->nn,cfg->maxgate);
-
 	for(i=0;i<mesh->nn;i++){
 		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
 			MESH_ERROR("node file has wrong format");
 	}
 	fclose(fp);
+        if(cfg->method==rtBLBadouelGrid)
+	        mesh_createdualmesh(mesh,cfg);
+	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
+}
+
+void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
+        int i;
+        mesh->nmin.x=VERY_BIG;
+	mesh->nmin.y=VERY_BIG;
+	mesh->nmin.z=VERY_BIG;
+        mesh->nmax.x=-VERY_BIG;
+	mesh->nmax.y=-VERY_BIG;
+	mesh->nmax.z=-VERY_BIG;
+
+	for(i=0;i<mesh->nn;i++){
+		mesh->nmin.x=MIN(mesh->node[i].x, mesh->nmin.x);
+		mesh->nmin.y=MIN(mesh->node[i].y, mesh->nmin.y);
+		mesh->nmin.z=MIN(mesh->node[i].z, mesh->nmin.z);
+		mesh->nmax.x=MAX(mesh->node[i].x, mesh->nmax.x);
+		mesh->nmax.y=MAX(mesh->node[i].y, mesh->nmax.y);
+		mesh->nmax.z=MAX(mesh->node[i].z, mesh->nmax.z);
+	}
+        mesh->nmin.x-=EPS;
+	mesh->nmin.y-=EPS;
+	mesh->nmin.z-=EPS;
+        mesh->nmax.x+=EPS;
+	mesh->nmax.y+=EPS;
+	mesh->nmax.z+=EPS;
+
+	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->unitinmm)+1;
+	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->unitinmm)+1;
+	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->unitinmm)+1;
+
+	cfg->crop0.x=cfg->dim.x;
+        cfg->crop0.y=cfg->dim.y*cfg->dim.x;
+	cfg->crop0.z=cfg->dim.y*cfg->dim.x*cfg->dim.z;
 }
 
 /**
@@ -224,7 +266,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	}
 	fclose(fp);
 
-        if(cfg->unitinmm!=1.f){
+        if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
            for(i=1;i<mesh->prop;i++){
                    mesh->med[i].mus*=cfg->unitinmm;
                    mesh->med[i].mua*=cfg->unitinmm;
@@ -260,6 +302,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	mesh->elem=(int *)malloc(sizeof(int)*mesh->elemlen*mesh->ne);
 	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
+	  if(cfg->method==rtBLBadouel)
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
@@ -547,8 +590,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		tracer_build(tracer);
 	    else
 	    	MESH_ERROR("tracer is not associated with a mesh");
-	}else if(cfg->srctype==stPencil && cfg->dim.x>0){
-            int eid=cfg->dim.x-1;
+	}else if(cfg->srctype==stPencil && cfg->e0>0){
+            int eid=cfg->e0-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
 	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
@@ -573,8 +616,6 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    }
 	    for(i=0;i<4;i++){
 	        bary[i]/=s;
-		if(bary[i]<1e-5f)
-		    cfg->dim.y=ifacemap[i]+1;
 	    }
 	}
 }
@@ -668,7 +709,7 @@ void tracer_build(raytracer *tracer){
 #endif
 			}
                 }
-	}else if(tracer->method==rtBLBadouel){
+	}else if(tracer->method==rtBLBadouel || tracer->method==rtBLBadouelGrid){
 		int ea,eb,ec;
 		float3 vecAB={0.f},vecAC={0.f},vN={0.f};
 
@@ -842,7 +883,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int i,j;
+	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
                 sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
@@ -852,7 +893,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         if(cfg->outputformat==ofBin){
 		if((fp=fopen(fweight,"wb"))==NULL)
          	        MESH_ERROR("can not open weight file to write");
-		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),mesh->nn*cfg->maxgate,fp)!=mesh->nn*cfg->maxgate)
+		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),datalen*cfg->maxgate,fp)!=datalen*cfg->maxgate)
 			MESH_ERROR("fail to write binary weight file");
 		fclose(fp);
 		return;
@@ -860,20 +901,11 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	if((fp=fopen(fweight,"wt"))==NULL){
 		MESH_ERROR("can not open weight file to write");
 	}
-	if(cfg->basisorder)
-	  for(i=0;i<cfg->maxgate;i++)
-	   for(j=0;j<mesh->nn;j++){
-		/*pn=mesh->node+j;
-		if(fprintf(fp,"%d %e %e %e %e\n",j+1,pn->x,pn->y,pn->z,mesh->weight[i*mesh->nn+j])==0)*/
-		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->nn+j])==0)
+	for(i=0;i<cfg->maxgate;i++)
+	    for(j=0;j<datalen;j++){
+		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
 			MESH_ERROR("can not write to weight file");
-	   }
-	else
-	  for(i=0;i<cfg->maxgate;i++)
-	   for(j=0;j<mesh->ne;j++){
-		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*mesh->ne+j])==0)
-			MESH_ERROR("can not write to weight file");
-	   }
+	}
 	fclose(fp);
 }
 
@@ -899,7 +931,9 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 		MESH_ERROR("can not open history file to write");
 	}
 	cfg->his.totalphoton=cfg->nphoton;
-        cfg->his.unitinmm=cfg->unitinmm;
+	cfg->his.unitinmm=1.f;
+        if(cfg->method!=rtBLBadouelGrid)
+	    cfg->his.unitinmm=cfg->unitinmm;
         cfg->his.detected=count;
 	cfg->his.savedphoton=count;
 	cfg->his.detnum=cfg->detnum;
@@ -940,6 +974,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 	int xsize=cfg->detparam1.w;
 	int ysize=cfg->detparam2.w;
 	int i,j,xindex,yindex,ntg,offset;
+	float unitinmm=(cfg->method!=rtBLBadouelGrid)? cfg->his.unitinmm : 1.f;
 
 	float xloc, yloc, weight, path;
 	for(i=0; i<count; i++){
@@ -947,7 +982,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 		weight = ppath[(i+1)*colcount-1];
 		for(j=1;j<=cfg->his.maxmedia;j++){
 			path += ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].n;
-			weight *= expf(-ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].mua*cfg->unitinmm);
+			weight *= expf(-ppath[i*colcount+j+cfg->his.maxmedia]*mesh->med[j].mua*unitinmm);
 		}
 		ntg = (int) path*R_C0/cfg->tstep;
 		if(ntg>cfg->maxgate-1)
@@ -1032,11 +1067,11 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
 float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
         int i,j,k;
-	float energydeposit=0.f, energyelem,normalizor;
+	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
+        int datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
-            int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
             if(cfg->outputtype==otWL || cfg->outputtype==otWP)
                normalizor=1.f/Etotal; /*Etotal is total detected photon weight in the replay mode*/
@@ -1047,19 +1082,20 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
            return normalizor;
         }
 	if(cfg->outputtype==otEnergy){
-            int datalen=(cfg->basisorder) ? mesh->nn : mesh->ne;
             normalizor=1.f/cfg->nphoton;
-            
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
                   mesh->weight[i*datalen+j]*=normalizor;
 	    return normalizor;
         }
-	if(cfg->basisorder){
+	if(cfg->method==rtBLBadouelGrid){
+            normalizor=1.0/(Etotal*cfg->unitinmm*cfg->unitinmm*cfg->unitinmm); /*scaling factor*/
+	}else{
+	  if(cfg->basisorder){
             for(i=0;i<cfg->maxgate;i++)
-              for(j=0;j<mesh->nn;j++)
+              for(j=0;j<datalen;j++)
         	if(mesh->nvol[j]>0.f)
-                   mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
+                   mesh->weight[i*datalen+j]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
 	      ee=(int *)(mesh->elem+i*mesh->elemlen);
@@ -1070,28 +1106,24 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
 	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
-	    if(cfg->outputtype==otFlux)
-               normalizor/=cfg->tstep;
-            for(i=0;i<cfg->maxgate;i++)
-               for(j=0;j<mesh->nn;j++)
-		  mesh->weight[i*mesh->nn+j]*=normalizor;
-	}else{
-            for(i=0;i<mesh->ne;i++)
+	  }else{
+            for(i=0;i<datalen;i++)
 	      for(j=0;j<cfg->maxgate;j++)
-	         energydeposit+=mesh->weight[j*mesh->ne+i];
+	         energydeposit+=mesh->weight[j*datalen+i];
 
-            for(i=0;i<mesh->ne;i++){
+            for(i=0;i<datalen;i++){
 	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]].mua;
               for(j=0;j<cfg->maxgate;j++)
-        	mesh->weight[j*mesh->ne+i]/=energyelem;
+        	mesh->weight[j*datalen+i]/=energyelem;
 	    }
             normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
-            if(cfg->outputtype==otFlux)
+	  }
+	}
+	if(cfg->outputtype==otFlux)
                normalizor/=cfg->tstep;
 
-            for(i=0;i<cfg->maxgate;i++)
-               for(j=0;j<mesh->ne;j++)
-                  mesh->weight[i*mesh->ne+j]*=normalizor;
-	}
+	for(i=0;i<cfg->maxgate;i++)
+	    for(j=0;j<datalen;j++)
+	        mesh->weight[i*datalen+j]*=normalizor;
 	return normalizor;
 }

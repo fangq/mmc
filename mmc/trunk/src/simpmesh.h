@@ -54,6 +54,9 @@
 #define R_MIN_MUS  1e9f
 #define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 #define DELTA_MUA  1e-4f
+#define VERY_BIG   1e30f
+#define MIN(a,b)  ((a)<(b)?(a):(b))
+#define MAX(a,b)  ((a)>(b)?(a):(b))
 
 #define MESH_ERROR(a)  mesh_error((a),__FILE__,__LINE__)
 
@@ -83,7 +86,9 @@ typedef struct MMC_mesh{
 	float *atte;           /**< precomputed attenuation for each media */
 	double *weight;        /**< volumetric fluence for all nodes at all time-gates */
 	float *evol;           /**< volume of an element */
-	float *nvol;           /**< veronio volume of a node */
+	float *nvol;           /**< voronoi volume of a node */
+	float4 nmin;           /**< lower-corner of the mesh bounding box */
+	float4 nmax;           /**< upper-corner of the mesh bounding box */
 } tetmesh;
 
 /***************************************************************************//**
@@ -127,6 +132,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 void mesh_savedetimage(float *detmap, mcconfig *cfg);
 float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg);
 void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg);
+void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);
 void tracer_build(raytracer *tracer);
