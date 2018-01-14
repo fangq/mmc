@@ -214,7 +214,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	r->Lmove=0.f;
 	vec_add(&(r->p0),&(r->vec),&p1);
 	vec_cross(&(r->p0),&p1,&pcrx);
-	ee=(int *)(tracer->mesh->elem+eid);
+	ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	rc=prop->n*R_C0;
         currweight=r->weight;
@@ -264,7 +264,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			r->faceid=faceorder[i];
 
 		       {
-			int *enb=(int *)(tracer->mesh->facenb+eid);
+			int *enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
 			r->nexteid=enb[r->faceid];
 #ifdef MMC_USE_SSE
 			int nexteid=(r->nexteid-1)*6;
@@ -377,7 +377,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 					memcpy(baryp0,baryout,sizeof(float4));
 				}else{
 		        		if(r->nexteid && faceidx>=0){
-		        		    int j,k,*nextenb=(int *)(tracer->mesh->elem+r->nexteid-1);
+		        		    int j,k,*nextenb=(int *)(tracer->mesh->elem+(r->nexteid-1)*tracer->mesh->elemlen);
 					    memset(baryp0,0,sizeof(float4));
 					    for(j=0;j<3;j++)
 					      for(k=0;k<4;k++){
@@ -472,7 +472,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	T = _mm_load_ps(&(r->vec.x));
 
 	medium *prop;
-	int *ee=(int *)(tracer->mesh->elem+eid);
+	int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	rc=prop->n*R_C0;
         currweight=r->weight;
@@ -493,14 +493,14 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		r->Lmove=((r->isend) ? dlen : Lp0);
 
                 if(!r->isend){
-		    enb=(int *)(tracer->mesh->facenb+eid);
+		    enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
                     r->nexteid=enb[r->faceid];
 		    if(r->nexteid){
 		        nextenb=(int *)(tracer->m+(r->nexteid-1)*12);
         		_mm_prefetch((char *)(nextenb),_MM_HINT_T0);
 		        _mm_prefetch((char *)(nextenb+4*16),_MM_HINT_T0);
         		_mm_prefetch((char *)(nextenb+8*16),_MM_HINT_T0);
-			nextenb=(int *)(tracer->mesh->elem+r->nexteid-1);
+			nextenb=(int *)(tracer->mesh->elem+(r->nexteid-1)*tracer->mesh->elemlen);
 		    }
 		}
 	        S = _mm_set1_ps(bary.x);
@@ -705,7 +705,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	}*/
 	if(r->faceid>=0){
 	    medium *prop;
-	    int *ee=(int *)(tracer->mesh->elem+eid);
+	    int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	    float mus;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    rc=prop->n*R_C0;
@@ -885,14 +885,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	if(r->faceid>=0){
 	    medium *prop;
-	    int *enb, *ee=(int *)(tracer->mesh->elem+eid);;
+	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	    float mus;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    rc=prop->n*R_C0;
             currweight=r->weight;
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
-            enb=(int *)(tracer->mesh->facenb+eid);
+            enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
             r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 	    if(r->nexteid){
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
@@ -1079,7 +1079,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
-			fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+r.eid-1));
+			fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+(r.eid-1)*mesh->elemlen));
 			continue;
                   }
 	    	  r.eid=-r.eid;
@@ -1091,7 +1091,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    while(r.faceid>=0 && !r.isend){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
 
-	    	    enb=(int *)(mesh->facenb+r.eid-1);
+	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
 
@@ -1128,7 +1128,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
-		       fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+r.eid-1));
+		       fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+(r.eid-1)*mesh->elemlen));
                        r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		       if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 	            		r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
@@ -1447,7 +1447,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 	float bary[4]={0.f};
 	for(is=0;is<mesh->srcelemlen;is++){
 		int include = 1;
-		int *elems=(int *)(mesh->elem+(mesh->srcelem[is])-1);
+		int *elems=(int *)(mesh->elem+(mesh->srcelem[is]-1)*mesh->elemlen);
 		for(i=0;i<4;i++){
 			ea=elems[out[i][0]]-1;
 			eb=elems[out[i][1]]-1;
@@ -1483,7 +1483,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 {
 		MMC_FPRINTF(cfg->flog,"all tetrahedra (%d) labeled with -1 do not enclose the source!\n",mesh->srcelemlen);
 		if(mesh->srcelemlen){
-		  int *elems=(int *)(mesh->elem+(mesh->srcelem[0])-1);
+		  int *elems=(int *)(mesh->elem+(mesh->srcelem[0]-1)*mesh->elemlen);
 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[0],mesh->node[elems[0]-1].x,mesh->node[elems[0]-1].y,mesh->node[elems[0]-1].z);
 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[1],mesh->node[elems[1]-1].x,mesh->node[elems[1]-1].y,mesh->node[elems[1]-1].z);
 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[2],mesh->node[elems[2]-1].x,mesh->node[elems[2]-1].y,mesh->node[elems[2]-1].z);
@@ -1510,7 +1510,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	float *baryp0=&(r->bary0.x);
 	int eid = r->eid-1;
-	int *ee = (int *)(mesh->elem+eid);
+	int *ee = (int *)(mesh->elem+eid*mesh->elemlen);
     	int i,tshift;
 	medium * prop=mesh->med+(mesh->type[eid]);
         float ww=r->weight;

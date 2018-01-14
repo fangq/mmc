@@ -443,16 +443,17 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         printf("mmc.nn=%d;\n",mesh->nn);
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]!=4)
+	if(arraydim[0]<=0 || arraydim[1]<4)
             MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
         double *val=mxGetPr(item);
         mesh->ne=arraydim[0];
+	mesh->elemlen=arraydim[1];
 	if(mesh->elem) free(mesh->elem);
-        mesh->elem=(int4 *)calloc(sizeof(int4),mesh->ne);
-        for(j=0;j<4;j++)
+        mesh->elem=(int *)calloc(sizeof(int)*arraydim[1],mesh->ne);
+        for(j=0;j<mesh->elemlen;j++)
           for(i=0;i<mesh->ne;i++)
-             ((int *)(&mesh->elem[i]))[j]=val[j*mesh->ne+i];
-        printf("mmc.ne=%d;\n",mesh->ne);
+             mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
+        printf("mmc.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -466,16 +467,17 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         printf("mmc.ne=%d;\n",mesh->ne);
     }else if(strcmp(name,"facenb")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]!=4)
+	if(arraydim[0]<=0 || arraydim[1]<4)
             MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
         double *val=mxGetPr(item);
         mesh->ne=arraydim[0];
+	mesh->elemlen=arraydim[1];
 	if(mesh->facenb) free(mesh->facenb);
-        mesh->facenb=(int4 *)malloc(sizeof(int4)*mesh->ne);
-        for(j=0;j<4;j++)
+        mesh->facenb=(int *)malloc(sizeof(int)*arraydim[1]*mesh->ne);
+        for(j=0;j<arraydim[1];j++)
           for(i=0;i<mesh->ne;i++)
-             ((int *)(&mesh->facenb[i]))[j]=val[j*mesh->ne+i];
-        printf("mmc.facenb=%d;\n",mesh->ne);
+             mesh->facenb[i*arraydim[1]+j]=val[j*mesh->ne+i];
+        printf("mmc.facenb=[%d,%d];\n",mesh->ne,mesh->elemlen);
     }else if(strcmp(name,"evol")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -661,7 +663,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      for(i=0;i<mesh->ne;i++){
         if(mesh->type[i]<=0)
 		continue;
-     	ee=(int *)(mesh->elem+i);
+     	ee=(int *)(mesh->elem+i*mesh->elemlen);
      	for(j=0;j<4;j++)
      	   	mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
      }

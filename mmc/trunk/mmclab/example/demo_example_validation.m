@@ -18,7 +18,7 @@
 %addpath('/Please/add/path/to/mcx/utils/')
 addpath('../../matlab/');
 
-cfg.nphoton=3e7;
+cfg.nphoton=3e6;
 cfg.seed=1648335518;
 [cfg.node,cfg.elem]=genT5mesh(0:2:60,0:2:60,0:2:60);
 cfg.elemprop=ones(size(cfg.elem,1),1);

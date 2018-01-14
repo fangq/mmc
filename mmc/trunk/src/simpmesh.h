@@ -70,14 +70,15 @@ typedef struct MMC_mesh{
 	int nn;                /**< number of nodes */
 	int ne;                /**< number of elements */
 	int prop;              /**< number of media */
+	int elemlen;           /**< number of nodes per element */
 	float3 *node;          /**< node coordinates */
-	int4 *elem;            /**< element indices */
+	int  *elem;            /**< element indices */
 	int  *srcelem;	       /**< candidate list of elements containing the source*/
 	int  srcelemlen;       /**< length of the elements that may contain the source*/
 	int  *detelem;	       /**< candidate list of elements containing a widefield detector*/
 	int  detelemlen;       /**< length of the elements that may contain the detector*/
 	int  *type;            /**< element-based media index */
-	int4 *facenb;          /**< face neighbors, idx of the element sharing a face */
+	int  *facenb;          /**< face neighbors, idx of the element sharing a face */
 	medium *med;           /**< optical property of different media */
 	float *atte;           /**< precomputed attenuation for each media */
 	double *weight;        /**< volumetric fluence for all nodes at all time-gates */

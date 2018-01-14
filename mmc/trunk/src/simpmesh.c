@@ -81,6 +81,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
 	mesh->prop=0;
+	mesh->elemlen=4;
 	mesh->node=NULL;
 	mesh->elem=NULL;
 	mesh->srcelemlen=0;
@@ -241,28 +242,39 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i;
-	int4 *pe;
+	int tmp,len,i,j;
+	int *pe;
 	char felem[MAX_PATH_LENGTH];
+
 	mesh_filenames("elem_%s.dat",felem,cfg);
 	if((fp=fopen(felem,"rt"))==NULL){
 		MESH_ERROR("can not open element file");
 	}
-	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
+	len=fscanf(fp,"%d %d",&(mesh->elemlen),&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
 		MESH_ERROR("element file has wrong format");
 	}
-	mesh->elem=(int4 *)malloc(sizeof(int4)*mesh->ne);
-	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
+	if(mesh->elemlen<4)
+	    mesh->elemlen=4;
+
+	mesh->elem=(int *)malloc(sizeof(int)*mesh->elemlen*mesh->ne);
+	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
 	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
 
 	for(i=0;i<mesh->ne;i++){
-		pe=mesh->elem+i;
-		if(fscanf(fp,"%d %d %d %d %d %d",&tmp,&(pe->x),&(pe->y),&(pe->z),&(pe->w),mesh->type+i)!=6)
-			MESH_ERROR("element file has wrong format");
+		pe=mesh->elem+i*mesh->elemlen;
+		if(fscanf(fp,"%d",&tmp)!=1)
+			break;
+		for(j=0;j<mesh->elemlen;j++)
+		        if(fscanf(fp,"%d",pe+j)!=1)
+			    break;
+		if(fscanf(fp,"%d",mesh->type+i)!=1)
+			break;
         }
 	fclose(fp);
+	if(i<mesh->ne)
+	    MESH_ERROR("element file has wrong format");
 	mesh_srcdetelem(mesh,cfg);
 }
 
@@ -332,8 +344,8 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 			MESH_ERROR("mesh file has wrong format");
                 if(mesh->type[i]==0)
 			continue;
-		ee=(int *)(mesh->elem+i);
-		for(j=0;j<4;j++)
+		ee=(int *)(mesh->elem+i*mesh->elemlen);
+		for(j=0;j<mesh->elemlen;j++)
 			mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
 	}
 	fclose(fp);
@@ -348,23 +360,27 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 
 void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i;
-	int4 *pe;
+	int len,i,j;
+	int *pe;
 	char ffacenb[MAX_PATH_LENGTH];
 	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
 		MESH_ERROR("can not open face-neighbor list file");
 	}
-	len=fscanf(fp,"%d %d",&tmp,&(mesh->ne));
+	len=fscanf(fp,"%d %d",&(mesh->elemlen),&(mesh->ne));
 	if(len!=2 || mesh->ne<=0){
 		MESH_ERROR("mesh file has wrong format");
 	}
-	mesh->facenb=(int4 *)malloc(sizeof(int4)*mesh->ne);
+	if(mesh->elemlen<4)
+	    mesh->elemlen=4;
+	mesh->facenb=(int *)malloc(sizeof(int)*mesh->elemlen*mesh->ne);
+
 	for(i=0;i<mesh->ne;i++){
-		pe=mesh->facenb+i;
-		if(fscanf(fp,"%d %d %d %d",&(pe->x),&(pe->y),&(pe->z),&(pe->w))!=4)
-			MESH_ERROR("face-neighbor list file has wrong format");
+		pe=mesh->facenb+i*mesh->elemlen;
+		for(j=0;j<mesh->elemlen;j++)
+		        if(fscanf(fp,"%d",pe+j)!=1)
+			    MESH_ERROR("face-neighbor list file has wrong format");
 	}
 	fclose(fp);
 }
@@ -536,7 +552,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
 	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
-	    int *elems=(int *)(tracer->mesh->elem+eid); // convert int4* to int*
+	    int *elems=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen); // convert int4* to int*
 	    for(i=0;i<4;i++){
             	ea=elems[out[i][0]]-1;
             	eb=elems[out[i][1]]-1;
@@ -1046,7 +1062,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
                    mesh->weight[i*mesh->nn+j]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
-	      ee=(int *)(mesh->elem+i);
+	      ee=(int *)(mesh->elem+i*mesh->elemlen);
 	      energyelem=0.f;
 	      for(j=0;j<cfg->maxgate;j++)
 		for(k=0;k<4;k++)
