@@ -313,14 +313,14 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
             if(cfg->replaydet==0 || cfg->replaydet==(int)(ppath[i*his.colcount])){
                 memcpy((char *)(cfg->photonseed)+cfg->nphoton*his.seedbyte, (char *)(cfg->photonseed)+i*his.seedbyte, his.seedbyte);
                 // replay with wide-field detection pattern, the partial path has to contain photon exit information
+                cfg->replayweight[cfg->nphoton]=ppath[(i+1)*his.colcount-1];
                 if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
-                    cfg->replayweight[cfg->nphoton]=1;
                     cfg->replaydetidx[cfg->nphoton]=mesh_getdetweight(i,his.colcount,ppath,cfg);
-                }else{
-                    cfg->replayweight[cfg->nphoton]=ppath[(i+1)*his.colcount-1];
                 }
+                /*
                 for(j=2;j<his.maxmedia+2;j++)
                     cfg->replayweight[cfg->nphoton]*=expf(-mesh->med[j-1].mua*ppath[i*his.colcount+j]*his.unitinmm);
+                */
                 cfg->replaytime[cfg->nphoton]=0.f;
                 for(j=2;j<his.maxmedia+2;j++)
                     cfg->replaytime[cfg->nphoton]+=mesh->med[j-1].n*ppath[i*his.colcount+j]*R_C0;
@@ -728,7 +728,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
     if(cfg->issaveseed && seeds!=NULL){
         cfg->his.seedbyte=seedbyte;
     }
-    cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+3*/
+    cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+3; /*column count=maxmedia+3*/
     
     fwrite(&(cfg->his),sizeof(history),1,fp);
     fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
@@ -759,8 +759,8 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
         ntg = (int) path*R_C0/cfg->tstep;
         if(ntg>cfg->maxgate-1)
             ntg = cfg->maxgate-1;
-        xloc = ppath[(i+1)*colcount-7];
-        yloc = ppath[(i+1)*colcount-6];
+        xloc = ppath[(i+1)*colcount-8];
+        yloc = ppath[(i+1)*colcount-7];
         xindex = (xloc-x0)/xrange*xsize;
         if(xindex<0 || xindex>xsize-1) continue;
         yindex = (yloc-y0)/yrange*ysize;
@@ -794,8 +794,8 @@ int mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg){
     float yrange=cfg->detparam1.y+cfg->detparam2.y;
     int xsize=cfg->detparam1.w;
     int ysize=cfg->detparam2.w;
-    float xloc=ppath[(photonid+1)*colcount-7];
-    float yloc=ppath[(photonid+1)*colcount-6];
+    float xloc=ppath[(photonid+1)*colcount-8];
+    float yloc=ppath[(photonid+1)*colcount-7];
     int xindex = (xloc-x0)/xrange*xsize;
     int yindex = (yloc-y0)/yrange*ysize;
     if(xindex<0 || xindex>xsize-1 || yindex<0 || yindex>ysize-1)

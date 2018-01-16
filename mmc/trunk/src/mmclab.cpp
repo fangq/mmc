@@ -54,7 +54,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -137,8 +137,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 #pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
 {
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
-	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
+	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -202,9 +202,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		errorflag++;
 	    }
 	}
-
+      if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
+        int idx;
+        for (idx=0; idx<cfg.detnum; idx++)
         #pragma omp atomic
-                master.totalweight += visit.totalweight;
+          master.totalweight[idx] += visit.totalweight[idx];
+      } else {
+        #pragma omp atomic
+          master.totalweight[0] += visit.totalweight[0];
+      }
 
 	if(cfg.issavedet && errorflag==0){
 	    #pragma omp atomic
@@ -275,9 +281,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	tracer_clear(&tracer);
 	if(cfg.isnormalized && master.totalweight){
-          cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight);
-	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg.his.normalizer);
+    if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)) {
+      int idx;
+      for (idx=0; idx<cfg.detnum; idx++) {
+        cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[idx],idx);
+      }
+    } else {
+      cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[0],0);
+  	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+  		master.totalweight[0],100.f*Eabsorb/master.totalweight[0],cfg.his.normalizer);
+    }
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
@@ -421,7 +434,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else if(strcmp(name,"detpos")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]>0 && arraydim[1]!=4)
-            MEXERROR("the 'detpos' field must have 4 columns (x,y,z,radius)");
+        MEXERROR("the 'detpos' field must have 4 columns (x,y,z,radius)");
         double *val=mxGetPr(item);
         cfg->detnum=arraydim[0];
 	if(cfg->detpos) free(cfg->detpos);
@@ -493,6 +506,14 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(k=0;k<arraydim[0]*arraydim[1];k++)
              cfg->srcpattern[k]=val[k];
         printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
+    }else if (strcmp(name,"detpattern")==0){
+        arraydim=mxGetDimensions(item);
+        double *val=mxGetPr(item);
+        if(cfg->detpattern) free(cfg->detpattern);
+        cfg->detpattern=(float*)malloc(arraydim[0]*arraydim[1]*arraydim[2]*sizeof(float));
+        for(k=0;k<arraydim[0]*arraydim[1]*arraydim[2];k++)
+             cfg->detpattern[k]=val[k];
+        printf("mmc.detpattern=[%d %d %d];\n",arraydim[0],arraydim[1],arraydim[2]);
     }else if(strcmp(name,"outputtype")==0){
         int len=mxGetNumberOfElements(item);
         const char *outputtype[]={"flux","fluence","energy","jacobian","wl","wp",""};
@@ -582,7 +603,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      mesh->nvol=(float *)calloc(sizeof(float),mesh->nn);
      for(i=0;i<mesh->ne;i++){
         if(mesh->type[i]<=0)
-		continue;
+		      continue;
      	ee=(int *)(mesh->elem+i);
      	for(j=0;j<4;j++)
      	   	mesh->nvol[ee[j]-1]+=mesh->evol[i]*0.25f;
@@ -595,8 +616,11 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      else
         mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate);
 
-     if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
+      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
+
+      if(!(cfg->outputtype==otWL || cfg->outputtype==otWP) && cfg->srcpattern!=NULL)
+        mexErrMsgTxt("the 'detpattern' should only be specified under replay mode");
 
      if(cfg->unitinmm!=1.f){
         for(i=1;i<mesh->prop;i++){
@@ -636,7 +660,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      }
      // cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
      cfg->his.detnum=cfg->detnum;
-     cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+1;
+     cfg->his.colcount=(1+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2;
 }
 
 extern "C" int mmc_throw_exception(const int id, const char *msg, const char *filename, const int linenum){

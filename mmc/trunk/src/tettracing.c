@@ -979,7 +979,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
     
     /*initialize the photon parameters*/
     launchphoton(cfg, &r, mesh, ran, ran0);
-    r.partialpath[visit->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
+    r.partialpath[visit->reclen-3] = r.weight; /*record the initial photon weight*/
     
     /*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
@@ -1086,9 +1086,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 if(cfg->debuglevel&dlExit)
                     MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
                             r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+                r.partialpath[visit->reclen-2] = r.weight; /*record the final photon weight*/
                 if(cfg->issavedet && cfg->issaveexit){                                     /*when issaveexit is set to 1*/
-                    memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
-                    memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
+                    memcpy(r.partialpath+(visit->reclen-3-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
+                    memcpy(r.partialpath+(visit->reclen-3-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                 }
             }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
                 MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);

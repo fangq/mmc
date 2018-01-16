@@ -117,7 +117,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 #pragma omp parallel private(ran0,ran1,threadid)
     {
         visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
-        visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
+        visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+3;
         int idx;
         // replay mode AND wide-field detection pattern(s)
         if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern!=NULL)){
