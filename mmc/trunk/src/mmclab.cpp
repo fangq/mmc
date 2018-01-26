@@ -106,8 +106,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	mcx_initcfg(&cfg);
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 	mesh_init(&mesh);
+  memset(&master,0,sizeof(visitor));
 
-        memset(&master,0,sizeof(visitor));
+  if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
+    master.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
+    master.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
+  } else {
+    master.totalweight=(double*)calloc(1, sizeof(double));
+    master.kahanc=(double*)calloc(1, sizeof(double));
+  }
 
 	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
             tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
@@ -139,6 +146,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
+  if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
+    visit.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
+    visit.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
+  } else {
+    visit.totalweight=(double*)calloc(1, sizeof(double));
+    visit.kahanc=(double*)calloc(1, sizeof(double));
+  }
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
