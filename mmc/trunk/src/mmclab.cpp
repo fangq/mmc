@@ -313,10 +313,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		fielddim[0]=mesh.ne;
 	    else
 		fielddim[0]=mesh.nn;
-	    fielddim[1]=cfg.maxgate; fielddim[2]=0; fielddim[3]=0; 
-    	    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
-	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
-	    memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
+	  fielddim[1]=cfg.maxgate;
+    	    
+      if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)) {
+        fielddim[2]=cfg.detnum; fielddim[3]=0;
+        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+        double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
+        memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*fielddim[2]*sizeof(double));
+      } else {
+        fielddim[2]=0; fielddim[3]=0;
+        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
+        double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
+	      memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*sizeof(double));
+      }
 	}
 	if(nlhs>=2 && cfg.issaveexit==2){
 	    float *detimage=(float*)calloc(cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
@@ -585,6 +594,14 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	cfg->replaytime=(float *)malloc(cfg->his.detected*sizeof(float));
         memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replaytime=%d;\n",cfg->his.detected);
+    }else if(strcmp(name,"replaydetidx")==0){
+      arraydim=mxGetDimensions(item);
+  if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'replaydetidx' field can not be empty");
+  cfg->his.detected=arraydim[0]*arraydim[1];
+  cfg->replaydetidx=(int *)malloc(cfg->his.detected*sizeof(int));
+  memcpy(cfg->replaydetidx,mxGetData(item),cfg->his.detected*sizeof(float));
+        printf("mmc.replaydetidx=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{
@@ -624,11 +641,13 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      }
      if(mesh->weight)
         free(mesh->weight);
-
+    int frame = 1;
+    if ((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern))
+      frame = cfg->detnum;
      if(!cfg->basisorder)
-        mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate);
+        mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate*frame);
      else
-        mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate);
+        mesh->weight=(double*)calloc(mesh->nn*sizeof(double),cfg->maxgate*frame);
 
       if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");

@@ -315,7 +315,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
                 // replay with wide-field detection pattern, the partial path has to contain photon exit information
                 cfg->replayweight[cfg->nphoton]=ppath[(i+1)*his.colcount-1];
                 if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
-                    cfg->replaydetidx[cfg->nphoton]=mesh_getdetweight(i,his.colcount,ppath,cfg);
+                    cfg->replaydetidx[cfg->nphoton]=mesh_getdetidx(i,his.colcount,ppath,cfg);
                 }
                 /*
                 for(j=2;j<his.maxmedia+2;j++)
@@ -786,7 +786,7 @@ void mesh_savedetimage(float *detmap, mcconfig *cfg){
     fclose(fp);
 }
 
-int mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg){
+int mesh_getdetidx(int photonid, int colcount, float* ppath, mcconfig* cfg){
     
     float x0=cfg->detpos[0].x;
     float y0=cfg->detpos[0].y;
