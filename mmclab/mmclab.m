@@ -56,8 +56,9 @@ function varargout=mmclab(cfg,type)
 %      cfg.isnormalized:[1]-normalize the output fluence to unitary source, 0-no reflection
 %      cfg.isspecular:  [1]-calculate specular reflection if source is outside
 %      cfg.ismomentum:  [0]-save momentum transfer for each detected photon
-%      cfg.method:      ray-tracing method, [P]:Plucker, H:Havel (SSE4),
-%                       B: partial Badouel, S: branchless Badouel (SSE)
+%      cfg.method:      ray-tracing method, ["plucker"]:Plucker, "havel": Havel (SSE4),
+%                       "badouel": partial Badouel, "elem": branchless Badouel (SSE), 
+%                       "grid": dual-mesh MMC
 %      cfg.mcmethod:    0 use MCX-styled MC method, 1 use MCML style MC
 %      cfg.nout:        [1.0] refractive index for medium type 0 (background)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]

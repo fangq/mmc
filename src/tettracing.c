@@ -822,9 +822,10 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	float3 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,rc,currweight,dlen,ww;
+	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
+	__m128i P;
 
 	r->p0.w=1.f;
 	r->vec.w=0.f;
@@ -917,11 +918,13 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    }
             if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-	       r->weight*=expf(-prop->mua*r->Lmove);
+	       totalloss=expf(-prop->mua*r->Lmove);
 #else
-	       r->weight*=fast_expf9(-prop->mua*r->Lmove);
+	       totalloss=fast_expf9(-prop->mua*r->Lmove);
 #endif
+               r->weight*=totalloss;
             }
+	    totalloss=1.f-totalloss;
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
@@ -945,32 +948,65 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		currweight+=r->weight;
 	    }
 	    if(bary.x>=0.f){
+	        int framelen=(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+		if(cfg->method==rtBLBadouelGrid)
+		    framelen=cfg->crop0.z;
 		ww=currweight-r->weight;
-		r->Eabsorb+=ww;
         	r->photontimer+=r->Lmove*rc;
 
 		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
-			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*framelen;
 		else
-                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
+                	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*framelen;
 
         	if(cfg->debuglevel&dlAccum) MMC_FPRINTF(cfg->flog,"A %f %f %f %e %d %e\n",
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
+		if(prop->mua>0.f){
+		  r->Eabsorb+=ww;
+		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+                     ww/=prop->mua;
+		}
+
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
+
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
+		     if(cfg->method==rtBLBadouel){
                         if(cfg->isatomic)
 #pragma omp atomic
 			    tracer->mesh->weight[eid+tshift]+=ww;
                         else
                             tracer->mesh->weight[eid+tshift]+=ww;
+                     }else{
+			    float dstep, segloss, w0;
+			    int4 idx __attribute__ ((aligned(16)));
+			    int i, seg=(int)(r->Lmove)+1;
+			    seg=(seg<<1);
+			    dstep=r->Lmove/seg;
+#ifdef __INTEL_COMPILER
+	                    segloss=expf(-prop->mua*dstep);
+#else
+	                    segloss=fast_expf9(-prop->mua*dstep);
+#endif
+			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
+			    O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
+			    S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
+			    dstep=1.f/cfg->unitinmm;
+			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
+			    w0=ww;
+                            for(i=0; i< seg; i++){
+				P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
+				_mm_store_si128((__m128i *)&(idx.x),P);
+				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
+				w0*=segloss;
+			        S = _mm_add_ps(S, T);
+                            }
+			}
 		  }else{
 			int i;
-	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
-                           ww/=prop->mua;
                         ww*=1.f/3.f;
                         if(cfg->isatomic)
 			    for(i=0;i<3;i++)
@@ -1037,10 +1073,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->dim.x,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
 
-	float (*engines[4])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
-	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet};
+	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
+	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
 
 	r.partialpath=(float*)calloc(visit->reclen-1,sizeof(float));
@@ -1051,7 +1087,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		memcpy(r.photonseed,(void *)ran, (sizeof(RandType)*RAND_BUF_LEN));
         }
 	tracercore=engines[0];
-	if(cfg->method>=0 && cfg->method<4)
+	if(cfg->method>=rtPlucker && cfg->method<=rtBLBadouelGrid)
 	    tracercore=engines[(int)(cfg->method)];
 	else
 	    MMC_ERROR(-6,"specified ray-tracing algorithm is not defined");
@@ -1236,7 +1272,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 		pn=tracer->n+(offs)+faceid;
 	}else if(cfg->method<rtBLBadouel){
 		pn=tracer->m+(offs+faceid)*3;
-	}else if(cfg->method==rtBLBadouel){
+	}else if(cfg->method==rtBLBadouel || cfg->method==rtBLBadouelGrid){
 		pnorm.x=(&(tracer->n[offs].x))[faceid];
 		pnorm.y=(&(tracer->n[offs].x))[faceid+4];
 		pnorm.z=(&(tracer->n[offs].x))[faceid+8];
@@ -1511,7 +1547,8 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	float *baryp0=&(r->bary0.x);
 	int eid = r->eid-1;
 	int *ee = (int *)(mesh->elem+eid*mesh->elemlen);
-    	int i,tshift;
+    	int i,tshift, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);;
+
 	medium * prop=mesh->med+(mesh->type[eid]);
         float ww=r->weight;
 
@@ -1520,15 +1557,18 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
         ww-=r->weight;
 	r->Eabsorb+=ww;
 
-	if(!cfg->basisorder){
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->ne;
+	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*datalen;
+
+        if(cfg->method==rtBLBadouelGrid){
+	
+	}else{
+	    if(!cfg->basisorder){
                 if(cfg->isatomic)
 #pragma omp atomic
 		    mesh->weight[eid+tshift]+=ww;
                 else
                     mesh->weight[eid+tshift]+=ww;
-	}else{
-		tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nn;
+	    }else{
                 if(cfg->isatomic)
 		    for(i=0;i<4;i++)
 #pragma omp atomic
@@ -1536,5 +1576,6 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
                 else
                     for(i=0;i<4;i++)
                         mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
+            }
 	}
 }

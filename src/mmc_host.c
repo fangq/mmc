@@ -249,7 +249,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f were overhead)\n",(double)cfg->nphoton/dt,raytri,raytri0));
+        MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
         if(cfg->issavedet)
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 

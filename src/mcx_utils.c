@@ -68,7 +68,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','-','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-','-','\0'};
 		 
 /**
  * Long command line options
@@ -84,7 +84,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton", ""};
+                 "--debugphoton",""};
 
 /**
  * Debug flags
@@ -101,9 +101,10 @@ const char debugflag[]={'M','C','B','W','D','I','O','X','A','T','R','P','E','\0'
  * h: Havel-based SSE4 ray-tracer, see Fang2012
  * b: Badouel ray-tracing algorithm, see Fang2011
  * s: branch-less Badouel SSE4 ray-tracer, see Fang2011
+ * g: grid-output using dual-mesh MMC
  */
 
-const char raytracing[]={'p','h','b','s','\0'};
+const char raytracing[]={'p','h','b','s','g','\0'};
 
 /**
  * Output data types
@@ -143,6 +144,7 @@ const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
      cfg->detnum=0;
+     cfg->e0=0;
      cfg->dim.x=0;
      cfg->dim.y=0;
      cfg->dim.z=0;
@@ -231,7 +233,7 @@ void mcx_clearcfg(mcconfig *cfg){
      	free(cfg->prop);
      if(cfg->detnum)
      	free(cfg->detpos);
-     if(cfg->dim.x && cfg->dim.y && cfg->dim.z)
+     if(cfg->vol)
         free(cfg->vol);
      if(cfg->srcpattern)
         free(cfg->srcpattern);
@@ -427,7 +429,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
 
      if(Mesh){
         strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_PATH_LENGTH);
-        cfg->dim.x=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
+        cfg->e0=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
         cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
      }
      if(Optode){
@@ -548,7 +550,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      }
      if(cfg->meshtag[0]=='\0')
          MMC_ERROR(-1,"You must specify mesh files");
-     if(cfg->dim.x==0)
+     if(cfg->e0==0)
 	 MMC_ERROR(-1,"InitElem must be given");
      return 0;
 }
@@ -644,11 +646,11 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 
      if(in==stdin)
      	MMC_FPRINTF(stdout,">> %s\nPlease specify the index to the tetrahedral element enclosing the source [start from 1]:\n\t",cfg->meshtag);
-     MMC_ASSERT(fscanf(in,"%d", &(cfg->dim.x))==1);
+     MMC_ASSERT(fscanf(in,"%d", &(cfg->e0))==1);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
      if(in==stdin)
-     	MMC_FPRINTF(stdout,">> %d\nPlease specify the total number of detectors and detector diameter (in mm):\n\t",cfg->dim.x);
+     	MMC_FPRINTF(stdout,">> %d\nPlease specify the total number of detectors and detector diameter (in mm):\n\t",cfg->e0);
      MMC_ASSERT(fscanf(in,"%d %f", &(cfg->detnum), &(cfg->detradius))==2);
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
@@ -990,7 +992,11 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         MMC_ERROR(-2,"the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
-     if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE) cfg->seed=time(NULL);
+     if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE)
+        cfg->seed=time(NULL);
+     if(cfg->method==rtBLBadouelGrid){
+	cfg->basisorder=0;
+     }
 }
 
 /**
@@ -1253,11 +1259,12 @@ where possible parameters include (the first item in [] is the default value)\n\
                                to calculate the mua/mus Jacobian matrices\n\
  -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
                                detector (det ID starts from 1), use with -E \n\
- -M [%c|PHBS]  (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+ -M [%c|PHBSG] (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
 			       B - partial Badouel's method (used by TIM-OS)\n\
 			       S - branch-less Badouel's method with SSE\n\
+			       G - dual-mesh MMC with grid output\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\

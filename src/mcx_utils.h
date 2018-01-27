@@ -49,7 +49,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
 
-enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel};
+enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};
 enum TMCMethod {mmMCX, mmMCML};
 
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
@@ -57,6 +57,8 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
+enum TOutputDomain {odMesh, odGrid};
+
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -116,6 +118,7 @@ typedef struct MMC_config{
         int nblocksize;                /**<thread block size*/
 	int nthread;                   /**<num of total threads, multiple of 128*/
 	int seed;                      /**<random number generator seed*/
+	int e0;                        /**<initial element id*/
 	float3 srcpos;                 /**<src position in mm*/
 	float4 srcdir;                 /**<src normal direction*/
 	int srctype;	               /**<src type: 0 - pencil beam, 1 - isotropic ... */
