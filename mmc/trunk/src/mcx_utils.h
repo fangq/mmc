@@ -173,7 +173,7 @@ typedef struct MMC_config{
     void *photonseed;
     float *replayweight;
     float *replaytime;
-    int *replaydetidx;	/** for replay under wide-field detection mode, record the idx of the pixel where the photon arrives*/
+    float *replaydetidx;	/** for replay under wide-field detection mode, record the idx of the pixel where the photon arrives*/
     char seedfile[MAX_PATH_LENGTH];
 } mcconfig;
 

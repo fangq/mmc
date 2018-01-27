@@ -219,7 +219,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                     int pshift = (tshift+eid)*cfg->detnum;
                     int offset, idx;
                     for(idx=0;idx<cfg->detnum;idx++){
-                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                         if(cfg->isatomic)
 #pragma omp atomic
                             tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
@@ -267,7 +267,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                                 for(i=0;i<4;i++){
                                     pshift = (ee[i]-1+tshift)*cfg->detnum;
                                     for(idx=0;idx<cfg->detnum;idx++){
-                                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
 #pragma omp atomic
                                         tracer->mesh->weight[pshift+idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
                                     }
@@ -276,7 +276,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                                 for(i=0;i<4;i++){
                                     pshift = (ee[i]-1+tshift)*cfg->detnum;
                                     for(idx=0;idx<cfg->detnum;idx++){
-                                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                        offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                                         tracer->mesh->weight[pshift+idx]+=ww*cfg->detpattern[offset]*(baryp0[i]+baryout[i]);
                                     }
                                 }
@@ -510,7 +510,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         if(!cfg->basisorder){
                             pshift = (tshift+eid)*cfg->detnum;
                             for(idx=0;idx<cfg->detnum;idx++){
-                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                                 if(cfg->isatomic)
 #pragma omp atomic
                                     tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
@@ -521,7 +521,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                             for(j=0;j<4;j++){
                                 pshift = (ee[j]-1+tshift)*cfg->detnum;
                                 for(idx=0;idx<cfg->detnum;idx++){
-                                    offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                    offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                                     T=_mm_mul_ps(_mm_add_ps(O,S),_mm_set1_ps(ww*cfg->detpattern[offset]*0.5f));
                                     _mm_store_ps(barypout,T);
                                     if(cfg->isatomic)
@@ -691,7 +691,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                     if(!cfg->basisorder){
                         pshift = (tshift+eid)*cfg->detnum;
                         for(idx=0; idx<cfg->detnum; idx++){
-                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                             if(cfg->isatomic)
 #pragma omp atomic
                                 tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
@@ -703,7 +703,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         for(i=0; i<3; i++){
                             pshift = (ee[out[faceidx][i]]-1+tshift)*cfg->detnum;
                             for(idx=0; idx<cfg->detnum; idx++){
-                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                                 if(cfg->isatomic)
 #pragma omp atomic
                                     tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
@@ -881,7 +881,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                     if(!cfg->basisorder){
                         pshift = (tshift+eid)*cfg->detnum;
                         for(idx=0; idx<cfg->detnum; idx++){
-                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                            offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                             if(cfg->isatomic)
 #pragma omp atomic
                                 tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
@@ -893,7 +893,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                         for(i=0; i<3; i++){
                             pshift = (ee[out[faceidx][i]]-1+tshift)*cfg->detnum;
                             for(idx=0; idx<cfg->detnum; idx++){
-                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r->photonid];
+                                offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r->photonid];
                                 if(cfg->isatomic)
 #pragma omp atomic
                                     tracer->mesh->weight[pshift+idx] += ww*cfg->detpattern[offset];
@@ -989,7 +989,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
             /* wide-field detection */
             int offset, idx;
             for(idx=0; idx<cfg->detnum; idx++){
-                offset = idx*cfg->detparam1.w*cfg->detparam2.w+cfg->replaydetidx[r.photonid];
+                offset = idx*cfg->detparam1.w*cfg->detparam2.w+(int)cfg->replaydetidx[r.photonid];
                 kahany=cfg->replayweight[r.photonid]*cfg->detpattern[offset]-visit->kahanc[idx];
                 kahant=visit->totalweight[idx] + kahany;
                 visit->kahanc[idx]=(kahant - visit->totalweight[idx]) - kahany;

@@ -302,7 +302,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
         cfg->replayweight=(float*)malloc(his.savedphoton*sizeof(float));
         cfg->replaytime=(float*)malloc(his.savedphoton*sizeof(float));
         if((cfg->detparam1.w*cfg->detparam2.w>0) && (cfg->detpattern!=NULL)){
-            cfg->replaydetidx=(int*)malloc(his.savedphoton*sizeof(float));
+            cfg->replaydetidx=(float*)malloc(his.savedphoton*sizeof(float));
         }
         fseek(fp,sizeof(his),SEEK_SET);
         if(fread(ppath,his.colcount*sizeof(float),his.savedphoton,fp)!=his.savedphoton)
@@ -786,7 +786,7 @@ void mesh_savedetimage(float *detmap, mcconfig *cfg){
     fclose(fp);
 }
 
-int mesh_getdetidx(int photonid, int colcount, float* ppath, mcconfig* cfg){
+float mesh_getdetidx(int photonid, int colcount, float* ppath, mcconfig* cfg){
     
     float x0=cfg->detpos[0].x;
     float y0=cfg->detpos[0].y;

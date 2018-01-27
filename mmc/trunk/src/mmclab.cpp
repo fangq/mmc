@@ -106,15 +106,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	mcx_initcfg(&cfg);
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 	mesh_init(&mesh);
-  memset(&master,0,sizeof(visitor));
+	memset(&master,0,sizeof(visitor));
 
-  if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
-    master.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
-    master.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
-  } else {
-    master.totalweight=(double*)calloc(1, sizeof(double));
-    master.kahanc=(double*)calloc(1, sizeof(double));
-  }
+	if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
+		master.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
+		master.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
+	} else {
+		master.totalweight=(double*)calloc(1, sizeof(double));
+		master.kahanc=(double*)calloc(1, sizeof(double));
+	}
 
 	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
             tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
@@ -146,13 +146,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
-  if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
-    visit.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
-    visit.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
-  } else {
-    visit.totalweight=(double*)calloc(1, sizeof(double));
-    visit.kahanc=(double*)calloc(1, sizeof(double));
-  }
+	if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
+		visit.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
+		visit.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
+	} else {
+		visit.totalweight=(double*)calloc(1, sizeof(double));
+		visit.kahanc=(double*)calloc(1, sizeof(double));
+	}
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -295,16 +295,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	tracer_clear(&tracer);
 	if(cfg.isnormalized && master.totalweight){
-    if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)) {
-      int idx;
-      for (idx=0; idx<cfg.detnum; idx++) {
-        cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[idx],idx);
-      }
-    } else {
-      cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[0],0);
-  	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-  		master.totalweight[0],100.f*Eabsorb/master.totalweight[0],cfg.his.normalizer);
-    }
+		if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)) {
+			int idx;
+			for (idx=0; idx<cfg.detnum; idx++) {
+				cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[idx],idx);
+			}
+		} else {
+			cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight[0],0);
+			printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+			master.totalweight[0],100.f*Eabsorb/master.totalweight[0],cfg.his.normalizer);
+		}
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
@@ -584,7 +584,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             MEXERROR("the 'replayweight' field can not be empty");
 	cfg->his.detected=arraydim[0]*arraydim[1];
 	cfg->replayweight=(float *)malloc(cfg->his.detected*sizeof(float));
-        memcpy(cfg->replayweight,mxGetData(item),cfg->his.detected*sizeof(float));
+	memcpy(cfg->replayweight,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replayweight=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"replaytime")==0){
 	arraydim=mxGetDimensions(item);
@@ -592,15 +592,15 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             MEXERROR("the 'replaytime' field can not be empty");
 	cfg->his.detected=arraydim[0]*arraydim[1];
 	cfg->replaytime=(float *)malloc(cfg->his.detected*sizeof(float));
-        memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
+	memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replaytime=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"replaydetidx")==0){
-      arraydim=mxGetDimensions(item);
-  if(MAX(arraydim[0],arraydim[1])==0)
+	arraydim=mxGetDimensions(item);
+	if(MAX(arraydim[0],arraydim[1])==0)
             MEXERROR("the 'replaydetidx' field can not be empty");
-  cfg->his.detected=arraydim[0]*arraydim[1];
-  cfg->replaydetidx=(int *)malloc(cfg->his.detected*sizeof(int));
-  memcpy(cfg->replaydetidx,mxGetData(item),cfg->his.detected*sizeof(float));
+  	cfg->his.detected=arraydim[0]*arraydim[1];
+	cfg->replaydetidx=(float *)malloc(cfg->his.detected*sizeof(float));
+	memcpy(cfg->replaydetidx,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replaydetidx=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
@@ -641,9 +641,9 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      }
      if(mesh->weight)
         free(mesh->weight);
-    int frame = 1;
-    if ((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern))
-      frame = cfg->detnum;
+     int frame = 1;
+     if((cfg->outputtype==otWL || cfg->outputtype==otWP) && (cfg->detpattern))
+        frame = cfg->detnum;
      if(!cfg->basisorder)
         mesh->weight=(double*)calloc(mesh->ne*sizeof(double),cfg->maxgate*frame);
      else
