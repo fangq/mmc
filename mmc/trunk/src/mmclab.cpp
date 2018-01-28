@@ -599,8 +599,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	if(MAX(arraydim[0],arraydim[1])==0)
             MEXERROR("the 'replaydetidx' field can not be empty");
   	cfg->his.detected=arraydim[0]*arraydim[1];
-	cfg->replaydetidx=(float *)malloc(cfg->his.detected*sizeof(float));
-	memcpy(cfg->replaydetidx,mxGetData(item),cfg->his.detected*sizeof(float));
+	cfg->replaydetidx=(uint32_t *)malloc(cfg->his.detected*sizeof(uint32_t));
+	memcpy(cfg->replaydetidx,mxGetData(item),cfg->his.detected*sizeof(uint32_t));
         printf("mmc.replaydetidx=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/

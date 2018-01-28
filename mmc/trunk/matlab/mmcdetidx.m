@@ -21,7 +21,7 @@ yindex = floor((detpos(:,2)-y0) / yrange * ysize);
 assert(isempty(find(xindex<0, 1) & find(xindex>=xsize, 1)), "photon location not within detection plane");
 assert(isempty(find(yindex<0, 1) & find(yindex>=ysize, 1)), "photon location not within detection plane");
 
-detidx = single(yindex * ysize + xindex);
+detidx = uint32(yindex * ysize + xindex);
 
 end
 
