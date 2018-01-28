@@ -1,23 +1,22 @@
 
 addpath('../../matlab/');
-addpath('../');
-addpath('/home/mry09/Desktop/iso2mesh');
 
 % wide-field illumination and 3 wide-field detection patterns for replay
 
 clear cfg newcfg
 
-cfg.nphoton=3e2;
+cfg.nphoton=3e6;
 cfg.seed=-1;
-[cfg.node,cfg.face,cfg.elem]=meshabox([0 0 0], [60 60 20], 2, 2);
-cfg.elemprop=ones(size(cfg.elem,1),1);
+[node,face,elem]=meshabox([0 0 0], [60 60 20], 2, 2);
+elemprop=ones(size(elem,1),1);
+cfg.node = node;
+cfg.elem = [elem, elemprop];
+
 cfg.srctype='planar';
 cfg.srcpos=[10,10,-1];
 cfg.srcdir=[0 0 1];
 cfg.srcparam1=[40 0 0 0];
 cfg.srcparam2=[0 40 0 0];
-
-cfg.elem = [cfg.elem, cfg.elemprop];
 
 srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
     'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
@@ -70,3 +69,11 @@ newcfg2.replaydetidx=mmcdetidx(detp.p,newcfg2.detpos,newcfg2.detparam1,newcfg2.d
 
 % load newcfg2.mat;
 [cube2,detp2,~,~]=mmclab(newcfg2);
+Jmua = squeeze(sum(cube2.data,3))';
+
+figure(1);
+plotmesh([node,log(Jmua(1:length(node),1))],elem);
+figure(2);
+plotmesh([node,log(Jmua(1:length(node),2))],elem);
+figure(3);
+plotmesh([node,log(Jmua(1:length(node),3))],elem);

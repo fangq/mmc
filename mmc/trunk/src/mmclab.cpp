@@ -316,7 +316,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	  fielddim[1]=cfg.maxgate;
     	    
       if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)) {
-        fielddim[2]=cfg.detnum; fielddim[3]=0;
+	fielddim[2]=fielddim[1]; fielddim[1]=fielddim[0];
+        fielddim[0]=cfg.detnum; fielddim[3]=0;
         mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
         double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
         memcpy(output,mesh.weight,fielddim[0]*fielddim[1]*fielddim[2]*sizeof(double));
