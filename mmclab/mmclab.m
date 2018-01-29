@@ -313,6 +313,8 @@ elseif(strcmp(type,'sse'))
     [varargout{1:mmcout}]=mmc_sse(cfg);
 elseif(strcmp(type,'prep') && nargout==1)
     varargout{1}=cfg;
+elseif(strcmp(type,'preview') && nargout==1)
+    varargout{1}=mcxpreview(cfg);
 else
     error('type is not recognized');
 end
