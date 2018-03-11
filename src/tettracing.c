@@ -1208,11 +1208,11 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
-		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f)
+		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f){
 			r.weight*=cfg->roulettesize;
                         if(cfg->debuglevel&dlWeight)
 			    MMC_FPRINTF(cfg->flog,"Russian Roulette bumps r.weight to %f\n",r.weight);
-		else
+		}else
 			break;
 	    }
             mom=0.f;
