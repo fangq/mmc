@@ -6,7 +6,7 @@ load ad.txt
 load mov.txt
 srcpos=[2 8 0];
 
-hh=tetramesh(elem,node);
+hh=tetramesh(elem(:1:4),node);
 set(hh,'facealpha',0.1)
 hold on
 
