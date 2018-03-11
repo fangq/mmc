@@ -141,7 +141,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         unsigned int i;
         float raytri=0.f,raytri0=0.f;
-        unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel;
+        unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel=0;
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
 
 	t0=StartTimer();
