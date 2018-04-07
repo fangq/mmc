@@ -30,7 +30,7 @@ cfg.srcdir=[0 0 1];
 cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-10;
-cfg.prop=[0 0 1 1;0.002 1.0 0.01 1.37;0.050 5.0 0.9 1.37];
+cfg.prop=[0 0 1 1;0.002 1.0 0.01 1.37;0.050 0 1 1.37];
 cfg.debuglevel='TP';
 cfg.isreflect=0;
 
@@ -90,7 +90,7 @@ cfg.srcdir=[0 0 1];
 cfg.srcfrom0=1;
 
 % format: [mua(1/mm) mus(1/mm) g n]
-cfg.prop=[0 0 1 1;0.002 1.0 0.01 1.37;0.050 5.0 0.9 1.37];
+cfg.prop=[0 0 1 1;0.002 1.0 0.01 1.37;0.050 0 1 1.37];
 
 % time-domain simulation parameters
 cfg.tstart=0;
@@ -109,7 +109,7 @@ tic;
 phimcx=mcxlab(cfg);
 toc;
 
-clines=[-1:0.5:9];
+clines=[-1:0.25:9];
 [xx,yy]=meshgrid(0:60,0:60);
 node1=cfgs(2).node;
 elem1=cfgs(2).elem;

@@ -165,6 +165,7 @@ function varargout=mmclab(cfg,type)
 %              detphoton.mom: cummulative cos_theta for momentum transfer in each medium
 %              detphoton.p or .v: exit position and direction, when cfg.issaveexit=1
 %              detphoton.w0: photon final weight at detection
+%              detphoton.prop: optical properties, a copy of cfg.prop
 %              detphoton.data: a concatenated and transposed array in the order of
 %                    [detid nscat ppath mom p v w0]'
 %              "data" is the is the only subfield in all MMCLAB before 2016.5
@@ -338,6 +339,7 @@ if(mmcout>=2)
                 newdetp.v=detp(end-3:end-1,:)';	     %columns 4-2 from the right store the exit dirs*/
             end
             newdetp.w0=detp(end,:)';  % last column is the initial packet weight
+            newdetp.prop=cfg(i).prop;
             newdetp.data=detp;      % enable this line for compatibility
             newdetpstruct(i)=newdetp;
         else
