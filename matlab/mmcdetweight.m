@@ -30,7 +30,11 @@ if(medianum<=1)
 end
 
 if(isstruct(detp))
-    detw=detp.w0;
+    if(~isfield(detp,'w0'))
+        detw=ones(size(detp.ppath,1),1);
+    else
+        detw=detp.w0;
+    end
     for i=1:medianum-1
         detw=detw.*exp(-prop(i+1,1)*detp.ppath(:,i));
     end
