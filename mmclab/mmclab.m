@@ -164,7 +164,7 @@ function varargout=mmclab(cfg,type)
 %                   one need to multiply cfg.unitinmm with ppath to convert it to mm.
 %              detphoton.mom: cummulative cos_theta for momentum transfer in each medium
 %              detphoton.p or .v: exit position and direction, when cfg.issaveexit=1
-%              detphoton.w0: photon final weight at detection
+%              detphoton.w0: photon initial weight at launch time
 %              detphoton.prop: optical properties, a copy of cfg.prop
 %              detphoton.data: a concatenated and transposed array in the order of
 %                    [detid nscat ppath mom p v w0]'
