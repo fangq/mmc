@@ -13,10 +13,18 @@ function [data, headerstruct, photonseed]=loadmch(fname,format,endian)
 %
 %    output:
 %        data:   the output detected photon data array
-%                data has header.medium+2 columns, the first column is the 
-%                ID of the detector; the 2nd column is the number of 
-%                scattering events for a detected photon; the remaining 
-%                columns are the partial path lengths (in mm) for each medium type
+%                data has at least M*2+2 columns (M=header.medium), the first column is the 
+%                ID of the detector; columns 2 to M+1 store the number of 
+%                scattering events for every tissue region; the following M
+%                columns are the partial path lengths (in mm) for each medium type;
+%                the last column is the initial weight at launch time of each detecetd
+%                photon; when the momentum transfer is recorded, M columns of
+%                momentum tranfer for each medium is inserted after the partial path;
+%                when the exit photon position/dir are recorded, 6 additional columns
+%                are inserted before the last column, first 3 columns represent the
+%                exiting position (x/y/z); the next 3 columns are the dir vector (vx/vy/vz).
+%                in other words, data is stored in the follow format
+%                    [detid(1) nscat(M) ppath(M) mom(M) p(3) v(3) w0(1)]
 %        header: file header info, a structure has the following fields
 %                [version,medianum,detnum,recordnum,totalphoton,
 %                 detectedphoton,savedphoton,lengthunit,seedbyte,normalizer]

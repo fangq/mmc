@@ -28,7 +28,7 @@ if(medianum<=1)
 end
 
 if(isstruct(detp))
-    dett=zeros(size(detp.w0));
+    dett=zeros(size(detp.ppath,1),1);
     for i=1:medianum-1
         dett=dett+prop(i+1,4)*detp.ppath(:,i)*R_C0;
     end

@@ -855,22 +855,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	S = _mm_add_ps(S, _mm_mul_ps(Ny,O));
 	O = _mm_set1_ps(r->vec.z);
 	S = _mm_add_ps(S, _mm_mul_ps(Nz,O));
-/** 
- * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
- * 
- * this function uses Branch-less Badouel-based SSE4 ray-triangle intersection 
- * tests to advance photon by one step, see Fang2012. Both Badouel and 
- * Branch-less Badouel algorithms do not calculate the Barycentric coordinates
- * and can only store energy loss using 0-th order basis function. This function
- * is the fastest among the 4 ray-tracers.
- *
- * \param[in,out] r: the current ray
- * \param[in] tracer: the ray-tracer aux data structure
- * \param[in] cfg: simulation configuration structure
- * \param[out] visit: statistics counters of this thread
- */
-
-	//T = _mm_mul_ps(T, rcp_nr(S));
 	T = _mm_div_ps(T, S);
 
 	O = _mm_cmpge_ps(S,_mm_set1_ps(0.f));
