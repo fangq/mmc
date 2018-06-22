@@ -826,20 +826,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
 	__m128i P;
+	const __m128 sign_mask = _mm_set1_ps(-0.f);
+	__m128 Nx,Ny,Nz,dd;
 
 	r->p0.w=1.f;
 	r->vec.w=0.f;
 	eid=r->eid-1;
 	baseid=eid<<2;
-
-	r->pout.x=MMC_UNDEFINED;
-	r->faceid=-1;
 	r->isend=0;
 
-	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
-	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
-	const __m128 Nz=_mm_load_ps(&(tracer->n[baseid+2].x));
-	const __m128 dd=_mm_load_ps(&(tracer->n[baseid+3].x));
+   if(r->dist-r->slen<=0.f){
+	r->pout.x=MMC_UNDEFINED;
+	r->faceid=-1;
+
+	Nx=_mm_load_ps(&(tracer->n[baseid].x));
+	Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
+	Nz=_mm_load_ps(&(tracer->n[baseid+2].x));
+	dd=_mm_load_ps(&(tracer->n[baseid+3].x));
 
 	O = _mm_set1_ps(r->p0.x);
 	T = _mm_mul_ps(Nx,O);
@@ -867,6 +870,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	_mm_store_ss(&(bary.x),O);
 	faceidx=maskmap[_mm_movemask_ps(_mm_cmpeq_ps(T,_mm_set1_ps(bary.x)))];
 	r->faceid=faceorder[faceidx];
+	
+	visit->raytet++;
+        if(tracer->mesh->type[eid]==0)
+                visit->raytet0++;
+   }
 
 	if(r->faceid>=0){
 	    medium *prop;
@@ -876,16 +884,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    rc=prop->n*R_C0;
             currweight=r->weight;
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
-
             enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-            r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-	    if(r->nexteid){
+	    if(r->dist-r->slen>0.f) // photon can not arrive at boundary
+	        bary.x=r->slen/mus;
+            else{
+                r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+	        if(r->nexteid){
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
-	    }
+	        }
+            }
 
 	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
-	    r->isend=(Lp0>dlen);
+	    r->isend=(Lp0>=dlen);
+	    if(!r->isend){
+            	    _mm_prefetch((char *)&(tracer->mesh->node[ee[2]-1].x),_MM_HINT_T0);
+		    _mm_prefetch((char *)&(tracer->mesh->node[ee[3]-1].x),_MM_HINT_T0);
+	    }
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
             O = _mm_load_ps(&(r->vec.x));
@@ -893,7 +908,39 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    T = _mm_set1_ps(bary.x);
 	    T = _mm_mul_ps(O, T);
 	    T = _mm_add_ps(T, S);
-	    _mm_store_ps(&(r->pout.x),T);
+	    _mm_store_ps(&(r->pout.x),T); // T is the end-position
+
+	    r->dist-=r->Lmove*mus;
+	    if(r->isend && r->dist<=0.f){
+                __m128 N3=_mm_load_ps(&(tracer->mesh->node[ee[3]-1].x)); // get the 4th node
+		__m128 N2=_mm_load_ps(&(tracer->mesh->node[ee[2]-1].x)); // get the 3rd node
+
+		float4 nd3,nd2;
+	        __m128 d3,d2;
+
+		d3=_mm_sub_ps(T,N3); // T is current pos, N3->T vector
+		d2=_mm_sub_ps(T,N2); // T is current pos, N2->T vector
+		_mm_store_ps(&(nd3.x),d3);  // save d3 to float4
+		_mm_store_ps(&(nd2.x),d2);  // save d2 to float4
+
+                d3=_mm_set_ps(nd2.x,nd3.x,nd3.x,nd3.x);  // create x-component projection
+		d2=_mm_mul_ps(d3,Nx);
+
+                d3=_mm_set_ps(nd2.y,nd3.y,nd3.y,nd3.y);  // create y-component projection
+		d2=_mm_add_ps(d2,_mm_mul_ps(d3,Ny));
+
+                d3=_mm_set_ps(nd2.z,nd3.z,nd3.z,nd3.z);  // create z-component projection
+		d2=_mm_add_ps(d2,_mm_mul_ps(d3,Nz));
+		
+		d2=_mm_andnot_ps(sign_mask, d2);  // take absolute value
+
+		d3 = _mm_movehl_ps(d2, d2);   // take horizontal min for min distance to faces, and store into r->dist 
+		d3 = _mm_min_ps(d3, d2);
+		d2 = _mm_shuffle_ps(d3, d3, _MM_SHUFFLE(1,1,1,1));
+		d3 = _mm_min_ss(d3, d2);
+		_mm_store_ss(&(r->dist),d3);
+		r->dist*=prop->mus;
+	    }
 
 	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 	       r->faceid=-2;
@@ -991,21 +1038,18 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			}
 		  }else{
 			int i;
-                        ww*=1.f/3.f;
+                        ww*=1.f/4.f;
                         if(cfg->isatomic)
-			    for(i=0;i<3;i++)
+			    for(i=0;i<4;i++)
 #pragma omp atomic
-				tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+				tracer->mesh->weight[ee[i]-1+tshift]+=ww;
                         else
-                            for(i=0;i<3;i++)
-                                tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+                            for(i=0;i<4;i++)
+                                tracer->mesh->weight[ee[i]-1+tshift]+=ww;
 		  }
 		}
 	    }
 	}
-	visit->raytet++;
-        if(tracer->mesh->type[eid]==0)
-                visit->raytet0++;
 
 	r->p0.w=0.f;
 	if(r->faceid==-2)
@@ -1057,7 +1101,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0.f};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1142,7 +1186,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+		    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
@@ -1200,7 +1244,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
             mom=0.f;
-	    r.slen0=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
+            r.slen0=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
 	    r.slen=r.slen0;
             if(cfg->mcmethod!=mmMCX)
                   albedoweight(&r,mesh,cfg,visit);

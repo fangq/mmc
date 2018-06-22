@@ -61,6 +61,7 @@ typedef struct MMC_ray{
 	float *partialpath;           /**< pointer to the partial path data buffer */
         void  *photonseed;            /**< pointer to store the photon seed */
 	float focus;                  /**< focal length of the source, if defined */
+	float dist;                   /**< minimum distance to the boundary */
 } ray;
 
 /***************************************************************************//**
