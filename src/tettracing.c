@@ -825,7 +825,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
-	__m128i P;
 	const __m128 sign_mask = _mm_set1_ps(-0.f);
 	__m128 Nx,Ny,Nz,dd;
 
@@ -835,7 +834,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	baseid=eid<<2;
 	r->isend=0;
 
-   if(r->dist-r->slen<=0.f){
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 
@@ -874,7 +872,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	visit->raytet++;
         if(tracer->mesh->type[eid]==0)
                 visit->raytet0++;
-   }
 
 	if(r->faceid>=0){
 	    medium *prop;
@@ -885,19 +882,16 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             currweight=r->weight;
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
             enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-	    if(r->dist-r->slen>0.f) // photon can not arrive at boundary
-	        bary.x=r->slen/mus;
-            else{
-                r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-	        if(r->nexteid){
-            	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
-	        }
-            }
+
+            r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+            if(r->nexteid){
+           	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
+	    }
 
 	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
 	    r->isend=(Lp0>=dlen);
-	    if(!r->isend){
+	    if(r->isend){
             	    _mm_prefetch((char *)&(tracer->mesh->node[ee[2]-1].x),_MM_HINT_T0);
 		    _mm_prefetch((char *)&(tracer->mesh->node[ee[3]-1].x),_MM_HINT_T0);
 	    }
@@ -908,39 +902,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    T = _mm_set1_ps(bary.x);
 	    T = _mm_mul_ps(O, T);
 	    T = _mm_add_ps(T, S);
-	    _mm_store_ps(&(r->pout.x),T); // T is the end-position
-
-	    r->dist-=r->Lmove*mus;
-	    if(r->isend && r->dist<=0.f){
-                __m128 N3=_mm_load_ps(&(tracer->mesh->node[ee[3]-1].x)); // get the 4th node
-		__m128 N2=_mm_load_ps(&(tracer->mesh->node[ee[2]-1].x)); // get the 3rd node
-
-		float4 nd3,nd2;
-	        __m128 d3,d2;
-
-		d3=_mm_sub_ps(T,N3); // T is current pos, N3->T vector
-		d2=_mm_sub_ps(T,N2); // T is current pos, N2->T vector
-		_mm_store_ps(&(nd3.x),d3);  // save d3 to float4
-		_mm_store_ps(&(nd2.x),d2);  // save d2 to float4
-
-                d3=_mm_set_ps(nd2.x,nd3.x,nd3.x,nd3.x);  // create x-component projection
-		d2=_mm_mul_ps(d3,Nx);
-
-                d3=_mm_set_ps(nd2.y,nd3.y,nd3.y,nd3.y);  // create y-component projection
-		d2=_mm_add_ps(d2,_mm_mul_ps(d3,Ny));
-
-                d3=_mm_set_ps(nd2.z,nd3.z,nd3.z,nd3.z);  // create z-component projection
-		d2=_mm_add_ps(d2,_mm_mul_ps(d3,Nz));
-		
-		d2=_mm_andnot_ps(sign_mask, d2);  // take absolute value
-
-		d3 = _mm_movehl_ps(d2, d2);   // take horizontal min for min distance to faces, and store into r->dist 
-		d3 = _mm_min_ps(d3, d2);
-		d2 = _mm_shuffle_ps(d3, d3, _MM_SHUFFLE(1,1,1,1));
-		d3 = _mm_min_ss(d3, d2);
-		_mm_store_ss(&(r->dist),d3);
-		r->dist*=prop->mus;
-	    }
+	    _mm_store_ps(&(r->pout.x),T); // pout is the exit-point of the ray, always on the boundary
 
 	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 	       r->faceid=-2;
@@ -1003,6 +965,38 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
 
+		if(r->isend || r->dist<0.f){
+		    float4 nd3,nd2;
+	            __m128 d3,d2;
+                    __m128 N3=_mm_load_ps(&(tracer->mesh->node[ee[3]-1].x)); // get the 4th node
+		    __m128 N2=_mm_load_ps(&(tracer->mesh->node[ee[2]-1].x)); // get the 3rd node
+
+		    d3=_mm_sub_ps(N3,T); // T is current pos, N3->T vector
+		    d2=_mm_sub_ps(N2,T); // T is current pos, N2->T vector
+		    _mm_store_ps(&(nd3.x),d3);  // save d3 to float4
+		    _mm_store_ps(&(nd2.x),d2);  // save d2 to float4
+
+                    d3=_mm_set_ps(nd2.x,nd3.x,nd3.x,nd3.x);  // create x-component projection
+		    d2=_mm_mul_ps(d3,Nx);
+
+                    d3=_mm_set_ps(nd2.y,nd3.y,nd3.y,nd3.y);  // create y-component projection
+		    d2=_mm_add_ps(d2,_mm_mul_ps(d3,Ny));
+
+                    d3=_mm_set_ps(nd2.z,nd3.z,nd3.z,nd3.z);  // create z-component projection
+		    d2=_mm_add_ps(d2,_mm_mul_ps(d3,Nz));
+
+		    _mm_store_ps(&(nd2.x),d2);  // save d2 to float4
+
+		    d2=_mm_andnot_ps(sign_mask, d2);  // take absolute value
+
+		    d3 = _mm_movehl_ps(d2, d2);   // take horizontal min for min distance to faces, and store into r->dist 
+		    d3 = _mm_min_ps(d3, d2);
+		    d2 = _mm_shuffle_ps(d3, d3, _MM_SHUFFLE(1,1,1,1));
+		    d3 = _mm_min_ss(d3, d2);
+		    _mm_store_ss(&(r->dist),d3);
+		    r->dist*=prop->mus;
+		}
+
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
 		     if(cfg->method==rtBLBadouel){
@@ -1011,31 +1005,32 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    tracer->mesh->weight[eid+tshift]+=ww;
                         else
                             tracer->mesh->weight[eid+tshift]+=ww;
-                     }else{
-			    float dstep, segloss, w0;
-			    int4 idx __attribute__ ((aligned(16)));
-			    int i, seg=(int)(r->Lmove)+1;
-			    seg=(seg<<1);
-			    dstep=r->Lmove/seg;
+		     }else{
+                           __m128i P;
+			   float dstep, segloss, w0;
+			   int4 idx __attribute__ ((aligned(16)));
+			   int i, seg=(int)(r->Lmove)+1;
+			   seg=(seg<<1);
+			   dstep=r->Lmove/seg;
 #ifdef __INTEL_COMPILER
-	                    segloss=expf(-prop->mua*dstep);
+			   segloss=expf(-prop->mua*dstep);
 #else
-	                    segloss=fast_expf9(-prop->mua*dstep);
+			   segloss=fast_expf9(-prop->mua*dstep);
 #endif
-			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
-			    O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
-			    S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
-			    dstep=1.f/cfg->unitinmm;
-			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
-			    w0=ww;
-                            for(i=0; i< seg; i++){
-				P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
-				_mm_store_si128((__m128i *)&(idx.x),P);
-				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
-				w0*=segloss;
-			        S = _mm_add_ps(S, T);
-                            }
-			}
+			   T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
+			   O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
+			   S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
+			   dstep=1.f/cfg->unitinmm;
+			   totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
+			   w0=ww;
+			    for(i=0; i< seg; i++){
+			       P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
+			       _mm_store_si128((__m128i *)&(idx.x),P);
+			       tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
+			       w0*=segloss;
+			       S = _mm_add_ps(S, T);
+			    }
+		       }
 		  }else{
 			int i;
                         ww*=1.f/4.f;
@@ -1057,6 +1052,38 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	return r->slen;
 }
+
+inline void savegrid(float mua,float ww, float totalloss, int tshift, ray *r, raytracer *tracer,mcconfig *cfg){
+	__m128i P;
+	__m128 O,T,S;
+
+	float dstep, segloss, w0;
+	int4 idx __attribute__ ((aligned(16)));
+	int i, seg=(int)(r->Lmove)+1;
+	seg=(seg<<1);
+	dstep=r->Lmove/seg;
+#ifdef __INTEL_COMPILER
+	segloss=expf(-mua*dstep);
+#else
+	segloss=fast_expf9(-mua*dstep);
+#endif
+        O = _mm_load_ps(&(r->vec.x));
+	S = _mm_load_ps(&(r->p0.x));
+	T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
+	O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
+	S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
+	dstep=1.f/cfg->unitinmm;
+	totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
+	w0=ww;
+        for(i=0; i< seg; i++){
+	    P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
+	    _mm_store_si128((__m128i *)&(idx.x),P);
+	    tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
+	    w0*=segloss;
+	    S = _mm_add_ps(S, T);
+        }
+}
+
 #else
 
 /** 
@@ -1101,7 +1128,8 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0.f};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},
+               cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0.f};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};

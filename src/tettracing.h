@@ -94,6 +94,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
+void savegrid(float mua,float ww,float totalloss, int tshift, ray *r, raytracer *tracer,mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus
