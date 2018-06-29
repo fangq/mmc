@@ -26,8 +26,8 @@ function [data, headerstruct, photonseed]=loadmch(fname,format,endian)
 %                in other words, data is stored in the follow format
 %                    [detid(1) nscat(M) ppath(M) mom(M) p(3) v(3) w0(1)]
 %        header: file header info, a structure has the following fields
-%                [version,medianum,detnum,recordnum,totalphoton,
-%                 detectedphoton,savedphoton,lengthunit,seedbyte,normalizer]
+%                [version,medianum,detnum,recordnum,totalphoton,detectedphoton,
+%                 savedphoton,lengthunit,seedbyte,normalizer,respin]
 %        photonseed: (optional) if the mch file contains a seed section, this
 %                returns the seed data for each detected photon. Each row of 
 %                photonseed is a byte array, which can be used to initialize a  
@@ -66,7 +66,8 @@ while(~feof(fid))
         unitmm=fread(fid,1,'float32');
 	seedbyte=fread(fid,1,'uint');
         normalizer=fread(fid,1,'float32');
-	junk=fread(fid,5,'uint');
+	respin=fread(fid,1,'int');
+	junk=fread(fid,4,'uint');
 
 	dat=fread(fid,hd(7)*hd(4),format);
 	dat=reshape(dat,[hd(4),hd(7)])';
@@ -82,6 +83,9 @@ while(~feof(fid))
               warning('photon seed section is not found');
             end
         end
+	if(respin>1)
+	    hd(5)=hd(5)*respin;
+	end
 	if(isempty(header))
 		header=[hd;unitmm]';
 	else
@@ -99,5 +103,6 @@ if(nargout>=2)
    headerstruct=struct('version',header(1),'medianum',header(2),'detnum',header(3),...
                        'recordnum',header(4),'totalphoton',header(5),...
                        'detectedphoton',header(6),'savedphoton',header(7),...
-                       'lengthunit',header(8),'seedbyte',seedbyte,'normalizer',normalizer);
+                       'lengthunit',header(8),'seedbyte',seedbyte,'normalizer',normalizer,...
+		       'respin',respin);
 end
