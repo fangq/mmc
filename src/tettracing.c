@@ -868,7 +868,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	faceidx=maskmap[_mm_movemask_ps(_mm_cmpeq_ps(T,_mm_set1_ps(bary.x)))];
 	r->faceid=faceorder[faceidx];
 
-	if(r->faceid>=0){
+	if(r->faceid>=0 && bary.x>=0.f){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	    float mus;
