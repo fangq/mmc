@@ -120,7 +120,7 @@ and type
   make
 
 this will create a fully optimized, multi-threaded and SSE4 enabled 
-mmc executable, located under the mmc/src/bin/ folder.
+mmc executable, located under the mmc/bin/ folder.
 
 Other compilation options include
 
