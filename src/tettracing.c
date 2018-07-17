@@ -868,73 +868,73 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	faceidx=maskmap[_mm_movemask_ps(_mm_cmpeq_ps(T,_mm_set1_ps(bary.x)))];
 	r->faceid=faceorder[faceidx];
 
-	if(r->faceid>=0){
-	    medium *prop;
-	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
-	    float mus;
-	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	    rc=prop->n*R_C0;
-            currweight=r->weight;
-            mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
+	if(r->faceid>=0 && bary.x>=0){
+		medium *prop;
+		int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+		float mus;
+		prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+		rc=prop->n*R_C0;
+		currweight=r->weight;
+		mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
-            enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-            r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-	    if(r->nexteid){
-            	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
-	    }
+        	enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
+		r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+		if(r->nexteid){
+			_mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
+		}
 
-	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
-	    Lp0=bary.x;
-	    r->isend=(Lp0>dlen);
-	    r->Lmove=((r->isend) ? dlen : Lp0);
+		dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
+		Lp0=bary.x;
+		r->isend=(Lp0>dlen);
+		r->Lmove=((r->isend) ? dlen : Lp0);
 
-            O = _mm_load_ps(&(r->vec.x));
-	    S = _mm_load_ps(&(r->p0.x));
-	    T = _mm_set1_ps(bary.x);
-	    T = _mm_mul_ps(O, T);
-	    T = _mm_add_ps(T, S);
-	    _mm_store_ps(&(r->pout.x),T);
+		O = _mm_load_ps(&(r->vec.x));
+		S = _mm_load_ps(&(r->p0.x));
+		T = _mm_set1_ps(bary.x);
+		T = _mm_mul_ps(O, T);
+		T = _mm_add_ps(T, S);
+		_mm_store_ps(&(r->pout.x),T);
 
-	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
-	       r->faceid=-2;
-	       r->pout.x=MMC_UNDEFINED;
-	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
-	    }
-            if(cfg->mcmethod==mmMCX){
+		if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
+			r->faceid=-2;
+			r->pout.x=MMC_UNDEFINED;
+			r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
+		}
+		if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
-	       totalloss=expf(-prop->mua*r->Lmove);
+			totalloss=expf(-prop->mua*r->Lmove);
 #else
-	       totalloss=fast_expf9(-prop->mua*r->Lmove);
+			totalloss=fast_expf9(-prop->mua*r->Lmove);
 #endif
-               r->weight*=totalloss;
-            }
-	    totalloss=1.f-totalloss;
-	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
+			r->weight*=totalloss;
+        	}
+		totalloss=1.f-totalloss;
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
-		currweight=expf(-DELTA_MUA*r->Lmove);
+			currweight=expf(-DELTA_MUA*r->Lmove);
 #else
-		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
+			currweight=fast_expf9(-DELTA_MUA*r->Lmove);
 #endif
-                currweight*=cfg->replayweight[r->photonid];
-		currweight+=r->weight;
-	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
-		currweight=r->Lmove;
-		currweight*=cfg->replayweight[r->photonid];
-		currweight+=r->weight;
-            }
-	    r->slen-=r->Lmove*mus;
-	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
-		if(r->slen0<EPS)
-		    currweight=1;
-		else
-		    currweight=r->Lmove*mus/r->slen0;
-		currweight*=cfg->replayweight[r->photonid];
-		currweight+=r->weight;
-	    }
-	    if(bary.x>=0.f){
+                	currweight*=cfg->replayweight[r->photonid];
+			currweight+=r->weight;
+		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
+			currweight=r->Lmove;
+			currweight*=cfg->replayweight[r->photonid];
+			currweight+=r->weight;
+		}
+		r->slen-=r->Lmove*mus;
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
+			if(r->slen0<EPS)
+				currweight=1;
+			else
+		    		currweight=r->Lmove*mus/r->slen0;
+			currweight*=cfg->replayweight[r->photonid];
+			currweight+=r->weight;
+	    	}
+
 	        int framelen=(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 		if(cfg->method==rtBLBadouelGrid)
-		    framelen=cfg->crop0.z;
+			framelen=cfg->crop0.z;
 		ww=currweight-r->weight;
         	r->photontimer+=r->Lmove*rc;
 
@@ -1001,7 +1001,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                                 tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
 		  }
 		}
-	    }
 	}
 	visit->raytet++;
         if(tracer->mesh->type[eid]==0)
