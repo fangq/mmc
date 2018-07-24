@@ -728,7 +728,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
     if(cfg->issaveseed && seeds!=NULL){
         cfg->his.seedbyte=seedbyte;
     }
-    cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+3; /*column count=maxmedia+3*/
+    cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+3*/
     
     fwrite(&(cfg->his),sizeof(history),1,fp);
     fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
@@ -759,8 +759,8 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
         ntg = (int) path*R_C0/cfg->tstep;
         if(ntg>cfg->maxgate-1)
             ntg = cfg->maxgate-1;
-        xloc = ppath[(i+1)*colcount-8];
-        yloc = ppath[(i+1)*colcount-7];
+        xloc = ppath[(i+1)*colcount-7];
+        yloc = ppath[(i+1)*colcount-6];
         xindex = (xloc-x0)/xrange*xsize;
         if(xindex<0 || xindex>xsize-1) continue;
         yindex = (yloc-y0)/yrange*ysize;
@@ -794,8 +794,8 @@ uint32_t mesh_getdetidx(int photonid, int colcount, float* ppath, mcconfig* cfg)
     float yrange=cfg->detparam1.y+cfg->detparam2.y;
     int xsize=cfg->detparam1.w;
     int ysize=cfg->detparam2.w;
-    float xloc=ppath[(photonid+1)*colcount-8];
-    float yloc=ppath[(photonid+1)*colcount-7];
+    float xloc=ppath[(photonid+1)*colcount-7];
+    float yloc=ppath[(photonid+1)*colcount-6];
     int xindex = (xloc-x0)/xrange*xsize;
     int yindex = (yloc-y0)/yrange*ysize;
     if(xindex<0 || xindex>xsize-1 || yindex<0 || yindex>ysize-1)
