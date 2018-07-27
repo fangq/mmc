@@ -6,7 +6,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Plï¿½cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **
 **  \section slicense License
 **          GPL v3, see LICENSE.txt for details
@@ -145,7 +145,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 #pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL};
-	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+3;
+	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
 	if ((cfg.outputtype==otWL || cfg.outputtype==otWP) && (cfg.detpattern)){
 		visit.totalweight=(double*)calloc(cfg.detnum, sizeof(double));
 		visit.kahanc=(double*)calloc(cfg.detnum, sizeof(double));
