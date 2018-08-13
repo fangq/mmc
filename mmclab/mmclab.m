@@ -306,6 +306,12 @@ if(exist('OCTAVE_VERSION'))
     fflush(stdout);
 end
 
+if(exist('maxNumCompThreads','file'))
+    warning('off','MATLAB:maxNumCompThreads:Deprecated');
+    np=maxNumCompThreads;
+    maxNumCompThreads(np*2);
+end
+
 mmcout=nargout;
 if(nargout>=3)
     mmcout=nargout-1;
