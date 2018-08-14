@@ -982,7 +982,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
 			    w0=ww;
                             for(i=0; i< seg; i++){
-				P =_mm_cvtps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
+				P =_mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
 				_mm_store_si128((__m128i *)&(idx.x),P);
 				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
 				w0*=segloss;
