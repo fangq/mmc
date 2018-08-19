@@ -58,7 +58,7 @@ function varargout=mmclab(cfg,type)
 %      cfg.ismomentum:  [0]-save momentum transfer for each detected photon
 %      cfg.method:      ray-tracing method, ["plucker"]:Plucker, "havel": Havel (SSE4),
 %                       "badouel": partial Badouel, "elem": branchless Badouel (SSE), 
-%                       "grid": dual-mesh MMC
+%                       "grid": dual-grid MMC
 %      cfg.mcmethod:    0 use MCX-styled MC method, 1 use MCML style MC
 %      cfg.nout:        [1.0] refractive index for medium type 0 (background)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]

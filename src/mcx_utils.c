@@ -1264,7 +1264,7 @@ where possible parameters include (the first item in [] is the default value)\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
 			       B - partial Badouel's method (used by TIM-OS)\n\
 			       S - branch-less Badouel's method with SSE\n\
-			       G - dual-mesh MMC with grid output\n\
+			       G - dual-grid MMC (DMMC) with voxel data output\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
@@ -1312,7 +1312,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
 \n\
 == Example ==\n\
-       %s -n 1000000 -f input.inp -s test -b 0 -D TP\n",exename,
+       %s -n 1000000 -f input.json -s test -b 0 -D TP\n",exename,
 #ifdef MMC_USE_SSE
 'H',
 #else

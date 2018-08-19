@@ -2,12 +2,19 @@ Change Log
 
 == MMC 1.0-Final (v2018, Sachima), Qianqian Fang <q.fang at neu.edu> ==
 
-2018-01-14 [53eb374] make mesh elem and facenb flexible to support complex elements in the future
-2018-01-13 [ecd9b80] add detailed doxygen documentation
+2018-08-14 [25b323c] fixed discrepancy between DMMC and MCX along the boundary
+2018-08-13*[2cfd54a] force matlab to use multi-threading with mmc
+2018-07-16 [45c5b72] fix branchless_badouel_raytet: bary.x of -Inf value
+2018-05-13 [f5f0379] process mcx generated detp output without w0
+2018-04-24 [8241b0d] correct typo in array index
+2018-01-29 [e4c33fb] use mcxpreview in mcxlab to preview the domain
+2018-01-27 [2ee97d7] restructure folders, update documents
+2018-01-14*[53eb374] make mesh elem and facenb flexible to support complex elements in the future
+2018-01-13*[ecd9b80] add detailed doxygen documentation
 2017-12-08 [50d7770] atomic condition fixed for havel element basis
 2017-11-24 [62714c5] fix normalization, validation of dmmc
 2017-11-15 [96c4eda] convert energy deposit to fluence
-2017-11-13 [8e2f5ea] add dualmesh mode in mmclab
+2017-11-13*[8e2f5ea] add dualmesh mode in mmclab
 2017-11-13 [3a25295] use unitinmm to set voxel length,fix normalization,fix weight deposit
 2017-11-09 [f9e9b93] define dedicated cfg->e0, allocate weight for grid output
 2017-11-09 [c528baf] initial update to support hybrid mesh-grid MC
@@ -15,10 +22,10 @@ Change Log
 2017-10-05 [0b5e2a8] enable wp for plucker mode, remove save_scatter_events (a function no longer needed)
 2017-10-05 [af83f00] minor modification for mmclab, when there's not issaveexit field in cfg
 2017-09-14 [e1de1ff] modified replay examples for testing wp and wl performance
-2017-09-14 [a75528b] merge wide_det branch to support wide-field detector array output
+2017-09-14*[a75528b] merge wide_det branch to support wide-field detector array output
 2017-09-14 [07b33f3] make mmclab compatible with older version of MATLAB
 2017-09-14 [70a308d] validated wide-field replay under "wL" mode, added an example
-2017-09-08 [db8ebf9] replay for detection pattern (binary), need to validate and add example
+2017-09-08*[db8ebf9] replay for detection pattern (binary), need to validate and add example
 2017-09-08 [ad76c08] suppress message of "specifying pattern file" when using input file
 2017-09-08 [9d71d01] manipulate replay photon weight for pattern illumination (sync with master)
 2017-09-07 [1061ab6] fix the wide_det issue for mmclab (caused by wrong maxmedia value), polish demo_wide_det
@@ -29,8 +36,8 @@ Change Log
 2017-08-31 [ffe7abe] fix size_t to int conversion issue, enable wide_det for mmclab, to be tested
 2017-08-31 [1e86fdb] put calculation and saving of detimage into two functions, issues with mmclab
 2017-08-31 [b0c620d] manipulate replay photon weight for pattern illumination
-2017-08-16 [3a2e634] Output accumulated photon weight as time-resolved 2D images with an example attached
-2017-07-15 [567d9ee] fix mmclab for octave crash due to an octave bug #48678
+2017-08-16*[3a2e634] Output accumulated photon weight as time-resolved 2D images with an example attached
+2017-07-15*[567d9ee] fix mmclab for octave crash due to an octave bug #48678
 
 
 == MMC 1.0-RC3 (v2017.7, Haw Flakes-Update 1) RC release, Qianqian Fang <q.fang at neu.edu> ==

@@ -57,18 +57,47 @@ you observed in the current software will likely be removed in the future
 version of the software. If you plan to perform comparison studies with 
 other works, please communicate with the software author to make
 sure you have correctly understood the details of the implementation.
+
 The details of MMCM can be found in the following paper:
 
   Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
   in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
+  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-1-1-165
 
-The generalized MMC algorithm for wide-field sources and detectors are
+While the original MMC paper was based on the Plücker coordinates, a number
+of more efficient SIMD-based ray-tracers, namely, Havel SSE4 ray-tracer, 
+Badouel SSE ray-tracer and branchless-Badouel SSE ray-tracer (fastest) have 
+been added since 2011. These methods can be selected by the -M flag. The 
+details of these methods can be found in the below paper
+
+  Qianqian Fang and David R. Kaeli, 
+  "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"
+  Biomed. Opt. Express 3(12), 3223-3230 (2012)
+  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223
+  
+and their key differences compared to another mesh-based MC simulator, 
+TIM-OS, are discussed in 
+
+  Qianqian Fang, "Comment on 'A study on tetrahedron-based inhomogeneous 
+  Monte-Carlo optical simulation'," Biomed. Opt. Express, vol. 2(5) 1258-1264, 2011.
+  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-2-5-1258
+
+In addition, the generalized MMC algorithm for wide-field sources and detectors are
 described in the following paper, and was made possible with the collaboration
 with Ruoyang Yao and Prof. Xavier Intes from RPI
 
   Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for
   wide-field illumination and detection via mesh retessellation,"
   Biomed. Optics Express, 7(1), 171-184 (2016)
+  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171
+
+In addition, we have been developing a fast approach to build the
+Jacobian matrix for solving inverse problems. The technique is called
+"photon replay", and is described in details in the below paper:
+
+  Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians for 
+  diffuse optical tomography using perturbation Monte Carlo-based 
+  photon 'replay'," Biomed. Optics Express, in press, (2018)
 
 The authors of the papers are greatly appreciated if you can cite 
 the above papers as references if you use MMC and related software
@@ -80,7 +109,7 @@ II. Download and Compile MMC
 
 The latest release of MMC can be downloaded from the following URL:
 
-  http://mcx.sourceforge.net/cgi-bin/index.cgi?Download
+  http://mcx.space/#mmc
 
 The development branch (not fully tested) of the code can be accessed 
 using Git. However this is not encouraged unless you are
@@ -88,9 +117,6 @@ a developer. To check out the Git source code, you should use the following
 command:
 
   git clone https://github.com/fangq/mmc.git mmc
-
-then type the password as "anonymous_user". This will allow you to 
-anonymously check out the entire source code tree.
 
 To compile the software, you need to install GNU gcc compiler toolchain
 on your system. For Debian/Ubuntu based GNU/Linux systems, you can type
@@ -120,7 +146,7 @@ and type
   make
 
 this will create a fully optimized, multi-threaded and SSE4 enabled 
-mmc executable, located under the mmc/bin/ folder.
+mmc executable, located under the mmc/src/bin/ folder.
 
 Other compilation options include
 
@@ -173,6 +199,14 @@ After compilation, you may add the path to the "mmc" binary (typically,
 mmc/src/bin) to your search path. To do so, you should modify your 
 $PATH environment variable. Detailed instructions can be found at [5].
 
+You can also compile MMC using Intel's C++ compiler - icc. To do this, you run
+
+  make CC=icc
+
+you must enable icc related environment variables by source the compilervars.sh 
+file. The speed of icc-generated mmc binary is generally faster than those compiled by 
+gcc.
+
 -------------------------------------------------------------------------------
 
 III. Running Simulations
@@ -224,11 +258,12 @@ where possible parameters include (the first item in [] is the default value)
                                to calculate the mua/mus Jacobian matrices
  -P [0|int]    (--replaydet)   replay only the detected photons from a given 
                                detector (det ID starts from 1), use with -E 
- -M [H|PHBS]  (--method)      choose ray-tracing algorithm (only use 1 letter)
+ -M [H|PHBSG]  (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
 			       H - Havel's SSE4 ray-tracing algorithm
 			       B - partial Badouel's method (used by TIM-OS)
 			       S - branch-less Badouel's method with SSE
+			       G - dual-grid MMC (DMMC) with voxel data output
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
@@ -276,7 +311,7 @@ where possible parameters include (the first item in [] is the default value)
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save
 
 == Example ==
-       mmc -n 1000000 -f input.inp -s test -b 0 -D TP
+       mmc -n 1000000 -f input.json -s test -b 0 -D TP
 </pre>
 
 
@@ -438,6 +473,49 @@ to 20; when using "-s onecubejson", the "Session"/"ID" value is modified.
 If your JSON input file is invalid, MMC will quit and point out
 where it expects you to double check.
 
+
+3.5 Photon debugging information using -D flag
+
+the output format for -D M (photon moving) is below:
+
+? px py pz eid id scat
+
+? is a single letter representing the state of the current position:
+   B a boundary point
+   P the photon is passing an interface point
+   T the photon terminates at this location due to
+      exceeding end of the time window
+   M a position other than any of the above
+
+px,py,pz: the current photon position
+
+eid: the index (starting from 1) of the current enclosing element
+
+id: the index of the current photon, from 1 to nphoton
+
+scat: the "normalized" length to read the next scattering site,
+   it is unitless
+
+for -D A (flux accumulation debugging), the output is
+
+A ax ay az ww eid dlen
+
+ax ay az: the location where the accumulation calculation was done
+   (typically, the half-way point of the line segment between the last
+   and current positions)
+
+ww: the photon weight loss for the line segment
+
+dlen=scat/mus of the current element: the distance left to arrive
+   the next scattering site
+
+for -D E
+
+E  px py pz vx vy vz w eid
+
+vx vy vz: the unitary propagation vector when the photon exits
+w: the current photon weight
+
 -------------------------------------------------------------------------------
 
 IV. Plotting the Results
@@ -510,15 +588,25 @@ If you already made a change to the source code to fix a bug you encountered
 in your research, we are appreciated if you can share your changes (as 
 "git diff" outputs) with the developers. We will patch the code as soon 
 as we fully test the changes (we will acknowledge your contribution in 
-the MMC documentation). If you want to become a developer, please send 
-an email to Qianqian and we will review your request. Once permitted, 
-you will have developer access to the source code repository.
+the MMC documentation). 
+
+When making edits to the source code with an intent of sharing with the
+upstream authors, please set your editor's tab width to 8 so that the 
+indentation of the source is correctly displayed. Please keep your patch
+as small and local as possible, so that other parts of the code are not
+influenced.
+
+To streamline the process process, the best way to contribute your patch
+is to click the "fork" button from http://github.com/fangq/mmc, and 
+then change the code in your forked repository. Once fully tested and
+documented, you can then create a "pull request" so that the upstream author
+can review the changes and accept your change.
 
 In you are a user, please use our mmc-users mailing list to post 
 questions or share experience regarding MMC. The mailing lists can be
 found from this link:
 
- http://mcx.space/#community
+ http://mcx.space/#about
 
 -------------------------------------------------------------------------------
 

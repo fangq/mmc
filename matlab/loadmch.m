@@ -39,7 +39,7 @@ function [data, headerstruct, photonseed]=loadmch(fname,format,endian)
 %
 
 if(nargin==1)
-   format='float';
+   format='float32=>float32';
 end
 
 if(nargin<3)

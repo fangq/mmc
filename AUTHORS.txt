@@ -22,10 +22,13 @@ Ruoyang has contributed to the development of the mesh-retessellation
 based MMC to support wide-field illumination and detection strategies.
 
 Publication:
-Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for 
+[Yao2016] Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for 
 wide-field illumination and detection via mesh retessellation,"
 Biomed. Optics Express, 7(1), 171-184 (2016)
 
+[Yao2018] Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians 
+for diffuse optical tomography using perturbation Monte Carlo-based 
+photon 'replay'," Biomed. Optics Express, in press, (2018)
 
 * Jin Chen <kikyouchen at gmail.com> (Intes Lab @ RPI)
 
@@ -34,7 +37,7 @@ parallel-beam based MMC (AAPB-MMC) to support wide-field
 illumination in the "widefield" code branch.
 
 Publication:
-Chen J, Fang Q, Intes X, "Mesh-based Monte Carlo method in time-domain 
+[Chen2012] Chen J, Fang Q, Intes X, "Mesh-based Monte Carlo method in time-domain 
 widefield fluorescence molecular tomography," Journal of Biomedical Optics, 
 17(10), 106009 2012
 

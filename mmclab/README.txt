@@ -2,7 +2,7 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.0-RC3, v2017.7
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.0 Final, v2018
 *URL: http://mcx.sf.net/cgi-bin/index.cgi?MMC/Doc/MMCLAB
 
 <toc>
@@ -108,8 +108,9 @@ the verbose command line options in MMC.
        cfg.isnormalized:[1]-normalize the output fluence to unitary source, 0-no reflection
        cfg.isspecular:  [1]-calculate specular reflection if source is outside
        cfg.ismomentum:  [0]-save momentum transfer for each detected photon
-       cfg.method:      ray-tracing method, [P]:Plucker, H:Havel (SSE4),
-                        B: partial Badouel, S: branchless Badouel (SSE)
+       cfg.method:      ray-tracing method, ["plucker"]:Plucker, "havel": Havel (SSE4),
+                        "badouel": partial Badouel, "elem": branchless Badouel (SSE), 
+                        "grid": dual-grid MMC
        cfg.mcmethod:    0 use MCX-styled MC method, 1 use MCML style MC
        cfg.nout:        [1.0] refractive index for medium type 0 (background)
        cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
@@ -160,6 +161,10 @@ the verbose command line options in MMC.
                                 the zenith angle
        cfg.{srcparam1,srcparam2}: 1x4 vectors, see cfg.srctype for details
        cfg.srcpattern: see cfg.srctype for details
+       cfg.replaydet:  only works when cfg.outputtype is 'jacobian', 'wl', 'nscat', or 'wp' and cfg.seed is an array
+                       -1 replay all detectors and save in separate volumes (output has 5 dimensions)
+                        0 replay all detectors and sum all Jacobians into one volume
+                        a positive number: the index of the detector to replay and obtain Jacobians
        cfg.voidtime:   for wide-field sources, [1]-start timer at launch, 0-when entering
                        the first non-zero voxel
  
@@ -182,6 +187,7 @@ the verbose command line options in MMC.
  == Output control ==
        cfg.issaveexit:  [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
        cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
+       cfg.isatomic:    [1]-use atomic operations for saving fluence, 0-no atomic operations
        cfg.outputtype:  'flux' - output fluence-rate
                         'fluence' - fluence, 
                         'energy' - energy deposit, 
@@ -189,6 +195,7 @@ the verbose command line options in MMC.
                         'wl'- weighted path lengths to build mua Jacobian (replay mode)
                         'wp'- weighted scattering counts to build mus Jacobian (replay mode)
        cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space
+       cfg.debugphoton: print the photon movement debug info only for a specified photon ID
  
        fields marked with * are required; options in [] are the default values
        fields marked with - are calculated if not given (can be faster if precomputed)
@@ -205,6 +212,8 @@ the verbose command line options in MMC.
              or [size(cfg.elem,1), total-time-gates] if cfg.basisorder=0. 
              The content of the array is the normalized fluence-rate (or others 
              depending on cfg.outputtype) at each mesh node and time-gate.
+             In the "replay" mode, if cfg.replaydet is set to -1 and multiple 
+             detectors exist, fluence.data will add a 5th dimension for the detector number.
        detphoton: (optional) a struct array, with a length equals to that of cfg.
              Starting from v2016.5, the detphoton contains the below subfields:
                detphoton.detid: the ID(>0) of the detector that captures the photon
@@ -213,7 +222,8 @@ the verbose command line options in MMC.
                     one need to multiply cfg.unitinmm with ppath to convert it to mm.
                detphoton.mom: cummulative cos_theta for momentum transfer in each medium
                detphoton.p or .v: exit position and direction, when cfg.issaveexit=1
-               detphoton.w0: photon final weight at detection
+               detphoton.w0: photon initial weight at launch time
+               detphoton.prop: optical properties, a copy of cfg.prop
                detphoton.data: a concatenated and transposed array in the order of
                      [detid nscat ppath mom p v w0]'
                "data" is the is the only subfield in all MMCLAB before 2016.5
@@ -245,7 +255,7 @@ the verbose command line options in MMC.
        cfgs(2).detpos=[30 20 0 1;30 40 0 1;20 30 1 1;40 30 0 1];
        % calculate the fluence and partial path lengths for the two configurations
        [fluxs,detps]=mmclab(cfgs);
- 
+
  
   This function is part of Mesh-based Monte Carlo (MMC) URL: http://mcx.space/#mmc
  

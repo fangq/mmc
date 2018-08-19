@@ -68,7 +68,7 @@ DOXY       := doxygen
 DOCDIR     := $(MMCDIR)/doc
 
 ifeq ($(CC),icc)
-	OPENMP   := -openmp
+	OPENMP   := -qopenmp
 	OPENMPLIB:= $(OPENMP)
 	FASTMATH :=
 	EXTRALIB :=

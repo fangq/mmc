@@ -596,6 +596,8 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
 	    int *elems=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen); // convert int4* to int*
+	    if(eid>=tracer->mesh->ne)
+	        MESH_ERROR("initial element index exceeds total element count");
 	    for(i=0;i<4;i++){
             	ea=elems[out[i][0]]-1;
             	eb=elems[out[i][1]]-1;
@@ -886,9 +888,9 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
         if(cfg->rootpath[0])
-                sprintf(fweight,"%s%c%s.dat",cfg->rootpath,pathsep,cfg->session);
+                sprintf(fweight,"%s%c%s.%s",cfg->rootpath,pathsep,cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
         else
-                sprintf(fweight,"%s.dat",cfg->session);
+                sprintf(fweight,"%s.%s",cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
 
         if(cfg->outputformat==ofBin){
 		if((fp=fopen(fweight,"wb"))==NULL)
