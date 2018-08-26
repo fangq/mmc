@@ -100,6 +100,11 @@ pnacl:	   EXTRALIB   :=
 pnacl:     INCLUDEDIR+= -I$(NACL_SDK_ROOT)/include/pnacl
 pnacl:     BINARY=libmmc-pnacl.a
 
+web: release
+web: CC=emcc
+web: AR=emcc
+web: EXTRALIB=-s WASM=1 -o $(BINDIR)/webmmc.html
+
 mex oct mexsse octsse:   EXTRALIB=
 mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
 mex oct mexsse octsse:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
@@ -131,7 +136,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-all release sse ssemath prof omp mex oct mexsse octsse pnacl: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp mex oct mexsse octsse pnacl web: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
