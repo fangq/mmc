@@ -1189,7 +1189,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 	    }
 	    i++;
      }
-     if(issavelog && cfg->session){
+     if(issavelog && cfg->session[0]){
           sprintf(logfile,"%s.log",cfg->session);
           cfg->flog=fopen(logfile,"wt");
           if(cfg->flog==NULL){
