@@ -75,6 +75,11 @@ ifeq ($(CC),icc)
 	EXTRALIB :=
 endif
 
+ifeq ($(CC),clang)
+	OPENMP   := -fopenmp
+        OPENMPLIB:= -fopenmp=libiomp5
+endif
+
 ARFLAGS    := 
 
 OBJSUFFIX  := .o

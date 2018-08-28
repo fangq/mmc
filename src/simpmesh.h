@@ -182,7 +182,7 @@ static inline void vec_cross(float3 *a,float3 *b,float3 *res){
 }
 
 static inline void mmc_sincosf(float x, float * sine, float * cosine){
-#if defined(__GNUC__) && defined(__linux__)
+#if defined(__GNUC__) && defined(__linux__) && !defined(__clang__)
     __builtin_sincosf(x, sine, cosine);
 #else
     *sine = sinf(x);
