@@ -105,7 +105,7 @@ pnacl:	   EXTRALIB   :=
 pnacl:     INCLUDEDIR+= -I$(NACL_SDK_ROOT)/include/pnacl
 pnacl:     BINARY=libmmc-pnacl.a
 
-web: omp
+web: release
 web: CC=emcc
 web: BINDIR:=webmmc
 web: AR=emcc
