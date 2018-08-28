@@ -105,10 +105,11 @@ pnacl:	   EXTRALIB   :=
 pnacl:     INCLUDEDIR+= -I$(NACL_SDK_ROOT)/include/pnacl
 pnacl:     BINARY=libmmc-pnacl.a
 
-web: release
+web: omp
 web: CC=emcc
+web: BINDIR:=webmmc
 web: AR=emcc
-web: EXTRALIB=-s WASM=1 -o $(BINDIR)/webmmc.html
+web: EXTRALIB=-s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
 mex oct mexsse octsse:   EXTRALIB=
 mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
