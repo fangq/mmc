@@ -308,8 +308,8 @@ end
 
 if(exist('maxNumCompThreads','file'))
     warning('off','MATLAB:maxNumCompThreads:Deprecated');
-    np=maxNumCompThreads;
-    maxNumCompThreads(np*2);
+    maxNumCompThreads('automatic');
+    maxNumCompThreads(maxNumCompThreads*2);
 end
 
 mmcout=nargout;
