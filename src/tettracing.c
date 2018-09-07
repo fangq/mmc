@@ -227,7 +227,17 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	    for(i=0;i<6;i++){
 	        D=_mm_load_ps(&(tracer->d[(eid)*6+i].x));
 	        M=_mm_load_ps(&(tracer->m[(eid)*6+i].x));
+  #ifdef __SSE4_1__
 		w[i]=_mm_cvtss_f32(_mm_add_ss(_mm_dp_ps(O,M,0x7F),_mm_dp_ps(T,D,0x7F)));
+  #else
+		M=_mm_mul_ps(O,M);
+		M=_mm_hadd_ps(M,M);
+		M=_mm_hadd_ps(M,M);
+		D=_mm_mul_ps(T,D);
+		D=_mm_hadd_ps(D,D);
+		D=_mm_hadd_ps(D,D);
+		_mm_store_ss(w+i,_mm_add_ss(M,D));
+  #endif
 	    }
 	}
 #else
@@ -403,6 +413,7 @@ inline __m128 rcp_nr(const __m128 a){
     return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
 }
 
+#if !defined(__EMSCRIPTEN__)
 
 /** 
  * \brief Havel-based SSE4 ray-triangle intersection test
@@ -803,6 +814,17 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 	return r->slen;
 }
+
+#else
+float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
+	return MMC_UNDEFINED;
+}
+float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
+	return MMC_UNDEFINED;
+}
+#endif  /* #if !defined(__EMSCRIPTEN__) */
 
 /** 
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step

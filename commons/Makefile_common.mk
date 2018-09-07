@@ -90,7 +90,7 @@ OBJS       := $(subst $(OBJDIR)/$(MMCSRC)/,$(MMCSRC)/,$(OBJS))
 OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 
 release:   CCFLAGS+= -O3
-sse ssemath mex oct mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse4
+sse ssemath mex oct mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
 sse ssemath omp mex oct mexsse octsse:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
 ssemath mexsse octsse:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
@@ -105,11 +105,14 @@ pnacl:	   EXTRALIB   :=
 pnacl:     INCLUDEDIR+= -I$(NACL_SDK_ROOT)/include/pnacl
 pnacl:     BINARY=libmmc-pnacl.a
 
-web: release
+web: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3
+web: CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+web: ARFLAGS+= $(OPENMPLIB) $(FASTMATH) -DUSE_SSE2 -DMMC_USE_SSE_MATH
+web: CFLAGS+=-D__SSE__ -D__SSE2__
 web: CC=emcc
 web: BINDIR:=webmmc
 web: AR=emcc
-web: EXTRALIB=-s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
+web: EXTRALIB=-s SIMD=1 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
 mex oct mexsse octsse:   EXTRALIB=
 mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
