@@ -989,7 +989,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                      }else{
 			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
-			    int i, seg=(int)(r->Lmove)+1;
+			    int i, seg=(int)(r->Lmove/cfg->unitinmm)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
 #ifdef __INTEL_COMPILER
