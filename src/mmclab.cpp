@@ -63,11 +63,7 @@
 #define MAX(a,b)  ((a)>(b)?(a):(b))                       //! Macro to calculate the max of two floating points
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
 
-#if (! defined MX_API_VER) || (MX_API_VER < 0x07300000)
-	typedef int dimtype;                              //! MATLAB before 2017 uses int as the dimension array
-#else
-	typedef size_t dimtype;                           //! MATLAB after 2017 uses size_t as the dimension array
-#endif
+typedef mwSize dimtype;                                   //! MATLAB type alias for integer type to use for array sizes and dimensions
 
 void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cfg, tetmesh *mesh);
 void mmc_validate_config(mcconfig *cfg, tetmesh *mesh);
