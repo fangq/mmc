@@ -186,7 +186,7 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
         if(cfg->method==rtBLBadouelGrid)
 	        mesh_createdualmesh(mesh,cfg);
 	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
+	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate*cfg->srcnum);
 }
 
 void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
@@ -303,7 +303,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
 	  if(cfg->method==rtBLBadouel)
-	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate);
+	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate*cfg->srcnum);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i*mesh->elemlen;

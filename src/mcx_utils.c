@@ -143,6 +143,7 @@ const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
 
 void mcx_initcfg(mcconfig *cfg){
      cfg->medianum=0;
+     cfg->srcnum=1;
      cfg->detnum=0;
      cfg->e0=0;
      cfg->dim.x=0;
@@ -697,14 +698,15 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 		    char srcpatternfile[MAX_PATH_LENGTH];
 		    FILE *fp;
 		    if(in==stdin)
-                    	MMC_FPRINTF(stdout,"Please specify the source pattern file name:\n\t");
+                    	MMC_FPRINTF(stdout,"Please specify the number of source patterns and source pattern file name:\n\t");
 		    if(cfg->srcpattern) free(cfg->srcpattern);
-		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w),sizeof(float));
-		    MMC_ASSERT(fscanf(in, "%s", srcpatternfile)==1);
+        MMC_ASSERT(fscanf(in, "%d %s", &(cfg->srcnum), srcpatternfile)==2);
+        if(cfg->srcnum < 1)  MMC_ERROR(-6,"the number of patterns cannot be smaller than 1");
+		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w*cfg->srcnum),sizeof(float));
 		    comm=fgets(comment,MAX_PATH_LENGTH,in);
 		    fp=fopen(srcpatternfile,"rb");
 		    if(fp==NULL)	MMC_ERROR(-6,"source pattern file can not be opened");
-		    MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w,sizeof(float),fp)==sizeof(float));
+		    MMC_ASSERT(fread(cfg->srcpattern,cfg->srcparam1.w*cfg->srcparam2.w*cfg->srcnum,sizeof(float),fp)==sizeof(float));
 		    fclose(fp);
 		}
 	    }
