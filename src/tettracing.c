@@ -1072,7 +1072,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
  * \param[out] visit: statistics counters of this thread
  */
 
-float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
+void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 RandType *ran, RandType *ran0, visitor *visit){
 
 	int oldeid,fixcount=0,exitdet=0;
@@ -1105,12 +1105,12 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP))
-		kahany=cfg->replayweight[r.photonid]-visit->kahanc;	/* when replay mode, accumulate detected photon weight */
+		kahany=cfg->replayweight[r.photonid]-visit->kahanc0;	/* when replay mode, accumulate detected photon weight */
 	else
-		kahany=r.weight-visit->kahanc;
-	kahant=visit->totalweight + kahany;
-	visit->kahanc=(kahant - visit->totalweight) - kahany;
-	visit->totalweight=kahant;
+		kahany=r.weight-visit->kahanc0;
+	kahant=visit->launchweight + kahany;
+	visit->kahanc0=(kahant - visit->launchweight) - kahany;
+	visit->launchweight=kahant;
 
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
@@ -1248,7 +1248,12 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	free(r.partialpath);
         if(r.photonseed)
 		free(r.photonseed);
-	return r.Eabsorb;
+
+	kahany=r.Eabsorb-visit->kahanc1;
+	kahant=visit->launchweight+kahany;
+	visit->kahanc1=(kahant-visit->launchweight)-kahany;
+	visit->launchweight=kahant;
+	// return r.Eabsorb;
 }
 
 /**
@@ -1583,5 +1588,36 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
                     for(i=0;i<4;i++)
                         mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
             }
+	}
+}
+
+void visitor_init(mcconfig *cfg, visitor* visit){
+	visit->launchweight->(double*)calloc(cfg->srcnum,sizeof(double));
+	visit->absorbweight->(double*)calloc(cfg->srcnum,sizeof(double));
+	visit->kahanc0=(double*)calloc(cfg->srcnum,sizeof(double));
+	visit->kahanc1=(double*)calloc(cfg->srcnum,sizeof(double));
+	if(cfg->issavedet){
+	    if(cfg->issaveseed)
+		visit->photonseed=calloc(visit->detcount,(sizeof(RandType)*RAND_BUF_LEN));
+	    visit->partialpath=(float*)calloc(visit->detcount*visit->reclen,sizeof(float));
+	}
+}
+
+void visitor_clear(visitor* visit){
+	free(visit->launchweight);
+	visit->launchweight=NULL;
+	free(visit->absorbweight);
+	visit->absorbweight=NULL;
+	free(visit->kahanc0);
+	visit->kahanc0=NULL;
+	free(visit->kahanc1);
+	visit->kahanc1=NULL;
+	if(visit->photonseed){
+		free(visit->photonseed);
+		visit->photonseed=NULL;
+	}
+	if(visit->partialpath){
+		free(visit->partialpath);
+		visit->partialpath=NULL;
 	}
 }

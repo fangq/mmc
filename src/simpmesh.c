@@ -303,7 +303,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
 	if(!cfg->basisorder)
 	  if(cfg->method==rtBLBadouel)
-	   mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate*cfg->srcnum);
+	    mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate*cfg->srcnum);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i*mesh->elemlen;
@@ -895,7 +895,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         if(cfg->outputformat==ofBin){
 		if((fp=fopen(fweight,"wb"))==NULL)
          	        MESH_ERROR("can not open weight file to write");
-		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),datalen*cfg->maxgate,fp)!=datalen*cfg->maxgate)
+		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),datalen*cfg->maxgate*cfg->srcnum,fp)!=datalen*cfg->maxgate*cfg->srcnum)
 			MESH_ERROR("fail to write binary weight file");
 		fclose(fp);
 		return;
@@ -903,10 +903,19 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	if((fp=fopen(fweight,"wt"))==NULL){
 		MESH_ERROR("can not open weight file to write");
 	}
-	for(i=0;i<cfg->maxgate;i++)
+	for(i=0;i<cfg->maxgate;i++){
 	    for(j=0;j<datalen;j++){
-		if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
+	    	if(1==cfg->srcnum){
+	    	    if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
 			MESH_ERROR("can not write to weight file");
+	    	}else{  // multiple sources for pattern illumination type
+		    for(k=0;k<cfg->srcnum;k++){
+		    	shift = (i*datalen+j)*cfg->srcnum+k;
+			    if(fprintf(fp,"%d\t%d\t%e\n",j+1,k+1,mesh->weight[shift])==0)
+				MESH_ERROR("can not write to weight file");
+		    }
+	    	}
+	    }
 	}
 	fclose(fp);
 }
@@ -1067,11 +1076,12 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
  */
 
 /*see Eq (1) in Fang&Boas, Opt. Express, vol 17, No.22, pp. 20178-20190, Oct 2009*/
-float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
+float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, int pair){
         int i,j,k;
 	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
         int datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+        int shift = pair*datalen*cfg->maxgate;
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
@@ -1087,7 +1097,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
             normalizor=1.f/cfg->nphoton;
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
-                  mesh->weight[i*datalen+j]*=normalizor;
+                  mesh->weight[shift+i*datalen+j]*=normalizor;
 	    return normalizor;
         }
 	if(cfg->method==rtBLBadouelGrid){
@@ -1097,26 +1107,26 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
             for(i=0;i<cfg->maxgate;i++)
               for(j=0;j<datalen;j++)
         	if(mesh->nvol[j]>0.f)
-                   mesh->weight[i*datalen+j]/=mesh->nvol[j];
+                   mesh->weight[shift+i*datalen+j]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
 	      ee=(int *)(mesh->elem+i*mesh->elemlen);
 	      energyelem=0.f;
 	      for(j=0;j<cfg->maxgate;j++)
 		for(k=0;k<4;k++)
-		   energyelem+=mesh->weight[j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
+		   energyelem+=mesh->weight[shift+j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
 	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
 	  }else{
             for(i=0;i<datalen;i++)
 	      for(j=0;j<cfg->maxgate;j++)
-	         energydeposit+=mesh->weight[j*datalen+i];
+	         energydeposit+=mesh->weight[shift+j*datalen+i];
 
             for(i=0;i<datalen;i++){
 	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]].mua;
               for(j=0;j<cfg->maxgate;j++)
-        	mesh->weight[j*datalen+i]/=energyelem;
+        	mesh->weight[shift+j*datalen+i]/=energyelem;
 	    }
             normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 	  }
@@ -1126,6 +1136,6 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal){
 
 	for(i=0;i<cfg->maxgate;i++)
 	    for(j=0;j<datalen;j++)
-	        mesh->weight[i*datalen+j]*=normalizor;
+	        mesh->weight[shift+i*datalen+j]*=normalizor;
 	return normalizor;
 }
