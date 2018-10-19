@@ -174,7 +174,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 {
 	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
-	visitor_init(visit);
+	visitor_init(cfg, &visit);
 
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();
@@ -208,16 +208,19 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			mesh_saveweightat(mesh,cfg,i+1);
 	}
 
-	for(j=0;j<cfg->srcnum;j++)
+	for(j=0;j<cfg->srcnum;j++){
 	    #pragma omp atomic
-		master.totalweight[j] += visit.totalweight[j];
+		master.launchweight[j] += visit.launchweight[j];
+	    #pragma omp atomic
+		master.absorbweight[j] += visit.absorbweight[j];
+	}
 
 	if(cfg->issavedet){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
 	    if(threadid==0)
-	    	visitor_init(master);
+	    	visitor_init(cfg, &master);
             #pragma omp barrier
             #pragma omp critical
             {
@@ -231,7 +234,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
             #pragma omp barrier
 	}
 
-	visitor_clear(visit);
+	visitor_clear(&visit);
 }
 
         /** \subsection sreport Post simulation */
@@ -244,12 +247,17 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",dt));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
         if(cfg->issavedet)
-           fprintf(cfg->flog,"detected %d photons\n",master.detcount);
+            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
 	if(cfg->isnormalized){
-          cfg->his.normalizer=mesh_normalize(mesh,cfg,master.absorbweight,master.launchweight);
-          fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg->his.normalizer);
+	    double cur_normalizer, sum_normalizer=0;
+	    for(j=0;j<cfg->srcnum;j++){
+	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
+          	sum_normalizer += cur_normalizer;
+          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+		j,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
+  	    }
+  	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
 	}
 	if(cfg->issave2pt){
 		switch(cfg->outputtype){
@@ -270,7 +278,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 		}
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
-        visitor_clear(master);
+        visitor_clear(&master);
 
 	return 0;
 }

@@ -345,7 +345,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         if(cfg->mcmethod==mmMCX){
                             if(cfg->srctype != stPattern){
                             	if(cfg->isatomic)
-#pragma omp atomic
+				  #pragma omp atomic
 		 	            tracer->mesh->weight[eid+tshift]+=ww;
                             	else
                                     tracer->mesh->weight[eid+tshift]+=ww;
@@ -354,7 +354,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 	    	int pidx; // pattern index
                 	    	for(pidx=0;pidx<cfg->srcnum;pidx++){
                 	    	    if(cfg->isatomic)
-#pragma omp atomic
+				      #pragma omp atomic
                 	    	    	tracer->mesh->weight[(eid+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx];
                 	    	    else
                 	    	    	tracer->mesh->weight[(eid+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx];
@@ -389,7 +389,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                                       if(cfg->srctype != stPattern){
                                     	  if(cfg->isatomic)
                 		      	      for(i=0;i<4;i++)
-#pragma omp atomic
+						#pragma omp atomic
                      			          tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
                                     	  else
                                       	      for(i=0;i<4;i++)
@@ -399,12 +399,12 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 	    		  int pidx; // pattern index
                 	    		  for(pidx=0;pidx<cfg->srcnum;pidx++){
                 	    		      if(cfg->isatomic)
-                	    		      	for(i=0;i<4;i++)
-#pragma omp atomic
-                	    		          tracer->mesh->weight[(ee[i]-1+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx]*(baryp0[i]+baryout[i]);
+                	    		      	  for(i=0;i<4;i++)
+						    #pragma omp atomic
+                	    		          	tracer->mesh->weight[(ee[i]-1+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx]*(baryp0[i]+baryout[i]);
                 	    		      else
-                	    		      	for(i=0;i<4;i++)
-                	    		      	  tracer->mesh->weight[(ee[i]-1+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx]*(baryp0[i]+baryout[i]);
+                	    		      	  for(i=0;i<4;i++)
+                	    		      	  	tracer->mesh->weight[(ee[i]-1+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx]*(baryp0[i]+baryout[i]);
                 	    		  }
                         	      }
                                   }
@@ -649,7 +649,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		    if(!cfg->basisorder){
 		    	if(cfg->srctype != stPattern){
 		  	    if(cfg->isatomic)
-#pragma omp atomic
+			      #pragma omp atomic
 		    	    	tracer->mesh->weight[eid+tshift]+=ww;
 			    else
 			    	tracer->mesh->weight[eid+tshift]+=ww;
@@ -659,7 +659,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 	    int pidx; // pattern index
                 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
                 	    	if(cfg->isatomic)
-#pragma omp atomic
+				  #pragma omp atomic
                 	    	    tracer->mesh->weight[(eid+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx];
                 	    	else
                 	    	    tracer->mesh->weight[(eid+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx];
@@ -671,7 +671,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		    	if(cfg->srctype != stPattern){
 		    	    if(cfg->isatomic)
 		    	    	for(j=0;j<4;j++)
-#pragma omp atomic
+				  #pragma omp atomic
 		    	    	    tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
 		    	    else
 		    	    	for(j=0;j<4;j++)
@@ -682,7 +682,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
                 	    	if(cfg->isatomic)
                 	    	    for(j=0;j<4;j++)
-#pragma omp atomic
+				      #pragma omp atomic
                 	    	    	tracer->mesh->weight[(ee[j]-1+tshift)*cfg->srcnum+pidx]+=barypout[j]*cfg->srcpattern[pidx*psize+r->posidx];
                 	    	else
                 	    	    for(j=0;j<4;j++)
@@ -1652,14 +1652,14 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	}else{
 	    if(!cfg->basisorder){
                 if(cfg->isatomic)
-#pragma omp atomic
+		  #pragma omp atomic
 		    mesh->weight[eid+tshift]+=ww;
                 else
                     mesh->weight[eid+tshift]+=ww;
 	    }else{
                 if(cfg->isatomic)
 		    for(i=0;i<4;i++)
-#pragma omp atomic
+		      #pragma omp atomic
 			mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
                 else
                     for(i=0;i<4;i++)
@@ -1669,8 +1669,8 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 }
 
 void visitor_init(mcconfig *cfg, visitor* visit){
-	visit->launchweight->(double*)calloc(cfg->srcnum,sizeof(double));
-	visit->absorbweight->(double*)calloc(cfg->srcnum,sizeof(double));
+	visit->launchweight=(double*)calloc(cfg->srcnum,sizeof(double));
+	visit->absorbweight=(double*)calloc(cfg->srcnum,sizeof(double));
 	visit->kahanc0=(double*)calloc(cfg->srcnum,sizeof(double));
 	visit->kahanc1=(double*)calloc(cfg->srcnum,sizeof(double));
 	if(cfg->issavedet){

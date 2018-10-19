@@ -909,6 +909,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	    	    if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
 			MESH_ERROR("can not write to weight file");
 	    	}else{  // multiple sources for pattern illumination type
+	    	    int k, shift;
 		    for(k=0;k<cfg->srcnum;k++){
 		    	shift = (i*datalen+j)*cfg->srcnum+k;
 			    if(fprintf(fp,"%d\t%d\t%e\n",j+1,k+1,mesh->weight[shift])==0)
