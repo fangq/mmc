@@ -176,6 +176,11 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
 	visitor_init(cfg, &visit);
+	if(cfg->issavedet){
+	    if(cfg->issaveseed)
+	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
+	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
+	}
 
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();
@@ -219,6 +224,12 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	if(cfg->issavedet){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
+	    #pragma omp barrier
+	    if(threadid==0){
+		master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
+	        if(cfg->issaveseed)
+        	    master.photonseed=calloc(master.detcount,(sizeof(RandType)*RAND_BUF_LEN));
+	    }
             #pragma omp barrier
             #pragma omp critical
             {
@@ -238,7 +249,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	if((cfg->debuglevel & dlProgress))
 		mcx_progressbar(cfg->nphoton,cfg);
-
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",dt));

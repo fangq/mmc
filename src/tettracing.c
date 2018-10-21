@@ -1673,11 +1673,6 @@ void visitor_init(mcconfig *cfg, visitor* visit){
 	visit->absorbweight=(double*)calloc(cfg->srcnum,sizeof(double));
 	visit->kahanc0=(double*)calloc(cfg->srcnum,sizeof(double));
 	visit->kahanc1=(double*)calloc(cfg->srcnum,sizeof(double));
-	if(cfg->issavedet){
-	    if(cfg->issaveseed)
-		visit->photonseed=calloc(visit->detcount,(sizeof(RandType)*RAND_BUF_LEN));
-	    visit->partialpath=(float*)calloc(visit->detcount*visit->reclen,sizeof(float));
-	}
 }
 
 void visitor_clear(visitor* visit){
