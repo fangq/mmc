@@ -994,6 +994,9 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         MMC_ERROR(-2,"the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
 
+     if(cfg->srcnum>1 && cfg->seed==SEED_FROM_FILE)
+        MMC_ERROR(-2,"multiple source simulation is currently not supported under replay mode");
+
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE)
         cfg->seed=time(NULL);
      if(cfg->method==rtBLBadouelGrid){

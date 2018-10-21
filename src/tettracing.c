@@ -1437,7 +1437,8 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		    int xsize=(int)cfg->srcparam1.w;
 		    int ysize=(int)cfg->srcparam2.w;
 		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
-		    if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP)){
+		    if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP)){ // replay mode currently doesn't support multiple source patterns
+		    	r->weight=cfg->srcpattern[MIN( (int)(ry*cfg->srcparam2.w), (int)cfg->srcparam2.w-1 )*(int)(cfg->srcparam1.w)+MIN( (int)(rx*cfg->srcparam1.w), (int)cfg->srcparam1.w-1 )];
 		    	cfg->replayweight[r->photonid] *= r->weight;
 		    }
 		}else if(cfg->srctype==stFourier){
