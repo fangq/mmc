@@ -142,6 +142,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         float raytri=0.f,raytri0=0.f;
         unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel=0;
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
+	visitor_init(cfg, &master);
 
 	t0=StartTimer();
 	
@@ -219,9 +220,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
             #pragma omp barrier
-	    if(threadid==0)
-	    	visitor_init(cfg, &master);
-            #pragma omp barrier
             #pragma omp critical
             {
 		memcpy(master.partialpath+master.bufpos*visit.reclen,
@@ -231,9 +229,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
                             visit.photonseed,visit.bufpos*(sizeof(RandType)*RAND_BUF_LEN));
 		master.bufpos+=visit.bufpos;
             }
-            #pragma omp barrier
 	}
-
+	#pragma omp barrier
 	visitor_clear(&visit);
 }
 
@@ -255,7 +252,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
           	sum_normalizer += cur_normalizer;
           	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		j,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
+		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
   	    }
   	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
 	}

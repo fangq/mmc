@@ -7,7 +7,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in PlÃ¼cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -948,6 +948,7 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	    cfg->his.unitinmm=cfg->unitinmm;
         cfg->his.detected=count;
 	cfg->his.savedphoton=count;
+	cfg->his.srcnum=cfg->srcnum;
 	cfg->his.detnum=cfg->detnum;
 	if(cfg->issaveseed && seeds!=NULL){
 	   cfg->his.seedbyte=seedbyte;
@@ -1082,7 +1083,6 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
 	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
         int datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-        int shift = pair*datalen*cfg->maxgate;
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);
@@ -1091,14 +1091,14 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
 
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
-                  mesh->weight[i*datalen+j]*=normalizor;
+                  mesh->weight[(i*datalen+j)*cfg->srcnum+pair]*=normalizor;
            return normalizor;
         }
 	if(cfg->outputtype==otEnergy){
             normalizor=1.f/cfg->nphoton;
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
-                  mesh->weight[shift+i*datalen+j]*=normalizor;
+                  mesh->weight[(i*datalen+j)*cfg->srcnum+pair]*=normalizor;
 	    return normalizor;
         }
 	if(cfg->method==rtBLBadouelGrid){
@@ -1108,26 +1108,26 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
             for(i=0;i<cfg->maxgate;i++)
               for(j=0;j<datalen;j++)
         	if(mesh->nvol[j]>0.f)
-                   mesh->weight[shift+i*datalen+j]/=mesh->nvol[j];
+                   mesh->weight[(i*datalen+j)*cfg->srcnum+pair]/=mesh->nvol[j];
 
             for(i=0;i<mesh->ne;i++){
 	      ee=(int *)(mesh->elem+i*mesh->elemlen);
 	      energyelem=0.f;
 	      for(j=0;j<cfg->maxgate;j++)
 		for(k=0;k<4;k++)
-		   energyelem+=mesh->weight[shift+j*mesh->nn+ee[k]-1]; /*1/4 factor is absorbed two lines below*/
+		   energyelem+=mesh->weight[(j*mesh->nn+ee[k]-1)*cfg->srcnum+pair]; /*1/4 factor is absorbed two lines below*/
 	      energydeposit+=energyelem*mesh->evol[i]*mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
 	    }
 	    normalizor=Eabsorb/(Etotal*energydeposit*0.25f); /*scaling factor*/
 	  }else{
             for(i=0;i<datalen;i++)
 	      for(j=0;j<cfg->maxgate;j++)
-	         energydeposit+=mesh->weight[shift+j*datalen+i];
+	         energydeposit+=mesh->weight[(i*datalen+j)*cfg->srcnum+pair];
 
             for(i=0;i<datalen;i++){
 	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]].mua;
               for(j=0;j<cfg->maxgate;j++)
-        	mesh->weight[shift+j*datalen+i]/=energyelem;
+        	mesh->weight[(i*datalen+j)*cfg->srcnum+pair]/=energyelem;
 	    }
             normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 	  }
@@ -1137,6 +1137,6 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
 
 	for(i=0;i<cfg->maxgate;i++)
 	    for(j=0;j<datalen;j++)
-	        mesh->weight[shift+i*datalen+j]*=normalizor;
+	        mesh->weight[(i*datalen+j)*cfg->srcnum+pair]*=normalizor;
 	return normalizor;
 }

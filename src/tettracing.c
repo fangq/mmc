@@ -1167,6 +1167,7 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    visit->launchweight[0]=kahant;
 	}else{
 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
+	    #pragma omp critical
 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
 	    	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP))
 		    kahany=cfg->replayweight[r.photonid]-visit->kahanc0[pidx];	/* when replay mode, accumulate detected photon weight */
@@ -1322,6 +1323,7 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    visit->absorbweight[0]=kahant;
 	}else{
 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
+	    #pragma omp critical
 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
 	    	kahany=r.Eabsorb*cfg->srcpattern[pidx*psize+r.posidx]-visit->kahanc1[pidx];
 	    	kahant=visit->absorbweight[pidx]+kahany;
@@ -1425,24 +1427,22 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		if(r->eid>0)
 		      return;
 	}else if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
-               do{
-		  float rx=rand_uniform01(ran);
-		  float ry=rand_uniform01(ran);
-		  r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
-		  r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
-		  r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
-		  r->weight=1.f;
-		  if(cfg->srctype==stPattern){
-		  	int xsize=(int)cfg->srcparam1.w;
-		  	int ysize=(int)cfg->srcparam2.w;
-		  	r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
-			// r->weight=cfg->srcpattern[MIN( (int)(ry*cfg->srcparam2.w), (int)cfg->srcparam2.w-1 )*(int)(cfg->srcparam1.w)+MIN( (int)(rx*cfg->srcparam1.w), (int)cfg->srcparam1.w-1 )];
-			// if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP)){
-			//      cfg->replayweight[r->photonid] *= r->weight;
-		  }else if(cfg->srctype==stFourier){
-			r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
-		  }
-                }while(r->weight<EPS);
+		float rx=rand_uniform01(ran);
+		float ry=rand_uniform01(ran);
+		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
+		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
+		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
+		r->weight=1.f;
+		if(cfg->srctype==stPattern){
+		    int xsize=(int)cfg->srcparam1.w;
+		    int ysize=(int)cfg->srcparam2.w;
+		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
+		    if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP)){
+		    	cfg->replayweight[r->photonid] *= r->weight;
+		    }
+		}else if(cfg->srctype==stFourier){
+		    r->weight=(cosf((floorf(cfg->srcparam1.w)*rx+floorf(cfg->srcparam2.w)*ry+cfg->srcparam1.w-floorf(cfg->srcparam1.w))*TWO_PI)*(1.f-cfg->srcparam2.w+floorf(cfg->srcparam2.w))+1.f)*0.5f;
+		}
 		origin.x+=(cfg->srcparam1.x+cfg->srcparam2.x)*0.5f;
 		origin.y+=(cfg->srcparam1.y+cfg->srcparam2.y)*0.5f;
 		origin.z+=(cfg->srcparam1.z+cfg->srcparam2.z)*0.5f;
