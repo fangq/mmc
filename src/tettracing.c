@@ -654,7 +654,6 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 			    else
 			    	tracer->mesh->weight[eid+tshift]+=ww;
 			}else{
-			    int pshift = (eid+tshift)*cfg->srcnum;
                 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                 	    int pidx; // pattern index
                 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
