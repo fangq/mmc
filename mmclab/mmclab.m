@@ -256,7 +256,7 @@ for i=1:len
         disp('searching initial element ...');
         [cfg(i).srcpos,cfg(i).e0]=mmcraytrace(cfg(i).node,cfg(i).elem,cfg(i).srcpos,cfg(i).srcdir,cfg(i).e0);
     end
-    if(cfg(i).srctype=='pattern' && ndim(cfg(i).srcpattern)==2)
+    if(cfg(i).srctype=='pattern' & ndims(cfg(i).srcpattern)==2)
         cfg(i).srcpattern=reshape(cfg(i).srcpattern,...
             size(cfg(i).srcpattern,1),size(cfg(i).srcpattern,2),1)
     end

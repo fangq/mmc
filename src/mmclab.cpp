@@ -329,7 +329,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	   if(usewaitbar)
              waitbar_destroy (hprop) ;
 #endif
-
 	tracer_clear(&tracer);
 	if(cfg.isnormalized){
             double cur_normalizer, sum_normalizer=0;
@@ -342,14 +341,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             cfg.his.normalizer=sum_normalizer/cfg.srcnum;
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
-
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
             fielddim[0]=cfg.srcnum;
             fielddim[1]=datalen;
 	    fielddim[2]=cfg.maxgate; fielddim[3]=0; fielddim[4]=0; 
 	    if(cfg.method==rtBLBadouelGrid){
-                fielddim[0]=cfg.dim.x;
+                fielddim[0]=cfg.srcnum;
 		fielddim[1]=cfg.dim.x;
 		fielddim[2]=cfg.dim.y;
 		fielddim[3]=cfg.dim.z;
@@ -378,6 +376,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     }
 
     /** \subsection sclean End the simulation */
+    visitor_clear(&master);
     mesh_clear(&mesh);
     mcx_clearcfg(&cfg);
   }
@@ -576,7 +575,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*arraydim[2]*sizeof(float));
         for(k=0;k<arraydim[0]*arraydim[1]*arraydim[2];k++)
              cfg->srcpattern[k]=val[k];
-        printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
+        printf("mmc.srcpattern=[%d %d %d];\n",arraydim[0],arraydim[1],arraydim[2]);
     }else if(strcmp(name,"method")==0){
         int len=mxGetNumberOfElements(item);
         const char *methods[]={"plucker","havel","badouel","elem","grid",""};
