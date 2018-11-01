@@ -80,7 +80,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
   visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
-  visitor_init(&cfg, &master);
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -151,8 +150,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 	mesh_init(&mesh);
 
-        memset(&master,0,sizeof(visitor));
-
         /** Read each struct element from input and set value to the cfg configuration */
 	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
             tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
@@ -176,6 +173,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	/** Validate all input fields, and warn incompatible inputs */
 	mmc_validate_config(&cfg,&mesh);
 
+        visitor_init(&cfg, &master);
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
 
@@ -374,7 +372,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     }catch(...){
       mexPrintf("Unknown Exception");
     }
-
     /** \subsection sclean End the simulation */
     visitor_clear(&master);
     mesh_clear(&mesh);
