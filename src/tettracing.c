@@ -344,11 +344,11 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                         	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
                         if(cfg->mcmethod==mmMCX){
                             if(cfg->srctype != stPattern){
-                            	if(cfg->isatomic)
-				  #pragma omp atomic
-		 	            tracer->mesh->weight[eid+tshift]+=ww;
-                            	else
-                                    tracer->mesh->weight[eid+tshift]+=ww;
+                            if(cfg->isatomic)
+#pragma omp atomic
+		 	        tracer->mesh->weight[eid+tshift]+=ww;
+                            else
+                                tracer->mesh->weight[eid+tshift]+=ww;
                 	    }else{
                 	    	int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                 	    	int pidx; // pattern index
@@ -387,13 +387,13 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                      			baryout[i]=(1.f-ratio)*baryp0[i]+ratio*baryout[i];
                                   if(cfg->mcmethod==mmMCX){
                                       if(cfg->srctype != stPattern){
-                                    	  if(cfg->isatomic)
-                		      	      for(i=0;i<4;i++)
-						#pragma omp atomic
-                     			          tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
-                                    	  else
-                                      	      for(i=0;i<4;i++)
-                                        	  tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+                                    if(cfg->isatomic)
+                		      for(i=0;i<4;i++)
+#pragma omp atomic
+                     			tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
+                                    else
+                                      for(i=0;i<4;i++)
+                                        tracer->mesh->weight[ee[i]-1+tshift]+=ww*(baryp0[i]+baryout[i]);
                         	      }else{
                 	    		  int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                 	    		  int pidx; // pattern index
@@ -648,11 +648,11 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                 if(cfg->mcmethod==mmMCX){
 		    if(!cfg->basisorder){
 		    	if(cfg->srctype != stPattern){
-		  	    if(cfg->isatomic)
-			      #pragma omp atomic
-		    	    	tracer->mesh->weight[eid+tshift]+=ww;
-			    else
-			    	tracer->mesh->weight[eid+tshift]+=ww;
+		  	if(cfg->isatomic)
+#pragma omp atomic
+		    	tracer->mesh->weight[eid+tshift]+=ww;
+			else
+				tracer->mesh->weight[eid+tshift]+=ww;
 			}else{
                 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                 	    int pidx; // pattern index
@@ -669,12 +669,12 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		    	_mm_store_ps(barypout,T);
 		    	if(cfg->srctype != stPattern){
 		    	    if(cfg->isatomic)
-		    	    	for(j=0;j<4;j++)
-				  #pragma omp atomic
-		    	    	    tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
-		    	    else
-		    	    	for(j=0;j<4;j++)
-		    	    	    tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+		        for(j=0;j<4;j++)
+#pragma omp atomic
+		            tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
+                    else
+                        for(j=0;j<4;j++)
+                            tracer->mesh->weight[ee[j]-1+tshift]+=barypout[j];
 		    	}else{
                 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                 	    int pidx; // pattern index
@@ -1426,13 +1426,13 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		if(r->eid>0)
 		      return;
 	}else if(cfg->srctype==stPlanar || cfg->srctype==stPattern || cfg->srctype==stFourier){
-		float rx=rand_uniform01(ran);
-		float ry=rand_uniform01(ran);
-		r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
-		r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
-		r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
-		r->weight=1.f;
-		if(cfg->srctype==stPattern){
+		  float rx=rand_uniform01(ran);
+		  float ry=rand_uniform01(ran);
+		  r->p0.x=cfg->srcpos.x+rx*cfg->srcparam1.x+ry*cfg->srcparam2.x;
+		  r->p0.y=cfg->srcpos.y+rx*cfg->srcparam1.y+ry*cfg->srcparam2.y;
+		  r->p0.z=cfg->srcpos.z+rx*cfg->srcparam1.z+ry*cfg->srcparam2.z;
+		  r->weight=1.f;
+		  if(cfg->srctype==stPattern){
 		    int xsize=(int)cfg->srcparam1.w;
 		    int ysize=(int)cfg->srcparam2.w;
 		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
@@ -1652,14 +1652,14 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit){
 	}else{
 	    if(!cfg->basisorder){
                 if(cfg->isatomic)
-		  #pragma omp atomic
+#pragma omp atomic
 		    mesh->weight[eid+tshift]+=ww;
                 else
                     mesh->weight[eid+tshift]+=ww;
 	    }else{
                 if(cfg->isatomic)
 		    for(i=0;i<4;i++)
-		      #pragma omp atomic
+#pragma omp atomic
 			mesh->weight[ee[i]-1+tshift]+=ww*baryp0[i];
                 else
                     for(i=0;i<4;i++)

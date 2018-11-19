@@ -181,7 +181,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
 	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
 	}
-
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();
 #endif
@@ -224,12 +223,12 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	if(cfg->issavedet){
 	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
-	    #pragma omp barrier
+            #pragma omp barrier
 	    if(threadid==0){
 		master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
 	        if(cfg->issaveseed)
         	    master.photonseed=calloc(master.detcount,(sizeof(RandType)*RAND_BUF_LEN));
-	    }
+            }
             #pragma omp barrier
             #pragma omp critical
             {
@@ -249,12 +248,13 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	if((cfg->debuglevel & dlProgress))
 		mcx_progressbar(cfg->nphoton,cfg);
+
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",dt));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
         if(cfg->issavedet)
-            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
+           fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
 	if(cfg->isnormalized){
 	    double cur_normalizer, sum_normalizer=0;

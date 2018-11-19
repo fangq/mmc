@@ -339,13 +339,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             cfg.his.normalizer=sum_normalizer/cfg.srcnum;
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
+
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
             fielddim[0]=cfg.srcnum;
             fielddim[1]=datalen;
 	    fielddim[2]=cfg.maxgate; fielddim[3]=0; fielddim[4]=0; 
 	    if(cfg.method==rtBLBadouelGrid){
-                fielddim[0]=cfg.srcnum;
+		fielddim[0]=cfg.srcnum;
 		fielddim[1]=cfg.dim.x;
 		fielddim[2]=cfg.dim.y;
 		fielddim[3]=cfg.dim.z;
@@ -372,6 +373,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     }catch(...){
       mexPrintf("Unknown Exception");
     }
+
     /** \subsection sclean End the simulation */
     visitor_clear(&master);
     mesh_clear(&mesh);
