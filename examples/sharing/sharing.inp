@@ -10,4 +10,4 @@ sharing                 # volume ('uchar' format)
 pattern                 # source type
 40.0 0.0 0.0 40         # parameters set 1
 0.0 40.0 0.0 40         # parameters set 2
-5   patterns.pat        # number of patterns and pattern file name
+patterns.pat  5         # number of patterns and pattern file name

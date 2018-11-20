@@ -10,6 +10,6 @@ replaywide          # volume ('uchar' format)
 pattern
 40.0 0.0 0.0 40     # source param1
 0.0 40.0 0.0 40     # source param2
-1  pattern0.pat     # number of source patterns and pattern file name
+pattern0.pat        # pattern file name
 40.0 0.0 0.0 40     # detector param1
 0.0 40.0 0.0 40     # detector param2

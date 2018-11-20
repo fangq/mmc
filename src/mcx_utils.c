@@ -700,7 +700,8 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 		    if(in==stdin)
                     	MMC_FPRINTF(stdout,"Please specify the number of source patterns and source pattern file name:\n\t");
 		    if(cfg->srcpattern) free(cfg->srcpattern);
-		    MMC_ASSERT(fscanf(in, "%d %s", &(cfg->srcnum), srcpatternfile)==2);
+		    // in case only one parameter is provided, use the default srcnum value (1)
+		    MMC_ASSERT(fscanf(in, "%s %d", srcpatternfile, &(cfg->srcnum))>=1);
 		    if(cfg->srcnum < 1)  MMC_ERROR(-6,"the number of patterns cannot be smaller than 1");
 		    cfg->srcpattern=(float*)calloc((cfg->srcparam1.w*cfg->srcparam2.w*cfg->srcnum),sizeof(float));
 		    comm=fgets(comment,MAX_PATH_LENGTH,in);
