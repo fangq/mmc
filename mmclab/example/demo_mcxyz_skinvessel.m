@@ -47,6 +47,7 @@ cfg.srcdir=[0 0 1];
 cfg.tstart=0;
 cfg.tend=5e-8;
 cfg.tstep=5e-8;
+% cfg.outputtype='energy'; %energy deposition in mmc varys with elem volume
 cfg.outputtype='flux';
 cfg.unitinmm=1;
 cfg.minenergy=0.01;
@@ -85,7 +86,7 @@ subplot(122);
 hold on;
 qmeshcut(cfg.elem(cfg.elemprop>0,1:4),cfg.node,log10(fluxcw),'x=0.5','linestyle','none'); 
 view([1 0 0]);
-set(gca,'zlim',[0 1],'ylim',[0 1])
+set(gca,'zlim',[0 1],'ylim',[0 1],'zdir','reverse')
 
 box on;
 axis equal
