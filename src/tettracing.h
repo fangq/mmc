@@ -61,6 +61,7 @@ typedef struct MMC_ray{
 	float *partialpath;           /**< pointer to the partial path data buffer */
         void  *photonseed;            /**< pointer to store the photon seed */
 	float focus;                  /**< focal length of the source, if defined */
+	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 } ray;
 
 /***************************************************************************//**
@@ -77,9 +78,11 @@ typedef struct MMC_visitor{
 	int   bufpos;                 /**< the position of the detected photon buffer */
 	int   reclen;                 /**< record (4-byte per record) number per detected photon */
 	float *partialpath;           /**< pointer to the partial path data buffer */
-	void  *photonseed;            /**< focal length of the source, if defined */
-	double totalweight;           /**< pointer to store the photon seed */
-	double kahanc;                /**< temp variable to enable Kahan summation to reduce round-off error */
+	void  *photonseed;            /**< pointer to store the photon seed */
+	double *launchweight;         /**< pointer to accumulated launched photon weight */
+	double *absorbweight;         /**< pointer to accumulated absorbed photon weight */
+	double *kahanc0;              /**< temp variable to enable Kahan summation to reduce round-off error */
+	double *kahanc1;              /**< temp variable to enable Kahan summation to reduce round-off error */
 } visitor;
 
 #ifdef	__cplusplus
@@ -88,11 +91,13 @@ extern "C" {
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
-float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
+void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
+void visitor_init(mcconfig *cfg, visitor* visit);
+void visitor_clear(visitor* visit);
 
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus

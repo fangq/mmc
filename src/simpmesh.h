@@ -121,7 +121,7 @@ void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg);
 void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg);
 
 void mesh_clear(tetmesh *mesh);
-float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal);
+float mesh_normalize(tetmesh *mesh, mcconfig *cfg, float Eabsorb, float Etotal, int pair);
 void mesh_build(tetmesh *mesh);
 void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);

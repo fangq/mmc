@@ -7,7 +7,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in PlÃ¼cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -93,6 +93,7 @@ typedef struct MMC_history{
 	char magic[4];                 /**< magic bits= 'M','C','X','H' */
 	unsigned int  version;         /**< version of the mch file format */
 	unsigned int  maxmedia;        /**< number of media in the simulation */
+	unsigned int  srcnum;	       /**< number of sources in the simulation*/
 	unsigned int  detnum;          /**< number of detectors in the simulation */
 	unsigned int  colcount;        /**< how many output files per detected photon */
 	unsigned int  totalphoton;     /**< how many total photon simulated */
@@ -135,9 +136,10 @@ typedef struct MMC_config{
 	uint3 crop0;                   /**<sub-volume for cache*/
 	uint3 crop1;                   /**<the other end of the caching box*/
 	int medianum;                  /**<total types of media*/
+	int srcnum;		       /**<total number of sources, could be larger than 1 only with pattern illumination*/
 	int detnum;                    /**<total detector numbers*/
 	float detradius;               /**<detector radius*/
-        float sradius;                 /**<source region radius: if set to non-zero, accumulation \
+	float sradius;                 /**<source region radius: if set to non-zero, accumulation \
                                            will not perform for dist<sradius; this can reduce \
                                            normalization error when using non-atomic write*/
 	medium *prop;                  /**<optical property mapping table*/

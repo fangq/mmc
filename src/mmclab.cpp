@@ -79,7 +79,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int i;
@@ -88,7 +88,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
   mxArray    *tmp;
   int        ifield, jstruct;
-  int        ncfg, nfields;
+  int        ncfg, nfields, pidx;
   dimtype     fielddim[4];
   int        usewaitbar=1;
   int        errorflag=0;
@@ -142,7 +142,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     try{
         printf("Running simulations for configuration #%d ...\n", jstruct+1);
         unsigned int ncomplete=0;
-        double Eabsorb=0.0;
         float raytri=0.f,raytri0=0.f;;
 
         /** Initialize cfg with default values first */
@@ -150,8 +149,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	mcx_initcfg(&cfg);
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"initializing ... "));
 	mesh_init(&mesh);
-
-        memset(&master,0,sizeof(visitor));
 
         /** Read each struct element from input and set value to the cfg configuration */
 	for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
@@ -176,6 +173,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	/** Validate all input fields, and warn incompatible inputs */
 	mmc_validate_config(&cfg,&mesh);
 
+        visitor_init(&cfg, &master);
 	tracer_init(&tracer,&mesh,cfg.method);
 	tracer_prep(&tracer,&cfg);
 
@@ -187,8 +185,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
 #pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
 {
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
+	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+        visitor_init(&cfg, &visit);
 	if(cfg.issavedet){
             if(cfg.issaveseed)
                 visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -205,7 +204,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     #endif
 
 	/*launch photons*/
-	#pragma omp for reduction(+:Eabsorb) reduction(+:raytri,raytri0)
+	#pragma omp for reduction(+:raytri,raytri0)
 	for(i=0;i<cfg.nphoton;i++){
             #pragma omp flush (errorflag)
 	    if(errorflag){
@@ -216,9 +215,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		visit.raytet=0.f;
                 visit.raytet0=0.f;
                 if(cfg.seed==SEED_FROM_FILE)
-                   Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i*RAND_BUF_LEN,ran1,&visit);
+                   onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i*RAND_BUF_LEN,ran1,&visit);
                 else
-                   Eabsorb+=onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
+                   onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
                 raytri0+=visit.raytet0;
 		#pragma omp atomic
@@ -253,8 +252,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    }
 	}
 
-        #pragma omp atomic
-                master.totalweight += visit.totalweight;
+        for(pidx=0;pidx<cfg.srcnum;pidx++){
+            #pragma omp atomic
+                master.launchweight[pidx] += visit.launchweight[pidx];
+            #pragma omp atomic
+                master.absorbweight[pidx] += visit.absorbweight[pidx];
+        }
 
         /** If no error is detected, generat all output data */
 	if(cfg.issavedet && errorflag==0){
@@ -298,8 +301,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
               }
             }
             #pragma omp barrier
-	    free(visit.partialpath);
-            visit.partialpath=NULL;
+	    visitor_clear(&visit);
 	}
 }
 
@@ -325,30 +327,36 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	   if(usewaitbar)
              waitbar_destroy (hprop) ;
 #endif
-
 	tracer_clear(&tracer);
-	if(cfg.isnormalized && master.totalweight){
-          cfg.his.normalizer=mesh_normalize(&mesh,&cfg,Eabsorb,master.totalweight);
-	  printf("total simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg.his.normalizer);
+	if(cfg.isnormalized){
+            double cur_normalizer, sum_normalizer=0;
+            for(pidx=0;pidx<cfg.srcnum;pidx++){
+                cur_normalizer=mesh_normalize(&mesh,&cfg,master.absorbweight[pidx],master.launchweight[pidx],pidx);
+                sum_normalizer+=cur_normalizer;
+	        printf("source %d\ttotal simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+		    pidx+1,master.launchweight[pidx],100.f*master.absorbweight[pidx]/master.launchweight[pidx],cur_normalizer);
+            }
+            cfg.his.normalizer=sum_normalizer/cfg.srcnum;
 	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
-            fielddim[0]=datalen;
-	    fielddim[1]=cfg.maxgate; fielddim[2]=0; fielddim[3]=0; 
+            fielddim[0]=cfg.srcnum;
+            fielddim[1]=datalen;
+	    fielddim[2]=cfg.maxgate; fielddim[3]=0; fielddim[4]=0; 
 	    if(cfg.method==rtBLBadouelGrid){
-		fielddim[0]=cfg.dim.x;
-		fielddim[1]=cfg.dim.y; 
-		fielddim[2]=cfg.dim.z; 
-		fielddim[3]=cfg.maxgate;
-	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,fielddim,mxDOUBLE_CLASS,mxREAL));
+		fielddim[0]=cfg.srcnum;
+		fielddim[1]=cfg.dim.x;
+		fielddim[2]=cfg.dim.y;
+		fielddim[3]=cfg.dim.z;
+		fielddim[4]=cfg.maxgate;
+	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
 	    }else{
-    	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,fielddim,mxDOUBLE_CLASS,mxREAL));
+    	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
-	    memcpy(output,mesh.weight,datalen*cfg.maxgate*sizeof(double));
+	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
 	}
 	if(nlhs>=2 && cfg.issaveexit==2){
 	    float *detimage=(float*)calloc(cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
@@ -367,6 +375,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     }
 
     /** \subsection sclean End the simulation */
+    visitor_clear(&master);
     mesh_clear(&mesh);
     mcx_clearcfg(&cfg);
   }
@@ -561,10 +570,11 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         arraydim=mxGetDimensions(item);
         double *val=mxGetPr(item);
         if(cfg->srcpattern) free(cfg->srcpattern);
-        cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*sizeof(float));
-        for(k=0;k<arraydim[0]*arraydim[1];k++)
+        cfg->srcnum=arraydim[2];
+        cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*arraydim[2]*sizeof(float));
+        for(k=0;k<arraydim[0]*arraydim[1]*arraydim[2];k++)
              cfg->srcpattern[k]=val[k];
-        printf("mmc.srcpattern=[%d %d];\n",arraydim[0],arraydim[1]);
+        printf("mmc.srcpattern=[%d %d %d];\n",arraydim[0],arraydim[1],arraydim[2]);
     }else if(strcmp(name,"method")==0){
         int len=mxGetNumberOfElements(item);
         const char *methods[]={"plucker","havel","badouel","elem","grid",""};
@@ -692,10 +702,13 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
 	cfg->basisorder=0;
      }
      datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-     mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate);
+     mesh->weight=(double *)calloc(sizeof(double)*datalen*cfg->srcnum,cfg->maxgate);
 
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
+
+     if(cfg->srcnum>1 && cfg->seed==SEED_FROM_FILE)
+        mexErrMsgTxt("multiple source simulation is currently not supported under replay mode");
 
      if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
         for(i=1;i<mesh->prop;i++){

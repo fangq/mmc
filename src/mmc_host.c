@@ -136,13 +136,13 @@ int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
  */
 
 int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
-        double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
-        unsigned int i;
+        unsigned int i,j;
         float raytri=0.f,raytri0=0.f;
         unsigned int threadid=0,ncomplete=0,t0,dt, debuglevel=0;
-	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
+	visitor_init(cfg, &master);
 
 	t0=StartTimer();
 	
@@ -173,8 +173,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 #pragma omp parallel private(ran0,ran1,threadid)
 {
-	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,0.f,0.f};
+	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
+	visitor_init(cfg, &visit);
 	if(cfg->issavedet){
 	    if(cfg->issaveseed)
 	        visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
@@ -186,7 +187,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	rng_init(ran0,ran1,(unsigned int *)&(cfg->seed),threadid);
 
 	/*launch photons*/
-        #pragma omp for reduction(+:Eabsorb) reduction(+:raytri,raytri0)
+        #pragma omp for reduction(+:raytri,raytri0)
 	for(i=0;i<cfg->nphoton;i++){
 		visit.raytet=0.f;
 		visit.raytet0=0.f;
@@ -194,9 +195,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
                     cfg->debuglevel = debuglevel;
 
 		if(cfg->seed==SEED_FROM_FILE)
-		    Eabsorb+=onephoton(i,tracer,mesh,cfg,((RandType *)cfg->photonseed)+i*RAND_BUF_LEN,ran1,&visit);
+		    onephoton(i,tracer,mesh,cfg,((RandType *)cfg->photonseed)+i*RAND_BUF_LEN,ran1,&visit);
 		else
-		    Eabsorb+=onephoton(i,tracer,mesh,cfg,ran0,ran1,&visit);
+		    onephoton(i,tracer,mesh,cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
 		raytri0+=visit.raytet0;
 
@@ -212,8 +213,12 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			mesh_saveweightat(mesh,cfg,i+1);
 	}
 
-	#pragma omp atomic
-		master.totalweight += visit.totalweight;
+	for(j=0;j<cfg->srcnum;j++){
+	    #pragma omp atomic
+		master.launchweight[j] += visit.launchweight[j];
+	    #pragma omp atomic
+		master.absorbweight[j] += visit.absorbweight[j];
+	}
 
 	if(cfg->issavedet){
 	    #pragma omp atomic
@@ -234,11 +239,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
                             visit.photonseed,visit.bufpos*(sizeof(RandType)*RAND_BUF_LEN));
 		master.bufpos+=visit.bufpos;
             }
-            #pragma omp barrier
-	    free(visit.partialpath);
-            if(cfg->issaveseed && visit.photonseed)
-                 free(visit.photonseed);
 	}
+	#pragma omp barrier
+	visitor_clear(&visit);
 }
 
         /** \subsection sreport Post simulation */
@@ -254,9 +257,14 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
 	if(cfg->isnormalized){
-          cfg->his.normalizer=mesh_normalize(mesh,cfg,Eabsorb,master.totalweight);
-          fprintf(cfg->flog,"total simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		master.totalweight,100.f*Eabsorb/master.totalweight,cfg->his.normalizer);
+	    double cur_normalizer, sum_normalizer=0;
+	    for(j=0;j<cfg->srcnum;j++){
+	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
+          	sum_normalizer += cur_normalizer;
+          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
+  	    }
+  	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
 	}
 	if(cfg->issave2pt){
 		switch(cfg->outputtype){
@@ -275,12 +283,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 			mesh_getdetimage(detimage,master.partialpath,master.bufpos,cfg,mesh);
 			mesh_savedetimage(detimage,cfg);	free(detimage);
 		}
-		free(master.partialpath);
-                if(cfg->issaveseed && master.photonseed)
-			free(master.photonseed);
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
+        visitor_clear(&master);
 
 	return 0;
 }
-
