@@ -13,7 +13,7 @@ clear cfg flux
 fc2=cell2mat(fc);
 fc=[fc2(:,[1 2 3]); fc2(:,[1 3 4])];
 
-[ncy,fcy]=meshacylinder([-1,100.5,100.5],[201,100.5,100.5],20,5); % add the vessel
+[ncy,fcy]=meshacylinder([-1,99.5,99.5],[201,99.5,99.5],20,5); % add the vessel
 [newnode,newelem]=surfboolean(no,fc,'first',ncy,fcy);  % merge the two domains
 
 c0=[10,100,150,26]';
