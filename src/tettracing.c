@@ -1166,7 +1166,8 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    visit->launchweight[0]=kahant;
 	}else{
 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
-	    #pragma omp critical
+#pragma omp critical
+{
 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
 	    	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otWL || cfg->outputtype==otWP))
 		    kahany=cfg->replayweight[r.photonid]-visit->kahanc0[pidx];	/* when replay mode, accumulate detected photon weight */
@@ -1176,6 +1177,7 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	visit->kahanc0[pidx]=(kahant - visit->launchweight[pidx]) - kahany;
 	    	visit->launchweight[pidx]=kahant;
 	    }
+}
 	}
 
 #ifdef MMC_USE_SSE
@@ -1322,13 +1324,15 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    visit->absorbweight[0]=kahant;
 	}else{
 	    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
-	    #pragma omp critical
+#pragma omp critical
+{
 	    for(pidx=0;pidx<cfg->srcnum;pidx++){
 	    	kahany=r.Eabsorb*cfg->srcpattern[pidx*psize+r.posidx]-visit->kahanc1[pidx];
 	    	kahant=visit->absorbweight[pidx]+kahany;
 	    	visit->kahanc1[pidx]=(kahant-visit->absorbweight[pidx])-kahany;
 	    	visit->absorbweight[pidx]=kahant;
 	    }
+}
 	}
 }
 

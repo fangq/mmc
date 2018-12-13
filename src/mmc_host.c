@@ -171,7 +171,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 /** \subsection ssimu Parallel photon transport simulation */
 
-#pragma omp parallel private(ran0,ran1,threadid)
+#pragma omp parallel private(ran0,ran1,threadid,j)
 {
 	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;

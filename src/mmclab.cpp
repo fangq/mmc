@@ -183,7 +183,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** \subsection ssimu Parallel photon transport simulation */
 
     /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
-#pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
+#pragma omp parallel private(ran0,ran1,threadid,pidx) shared(errorflag)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
