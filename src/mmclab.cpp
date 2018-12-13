@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mxArray    *tmp;
   int        ifield, jstruct;
   int        ncfg, nfields, pidx;
-  dimtype     fielddim[4];
+  dimtype     fielddim[5];
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
@@ -351,9 +351,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		fielddim[2]=cfg.dim.y;
 		fielddim[3]=cfg.dim.z;
 		fielddim[4]=cfg.maxgate;
-	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
+        if(cfg.srcnum>1){
+            mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
+        }else{
+            mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+        }
 	    }else{
-    	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+            if(cfg.srcnum>1){
+              mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+            }else{
+              mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+            }
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
