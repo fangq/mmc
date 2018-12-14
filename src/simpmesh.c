@@ -1095,7 +1095,7 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
            return normalizor;
         }
 	if(cfg->outputtype==otEnergy){
-            normalizor=1.f/cfg->nphoton;
+            normalizor=1.f/Etotal;
             for(i=0;i<cfg->maxgate;i++)
                for(j=0;j<datalen;j++)
                   mesh->weight[(i*datalen+j)*cfg->srcnum+pair]*=normalizor;

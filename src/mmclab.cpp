@@ -89,7 +89,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mxArray    *tmp;
   int        ifield, jstruct;
   int        ncfg, nfields, pidx;
-  dimtype     fielddim[4];
+  dimtype     fielddim[5];
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
@@ -183,7 +183,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** \subsection ssimu Parallel photon transport simulation */
 
     /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
-#pragma omp parallel private(ran0,ran1,threadid) shared(errorflag)
+#pragma omp parallel private(ran0,ran1,threadid,pidx) shared(errorflag)
 {
 	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
@@ -351,9 +351,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		fielddim[2]=cfg.dim.y;
 		fielddim[3]=cfg.dim.z;
 		fielddim[4]=cfg.maxgate;
-	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
+        if(cfg.srcnum>1){
+            mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
+        }else{
+            mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+        }
 	    }else{
-    	        mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+            if(cfg.srcnum>1){
+              mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+            }else{
+              mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+            }
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
