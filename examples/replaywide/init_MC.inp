@@ -1,0 +1,15 @@
+1000000             # total photon, not used
+12345678            # RNG seed, negative to generate
+10.0 10.0 -2.0      # source position (mm)
+0. 0. 1.            # initial directional vector
+0.0 2e-9 2e-9       # time-gates(s): start, end, step
+replaywide          # volume ('uchar' format)
+-1                  # initial eid
+1 0                 # detector number and radius (mm)
+10.0 10.0 20.1 0.0	# detector 1 position (mm)
+pattern
+40.0 0.0 0.0 40     # source param1
+0.0 40.0 0.0 40     # source param2
+pattern0.pat        # pattern file name
+40.0 0.0 0.0 40     # detector param1
+0.0 40.0 0.0 40     # detector param2

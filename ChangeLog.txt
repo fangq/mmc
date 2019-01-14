@@ -1,0 +1,215 @@
+Change Log
+
+== MMC 1.0-Final (v2018, Sachima), Qianqian Fang <q.fang at neu.edu> ==
+
+2018-08-14 [25b323c] fixed discrepancy between DMMC and MCX along the boundary
+2018-08-13*[2cfd54a] force matlab to use multi-threading with mmc
+2018-07-16 [45c5b72] fix branchless_badouel_raytet: bary.x of -Inf value
+2018-05-13 [f5f0379] process mcx generated detp output without w0
+2018-04-24 [8241b0d] correct typo in array index
+2018-01-29 [e4c33fb] use mcxpreview in mcxlab to preview the domain
+2018-01-27 [2ee97d7] restructure folders, update documents
+2018-01-14*[53eb374] make mesh elem and facenb flexible to support complex elements in the future
+2018-01-13*[ecd9b80] add detailed doxygen documentation
+2017-12-08 [50d7770] atomic condition fixed for havel element basis
+2017-11-24 [62714c5] fix normalization, validation of dmmc
+2017-11-15 [96c4eda] convert energy deposit to fluence
+2017-11-13*[8e2f5ea] add dualmesh mode in mmclab
+2017-11-13 [3a25295] use unitinmm to set voxel length,fix normalization,fix weight deposit
+2017-11-09 [f9e9b93] define dedicated cfg->e0, allocate weight for grid output
+2017-11-09 [c528baf] initial update to support hybrid mesh-grid MC
+2017-10-30 [a63c19a] fix bug in getdetimage
+2017-10-05 [0b5e2a8] enable wp for plucker mode, remove save_scatter_events (a function no longer needed)
+2017-10-05 [af83f00] minor modification for mmclab, when there's not issaveexit field in cfg
+2017-09-14 [e1de1ff] modified replay examples for testing wp and wl performance
+2017-09-14*[a75528b] merge wide_det branch to support wide-field detector array output
+2017-09-14 [07b33f3] make mmclab compatible with older version of MATLAB
+2017-09-14 [70a308d] validated wide-field replay under "wL" mode, added an example
+2017-09-08*[db8ebf9] replay for detection pattern (binary), need to validate and add example
+2017-09-08 [ad76c08] suppress message of "specifying pattern file" when using input file
+2017-09-08 [9d71d01] manipulate replay photon weight for pattern illumination (sync with master)
+2017-09-07 [1061ab6] fix the wide_det issue for mmclab (caused by wrong maxmedia value), polish demo_wide_det
+2017-09-05 [373bbb1] do not split subfields when no photon is detected
+2017-09-01 [ebf0bca] add wide_det example for mmclab, still has a memory issue
+2017-09-01 [a574da7] change some int to size_t for Matlab2017a
+2017-09-01 [20ceaf4] modified mmclab.m for outputing detimages, mmclab issue not fixed
+2017-08-31 [ffe7abe] fix size_t to int conversion issue, enable wide_det for mmclab, to be tested
+2017-08-31 [1e86fdb] put calculation and saving of detimage into two functions, issues with mmclab
+2017-08-31 [b0c620d] manipulate replay photon weight for pattern illumination
+2017-08-16*[3a2e634] Output accumulated photon weight as time-resolved 2D images with an example attached
+2017-07-15*[567d9ee] fix mmclab for octave crash due to an octave bug #48678
+
+
+== MMC 1.0-RC3 (v2017.7, Haw Flakes-Update 1) RC release, Qianqian Fang <q.fang at neu.edu> ==
+
+2017-07-03 [dd50986] fix rootpath handling, move MeshID and InitElem to Domain section
+2017-07-02 [d315be8] fix basisorder verbose flag,fix terminal width initial value
+2017-06-20 [0fb129d] support rotation angle in expanded src domain
+2017-06-20 [04485b3] add --debugphoton flag to print debug info for selected photon ID
+2017-06-06 [c076f68] add flag --atomic to select use or not use atomic operations
+2017-06-06 [a797230] support older version of MATLAB
+2017-05-30 [74be9ef] support mcx detpt and old mmc output format
+2017-05-27 [10c8a27] avoid static TLS error in matlab by linking with libiomp5 instead of libgomp
+2017-04-01 [588bd00] update replay testing statement
+2017-03-31 [20b2906] add musmap for nodal based Jacobian (validated for homo media)
+2017-03-30 [d646b4f] avoid launching 0-energy photons, improved upon c4a87df
+
+== MMC 1.0-RC2 (v2017.3, Haw Flakes) RC release, Qianqian Fang <q.fang at neu.edu> ==
+
+2017-03-30 [26fd658] fix a bug when replaying photons from multiple detectors
+2017-03-30 [c4a87df] avoid launching photons with 0 weight (for pattern with 0 values)
+2017-03-30 [c2e0e3c] function for calculating tpsf curve with detp data
+2017-03-04 [1eaed5f] flush printing message in mmclab
+2017-01-15 [b9b98c2] fix a bug that prevent external detector from detecting photons
+2016-11-05 [0d988d8] including mexopts file for compiling mmclab on windows
+2016-08-29 [f8101f6] resize mesh->med before use for widefield det
+2016-08-29 [1f6451f] make mmclab support widefield detectors
+2016-08-01 [d935226] implement time-dependent Jacobian under "replay" mode
+2016-07-24 [d11dde5] add MCML like MC for validation and replay
+2016-07-03 [b767e87] modular mmc main function, better interface with other programs
+2016-06-08 [2458363] autobuild support for windows
+
+== MMC 1.0-RC1 (v2016.5, Hot Cocoa) RC release, Qianqian Fang <q.fang at neu.edu> ==
+2016-06-01 output partial path, scattering count, exit position/dir as subfield in 2nd output of mmclab
+2016-05-31 remove double correction of length unit in mmc and mmclab
+2016-05-25 elegantly terminate mmclab when exception is shown, print error unit and line numbers
+2016-05-09 add widefield gaussian source support
+2016-04-15 use mu_t for replay calculations for scattering Jacobian
+2016-04-10 save scattering events number for each media type
+2016-04-10 fix the bug in havel ray tracer, enable saving weighted scattering events number
+2016-03-10 fix bug in weight calculations when the output is jacobian
+2016-03-10 fix bug in basisorder for Havel raytracer
+
+== MMC 1.0-beta (v2016.1, Cotton Candy) beta release, Qianqian Fang <q.fang at neu.edu> ==
+
+2016/01/01 release 1.0-beta, also label as v2016.1 for time-based release strategy
+2015/12/31 fix crash caused by round-off errors in Havel SSE4 ray-tracer
+2015/12/25 replace drand48_r by erand48 for POSIX compliance
+2015/12/24 make sse target by default for mmc and mmclab
+2015/12/23 debugged replay demo script in mmclab, plot the sensitivity profile
+2015/12/20 update cJSON library to the latest version
+2015/12/16 add SFDI simulation examples and demo script 
+2015/11/10 use Kahan sum for total weight accummulation to avoid incorrect normalization
+2015/09/13 support converting and diverging beams in all area-sources
+2015/08/06 add script to systematically compare MMC and MCX
+2015/08/05 automatic retessellation when a wide-field source is specified
+2015/08/05 add wide-field source support in MMCLAB
+2015/07/18 fix vector normalization bug when reflection is enabled
+2015/07/17 fix floating-point round-off bug by using a proper epsilon value
+2015/04/24 fix crash due to the round-off of photon timer near tend
+2015/04/21 report wide-field overhead in all ray-tracers
+2015/04/21 add wide-field detection support
+2015/04/11 allow to specify endianness when loading mch files
+2015/02/06 initial implementation of mesh-retessellation based MMC for wide-field simulations
+2014/06/05 add Colin27 brain atlas example
+
+== MMC 0.9.5 (Wasabi Peas) stable release, Qianqian Fang <q.fang at neu.edu> ==
+
+2013/12/22 WebMMC skeleton uploaded, allowing MMC to run inside a web browser
+2013/12/20 output static or dynamic libraries (libmmc.a/libmmc.so)
+2013/10/22 fix isotropic source bug
+2013/06/26 (experimental) output absorption Jacobian pattern in the replay mode
+2013/03/03 saving photon exit pos and direction with the "-x" flag
+2013/03/02 photon replay with a pre-recorded seed for perturbation MC
+2012/08/17 add MMCLAB examples
+2012/08/16 initial ray-tracing in MMCLAB if source is not inside the mesh
+2012/08/03 allow detector individual radius
+2012/07/19 (experimental) add MMCLAB - a matlab interface
+2012/02/02 support binary output format with -F flag
+2012/01/25 support isotropic source, reading source types from JSON input
+
+
+== MMC 0.9.0 (Banana Pudding) stable release, Qianqian Fang <q.fang at neu.edu> ==
+
+2011/12/19 final release of 0.9.0
+2011/12/19 fix a critical bug in the Havel ray-tracer, all SSE4 binaries are effected
+2011/12/15 make nphoton unsigned int, maximum photon number is 2^32-1
+2011/11/02 print unit and line number during error handling
+2011/11/01 accept JSON-formatted input files
+2011/10/14 Stefan Carp contributed a patch and validation package for DCS simulations
+2011/10/12 fix a bug in writing mch file under Windows
+2011/08/24 fix an SFMT bug when initializing RNG seeds in multiple parallel threads
+
+
+== MMC 0.8.0 (Snow Cone) stable release, Qianqian Fang <q.fang at neu.edu> ==
+
+2011/06/17 final release of 0.8.0
+2011/04/23 sync private dev branch to trunk, publish v0.8.pre in the SVN
+2011/04/19 the second paper regarding MMC published on Biomed. Opt. Exp. 2(5):1258–1264
+2011/03/17 fix a critical bug in sphdiffusionslab.m
+2011/02/25 use atomic for weight accumulation and double precision weight array
+2011/02/20 can output fluence and energy deposit with the -O option
+2011/02/18 supported recording photon partial path lengths
+2011/02/17 supported specular reflection, match results from other simulators
+2011/02/11 basic support of source types, set seed from command line
+2011/01/12 select ray-tracing method from command line
+2011/01/11 added sse math support, gain about 10% speed-up
+2011/01/11 simplified Plucker method with initial barycentric coordinates
+2011/01/09 used initial barycentric coordinates for Havel/Plucker methods
+2011/01/05 added branchless Badouel with SSE, improves speed by 13%
+2010/12/21 added support for Badouel's method
+2010/12/20 merged with mmc 0.4.0 public svn
+2010/11/17 Havel's SSE4 ray-tracing algorithm worked
+2010/11/14 branch mmc source code for SSE implementation
+
+
+== MMC 0.4.0 (Pecan Pie) stable release, Qianqian Fang <q.fang at neu.edu> ==
+
+2010/12/14 tested on Windows using MinGW 20101030 with gcc 4.5 and LibGW32C, add documentation
+2010/12/13 fixed negative time difference by promoting time counter from int to long
+2010/12/13 fixed diminishing absorption fraction by using a double accumulator
+2010/12/12 added initial support for SFMT RNG, speed and accuracy need further optimization
+2010/12/11 included RNG C units in the main code to enable static inlining
+2010/12/04 initial doxygen support for automatic documentation
+2010/12/04 support llvm-gcc, icc and tcc via "make target CC=compiler"
+2010/12/03 speed up gcc-compiled binary by 2x with fast exponential
+2010/11/30 fix normalization using the correct time unit
+2010/08/29 initial Windows support using MinGW and Libgw32c
+
+
+== MMC 0.2 (Cheese Cake) stable release, Qianqian Fang <q.fang at neu.edu> ==
+
+2010/08/29 first public release of MMC - v0.2
+2010/08/28 update examples to use iso2mesh 1.0 and MCX 0.4.9 options, remove unused input file format
+2010/07/25 release Collins adult brain atlas FEM mesh version 1
+2010/07/25 add help text for all matlab/octave functions, release Sphere-Diffusion toolbox v1
+2010/07/16 add README files for all examples
+2010/07/15 paper published http://www.opticsinfobase.org/boe/abstract.cfm?uri=boe-1-1-165
+2010/07/15 update license to GPL v3, mmc is officially open-source
+2010/07/04 paper accepeted, update website at http://mcx.sf.net/mmc/
+2010/06/23 used meaningful strings as debug flags, added "P" flag for progress bar
+2010/06/23 made it possible to model transparent medium
+2010/06/21 Russian Roulette to terminate photon
+2010/06/20 added boundary reflection at internal or external surfaces
+2010/06/07 paper submitted, wait ... wait ... wait ...
+2010/06/04 finished paper, added timing unit from mcxcl project, added MMCDEBUG macro
+2010/06/03 generated complex mesh from a brain atlas, run simulation and make figures
+2010/05/30 announced sphere-diffusion toolbox, tested for Windows, compatible with Octave
+2010/05/27 fixed a regression (once fixed in rev161), results are good, regenerated figures
+2010/05/26 added scripts for analytical solutions for sphere in infinite-slab geometry
+2010/05/25 added scripts for analytical solutions for sphere in semi-infinite medium
+2010/05/23 used simple fluence addition approach by default, add MINSTEP_ADDITION macro
+2010/05/22 reduced roundoff-error by explicit counting energy loss
+2010/05/20 added README document
+2010/05/20 added functions to compute the analytical solution of a sphere inside infinite medium
+2010/05/19 used elem-volume, update tests, twig parameters
+2010/05/19 used MCX approach for fluence accumulation, debugged normalization, tested with benchmarks
+2010/05/13 updated POSIX MT RNG to the 48bit version (drand48_r)
+2010/05/10 added POSIX MT and logistic RNGs, use MCX interface, improved OpenMP efficiency
+2010/05/09 debugged meshtest case, flexible mesh generation using improved iso2mesh toolbox
+2010/05/07 isolated photon simulation commands into a function
+2010/05/07 created sortmesh.m in iso2mesh to increase memory consistency and reduce cache miss
+2010/05/06 added meshreorient.m in iso2mesh to ensure the correct tetrahedron node orientation
+2010/05/05 added validation and mesh test cases
+2010/05/04 added matlab utilities for mesh generation and result processing
+2010/05/01 fluence normalization and SSE4 support
+2010/04/22 added support for time-resolved imaging, use node voronoi-volume to normalize
+2010/04/21 major code cleaning up, bug fixes for scattering handling
+2010/04/18 update weight-recording scheme, only save the absorbed energy, need revisit
+2010/01/01 used gprof to optimize,add debuglevel,add weight middle pt at pin and pout
+2009/12/30 added examples: sphere-box, port mcx_utils from MCX (mcx.sf.net)
+2009/12/30 supported scattering based on mus, and accumulate packet weight
+2009/12/29 initial upload to SVN
+2009/12/28 completed mesh classes, tested with mouse-head-CT dataset
+2009/08/07 ray-tracing of randomly scattered particles and added Makefile
+2009/07/31 initial version supporting Plucker-coordinate-based ray-tracing

@@ -1,8 +1,0 @@
-ROOTDIR = ../..
-BINARY=rngtest_log
-
-FILES=$(ROOTDIR)/src/logistic_rand rngtest
-USERCCFLAGS=-DMMC_LOGISTIC -I$(ROOTDIR)/src -O3
-
-include $(ROOTDIR)/commons/Makefile_common.mk
-
