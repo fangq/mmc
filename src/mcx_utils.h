@@ -31,7 +31,7 @@
 #define _MMC_UTILITIES_H
 
 #include <stdio.h>
-#include <vector_types.h>
+#include "vector_types.h"
 #include "cjson/cJSON.h"
 
 #define MAX_PROP            256                          /**< max optical property count */
@@ -44,6 +44,7 @@
 #define MIN(a,b)            ((a)<(b)?(a):(b))            /**< macro to get the min values of two numbers */
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
+#define MAX_DEVICE          256
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
@@ -189,6 +190,8 @@ typedef struct MMC_config{
 	float *replayweight;           /**< pointer to the detected photon weight array */
 	float *replaytime;             /**< pointer to the detected photon time-of-fly array */
         char seedfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
+        char deviceid[MAX_DEVICE];
+        float workload[MAX_DEVICE];
 } mcconfig;
 
 #ifdef	__cplusplus

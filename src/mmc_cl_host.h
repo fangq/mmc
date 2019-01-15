@@ -25,13 +25,15 @@
 #ifndef _MMC_HOSTCODE_CL_H
 #define _MMC_HOSTCODE_CL_H
 
+#include "mmc_cl_utils.h"
+#include "simpmesh.h"
+#include "tettracing.h"
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
 #define MIN(a,b)           ((a)<(b)?(a):(b))
-#define MCX_RNG_NAME       "Logistic-Lattice"
-#define RAND_SEED_LEN      5        //32bit seed length (32*5=160bits)
 #define RO_MEM             (CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR)
 #define WO_MEM             (CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR)
 #define RW_MEM             (CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR)

@@ -24,7 +24,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "mmc_host_cl.hpp"
+#include "mmc_cl_host.h"
 #include "tictoc.h"
 
 #ifdef _OPENMP
@@ -69,10 +69,14 @@ int mmc_run_cl (mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	double Eabsorb=0.0;
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
 	RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
-	unsigned int i;
+	unsigned int i, j;
 	float raytri=0.f,raytri0=0.f;
 	unsigned int threadid=0,ncomplete=0,t0,dt;
-	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,0.f,0.f};
+	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
+     cl_uint detected=0,workdev;
+     cl_float fullload=0.f;
+     cl_uint   *Pseed;
+     float  *Pdet;
 
      cl_context mcxcontext;                 // compute mcxcontext
      cl_command_queue *mcxqueue;          // compute command queue
@@ -91,9 +95,9 @@ int mmc_run_cl (mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
      char opt[MAX_PATH_LENGTH]={'\0'};
      cl_uint detreclen=cfg->medianum+1;
 
-        gmcconfig gcfg;
-	gtetmesh  gmesh;
-        gmmcdata  gdata; /*organizer for gpu global mem data*/
+     gmcconfig gcfg;
+     gtetmesh  gmesh;
+     gmmcdata  gdata; /*organizer for gpu global mem data*/
 
      platform=mcx_list_gpu(cfg,&workdev,devices);
 
@@ -196,7 +200,7 @@ int mmc_run_cl (mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 =                    Computational Imaging Laboratory (CIL)                   =\n\
 =             Department of Bioengineering, Northeastern University           =\n\
 ===============================================================================\n\
-$MCXCL$Rev::    $ Last Commit $Date::                     $ by $Author:: fangq$\n\
+$MCXCL$Rev::    $ Last Commit $Date::                     $ by $Author::      $\n\
 ===============================================================================\n");
 
      tic=StartTimer();

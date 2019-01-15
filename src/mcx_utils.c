@@ -66,7 +66,7 @@
  * Array terminates with '\0'.
  */
 
-const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
+const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D','G',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
                  'i','V','O','-','F','q','x','P','k','v','m','-','-','-','\0'};
 		 
@@ -77,7 +77,7 @@ const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
 
 const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--thread","--blocksize","--session","--array",
-                 "--gategroup","--reflect","--debug","--savedet",
+                 "--gategroup","--reflect","--debug","--gpu","--savedet",
                  "--repeat","--save2pt","--minenergy",
                  "--normalize","--skipradius","--log","--listgpu",
                  "--printgpu","--root","--unitinmm","--basisorder",
@@ -221,6 +221,11 @@ void mcx_initcfg(mcconfig *cfg){
      memset(&(cfg->detparam1),0,sizeof(float4));
      memset(&(cfg->detparam2),0,sizeof(float4));
      cfg->detpattern=NULL;
+
+     memset(cfg->deviceid,0,MAX_DEVICE);
+     memset(cfg->workload,0,MAX_DEVICE*sizeof(float));
+     cfg->deviceid[0]='1'; /*use the first GPU device by default*/
+
 }
 
 /**
@@ -968,6 +973,17 @@ int mcx_keylookup(char *key, const char *table[]){
     return -1;
 }
 
+int mcx_isbinstr(const char * str){
+    int i, len=strlen(str);
+    if(len==0)
+        return 0;
+    for(i=0;i<len;i++)
+        if(str[i]!='0' && str[i]!='1')
+	   return 0;
+    return 1;
+}
+
+
 /** 
  * @brief Validate all input fields, and warn incompatible inputs
  *
@@ -1003,6 +1019,9 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->method==rtBLBadouelGrid){
 	cfg->basisorder=0;
      }
+     for(int i=0;i<MAX_DEVICE;i++)
+        if(cfg->deviceid[i]=='0')
+           cfg->deviceid[i]='\0';
 }
 
 /**
@@ -1176,6 +1195,20 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                      case 'k':
                                 i=mcx_readarg(argc,argv,i,&(cfg->voidtime),"int");
                                 break;
+                     case 'G':
+                                if(mcx_isbinstr(argv[i+1])){
+                                    i=mcx_readarg(argc,argv,i,cfg->deviceid,"string");
+                                    break;
+                                }else{
+				    int gpuid;
+                                    i=mcx_readarg(argc,argv,i,&gpuid,"int");
+                                    memset(cfg->deviceid,'0',MAX_DEVICE);
+                                    if(gpuid>0 && gpuid<MAX_DEVICE)
+                                         cfg->deviceid[gpuid-1]='1';
+                                    else
+                                         mcx_error(-2,"GPU id can not be more than 256",__FILE__,__LINE__);
+                                    break;
+                                }
                      case '-':  /*additional verbose parameters*/
                                 if(strcmp(argv[i]+2,"momentum")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");

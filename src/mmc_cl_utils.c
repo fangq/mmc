@@ -24,7 +24,8 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "mmc_utils_cl.h"
+#include "mmc_cl_utils.h"
+#include "mmc_cl_host.h"
 
 char *print_cl_errstring(cl_int err) {
     switch (err) {
