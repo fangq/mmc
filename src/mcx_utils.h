@@ -34,6 +34,10 @@
 #include <vector_types.h>
 #include "cjson/cJSON.h"
 
+#ifdef _OPENMP                      ///< use multi-threading for running simulation on multiple GPUs
+    #include <omp.h>
+#endif
+
 #define MAX_PROP            256                          /**< max optical property count */
 #define MAX_DETECTORS       256                          /**< max number of detectors */
 #define MAX_PATH_LENGTH     1024                         /**< max characters in a full file name string */
@@ -220,7 +224,11 @@ int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
-  #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
+ #ifdef _OPENMP
+  #define MCX_FPRINTF(fp,...) {if(omp_get_thread_num()==0) mexPrintf(__VA_ARGS__);}
+ #else
+  #define MCX_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
+ #endif
 #else
   #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)
 #endif
