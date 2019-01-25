@@ -26,12 +26,14 @@
   #define TOFLOAT4
 #endif
 
+#define MCX_USE_NATIVE
+
 #ifdef MCX_USE_NATIVE
   #define MCX_MATHFUN(fun)              native_##fun
   #define MCX_SINCOS(theta,osin,ocos)   {(osin)=native_sin(theta);(ocos)=native_cos(theta);} 
 #else
   #define MCX_MATHFUN(fun)              fun
-  #define MCX_SINCOS(theta,osin,ocos)   (ocos)=sincos((theta),&(osin))
+  #define MCX_SINCOS(theta,osin,ocos)   (ocos)=sincos((theta),(osin))
 #endif
 
 #ifdef MCX_GPU_DEBUG
@@ -61,10 +63,14 @@
 #define MED_MASK           0x0000FFFF
 #define NULL               0
 #define MAX_ACCUM          1000.f
+#define R_MIN_MUS          1e9f
+#define FIX_PHOTON         1e-3f      /**< offset to the ray to avoid edge/vertex */
+#define MAX_TRIAL          3          /**< number of fixes when a photon hits an edge/vertex */
 
 #define MCX_DEBUG_RNG       1                   /**< MCX debug flags */
 #define MCX_DEBUG_MOVE      2
 #define MCX_DEBUG_PROGRESS  4
+#define MMC_UNDEFINED      (3.40282347e+38F)
 
 #define MIN(a,b)           ((a)<(b)?(a):(b))
 
@@ -84,49 +90,80 @@ typedef struct MMC_ray{
 	float Lmove;                  /**< last photon movement length */
 	double Eabsorb;               /**< accummulated energy being absorbed */
 	unsigned int photonid;        /**< index of the current photon */
-	float focus;                  /**< focal length of the source, if defined */
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 } ray __attribute__ ((aligned (32)));
 
-/***************************************************************************//**
-\struct MMC_visitor tettracing.h
-\brief  A structure that accumulates the statistics about the simulation
-
-*******************************************************************************/  
-
-typedef struct MMC_visitor{
-	float raytet;                 /**< total number of ray-tet tests */
-	float raytet0;                /**< total number of ray-tet tests outside of the object mesh */
-	float rtstep;                 /**< reciprocal of the movement step - obsolete */
-	int   detcount;               /**< number of total detected photons */
-	int   bufpos;                 /**< the position of the detected photon buffer */
-	int   reclen;                 /**< record (4-byte per record) number per detected photon */
-} visitor __attribute__ ((aligned (32)));
 
 typedef struct KernelParams {
-  float4 ps,c0;
-  float  twin0,twin1,tmax;
-  uint   save2pt,doreflect,dorefint,savedet;
+  float3 srcpos;
+  float3 srcdir;
+  float  tstart,tend;
+  uint   isreflect,issavedet,issaveexit,ismomentum,isatomic,isspecular;
   float  Rtstep;
   float  minenergy;
   uint   maxdetphoton;
   uint   maxmedia;
   uint   detnum;
-  uint   idx1dorig;
-  uint   mediaidorig;
   uint   blockphoton;
   uint   blockextra;
   int    voidtime;
   int    srctype;                    /**< type of the source */
   float4 srcparam1;                  /**< source parameters set 1 */
   float4 srcparam2;                  /**< source parameters set 2 */
-  uint   maxvoidstep;
-  uint   issaveexit;    /**<1 save the exit position and dir of a detected photon, 0 do not save*/
   uint   issaveref;     /**<1 save diffuse reflectance at the boundary voxels, 0 do not save*/
   uint   maxgate;
-  uint   threadphoton;                  /**< how many photons to be simulated in a thread */
   uint   debuglevel;           /**< debug flags */
+  int    reclen;                 /**< record (4-byte per record) number per detected photon */
+  int    outputtype;
+  int    elemlen;
+  int    mcmethod;
+  int    method;
+  float  dstep;
+  int    basisorder;
+  float  focus;
+  int    ne, nn;
+  float3 nmin;
+  float  nout;
+  uint   roulettesize;
+  int    srcnum;
+  int4   crop0;
+  int    srcelemlen;
+  float4 bary0;
+  int    e0;
+  int    faceid0;
+  int    isextdet;
+  //int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
+
+
+typedef struct MMC_medium{
+        float mua;                     /**<absorption coeff in 1/mm unit*/
+        float mus;                     /**<scattering coeff in 1/mm unit*/
+        float g;                       /**<anisotropy*/
+        float n;                       /**<refractive index*/
+} medium __attribute__ ((aligned (32)));
+
+__constant int faceorder[]={1,3,2,0,-1};
+__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
+__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+__constant int ifaceorder[]={3,0,2,1};
+__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+__constant int facemap[]={2,0,1,3};
+__constant int ifacemap[]={1,2,0,3};
+
+enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
+                  dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
+                  dlProgress=2048,dlExit=4096};
+
+enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};   
+enum TMCMethod {mmMCX, mmMCML};
+
+enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
+               stPattern, stFourier, stArcSin, stDisk, stFourierX, 
+               stFourier2D, stZGaussian, stLine, stSlit};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
+enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
+enum TOutputDomain {odMesh, odGrid};
 
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
@@ -154,9 +191,9 @@ static float xorshift128p_nextf (__private RandType t[RAND_BUF_LEN]){
    return s1.f[0] - 1.0f;
 }
 
-static void copystate(__private RandType t[RAND_BUF_LEN], __private RandType tnew[RAND_BUF_LEN]){
-    tnew[0]=t[0];
-    tnew[1]=t[1];
+static void copystate(__local float *v1, __private float *v2, int len){
+    for(int i=0;i<len;i++)
+        v1[i]=v2[i];
 }
 
 static float rand_uniform01(__private RandType t[RAND_BUF_LEN]){
@@ -193,6 +230,50 @@ inline float atomicadd(volatile __global float* address, const float value){
 }
 #endif
 
+void clearpath(__local float *p, __constant MCXParam *gcfg){
+      uint i;
+      for(i=0;i<gcfg->maxmedia;i++)
+      	   p[i]=0.f;
+}
+
+#ifdef MCX_SAVE_DETECTORS
+uint finddetector(float3 *p0,__constant float4 *gdetpos,__constant MCXParam *gcfg){
+      uint i;
+      for(i=0;i<gcfg->detnum;i++){
+      	if((gdetpos[i].x-p0[0].x)*(gdetpos[i].x-p0[0].x)+
+	   (gdetpos[i].y-p0[0].y)*(gdetpos[i].y-p0[0].y)+
+	   (gdetpos[i].z-p0[0].z)*(gdetpos[i].z-p0[0].z) < gdetpos[i].w){
+	        return i+1;
+	   }
+      }
+      return 0;
+}
+
+void savedetphoton(__global float *n_det,__global uint *detectedphoton,
+                   __local float *ppath,float3 *p0,float3 *v,__constant float4 *gdetpos,__constant MCXParam *gcfg){
+      uint detid=finddetector(p0,gdetpos,gcfg);
+      if(detid){
+	 uint baseaddr=atomic_inc(detectedphoton);
+	 if(baseaddr<gcfg->maxdetphoton){
+	    uint i;
+	    baseaddr*=gcfg->maxmedia+2+gcfg->issaveexit*6;
+	    n_det[baseaddr++]=detid;
+	    for(i=0;i<(gcfg->maxmedia<<1);i++)
+		n_det[baseaddr+i]=ppath[i]; // save partial pathlength to the memory
+	    if(gcfg->issaveexit){
+                baseaddr+=(gcfg->maxmedia<<1);
+	        n_det[baseaddr++]=p0->x;
+		n_det[baseaddr++]=p0->y;
+		n_det[baseaddr++]=p0->z;
+		n_det[baseaddr++]=v->x;
+		n_det[baseaddr++]=v->y;
+		n_det[baseaddr++]=v->z;
+	    }
+	 }
+      }
+}
+#endif
+
 /** 
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
  * 
@@ -208,17 +289,14 @@ inline float atomicadd(volatile __global float* address, const float value){
  * \param[out] visit: statistics counters of this thread
  */
 
-float branchless_badouel_raytet(ray *r,visitor *visit, __constant MCXParam *gcfg,__global float3 *node,__global int4 *elem,
-    __global int *type, __global int4 *facenb, __global float3 *normal, __global float4 *med){
+float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int4 *elem,__global float *weight,
+    int type, __global int4 *facenb, __global float4 *normal, __global medium *med){
 
-	float4 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
+	float Lmin=1e10f;
+	float Lp0=0.f,currweight,ww,totalloss=0.f;
 	int tshift,faceidx=-1,baseid,eid;
 	float3 O,T,S;
-	int3 P;
 
-	r->p0.w=1.f;
-	r->vec.w=0.f;
 	eid=r->eid-1;
 	baseid=eid<<2;
 
@@ -226,39 +304,38 @@ float branchless_badouel_raytet(ray *r,visitor *visit, __constant MCXParam *gcfg
 	r->faceid=-1;
 	r->isend=0;
 
-	T = normal[baseid+3] - ((float3)(r->p0.x)*normal[baseid]+(float3)(r->p0.y)*normal[baseid+1]+(float3)(r->p0.z)*normal[baseid+2]);
-	S = ((float3)(r->vec.x)*normal[baseid]+(float3)(r->vec.y)*normal[baseid+1]+(float3)(r->vec.z)*normal[baseid+2]);
+	T = normal[baseid+3].xyz - ((float3)(r->p0.x)*normal[baseid].xyz+(float3)(r->p0.y)*normal[baseid+1].xyz+(float3)(r->p0.z)*normal[baseid+2].xyz);
+	S = ((float3)(r->vec.x)*normal[baseid].xyz+(float3)(r->vec.y)*normal[baseid+1].xyz+(float3)(r->vec.z)*normal[baseid+2].xyz);
 	T = T/S;
 
-	O = isgreaterequal(S,(float3)(0.f));
-	T = isless(S,(float3)(0.f))*(float3)(1e10f))+(O*T);
+	O = convert_float3(isgreaterequal(S,(float3)(0.f)));
+	T = convert_float3(isless(S,(float3)(0.f)))*(float3)(1e10f)+(O*T);
 
-	bary.x=fmin(fmin(T.x,T.y),T.z);
-	faceidx=(bary.x==T.x? 0: (bary.x==T.y? 1 : 2));
+	Lmin=fmin(fmin(T.x,T.y),T.z);
+	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : 2));
 	r->faceid=faceorder[faceidx];
 
-	if(r->faceid>=0 && bary.x>=0){
+	if(r->faceid>=0 && Lmin>=0){
 	    medium prop;
-	    int *ee=(int *)(elem+eid*gcfg->elemlen);
-	    prop=med[type[eid]];
-	    rc=prop.n*R_C0;
+	    __global int *ee=(__global int *)(elem+eid*gcfg->elemlen);
+	    prop=med[type];
             currweight=r->weight;
 
-            r->nexteid=((int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+            r->nexteid=((__global int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 
-	    dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
-	    Lp0=bary.x;
+	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
+	    Lp0=Lmin;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
             O = r->vec;
 	    S = r->p0;
-	    T = (float3)(bary.x);
+	    T = (float3)(Lmin);
 	    T = O*T;
 	    T = T+S;
 	    r->pout=T;
 
-	    if((int)((r->photontimer+r->Lmove*rc-gcfg->tstart)*visit->rtstep)>=(int)((gcfg->tend-gcfg->tstart)*visit->rtstep)){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>=(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(gcfg->tend-r->photontimer)/(prop.n*R_C0)-1e-4f;
@@ -268,42 +345,22 @@ float branchless_badouel_raytet(ray *r,visitor *visit, __constant MCXParam *gcfg
                r->weight*=totalloss;
             }
 	    totalloss=1.f-totalloss;
-	    if(gcfg->seed==SEED_FROM_FILE && gcfg->outputtype==otJacobian){
-#ifdef __INTEL_COMPILER
-		currweight=exp(-DELTA_MUA*r->Lmove);
-#else
-		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
-#endif
-                currweight*=replayweight[r->photonid];
-		currweight+=r->weight;
-	    }else if(gcfg->seed==SEED_FROM_FILE && gcfg->outputtype==otWL){
-		currweight=r->Lmove;
-		currweight*=replayweight[r->photonid];
-		currweight+=r->weight;
-            }
 	    r->slen-=r->Lmove*prop.mus;
-	    if(gcfg->seed==SEED_FROM_FILE && gcfg->outputtype==otWP){
-		if(r->slen0<EPS)
-		    currweight=1;
-		else
-		    currweight=r->Lmove*prop.mus/r->slen0;
-		currweight*=replayweight[r->photonid];
-		currweight+=r->weight;
-	    }
-	    if(bary.x>=0.f){
+	    if(Lmin>=0.f){
 	        int framelen=(gcfg->basisorder?gcfg->nn:gcfg->ne);
 		if(gcfg->method==rtBLBadouelGrid)
 		    framelen=gcfg->crop0.z;
 		ww=currweight-r->weight;
-        	r->photontimer+=r->Lmove*rc;
-
+        	r->photontimer+=r->Lmove*(prop.n*R_C0);
+/*
 		if(gcfg->outputtype==otWL || gcfg->outputtype==otWP)
-			tshift=MIN( ((int)(gcfg->replaytime[r->photonid]*visit->rtstep)), gcfg->maxgate-1 )*framelen;
+			tshift=MIN( ((int)(replaytime[r->photonid]*gcfg->Rtstep)), gcfg->maxgate-1 )*framelen;
 		else
-                	tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*visit->rtstep)), gcfg->maxgate-1 )*framelen;
+*/
+                	tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*framelen;
 
-        	if(gcfg->debuglevel&dlAccum) MMC_FPRINTF(gcfg->flog,"A %f %f %f %e %d %e\n",
-        	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
+        	//if(gcfg->debuglevel&dlAccum)
+		   //MMC_FPRINTF(("A %f %f %f %e %d %e\n",r->p0.x,r->p0.y,r->p0.z,Lmin,eid+1,dlen));
 
 		if(prop.mua>0.f){
 		  r->Eabsorb+=ww;
@@ -325,49 +382,40 @@ float branchless_badouel_raytet(ray *r,visitor *visit, __constant MCXParam *gcfg
 #endif
                             weight[eid+tshift]+=ww;
                      }else{
-			    float dstep, segloss, w0;
+			    float segloss, w0, dstep;
 			    int3 idx;
-			    int i, seg=(int)(r->Lmove/gcfg->unitinmm)+1;
+			    int i, seg=(int)(r->Lmove*gcfg->dstep)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
 	                    segloss=exp(-prop.mua*dstep);
-			    T =  O * (float3)(dstep)); /*step*/
+			    T =  O * (float3)(dstep); /*step*/
 			    O =  S - gcfg->nmin;
 			    S =  O + (T * (float3)(0.5f)); /*starting point*/
-			    dstep=1.f/gcfg->unitinmm;
 			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
 			    w0=ww;
                             for(i=0; i< seg; i++){
-				idx= convert_int3_rtn(S * (float3)(dstep));
+				idx= convert_int3_rtn(S * (float3)(gcfg->dstep));
 				weight[idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x+tshift]+=w0*totalloss;
 				w0*=segloss;
 			        S += T;
                             }
 			}
 		  }else{
-			int i;
-                        ww*=1.f/3.f;
+                        ww*=(1.f/3.f);
 #ifdef USE_ATOMIC
                         if(gcfg->isatomic)
-			    for(i=0;i<3;i++)
+			    for(int i=0;i<3;i++)
 				atomicadd(weight+ee[out[faceidx][i]]-1+tshift, ww);
                         else
 #endif
-                            for(i=0;i<3;i++)
+                            for(int i=0;i<3;i++)
                                 weight[ee[out[faceidx][i]]-1+tshift]+=ww;
 		  }
 		}
 	    }
 	}
-	visit->raytet++;
-        if(type[eid]==0)
-                visit->raytet0++;
 
-	r->p0.w=0.f;
-	if(r->faceid==-2)
-           return 0.f;
-
-	return r->slen;
+	return ((r->faceid==-2) ? 0.f : r->slen);
 }
 
 
@@ -387,32 +435,25 @@ float branchless_badouel_raytet(ray *r,visitor *visit, __constant MCXParam *gcfg
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
+float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,RandType *ran, __global int *type, __global float4 *normal, __global medium *med){
 	/*to handle refractive index mismatch*/
-        float3 pnorm={0.f}, *pn=&pnorm;
+        float3 pnorm={0.f,0.f,0.f};
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
 	int offs=(*oldeid-1)<<2;
 
 	faceid=ifaceorder[faceid];
 	/*calculate the normal direction of the intersecting triangle*/
-/*	if(gcfg->method==rtPlucker) { //Plucker ray-tracing
-		pn=normal+(offs)+faceid;
-	}else if(gcfg->method<rtBLBadouel){
-		pn=moment+(offs+faceid)*3;
-	}else 
-*/
-	  if(gcfg->method==rtBLBadouel || gcfg->method==rtBLBadouelGrid){
-		pnorm.x=(&(normal[offs].x))[faceid];
-		pnorm.y=(&(normal[offs].x))[faceid+4];
-		pnorm.z=(&(normal[offs].x))[faceid+8];
-	}
+	pnorm.x=((__global float*)&(normal[offs]))[faceid];
+	pnorm.y=((__global float*)&(normal[offs]))[faceid+4];
+	pnorm.z=((__global float*)&(normal[offs]))[faceid+8];
+
 	/*pn pointing outward*/
 
 	/*compute the cos of the incidence angle*/
-        Icos=fabs(dot(c0,pn));
+        Icos=fabs(dot(*c0,pnorm));
 
-	n1=(*oldeid!=*eid) ? med[type[*oldeid-1]].n : gcfg->nout;
-	n2=(*eid>0) ? med[type[*eid-1]].n : gcfg->nout;
+	n1=((*oldeid!=*eid) ? med[type[*oldeid-1]].n : gcfg->nout);
+	n2=((*eid>0) ? med[type[*eid-1]].n : gcfg->nout);
 
 	tmp0=n1*n1;
 	tmp1=n2*n2;
@@ -427,23 +468,23 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
-              c0+=((float3)(-2.f*Icos))*pn;
-              //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(gcfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+              *c0+=((float3)(-2.f*Icos))*pnorm;
+              //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal));
 	      *eid=*oldeid; /*stay with the current element*/
 	  }else if(gcfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
-              c0+=((float3)(-Icos))*pn;
-	      c0=((float3)(tmp2))*pn+(float3)(n1/n2)*c0;
-              //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(gcfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
+              *c0+=((float3)(-Icos))*pnorm;
+	      *c0=((float3)(tmp2))*pnorm+(float3)(n1/n2)*(*c0);
+              //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal));
 	  }
        }else{ /*total internal reflection*/
-          c0+=((float3)(-2.f*Icos))*pn;
+          *c0+=((float3)(-2.f*Icos))*pnorm;
 	  *eid=*oldeid;
-          //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(gcfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
+          //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f));
        }
-       tmp0=rsqrt(dot(c0,c0));
-       c0*=tmp0;
+       tmp0=rsqrt(dot(*c0,*c0));
+       (*c0)*=(float3)tmp0;
        return 1.f;
 }
 
@@ -455,34 +496,21 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
  * @param[in] g: anisotropy g
  * @param[out] dir: current ray direction vector
  * @param[out] ran: random number generator states
- * @param[out] ran0: additional random number generator states
  * @param[out] cfg: the simulation configuration
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, __constant MCXParam *gcfg, float *pmom){
+float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *gcfg, float *pmom){
 
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
 
     //random scattering length (normalized)
-#ifdef MMC_USE_SSE_MATH
-    nextslen=rand_next_scatlen_ps(ran);
-#else
     nextslen=rand_next_scatlen(ran);
-#endif
 
-    //random arimuthal angle
-#ifdef MMC_USE_SSE_MATH
-    rand_next_aangle_sincos(ran,&sphi,&cphi);
-#else
     tmp0=TWO_PI*rand_next_aangle(ran); //next arimuth angle
-    MCX_SINCOS(tmp0,&sphi,&cphi);
-#endif
-
-    //Henyey-Greenstein Phase Function, "Handbook of Optical Biomedical Diagnostics",2002,Chap3,p234
-    //see Boas2002
+    MCX_SINCOS(tmp0,sphi,cphi);
 
     if(g>EPS){  //if g is too small, the distribution of theta is bad
 	tmp0=(1.f-g*g)/(1.f-g+2.f*g*rand_next_zangle(ran));
@@ -493,13 +521,13 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, __cons
     	if(tmp0> 1.f) tmp0=1.f;
         if(tmp0<-1.f) tmp0=-1.f;
 
-	theta=acosf(tmp0);
+	theta=acos(tmp0);
 	stheta=sqrt(1.f-tmp0*tmp0);
 	//stheta=sin(theta);
 	ctheta=tmp0;
     }else{
-	theta=acosf(2.f*rand_next_zangle(ran)-1.f);
-    	MCX_SINCOS(theta,&stheta,&ctheta);
+	theta=acos(2.f*rand_next_zangle(ran)-1.f);
+    	MCX_SINCOS(theta,stheta,ctheta);
     }
 
     if( dir->z>-1.f+EPS && dir->z<1.f-EPS ) {
@@ -515,7 +543,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, __cons
 	p.y=stheta*sphi;
 	p.z=(dir->z>0.f)?ctheta:-ctheta;
     }
-    if (cfg->ismomentum)
+    if (gcfg->ismomentum)
         pmom[0]+=(1.f-ctheta);
 
     dir->x=p.x;
@@ -535,13 +563,13 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, __cons
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-void fixphoton(float3 *p,float3 *nodes, int *ee){
+void fixphoton(float3 *p,__global float3 *nodes, __global int *ee){
         float3 c0={0.f,0.f,0.f};
 	int i;
         /*calculate element centroid*/
 	for(i=0;i<4;i++)
 		c0+=nodes[ee[i]-1];
-	*p+=(c0*(float3)(0.25f)-*p)*((float3)(FIX_PHOTON))
+	*p+=(c0*(float3)(0.25f)-*p)*((float3)(FIX_PHOTON));
 }
 
 
@@ -555,12 +583,11 @@ void fixphoton(float3 *p,float3 *nodes, int *ee){
  * \param[in,out] r: the current ray
  * \param[in] mesh: the mesh data structure
  * \param[in,out] ran: the random number generator states
- * \param[in,out] ran0: the additional random number generator states
  */
 
-void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *elem, RandType *ran, RandType *ran0){
+void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *elem,__global int *srcelem, RandType *ran){
         int canfocus=1;
-        float3 origin={r->p0.x,r->p0.y,r->p0.z};
+        float3 origin=r->p0;
 
 	r->slen=rand_next_scatlen(ran);
 	if(gcfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
@@ -577,12 +604,8 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 		    int xsize=(int)gcfg->srcparam1.w;
 		    int ysize=(int)gcfg->srcparam2.w;
 		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
-		    if(gcfg->seed==SEED_FROM_FILE && (gcfg->outputtype==otWL || gcfg->outputtype==otWP)){ // replay mode currently doesn't support multiple source patterns
-		    	r->weight=gcfg->srcpattern[MIN( (int)(ry*gcfg->srcparam2.w), (int)gcfg->srcparam2.w-1 )*(int)(gcfg->srcparam1.w)+MIN( (int)(rx*gcfg->srcparam1.w), (int)gcfg->srcparam1.w-1 )];
-		    	replayweight[r->photonid] *= r->weight;
-		    }
 		}else if(gcfg->srctype==stFourier){
-		    r->weight=(cos((floorf(gcfg->srcparam1.w)*rx+floorf(gcfg->srcparam2.w)*ry+gcfg->srcparam1.w-floorf(gcfg->srcparam1.w))*TWO_PI)*(1.f-gcfg->srcparam2.w+floorf(gcfg->srcparam2.w))+1.f)*0.5f;
+		    r->weight=(cos((floor(gcfg->srcparam1.w)*rx+floor(gcfg->srcparam2.w)*ry+gcfg->srcparam1.w-floor(gcfg->srcparam1.w))*TWO_PI)*(1.f-gcfg->srcparam2.w+floor(gcfg->srcparam2.w))+1.f)*0.5f;
 		}
 		origin.x+=(gcfg->srcparam1.x+gcfg->srcparam2.x)*0.5f;
 		origin.y+=(gcfg->srcparam1.y+gcfg->srcparam2.y)*0.5f;
@@ -591,7 +614,7 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		float4 v2=gcfg->srcparam1;
-		v2.w*=1.f/(sqrt(gcfg->srcparam1.x*gcfg->srcparam1.x+gcfg->srcparam1.y*gcfg->srcparam1.y+gcfg->srcparam1.z*gcfg->srcparam1.z));
+		v2.w*=rsqrt(gcfg->srcparam1.x*gcfg->srcparam1.x+gcfg->srcparam1.y*gcfg->srcparam1.y+gcfg->srcparam1.z*gcfg->srcparam1.z);
 		v2.x=v2.w*(gcfg->srcdir.y*gcfg->srcparam1.z - gcfg->srcdir.z*gcfg->srcparam1.y);
 		v2.y=v2.w*(gcfg->srcdir.z*gcfg->srcparam1.x - gcfg->srcdir.x*gcfg->srcparam1.z); 
 		v2.z=v2.w*(gcfg->srcdir.x*gcfg->srcparam1.y - gcfg->srcdir.y*gcfg->srcparam1.x);
@@ -612,11 +635,11 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 		float r0;
 		if(gcfg->srctype==stDisk)
 		    r0=sqrt(rand_uniform01(ran))*gcfg->srcparam1.x;
-		else if(fabs(r->focus) < 1e-5f || fabs(gcfg->srcparam1.y) < 1e-5f)
+		else if(fabs(gcfg->focus) < 1e-5f || fabs(gcfg->srcparam1.y) < 1e-5f)
 		    r0=sqrt(-log(rand_uniform01(ran)))*gcfg->srcparam1.x;
 		else{
 		    float z0=gcfg->srcparam1.x*gcfg->srcparam1.x*M_PI/gcfg->srcparam1.y; //Rayleigh range
-		    r0=sqrt(-log(rand_uniform01(ran))*(1.f+(r->focus*r->focus/(z0*z0))))*gcfg->srcparam1.x;
+		    r0=sqrt(-log(rand_uniform01(ran))*(1.f+(gcfg->focus*gcfg->focus/(z0*z0))))*gcfg->srcparam1.x;
 		}
 		if(gcfg->srcdir.z>-1.f+EPS && gcfg->srcdir.z<1.f-EPS){
 		    float tmp0=1.f-gcfg->srcdir.z*gcfg->srcdir.z;
@@ -634,11 +657,11 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 		sphi=sin(ang);	cphi=cos(ang);
 		if(gcfg->srctype==stCone){  // a solid-angle section of a uniform sphere
 		        do{
-				ang=(gcfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
+				ang=(gcfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acos(2.f*rand_uniform01(ran)-1.f); //sine distribution
 		        }while(ang>gcfg->srcparam1.x);
 		}else{
 			if(gcfg->srctype==stIsotropic) // uniform sphere
-				ang=acosf(2.f*rand_uniform01(ran)-1.f); //sine distribution
+				ang=acos(2.f*rand_uniform01(ran)-1.f); //sine distribution
 			else
 				ang=M_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
 		}
@@ -655,7 +678,7 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sin(ang);	cphi=cos(ang);
-		ang=sqrt(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran0))*gcfg->srcparam1.x;
+		ang=sqrt(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran))*gcfg->srcparam1.x;
 		stheta=sin(ang);
 		ctheta=cos(ang);
 		r->vec.x=stheta*cphi;
@@ -686,12 +709,12 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
               canfocus=(gcfg->srctype==stSlit);
         }
 
-        if(canfocus && r->focus!=0.f){ // if beam focus is set, determine the incident angle
+        if(canfocus && gcfg->focus!=0.f){ // if beam focus is set, determine the incident angle
 	        float Rn2;
-	        origin.x+=r->focus*r->vec.x;
-		origin.y+=r->focus*r->vec.y;
-		origin.z+=r->focus*r->vec.z;
-		if(r->focus<0.f){ // diverging beam
+	        origin.x+=gcfg->focus*r->vec.x;
+		origin.y+=gcfg->focus*r->vec.y;
+		origin.z+=gcfg->focus*r->vec.z;
+		if(gcfg->focus<0.f){ // diverging beam
                      r->vec.x=r->p0.x-origin.x;
                      r->vec.y=r->p0.y-origin.y;
                      r->vec.z=r->p0.z-origin.z;
@@ -700,19 +723,19 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
                      r->vec.y=origin.y-r->p0.y;
                      r->vec.z=origin.z-r->p0.z;
 		}
-		Rn2=rsqrt(dot(&r->vec,&r->vec)); // normalize
+		Rn2=rsqrt(dot(r->vec,r->vec)); // normalize
 		r->vec=r->vec*Rn2;
 	}
 
         r->p0+=r->vec*EPS;
 
 	/*Caluclate intial element id and bary-centric coordinates*/
-	float3 vecS={0.f}, vecAB, vecAC, vecN;
+	float3 vecS=(float3)(0.f), vecAB, vecAC, vecN;
 	int is,i,ea,eb,ec;
-	float bary[4]={0.f};
-	for(is=0;is<srcelemlen;is++){
+	for(is=0;is<gcfg->srcelemlen;is++){
+                float bary[4]={0.f,0.f,0.f,0.f};
 		int include = 1;
-		int *elems=(int *)(elem+(srcelem[is]-1)*gcfg->elemlen);
+		__global int *elems=(__global int *)(elem+(srcelem[is]-1)*gcfg->elemlen);
 		for(i=0;i<4;i++){
 			ea=elems[out[i][0]]-1;
 			eb=elems[out[i][1]]-1;
@@ -721,7 +744,7 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 			vecAC=node[ea]-node[ec]; //repeated for all photons
 			vecS=node[ea]-r->p0;
 			vecN=cross(vecAB,vecAC); //repeated for all photons, vecN can be precomputed
-			bary[facemap[i]]=-dot(&vecS,&vecN);
+			bary[facemap[i]]=-dot(vecS,vecN);
 		}
 		for(i=0;i<4;i++){
 			if(bary[i]<-1e-4f){
@@ -744,7 +767,7 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
 			break;
 		}
 	}
-	if(is==srcelemlen){
+	if(is==gcfg->srcelemlen){
 	    return;
 	}
 }
@@ -760,80 +783,64 @@ void launchphoton(MCXParam *gcfg, ray *r, __global float3 *node,__global int4 *e
  * \param[in] tracer: the ray-tracer aux data structure
  * \param[in] mesh: the mesh data structure
  * \param[in,out] ran: the random number generator states
- * \param[in,out] ran0: the additional random number generator states
  * \param[in,out] cfg: simulation configuration structure
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id, __constant MCXParam *gcfg,__global float3 *node,__global int4 *elem,
-    __global int *type, __global int4 *facenb, __global float3 *normal, __global float4 *med,
-                RandType *ran, RandType *ran0, visitor *visit){
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int4 *elem, __global float *weight,
+    __global int *type, __global int4 *facenb,  __global int *srcelem, __global float4 *normal, __global medium *med, __global float *n_det, __global uint *detectedphoton, __constant float4 *gdetpos,RandType *ran){
 
 	int oldeid,fixcount=0,exitdet=0;
-        float mom;
-	float kahany, kahant;
-	ray r={gcfg->srcpos,{gcfg->srcdir.x,gcfg->srcdir.y,gcfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,gcfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,gcfg->srcdir.w,0};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,gcfg->faceid0-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,0};
 
-	__local float *ppath=sharedmem+get_local_id(0)*(visit->reclen-1);
 	r.photonid=id;
-/*
-        if(gcfg->issavedet && gcfg->issaveseed){
-                r.photonseed=(void*)calloc(1,(sizeof(RandType)*RAND_BUF_LEN));
-		memcpy(r.photonseed,(void *)ran, (sizeof(RandType)*RAND_BUF_LEN));
-        }
-*/
+
 	/*initialize the photon parameters*/
-        launchphoton(gcfg, &r, node, elem, type, facenb, normal, med, ran, ran0);
-	ppath[visit->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
+        launchphoton(gcfg, &r, node, elem, srcelem, ran);
+	ppath[gcfg->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 	int pidx;
-	if(gcfg->srctype!=stPattern){
-	    if(gcfg->seed==SEED_FROM_FILE && (gcfg->outputtype==otWL || gcfg->outputtype==otWP))
-		visit->launchweight=replayweight[r.photonid];
-	    else
-		visit->launchweight=r.weight;
-	}
 
 	while(1){  /*propagate a photon until exit*/
-	    r.slen=branchless_badouel_raytet(&r,visit, gcfg,node,elem, type, facenb, normal, med);
+	    r.slen=branchless_badouel_raytet(&r, gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
-			fixphoton(&r.p0,node,(int *)(elem+(r.eid-1)*gcfg->elemlen));
+			fixphoton(&r.p0,node,(__global int *)(elem+(r.eid-1)*gcfg->elemlen));
 			continue;
                   }
 	    	  r.eid=-r.eid;
         	  r.faceid=-1;
 	    }
 	    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
-	            ppath[gcfg->prop-1+type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
+	            ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
 	            r.p0=r.pout;
 
 		    oldeid=r.eid;
-	    	    r.eid=((int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
+	    	    r.eid=((__global int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
 
 		    if(gcfg->isreflect && (r.eid==0 || med[type[r.eid-1]].n != med[type[oldeid-1]].n )){
 			if(! (r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ))
-			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
+			    reflectray(gcfg,&r.vec,&oldeid,&r.eid,r.faceid,ran,type,normal,med);
 		    }
 	    	    if(r.eid==0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(type[oldeid-1]==0 && type[r.eid-1]){
                         //if(gcfg->debuglevel&dlExit)
-			    MMC_FPRINTF(gcfg->flog,"e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
-			    	r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+			    MMC_FPRINTF(("e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    	r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
                         if(!gcfg->voidtime)
                             r.photontimer=0.f;
                     }
 		    /*when a photon exits the domain into the background*/
 		    if(type[oldeid-1] && type[r.eid-1]==0){
                         //if(gcfg->debuglevel&dlExit)
-		            MMC_FPRINTF(gcfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
-			        r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+		            MMC_FPRINTF(("x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			        r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
 			if(!gcfg->isextdet){
                             r.eid=0;
         		    break;
@@ -841,18 +848,18 @@ void onephoton(unsigned int id, __constant MCXParam *gcfg,__global float3 *node,
 		    }
 //		    if(r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ) break;
 	    	    //if(r.pout.x!=MMC_UNDEFINED && (gcfg->debuglevel&dlMove))
-	    		MMC_FPRINTF(gcfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
+	    		MMC_FPRINTF(("P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen));
 
-	    	    r.slen=branchless_badouel_raytet(&r,visit,gcfg,node,elem, type, facenb, normal, med);
+	    	    r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
 		    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
-			ppath[gcfg->prop-1+type[r.eid-1]]+=r.Lmove;
+			ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
-		       fixphoton(&r.p0,node,(int *)(elem+(r.eid-1)*gcfg->elemlen));
-                       r.slen=branchless_badouel_raytet(&r,visit,gcfg,node,elem, type, facenb, normal, med);
+		       fixphoton(&r.p0,node,(__global int *)(elem+(r.eid-1)*gcfg->elemlen));
+                       r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
 		       if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
-	            		ppath[gcfg->prop-1+type[r.eid-1]]+=r.Lmove;
+	            		ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
@@ -862,108 +869,70 @@ void onephoton(unsigned int id, __constant MCXParam *gcfg,__global float3 *node,
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    //if(r.eid==0 && (gcfg->debuglevel&dlMove))
-        		 MMC_FPRINTF(gcfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(("B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    if(r.eid==0){
                        //if(gcfg->debuglevel&dlExit)
-        		 MMC_FPRINTF(gcfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
-			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
+        		 MMC_FPRINTF(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
                        if(gcfg->issavedet && gcfg->issaveexit){                                     /*when issaveexit is set to 1*/
-                            copystate(ppath+(visit->reclen-2-6),&(r.p0.x),3);  /*columns 7-5 from the right store the exit positions*/
-                            copystate(ppath+(visit->reclen-2-3),&(r.vec.x),3); /*columns 4-2 from the right store the exit dirs*/
+                            copystate(ppath+(gcfg->reclen-2-6),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
+                            copystate(ppath+(gcfg->reclen-2-3),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
-                         MMC_FPRINTF(gcfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+                         MMC_FPRINTF(("T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 	    	    }else if(r.eid && r.faceid!=-2  && gcfg->debuglevel&dlEdge){
-        		 MMC_FPRINTF(gcfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    }
 		    if(gcfg->issavedet && r.eid==0){
 		       int i;
-                       if(gcfg->detnum==0 && gcfg->isextdet && type[oldeid-1]==prop+1){
+                       if(gcfg->detnum==0 && gcfg->isextdet && type[oldeid-1]==gcfg->maxmedia+1){
                           exitdet=oldeid;
-                       }else
-		         for(i=0;i<gcfg->detnum;i++){
-        		    if((gcfg->detpos[i].x-r.p0.x)*(gcfg->detpos[i].x-r.p0.x)+
-        		       (gcfg->detpos[i].y-r.p0.y)*(gcfg->detpos[i].y-r.p0.y)+
-        		       (gcfg->detpos[i].z-r.p0.z)*(gcfg->detpos[i].z-r.p0.z) < gcfg->detpos[i].w*gcfg->detpos[i].w){
-			          exitdet=i+1;
-                		  break;
-        		     }
-		         }
+                       }else{
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,gcfg);
+                          clearpath(ppath,gcfg);
+		       }
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
 	    //if(gcfg->debuglevel&dlMove)
-	        MMC_FPRINTF(gcfg->flog,"M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-	    if(gcfg->minenergy>0.f && r.weight < gcfg->minenergy && (gcfg->tend-gcfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
+	        MMC_FPRINTF(("M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
+	    if(gcfg->minenergy>0.f && r.weight < gcfg->minenergy && (gcfg->tend-gcfg->tstart)*gcfg->Rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*gcfg->roulettesize<=1.f){
 			r.weight*=gcfg->roulettesize;
                         //if(gcfg->debuglevel&dlWeight)
-			    MMC_FPRINTF(gcfg->flog,"Russian Roulette bumps r.weight to %f\n",r.weight);
+			    MMC_FPRINTF(("Russian Roulette bumps r.weight to %f\n",r.weight));
 		}else
 			break;
 	    }
-            mom=0.f;
-	    r.slen0=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
+            float mom=0.f;
+	    r.slen0=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
 	    r.slen=r.slen0;
             if(gcfg->ismomentum && type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
-                  ppath[(prop<<1)-1+type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
-            ppath[type[r.eid-1]-1]++;                          /*the first medianum block stores the scattering event counts*/
+                  ppath[(gcfg->maxmedia<<1)-1+type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
+            ppath[type[r.eid-1]-1]+=1.f;                          /*the first medianum block stores the scattering event counts*/
 	}
 	if(gcfg->issavedet && exitdet>0){
-		int offset=visit->bufpos*visit->reclen;
-		if(visit->bufpos>=visit->detcount){
-		    visit->detcount+=DET_PHOTON_BUF;
-		}
-		visit->partialpath[offset]=exitdet;
-	        copystate(visit->partialpath+offset+1,ppath,(visit->reclen-1));
-                if(gcfg->issaveseed)
-	            copystate(visit->photonseed+visit->bufpos*(sizeof(RandType)*RAND_BUF_LEN),r.photonseed,(sizeof(RandType)*RAND_BUF_LEN));
-		visit->bufpos++;
+		/*uint baseaddr=atomic_inc(detectedphoton);
+		ppath[offset]=exitdet;
+	        copystate(ppath+offset+1,ppath,(gcfg->reclen-1));
+		*/
 	}
 /*
-        if(r.photonseed)
-		free(r.photonseed);
-*/	
 	if(gcfg->srctype!=stPattern){
-	    kahany=r.Eabsorb-visit->kahanc1[0];
-	    kahant=visit->absorbweight[0]+kahany;
-	    visit->kahanc1[0]=(kahant-visit->absorbweight[0])-kahany;
-	    visit->absorbweight[0]=kahant;
-	}
-/*else{
-	    int psize = (int)gcfg->srcparam1.w * (int)gcfg->srcparam2.w;
-#pragma omp critical
-{
-	    for(pidx=0;pidx<gcfg->srcnum;pidx++){
-	    	kahany=r.Eabsorb*gcfg->srcpattern[pidx*psize+r.posidx]-visit->kahanc1[pidx];
-	    	kahant=visit->absorbweight[pidx]+kahany;
-	    	visit->kahanc1[pidx]=(kahant-visit->absorbweight[pidx])-kahany;
-	    	visit->absorbweight[pidx]=kahant;
-	    }
-}
+	    absorbweight+=r.Eabsorb;
 	}
 */
 }
 
-void mmc_main_loop(__constant MCXParam *gcfg,__global float3 *node,__global int4 *elem,
-    __global int *type, __global int4 *facenb, __global float3 *normal, __global float4 *med){
-        dt=GetTimeMillis();
-        MMCDEBUG(cfg,dlTime,(gcfg->flog,"seed=%u\nsimulating ... ",gcfg->seed));
-
-	visitor visit={0.f,0.f,1.f/gcfg->tstep,DET_PHOTON_BUF,0,0,0.f,0.f};
-	visit.reclen=(2+((gcfg->ismomentum)>0))*mesh->prop+(gcfg->issaveexit>0)*6+2;
-	rng_init(ran0,ran1,(unsigned int *)&(gcfg->seed),threadid);
-
+void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
+    __global float3 *node,__global int4 *elem,  __global float *weight, __global int *type, __global int4 *facenb,  __global int *srcelem, __global float4 *normal, 
+    __global medium *med, __global float *n_det, __global uint *detectedphoton, __constant float4 *gdetpos, 
+    __global uint *n_seed, __global RandType *photonseed){
+ 
+ 	RandType t[RAND_BUF_LEN];
+	gpu_rng_init(t,n_seed,get_local_id(0));
+    
 	/*launch photons*/
-	for(i=0;i<gcfg->nphoton;i++){
-		visit.raytet=0.f;
-		visit.raytet0=0.f;
-		if(gcfg->seed==SEED_FROM_FILE)
-		    Eabsorb+=onephoton(i,tracer,mesh,gcfg,((RandType *)gcfg->photonseed)+i*RAND_BUF_LEN,ran1,&visit);
-		else
-		    Eabsorb+=onephoton(i,tracer,mesh,gcfg,ran0,ran1,&visit);
-		raytri+=visit.raytet;
-		raytri0+=visit.raytet0;
-	}
-	return 0;
+	for(int i=0;i<nphoton+(get_local_id(0)<ophoton);i++)
+	    onephoton(i,sharedmem+get_local_id(0)*(gcfg->reclen-1),gcfg,node,elem,weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,gdetpos,t);
 }
