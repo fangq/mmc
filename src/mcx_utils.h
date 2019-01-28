@@ -63,6 +63,8 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
+enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU};
+enum TMCXParent  {mpStandalone, mpMATLAB};
 
 
 /***************************************************************************//**
@@ -109,6 +111,23 @@ typedef struct MMC_history{
         float normalizer;              /**< what is the normalization factor */
 	int reserved[5];               /**< reserved fields for future extension */
 } history;
+
+
+typedef struct MCXGPUInfo {
+        char name[MAX_SESSION_LENGTH];
+        int id;
+	int devcount;
+        int platformid;
+        int major, minor;
+        size_t globalmem, constmem, sharedmem;
+        int regcount;
+        int clock;
+        int sm, core;
+        size_t autoblock, autothread;
+        int maxgate;
+        int maxmpthread;  /**< maximum thread number per multi-processor */
+        enum TDeviceVendor vendor;
+} GPUInfo;
 
 /***************************************************************************//**
 \struct MMC_config mcx_utils.h
@@ -196,6 +215,19 @@ typedef struct MMC_config{
         char seedfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
         char deviceid[MAX_DEVICE];
         float workload[MAX_DEVICE];
+	char compileropt[MAX_PATH_LENGTH];
+        char kernelfile[MAX_SESSION_LENGTH];
+	char *clsource;
+	int parentid;
+	int optlevel;
+        unsigned int maxdetphoton; /*anticipated maximum detected photons*/
+	double *exportfield;     /*memory buffer when returning the flux to external programs such as matlab*/
+	float *exportdetected;  /*memory buffer when returning the partial length info to external programs such as matlab*/
+	double energytot, energyabs, energyesc;
+	unsigned int detectedcount; /**<total number of detected photons*/
+	unsigned int runtime;
+        char autopilot;     /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
+	float normalizer;            /**<normalization factor*/
 } mcconfig;
 
 #ifdef	__cplusplus
@@ -211,7 +243,7 @@ void mcx_initcfg(mcconfig *cfg);
 void mcx_clearcfg(mcconfig *cfg);
 void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
-void mcx_usage(char *exename);
+void mcx_usage(mcconfig *cfg, char *exename);
 void mcx_loadvolume(char *filename,mcconfig *cfg);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
@@ -225,6 +257,7 @@ int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
+void mcx_printheader(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP

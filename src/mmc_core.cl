@@ -104,8 +104,6 @@ typedef struct KernelParams {
   uint   maxdetphoton;
   uint   maxmedia;
   uint   detnum;
-  uint   blockphoton;
-  uint   blockextra;
   int    voidtime;
   int    srctype;                    /**< type of the source */
   float4 srcparam1;                  /**< source parameters set 1 */
@@ -121,7 +119,7 @@ typedef struct KernelParams {
   float  dstep;
   int    basisorder;
   float  focus;
-  int    ne, nn;
+  int    nn, ne;
   float3 nmin;
   float  nout;
   uint   roulettesize;
@@ -130,7 +128,6 @@ typedef struct KernelParams {
   int    srcelemlen;
   float4 bary0;
   int    e0;
-  int    faceid0;
   int    isextdet;
   //int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
@@ -590,27 +587,28 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
         float3 origin=r->p0;
 
 	r->slen=rand_next_scatlen(ran);
-	if(gcfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
+#if defined(MCX_SRC_PENCIL 
 		if(r->eid>0)
 		      return;
-	}else if(gcfg->srctype==stPlanar || gcfg->srctype==stPattern || gcfg->srctype==stFourier){
+#elif defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) /*a rectangular grid over a plane*/
 		  float rx=rand_uniform01(ran);
 		  float ry=rand_uniform01(ran);
 		  r->p0.x=gcfg->srcpos.x+rx*gcfg->srcparam1.x+ry*gcfg->srcparam2.x;
 		  r->p0.y=gcfg->srcpos.y+rx*gcfg->srcparam1.y+ry*gcfg->srcparam2.y;
 		  r->p0.z=gcfg->srcpos.z+rx*gcfg->srcparam1.z+ry*gcfg->srcparam2.z;
 		  r->weight=1.f;
+    #if defined(MCX_SRC_PATTERN) 
 		  if(gcfg->srctype==stPattern){
 		    int xsize=(int)gcfg->srcparam1.w;
 		    int ysize=(int)gcfg->srcparam2.w;
 		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
-		}else if(gcfg->srctype==stFourier){
+    #elif defined(MCX_SRC_FOURIER)  // need to prevent rx/ry=1 here
 		    r->weight=(cos((floor(gcfg->srcparam1.w)*rx+floor(gcfg->srcparam2.w)*ry+gcfg->srcparam1.w-floor(gcfg->srcparam1.w))*TWO_PI)*(1.f-gcfg->srcparam2.w+floor(gcfg->srcparam2.w))+1.f)*0.5f;
-		}
+    #endif
 		origin.x+=(gcfg->srcparam1.x+gcfg->srcparam2.x)*0.5f;
 		origin.y+=(gcfg->srcparam1.y+gcfg->srcparam2.y)*0.5f;
 		origin.z+=(gcfg->srcparam1.z+gcfg->srcparam2.z)*0.5f;
-	}else if(gcfg->srctype==stFourierX || gcfg->srctype==stFourier2D){
+#elif defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D) // [v1x][v1y][v1z][|v2|]; [kx][ky][phi0][M], unit(v0) x unit(v1)=unit(v2)
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		float4 v2=gcfg->srcparam1;
@@ -621,26 +619,30 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 		r->p0.x=gcfg->srcpos.x+rx*gcfg->srcparam1.x+ry*v2.x;
 		r->p0.y=gcfg->srcpos.y+rx*gcfg->srcparam1.y+ry*v2.y;
 		r->p0.z=gcfg->srcpos.z+rx*gcfg->srcparam1.z+ry*v2.z;
-		if(gcfg->srctype==stFourier2D)
+    #if defined(MCX_SRC_FOURIERX2D)
 			r->weight=(sin((gcfg->srcparam2.x*rx+gcfg->srcparam2.z)*TWO_PI)*sin((gcfg->srcparam2.y*ry+gcfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
-		else
+    #else
 			r->weight=(cos((gcfg->srcparam2.x*rx+gcfg->srcparam2.y*ry+gcfg->srcparam2.z)*TWO_PI)*(1.f-gcfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
+    #endif
 		origin.x+=(gcfg->srcparam1.x+v2.x)*0.5f;
 		origin.y+=(gcfg->srcparam1.y+v2.y)*0.5f;
 		origin.z+=(gcfg->srcparam1.z+v2.z)*0.5f;
-	}else if(gcfg->srctype==stDisk || gcfg->srctype==stGaussian){  // uniform disk and Gaussian beam
+#elif defined(MCX_SRC_DISK) || defined(MCX_SRC_GAUSSIAN) // uniform disk distribution or Gaussian-beam
 		float sphi, cphi;
 		float phi=TWO_PI*rand_uniform01(ran);
 		sphi=sin(phi);	cphi=cos(phi);
 		float r0;
-		if(gcfg->srctype==stDisk)
+    #if defined(MCX_SRC_DISK)
 		    r0=sqrt(rand_uniform01(ran))*gcfg->srcparam1.x;
-		else if(fabs(gcfg->focus) < 1e-5f || fabs(gcfg->srcparam1.y) < 1e-5f)
+    #else
+		if(fabs(gcfg->focus) < 1e-5f || fabs(gcfg->srcparam1.y) < 1e-5f)
 		    r0=sqrt(-log(rand_uniform01(ran)))*gcfg->srcparam1.x;
 		else{
 		    float z0=gcfg->srcparam1.x*gcfg->srcparam1.x*M_PI/gcfg->srcparam1.y; //Rayleigh range
 		    r0=sqrt(-log(rand_uniform01(ran))*(1.f+(gcfg->focus*gcfg->focus/(z0*z0))))*gcfg->srcparam1.x;
 		}
+    #endif
+
 		if(gcfg->srcdir.z>-1.f+EPS && gcfg->srcdir.z<1.f-EPS){
 		    float tmp0=1.f-gcfg->srcdir.z*gcfg->srcdir.z;
 		    float tmp1=r0/sqrt(tmp0);
@@ -651,20 +653,20 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
    		    r->p0.x+=r0*cphi;
 		    r->p0.y+=r0*sphi;
 		}
-	}else if(gcfg->srctype==stCone || gcfg->srctype==stIsotropic || gcfg->srctype==stArcSin){
+#elif defined(MCX_SRC_CONE) || defined(MCX_SRC_ISOTROPIC) || defined(MCX_SRC_ARCSINE) 
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sin(ang);	cphi=cos(ang);
-		if(gcfg->srctype==stCone){  // a solid-angle section of a uniform sphere
+    #if defined(MCX_SRC_CONE) // a solid-angle section of a uniform sphere
 		        do{
 				ang=(gcfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acos(2.f*rand_uniform01(ran)-1.f); //sine distribution
 		        }while(ang>gcfg->srcparam1.x);
-		}else{
+    #else
 			if(gcfg->srctype==stIsotropic) // uniform sphere
 				ang=acos(2.f*rand_uniform01(ran)-1.f); //sine distribution
 			else
 				ang=M_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
-		}
+    #endif
 		stheta=sin(ang);
 		ctheta=cos(ang);
 		r->vec.x=stheta*cphi;
@@ -674,7 +676,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
                 if(gcfg->srctype==stIsotropic)
                     if(r->eid>0)
                         return;
-	}else if(gcfg->srctype==stZGaussian){
+#elif defined(MCX_SRC_ZGAUSSIAN)
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sin(ang);	cphi=cos(ang);
@@ -685,13 +687,13 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
 		canfocus=0;
-	}else if(gcfg->srctype==stLine || gcfg->srctype==stSlit){
+#elif defined(MCX_SRC_LINE) || defined(MCX_SRC_SLIT) 
 	      float t=rand_uniform01(ran);
 	      r->p0.x+=t*gcfg->srcparam1.x;
 	      r->p0.y+=t*gcfg->srcparam1.y;
 	      r->p0.z+=t*gcfg->srcparam1.z;
 
-              if(gcfg->srctype==stLine){
+    #if defined(MCX_SRC_LINE)
 	              float s,p;
 		      t=1.f-2.f*rand_uniform01(ran);
 		      s=1.f-2.f*rand_uniform01(ran);
@@ -702,12 +704,12 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 		      vv.z=r->vec.x*s-r->vec.y*t;
 		      r->vec=vv;
 		      //*((float3*)&(r->vec))=(float3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
-	      }
+    #endif
               origin.x+=(gcfg->srcparam1.x)*0.5f;
               origin.y+=(gcfg->srcparam1.y)*0.5f;
               origin.z+=(gcfg->srcparam1.z)*0.5f;
               canfocus=(gcfg->srctype==stSlit);
-        }
+#endif
 
         if(canfocus && gcfg->focus!=0.f){ // if beam focus is set, determine the incident angle
 	        float Rn2;
@@ -791,7 +793,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
     __global int *type, __global int4 *facenb,  __global int *srcelem, __global float4 *normal, __global medium *med, __global float *n_det, __global uint *detectedphoton, __constant float4 *gdetpos,RandType *ran){
 
 	int oldeid,fixcount=0,exitdet=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,gcfg->faceid0-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,0};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,0};
 
 	r.photonid=id;
 
@@ -926,13 +928,15 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 
 void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
     __global float3 *node,__global int4 *elem,  __global float *weight, __global int *type, __global int4 *facenb,  __global int *srcelem, __global float4 *normal, 
-    __global medium *med, __global float *n_det, __global uint *detectedphoton, __constant float4 *gdetpos, 
-    __global uint *n_seed, __global RandType *photonseed){
+    __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
+    __global uint *n_seed, __global int *progress){
  
  	RandType t[RAND_BUF_LEN];
 	gpu_rng_init(t,n_seed,get_local_id(0));
     
 	/*launch photons*/
-	for(int i=0;i<nphoton+(get_local_id(0)<ophoton);i++)
+	for(int i=0;i<nphoton+(get_local_id(0)<ophoton);i++){
 	    onephoton(i,sharedmem+get_local_id(0)*(gcfg->reclen-1),gcfg,node,elem,weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,gdetpos,t);
+	    //atomicadd(progress,1);
+	}
 }

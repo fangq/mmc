@@ -29,6 +29,10 @@
 
 #include "mmc_host.h"
 
+#ifdef USE_OPENCL
+    #include "mmc_cl_host.h"
+#endif
+
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the 
 necessary data structures. This include the command line options (cfg),
@@ -57,8 +61,11 @@ int main(int argc, char**argv){
            The core simulation loop is executed in the mmc_run_mp() function where
 	   multiple threads are executed to simulate all photons.
          */
+#ifdef USE_OPENCL
+        mmc_run_cl(&cfg,&mesh,&tracer);
+#else
         mmc_run_mp(&cfg,&mesh,&tracer);
-	
+#endif
 	/** 
            Once all photon simulations are complete, we clean up all allocated memory
 	   and finish the execution.

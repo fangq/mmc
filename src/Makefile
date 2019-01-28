@@ -1,7 +1,8 @@
 ROOTDIR = ..
-BINARY=mmc
+BINARY=mmcx
 
-FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host mmc_cl_utils mmc_cl_host
+FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host highordermesh mmc_cl_utils mmc_cl_host
+CLPROGRAM=mmc_core
 
 PLATFORM = $(shell uname -s)        
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
@@ -18,7 +19,7 @@ endif
 
 DOXYCFG=mmcdoxy.cfg
 
-USERCCFLAGS=-DUSE_OS_TIMER
+USERCCFLAGS=-DUSE_OS_TIMER -DUSE_OPENCL
 
 DUMMY:=$(shell mkdir -p built/cjson)
 

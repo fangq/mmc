@@ -24,11 +24,14 @@ BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
-CCFLAGS    += -c -Wall -g -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
+CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
 INCLUDEDIR := $(MMCDIR)/src
-EXTRALIB   += -lm -lstdc++
 AROUTPUT   += -o
 MAKE       := make
+
+LIBOPENCLDIR ?= /usr/local/cuda/lib64
+LIBOPENCL=-lOpenCL
+EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR) -lOpenCL
 
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
@@ -84,10 +87,12 @@ ARFLAGS    :=
 
 OBJSUFFIX  := .o
 BINSUFFIX  := 
+CLHEADER=.clh
 
 OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
 OBJS       := $(subst $(OBJDIR)/$(MMCSRC)/,$(MMCSRC)/,$(OBJS))
 OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
+CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
 
 release:   CCFLAGS+= -O3
 sse ssemath mex oct mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
@@ -174,8 +179,11 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 	@$(ECHO) Building $@
 	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
+%$(CLHEADER): %.cl
+	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
+
 ##  Link  ##
-$(BINDIR)/$(BINARY): makedirs $(OBJS)
+$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
 

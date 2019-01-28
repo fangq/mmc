@@ -35,6 +35,11 @@
 #include <time.h>
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
+#include "mcx_const.h"
+
+#ifdef MCX_EMBED_CL
+    #include "mmc_core.clh"
+#endif
 
 /**
  * Macro to load JSON keys
@@ -66,16 +71,16 @@
  * Array terminates with '\0'.
  */
 
-const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D','G',
-                 'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','-','-','\0'};
+const char shortopt[]={'h','E','f','n','A','t','T','s','a','g','b','D','G',
+                 'd','r','S','e','U','R','l','L','I','-','u','C','M',
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-','-','J','o','H','\0'};
 		 
 /**
  * Long command line options
  * The length of this array must match the length of shortopt[], terminates with ""
  */
 
-const char *fullopt[]={"--help","--seed","--input","--photon",
+const char *fullopt[]={"--help","--seed","--input","--photon","--autopilot",
                  "--thread","--blocksize","--session","--array",
                  "--gategroup","--reflect","--debug","--gpu","--savedet",
                  "--repeat","--save2pt","--minenergy",
@@ -84,7 +89,10 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton",""};
+                 "--debugphoton","--compileropt","--optlevel","--maxdetphoton",""};
+
+extern char pathsep;
+
 
 /**
  * Debug flags
@@ -222,10 +230,33 @@ void mcx_initcfg(mcconfig *cfg){
      memset(&(cfg->detparam2),0,sizeof(float4));
      cfg->detpattern=NULL;
 
+     cfg->optlevel=0;
+
      memset(cfg->deviceid,0,MAX_DEVICE);
      memset(cfg->workload,0,MAX_DEVICE*sizeof(float));
      cfg->deviceid[0]='1'; /*use the first GPU device by default*/
+     memset(cfg->compileropt,0,MAX_PATH_LENGTH);
+     memset(cfg->kernelfile,0,MAX_SESSION_LENGTH);
+     cfg->maxdetphoton=1000000; 
+     cfg->exportfield=NULL;
+     cfg->exportdetected=NULL;
+     cfg->detectedcount=0;
+     cfg->energytot=0.f;
+     cfg->energyabs=0.f;
+     cfg->energyesc=0.f;
+     cfg->runtime=0;
+     cfg->autopilot=0;
 
+#ifdef MCX_EMBED_CL
+     cfg->clsource=(char *)mmc_core_cl;
+#else
+     cfg->clsource=NULL;
+#endif
+#ifdef MCX_CONTAINER
+     cfg->parentid=mpMATLAB;
+#else
+     cfg->parentid=mpStandalone;
+#endif
 }
 
 /**
@@ -253,6 +284,10 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->replaytime);
      if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)
         fclose(cfg->flog);
+#ifndef MCX_EMBED_CL
+     if(cfg->clsource && cfg->clsource!=(char *)mmc_core_cl)
+        free(cfg->clsource);
+#endif
      mcx_initcfg(cfg);
 }
 
@@ -1058,7 +1093,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      float np=0.f;
 
      if(argc<=1){
-     	mcx_usage(argv[0]);
+     	mcx_usage(cfg, argv[0]);
      	exit(0);
      }
      while(i<argc){
@@ -1071,7 +1106,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		}
 	        switch(argv[i][1]){
 		     case 'h':
-		                mcx_usage(argv[0]);
+		                mcx_usage(cfg, argv[0]);
 				exit(0);
 		     case 'i':
 				if(filename[0]){
@@ -1183,8 +1218,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'I':
                                 cfg->isgpuinfo=1;
 		                break;
+		     case 'J': 
+		     	        cfg->compileropt[strlen(cfg->compileropt)]=' ';
+				i=mcx_readarg(argc,argv,i,cfg->compileropt+strlen(cfg->compileropt),"string");
+				break;
 		     case 'o':
-		     	        i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->optlevel),"int");
 		     	        break;
                      case 'D':
 				if(i+1<argc && isalpha(argv[i+1][0]) )
@@ -1194,6 +1233,11 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                 break;
                      case 'k':
                                 i=mcx_readarg(argc,argv,i,&(cfg->voidtime),"int");
+                                break;
+		     case 'H':
+		     	        i=mcx_readarg(argc,argv,i,&(cfg->maxdetphoton),"int");
+                     case 'A':
+                                i=mcx_readarg(argc,argv,i,&(cfg->autopilot),"char");
                                 break;
                      case 'G':
                                 if(mcx_isbinstr(argv[i+1])){
@@ -1215,6 +1259,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                      if (cfg->ismomentum) cfg->issavedet=1;
                                 }else if(strcmp(argv[i]+2,"atomic")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->isatomic),"bool");
+                                }else if(strcmp(argv[i]+2,"root")==0){
+		                     i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
                                 }else if(strcmp(argv[i]+2,"debugphoton")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
                                 }else
@@ -1236,6 +1282,22 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		MMC_FPRINTF(cfg->flog,"unable to save to log file, will print from stdout\n");
           }
      }
+     if(cfg->kernelfile[0]!='\0' && cfg->isgpuinfo!=2){
+     	  FILE *fp=fopen(cfg->kernelfile,"rb");
+	  int srclen;
+	  if(fp==NULL){
+	  	mcx_error(-10,"the specified OpenCL kernel file does not exist!",__FILE__,__LINE__);
+	  }
+	  fseek(fp,0,SEEK_END);
+	  srclen=ftell(fp);
+	  if(cfg->clsource!=(char *)mmc_core_cl)
+	      free(cfg->clsource);
+	  cfg->clsource=(char *)malloc(srclen+1);
+	  fseek(fp,0,SEEK_SET);
+	  MMC_ASSERT((fread(cfg->clsource,srclen,1,fp)==1));
+	  cfg->clsource[srclen]='\0';
+	  fclose(fp);
+     }
      if((cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP) && cfg->seed!=SEED_FROM_FILE)
          MMC_ERROR(-1,"Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
      if(cfg->isgpuinfo!=2){ /*print gpu info only*/
@@ -1248,6 +1310,25 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      mcx_validatecfg(cfg);
 }
 
+void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mcconfig *cfg){
+	FILE *fp;
+	char fhistory[MAX_PATH_LENGTH];
+        if(cfg->rootpath[0])
+                sprintf(fhistory,"%s%c%s.mch",cfg->rootpath,pathsep,cfg->session);
+        else
+                sprintf(fhistory,"%s.mch",cfg->session);
+	if(doappend){
+           fp=fopen(fhistory,"ab");
+	}else{
+           fp=fopen(fhistory,"wb");
+	}
+	if(fp==NULL){
+	   mcx_error(-2,"can not save data to disk",__FILE__,__LINE__);
+        }
+	fwrite(&(cfg->his),sizeof(history),1,fp);
+	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
+	fclose(fp);
+}
 /**
  * @brief Print MCX software version
  *
@@ -1258,14 +1339,9 @@ void mcx_version(mcconfig *cfg){
     MMC_ERROR(MMC_INFO,"MMC $Rev::      $");
 }
 
-/**
- * @brief Print MCX help information
- *
- * @param[in] exename: path and name of the mcx executable
- */
 
-void mcx_usage(char *exename){
-     printf("\
+void mcx_printheader(mcconfig *cfg){
+    MMC_FPRINTF(cfg->flog,"\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
 #          Copyright (c) 2010-2018 Qianqian Fang <q.fang at neu.edu>          #\n\
@@ -1277,8 +1353,18 @@ void mcx_usage(char *exename){
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
 $Rev::       $ Last $Date::                       $ by $Author::              $\n\
-###############################################################################\n\
-\n\
+###############################################################################\n");
+}
+
+/**
+ * @brief Print MCX help information
+ *
+ * @param[in] exename: path and name of the mcx executable
+ */
+
+void mcx_usage(mcconfig *cfg, char *exename){
+     mcx_printheader(cfg);
+     printf("\n\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
 \n\
@@ -1307,6 +1393,11 @@ where possible parameters include (the first item in [] is the default value)\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
+ -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable\n\
+ -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto\n\
+      or\n\
+ -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\
+ -W '50,30,20' (--workload)    workload for active devices; normalized by sum\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
 \n\
 == Output options ==\n\
@@ -1316,6 +1407,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -s sessionid  (--session)     a string used to tag all output file names\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
+ -H [1000000] (--maxdetphoton) max number of detected photons\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
