@@ -1,7 +1,7 @@
 ROOTDIR = ..
 BINARY=mmcx
 
-FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host highordermesh mmc_cl_utils mmc_cl_host
+FILES=xorshift128p_rand simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host highordermesh mmc_cl_utils mmc_cl_host
 CLPROGRAM=mmc_core
 
 PLATFORM = $(shell uname -s)        

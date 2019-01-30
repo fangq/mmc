@@ -22,44 +22,59 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    sfmt_rand.h
+\file    posix_randr.c
 
-\brief   An interface to use the SFMT-19937 random number generator
+\brief   A POSIX Random Number Generator for multi-threaded applications
 *******************************************************************************/
 
-#ifndef _MCEXTREME_SFMT_RAND_H
-#define _MCEXTREME_SFMT_RAND_H
+#ifndef _MMC_POSIX_RAND_H
+#define _MMC_POSIX_RAND_H
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
-
-#define __device__ static inline
-
-typedef unsigned int RandType;
-typedef unsigned int uint;
-
-#define MCX_RNG_NAME       "xorshift128+ RNG"
-
-#define RAND_BUF_LEN       1248    //buffer length
-#define RAND_SEED_LEN      2       //
-#define MEXP               19937
-
-__device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx);
-
-__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]);
-// generate [0,1] random number for the next scattering length
-__device__ float rand_next_scatlen(RandType t[RAND_BUF_LEN]);
-// generate [0,1] random number for the next arimuthal angle
-__device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]);
-// generate random number for the next zenith angle
-__device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]);
-__device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]);
-__device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]);
+#include <stdio.h>
+#include "xorshift128p_rand.h"
+#include "fastmath.h"
 
 #ifdef MMC_USE_SSE_MATH
-__device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co);
-__device__ float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]);
+#include "sse_math/sse_math.h"
+#include <smmintrin.h>
 #endif
+
+#define LOG_RNG_MAX         22.1807097779182f
+#define IEEE754_DOUBLE_BIAS     0x3FF0000000000000ul /* Added to exponent.  */
+
+static float xorshift128p_nextf (RandType t[RAND_BUF_LEN]){
+   union {
+        ulong  i;
+	float f[2];
+	uint  u[2];
+   } s1;
+   const ulong s0 = t[1];
+   s1.i = t[0];
+   t[0] = s0;
+   s1.i ^= s1.i << 23; // a
+   t[1] = s1.i ^ s0 ^ (s1.i >> 18) ^ (s0 >> 5); // b, c
+   s1.i = t[1] + s0;
+   s1.u[0] = 0x3F800000U | (s1.u[0] >> 9);
+
+   return s1.f[0] - 1.0f;
+}
+
+static void xorshift128p_seed (uint *seed,RandType t[RAND_BUF_LEN]){
+    t[0] = (ulong)seed[0] << 32 | seed[1] ;
+    t[1] = (ulong)seed[2] << 32 | seed[3];
+}
+
+// transform into [0,1] random number
+__device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
+    return xorshift128p_nextf(t);
+}
+__device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
+    xorshift128p_seed((n_seed+idx*RAND_SEED_LEN),t);
+}
+__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]){
+}
+
+#include "rng_common.h"
 
 #endif

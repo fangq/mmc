@@ -55,7 +55,7 @@ int main(int argc, char**argv){
            In the second step, we pre-compute all needed mesh and ray-tracing data
 	   and get ready for launching photon simulations.
         */
-        mmc_prep(&cfg,&mesh,&tracer);
+        if(cfg.isgpuinfo==0) mmc_prep(&cfg,&mesh,&tracer);
 	
 	/** 
            The core simulation loop is executed in the mmc_run_mp() function where

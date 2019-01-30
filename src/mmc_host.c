@@ -55,8 +55,8 @@ tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv){
         mcx_initcfg(cfg);
         mcx_parsecmd(argc,argv,cfg);
-	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from commands ... "));
-	mesh_init_from_cfg(mesh,cfg);
+	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from commands %d ... ",cfg->isgpuinfo));
+	if(cfg->isgpuinfo==0) mesh_init_from_cfg(mesh,cfg);
         return 0;
 }
 

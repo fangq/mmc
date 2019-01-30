@@ -38,12 +38,20 @@
 #include <smmintrin.h>
 #endif
 
+#ifndef USE_OPENCL
+
 #ifdef MMC_LOGISTIC
   #include "logistic_rand.c"
 #elif defined MMC_SFMT    
   #include "sfmt_rand.c"
 #else
   #include "posix_randr.c"
+#endif
+
+#else
+
+  #include "xorshift128p_rand.c"
+
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)

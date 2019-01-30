@@ -81,24 +81,23 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 
      cl_uint meshlen=(cfg->basisorder? mesh->nn : mesh->ne);
 
-     cl_uint  *media=(cl_uint *)(cfg->vol);
      cl_double  *field;
 
      cl_uint   *Pseed;
      float  *Pdet;
      char opt[MAX_PATH_LENGTH]={'\0'};
-     cl_uint detreclen=mesh->prop+1+(cfg->issaveexit>0)*6;
+     cl_uint detreclen=(mesh->prop+1)+1+(cfg->issaveexit>0)*6;
      GPUInfo *gpu=NULL;
 
      MCXParam param={{{cfg->srcpos.x,cfg->srcpos.y,cfg->srcpos.z}}, {{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z}},
 		     cfg->tstart, cfg->tend, (uint)cfg->isreflect,(uint)cfg->issavedet,(uint)cfg->issaveexit,
 		     (uint)cfg->ismomentum, (uint)cfg->isatomic, (uint)cfg->isspecular, 1.f/cfg->tstep, cfg->minenergy, 
-		     cfg->maxdetphoton, mesh->prop, cfg->detnum, (uint)cfg->voidtime, (uint)cfg->srctype, 
+		     cfg->maxdetphoton, (mesh->prop+1), cfg->detnum, (uint)cfg->voidtime, (uint)cfg->srctype, 
 		     {{cfg->srcparam1.x,cfg->srcparam1.y,cfg->srcparam1.z,cfg->srcparam1.w}},
 		     {{cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w}},
 		     0,cfg->maxgate,(uint)cfg->debuglevel, 0 /*reclen*/, cfg->outputtype, mesh->elemlen, 
 		     cfg->mcmethod, cfg->method, minstep*R_C0*cfg->unitinmm, cfg->basisorder, cfg->srcpos.w, 
-		     mesh->nn, mesh->ne, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z,mesh->nmin.w}}, cfg->nout, 
+		     mesh->nn, mesh->ne, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout, 
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
 		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, cfg->e0, cfg->isextdet};
 
@@ -182,7 +181,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      }
 
      field=(cl_double *)calloc(sizeof(cl_double)*meshlen,cfg->maxgate);
-     Pdet=(float*)calloc(cfg->maxdetphoton,sizeof(float)*(mesh->prop+1));
+     Pdet=(float*)calloc(cfg->maxdetphoton,sizeof(float)*((mesh->prop+1)+1));
 
      fieldlen=meshlen*cfg->maxgate;
 
@@ -195,14 +194,19 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      OCL_ASSERT(((gelem=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int4)*(mesh->ne),mesh->elem,&status),status)));
      OCL_ASSERT(((gtype=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->ne),mesh->type,&status),status)));
      OCL_ASSERT(((gfacenb=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int4)*(mesh->ne),mesh->facenb,&status),status)));
-     OCL_ASSERT(((gsrcelem=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->srcelemlen),mesh->srcelem,&status),status)));
+     if(mesh->srcelemlen>0)
+         OCL_ASSERT(((gsrcelem=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->srcelemlen),mesh->srcelem,&status),status)));
+     else
+         gsrcelem=NULL;
      OCL_ASSERT(((gnormal=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float4)*(mesh->nn)*4,tracer->n,&status),status)));
      if(cfg->detpos)
            OCL_ASSERT(((gdetpos=clCreateBuffer(mcxcontext,RO_MEM, cfg->detnum*sizeof(float4),cfg->detpos,&status),status)));
+     else
+         gdetpos=NULL;
 
-     OCL_ASSERT(((gproperty=clCreateBuffer(mcxcontext,RO_MEM, mesh->prop*sizeof(medium),mesh->med,&status),status)));
+     OCL_ASSERT(((gproperty=clCreateBuffer(mcxcontext,RO_MEM, (mesh->prop+1)*sizeof(medium),mesh->med,&status),status)));
      OCL_ASSERT(((gparam=clCreateBuffer(mcxcontext,RO_MEM, sizeof(MCXParam),&param,&status),status)));
-     OCL_ASSERT(((gprogress[0]=clCreateBuffer(mcxcontext,RW_PTR, sizeof(cl_uint),NULL,&status),status)));
+     OCL_ASSERT(((gprogress[0]=clCreateBuffer(mcxcontext,RW_PTR, sizeof(cl_uint),&progress,&status),status)));
      progress = (cl_uint *)clEnqueueMapBuffer(mcxqueue[0], gprogress[0], CL_TRUE, CL_MAP_WRITE, 0, sizeof(cl_uint), 0, NULL, NULL, NULL);
      *progress=0;
      clEnqueueUnmapMemObject(mcxqueue[0], gprogress[0], progress, 0, NULL, NULL);
@@ -214,7 +218,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	   Pseed[j]=rand();
        OCL_ASSERT(((gseed[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_LEN,Pseed,&status),status)));
        OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(double)*(cfg->basisorder?mesh->nn:mesh->ne)*cfg->maxgate,mesh->weight,&status),status)));
-       OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*(mesh->prop+1),Pdet,&status),status)));
+       OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*((mesh->prop+1)+1),Pdet,&status),status)));
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
        if(cfg->srctype==MCX_SRC_PATTERN)
@@ -296,6 +300,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	 OCL_ASSERT(((mcxkernel[i] = clCreateKernel(mcxprogram, "mmc_main_loop", &status),status)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 0, sizeof(cl_uint),(void*)&threadphoton)));
          OCL_ASSERT((clSetKernelArg(mcxkernel[i], 1, sizeof(cl_uint),(void*)&oddphotons)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 2, sizeof(cl_mem), (void*)&gparam)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, cfg->issavedet? sizeof(int)+sizeof(cl_float)*cfg->nblocksize*param.maxmedia : sizeof(int), NULL)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)&gnode)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)&gelem)));
@@ -308,15 +313,16 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],12, sizeof(cl_mem), (void*)&gdetpos)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],13, sizeof(cl_mem), (void*)(gdetphoton+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],14, sizeof(cl_mem), (void*)(gdetected+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],15, sizeof(cl_mem), (void*)(gseed+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],16, sizeof(cl_mem), (void*)(gprogress))));
 	// OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)(gsrcpattern+i))));
      }
-     MMC_FPRINTF(cfg->flog,"set kernel arguments complete : %d ms\n",GetTimeMillis()-tic);fflush(cfg->flog);
+     MMC_FPRINTF(cfg->flog,"set kernel arguments complete : %d ms %d\n",GetTimeMillis()-tic, param.method);fflush(cfg->flog);
 
      if(cfg->exportfield==NULL)
          cfg->exportfield=mesh->weight;
      if(cfg->exportdetected==NULL)
-         cfg->exportdetected=(float*)malloc((mesh->prop+1)*cfg->maxdetphoton*sizeof(float));
+         cfg->exportdetected=(float*)malloc(((mesh->prop+1)+1)*cfg->maxdetphoton*sizeof(float));
 
      cfg->energytot=0.f;
      cfg->energyesc=0.f;
@@ -324,8 +330,6 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 
      //simulate for all time-gates in maxgate groups per run
 
-     cl_float Vvox;
-     Vvox=cfg->steps.x*cfg->steps.y*cfg->steps.z;
      tic0=GetTimeMillis();
 
      for(t=cfg->tstart;t<cfg->tend;t+=cfg->tstep*cfg->maxgate){
@@ -342,8 +346,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	   param.tend=twindow1;
 
            for(devid=0;devid<workdev;devid++){
-               OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gparam,CL_TRUE,0,sizeof(MCXParam),&param, 0, NULL, NULL)));
-               OCL_ASSERT((clSetKernelArg(mcxkernel[devid],2, sizeof(cl_mem), (void*)&gparam)));
+               //OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gparam,CL_TRUE,0,sizeof(MCXParam),&param, 0, NULL, NULL)));
+               //OCL_ASSERT((clSetKernelArg(mcxkernel[devid],2, sizeof(cl_mem), (void*)&gparam)));
                // launch mcxkernel
 #ifndef USE_OS_TIMER
                OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid],mcxkernel[devid],1,NULL,&gpu[devid].autothread,&gpu[devid].autoblock, 0, NULL, &kernelevent)));
@@ -392,7 +396,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
              if(cfg->issavedet){
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetected[devid],CL_FALSE,0,sizeof(uint),
                                             &detected, 0, NULL, waittoread+devid)));
-                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*cfg->maxdetphoton*(mesh->prop+1),
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*cfg->maxdetphoton*((mesh->prop+1)+1),
 	                                        Pdet, 0, NULL, NULL)));
 		if(detected>cfg->maxdetphoton){
 			MMC_FPRINTF(cfg->flog,"WARNING: the detected photon (%d) \
@@ -446,10 +450,12 @@ is more than what your have specified (%d), please use the -H option to specify 
              }
 	     //initialize the next simulation
 	     if(twindow1<cfg->tend && iter<cfg->respin){
+/*
                   memset(field,0,sizeof(cl_double)*meshlen*cfg->maxgate);
                   OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gweight[devid],CL_TRUE,0,sizeof(cl_double)*meshlen*cfg->maxgate,
                                                 field, 0, NULL, NULL)));
 		  OCL_ASSERT((clSetKernelArg(mcxkernel[devid], 3, sizeof(cl_mem), (void*)(gweight+devid))));
+*/
 	     }
 	     if(cfg->respin>1 && RAND_SEED_LEN>1){
                Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_LEN);
@@ -474,31 +480,9 @@ is more than what your have specified (%d), please use the -H option to specify 
      }// time gates
 
      if(cfg->isnormalized){
-	   float scale=1.f, mua;
-	   uint t;
-           MMC_FPRINTF(cfg->flog,"normalizing raw data ...\t");fflush(cfg->flog);
-           if(cfg->outputtype==otFlux || cfg->outputtype==otFluence){
-               scale=1.f/(cfg->energytot*Vvox*cfg->tstep);
-	       if(cfg->unitinmm!=1.f)
-		   scale*=cfg->unitinmm; /* Vvox (in mm^3 already) * (Tstep) * (Eabsorp/U) */
+         MMC_FPRINTF(cfg->flog,"normalizing raw data ...\t");fflush(cfg->flog);
 
-               if(cfg->outputtype==otFluence)
-		   scale*=cfg->tstep;
-               if(cfg->exportfield)
-	          for(t=0;t<cfg->maxgate;t++)
-	            for(i=0;i<meshlen;i++){
-		        mua=cfg->prop[media[i] & MED_MASK].mua;
-			if(mua > 0.f)
-			    cfg->exportfield[t*meshlen+i]/=mua;
-		    }
-	   }else if(cfg->outputtype==otEnergy || cfg->outputtype==otJacobian)
-	       scale=1.f/cfg->energytot;
-
-         cfg->normalizer=scale;
-	 cfg->his.normalizer=scale;
          cfg->energyabs+=cfg->energytot-cfg->energyesc;
-
-	 MMC_FPRINTF(cfg->flog,"normalization factor alpha=%f\n",scale);  fflush(cfg->flog);
 	 mesh_normalize(mesh,cfg,cfg->energyabs,cfg->energytot,0);
      }
      if(cfg->issave2pt && cfg->parentid==mpStandalone){

@@ -41,6 +41,8 @@ extern "C" {
 
 #define OCL_ASSERT(x)  ocl_assess((x),__FILE__,__LINE__)
 
+#define RAND_SEED_LEN      4        //48 bit packed with 64bit length
+
 typedef struct GPU_mcconfig{
   cl_float3 srcpos;
   cl_float3 srcdir;

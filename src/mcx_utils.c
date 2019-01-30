@@ -157,9 +157,9 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->dim.x=0;
      cfg->dim.y=0;
      cfg->dim.z=0;
-     cfg->nblocksize=128;
+     cfg->nblocksize=64;
      cfg->nphoton=0;
-     cfg->nthread=0;
+     cfg->nthread=1024*8;
      cfg->seed=0x623F9A9E;
      cfg->isrowmajor=0;      /* not needed */
      cfg->maxgate=1;
@@ -171,10 +171,14 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
-#ifndef MMC_USE_SSE
-     cfg->method=0;
+#ifdef USE_OPENCL
+     cfg->method=3;
 #else
+  #ifndef MMC_USE_SSE
+     cfg->method=0;
+  #else
      cfg->method=1;
+  #endif
 #endif
      cfg->prop=NULL;
      cfg->detpos=NULL;
@@ -245,7 +249,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->energyabs=0.f;
      cfg->energyesc=0.f;
      cfg->runtime=0;
-     cfg->autopilot=0;
+     cfg->autopilot=1;
 
 #ifdef MCX_EMBED_CL
      cfg->clsource=(char *)mmc_core_cl;
@@ -1307,7 +1311,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      	  mcx_readconfig(filename,cfg);
        }
      }
-     mcx_validatecfg(cfg);
+     if(cfg->isgpuinfo==0)
+         mcx_validatecfg(cfg);
 }
 
 void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mcconfig *cfg){
