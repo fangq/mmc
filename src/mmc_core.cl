@@ -26,21 +26,19 @@
   #define TOFLOAT4
 #endif
 
-#define MCX_USE_NATIVE
-
 #ifdef MCX_USE_NATIVE
   #define MCX_MATHFUN(fun)              native_##fun
   #define MCX_SINCOS(theta,osin,ocos)   {(osin)=native_sin(theta);(ocos)=native_cos(theta);} 
 #else
   #define MCX_MATHFUN(fun)              fun
-  #define MCX_SINCOS(theta,osin,ocos)   (ocos)=sincos((theta),(osin))
+  #define MCX_SINCOS(theta,osin,ocos)   (ocos)=sincos((theta),&(osin))
 #endif
 
-//#ifdef MCX_GPU_DEBUG
+#ifdef MCX_GPU_DEBUG
   #define MMC_FPRINTF(x)        printf x             // enable debugging in CPU mode
-//#else
-//  #define MMC_FPRINTF(x)        {}
-//#endif
+#else
+  #define MMC_FPRINTF(x)        {}
+#endif
 
 #define R_PI               0.318309886183791f
 #define RAND_MAX           4294967295
@@ -90,7 +88,6 @@ typedef struct MMC_ray{
 	float slen0;                  /**< initial unitless scattering length = length*mus */
 	float slen;                   /**< the remaining unitless scattering length = length*mus  */
 	float Lmove;                  /**< last photon movement length */
-	double Eabsorb;               /**< accummulated energy being absorbed */
 	unsigned int photonid;        /**< index of the current photon */
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 } ray __attribute__ ((aligned (32)));
@@ -229,9 +226,9 @@ inline float atomicadd(volatile __global float* address, const float value){
 }
 #endif
 
-void clearpath(__local float *p, __constant MCXParam *gcfg){
+void clearpath(__local float *p, int len){
       uint i;
-      for(i=0;i<gcfg->maxmedia;i++)
+      for(i=0;i<len;i++)
       	   p[i]=0.f;
 }
 
@@ -255,7 +252,7 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
 	 uint baseaddr=atomic_inc(detectedphoton);
 	 if(baseaddr<gcfg->maxdetphoton){
 	    uint i;
-	    baseaddr*=gcfg->maxmedia+2+gcfg->issaveexit*6;
+	    baseaddr*=gcfg->reclen;
 	    n_det[baseaddr++]=detid;
 	    for(i=0;i<(gcfg->maxmedia<<1);i++)
 		n_det[baseaddr+i]=ppath[i]; // save partial pathlength to the memory
@@ -306,13 +303,14 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 	S = ((float4)(r->vec.x)*normal[baseid]+(float4)(r->vec.y)*normal[baseid+1]+(float4)(r->vec.z)*normal[baseid+2]);
 	T = normal[baseid+3] - ((float4)(r->p0.x)*normal[baseid]+(float4)(r->p0.y)*normal[baseid+1]+(float4)(r->p0.z)*normal[baseid+2]);
 	T = T/S;
+//printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
 
         //S = -convert_float3_rte(isgreaterequal(T,(float4)(0.f)));
         //T =  S * T + (isless(T,(float4)(0.f))) 
-	T.x=((T.x<=0.f)?1e10f:T.x);
-	T.y=((T.y<=0.f)?1e10f:T.y);
-	T.z=((T.z<=0.f)?1e10f:T.z);
-	T.w=((T.w<=0.f)?1e10f:T.w);
+	T.x=((T.x<=1e-5f)?1e10f:T.x);
+	T.y=((T.y<=1e-5f)?1e10f:T.y);
+	T.z=((T.z<=1e-5f)?1e10f:T.z);
+	T.w=((T.w<=1e-5f)?1e10f:T.w);
 
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
 	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
@@ -326,7 +324,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
             currweight=r->weight;
 
             r->nexteid=((__global int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->vec.x,r->vec.y,r->vec.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
+//printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
 
 	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
 	    Lp0=Lmin;
@@ -339,12 +337,12 @@ printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(gcfg->tend-r->photontimer)/(prop.n*R_C0)-1e-4f;
 	    }
-            if(gcfg->mcmethod==mmMCX){
-	       totalloss=exp(-prop.mua*r->Lmove);
-               r->weight*=totalloss;
-            }
+            totalloss=MCX_MATHFUN(exp)(-prop.mua*r->Lmove);
+            r->weight*=totalloss;
+
 	    totalloss=1.f-totalloss;
 	    r->slen-=r->Lmove*prop.mus;
+//printf("slen=%e lmove=%e mus=%f\n",r->slen,r->Lmove, prop.mus);
 	    if(Lmin>=0.f){
 	        int framelen=(gcfg->basisorder?gcfg->nn:gcfg->ne);
 		if(gcfg->method==rtBLBadouelGrid)
@@ -362,15 +360,13 @@ printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.
 		   //MMC_FPRINTF(("A %f %f %f %e %d %e\n",r->p0.x,r->p0.y,r->p0.z,Lmin,eid+1,dlen));
 
 		if(prop.mua>0.f){
-		  r->Eabsorb+=ww;
 		  if(gcfg->outputtype==otFlux || gcfg->outputtype==otJacobian)
                      ww/=prop.mua;
 		}
 
 	        r->p0=r->p0+(float3)(r->Lmove)*r->vec;;
 
-                if(gcfg->mcmethod==mmMCX){
-		  if(!gcfg->basisorder){
+                if(!gcfg->basisorder){
 		     if(gcfg->method==rtBLBadouel){
 #ifdef USE_ATOMIC
                         if(gcfg->isatomic)
@@ -384,7 +380,7 @@ printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.
 			    int i, seg=(int)(r->Lmove*gcfg->dstep)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
-	                    segloss=exp(-prop.mua*dstep);
+	                    segloss=MCX_MATHFUN(exp)(-prop.mua*dstep);
 			    T.xyz =  r->vec * (float3)(dstep); /*step*/
 			    S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
 			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
@@ -407,7 +403,6 @@ printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.
                             for(int i=0;i<3;i++)
                                 weight[ee[out[faceidx][i]]-1+tshift]+=ww;
 		  }
-		}
 	    }
 	}
 
@@ -430,6 +425,8 @@ printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.
  * \param[in] faceid: index of the face through which the photon reflects/transmits
  * \param[in,out] ran: the random number generator states
  */
+
+#ifdef MCX_DO_REFLECTION
 
 float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,RandType *ran, __global int *type, __global float4 *normal, __constant medium *med){
 	/*to handle refractive index mismatch*/
@@ -457,7 +454,7 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
 
         if(tmp2>0.f){ /*if no total internal reflection*/
           Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
-	  tmp2=sqrt(tmp2); /*to save one sqrt*/
+	  tmp2=MCX_MATHFUN(sqrt)(tmp2); /*to save one sqrt*/
           Im=2.f*n1*n2*Icos*tmp2;
           Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
           Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
@@ -479,10 +476,12 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
 	  *eid=*oldeid;
           //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f));
        }
-       tmp0=rsqrt(dot(*c0,*c0));
+       tmp0=MCX_MATHFUN(rsqrt)(dot(*c0,*c0));
        (*c0)*=(float3)tmp0;
        return 1.f;
 }
+
+#endif
 
 /**
  * @brief Performing one scattering event of the photon
@@ -518,8 +517,8 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *g
         if(tmp0<-1.f) tmp0=-1.f;
 
 	theta=acos(tmp0);
-	stheta=sqrt(1.f-tmp0*tmp0);
-	//stheta=sin(theta);
+	stheta=MCX_MATHFUN(sqrt)(1.f-tmp0*tmp0);
+	//stheta=MCX_MATHFUN(sin)(theta);
 	ctheta=tmp0;
     }else{
 	theta=acos(2.f*rand_next_zangle(ran)-1.f);
@@ -528,7 +527,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *g
 
     if( dir->z>-1.f+EPS && dir->z<1.f-EPS ) {
 	tmp0=1.f-dir->z*dir->z;   //reuse tmp to minimize registers
-	tmp1=rsqrt(tmp0);
+	tmp1=MCX_MATHFUN(rsqrt)(tmp0);
 	tmp1=stheta*tmp1;
 
 	p.x=tmp1*(dir->x*dir->z*cphi - dir->y*sphi) + dir->x*ctheta;
@@ -602,7 +601,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 		    int ysize=(int)gcfg->srcparam2.w;
 		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
     #elif defined(MCX_SRC_FOURIER)  // need to prevent rx/ry=1 here
-		    r->weight=(cos((floor(gcfg->srcparam1.w)*rx+floor(gcfg->srcparam2.w)*ry+gcfg->srcparam1.w-floor(gcfg->srcparam1.w))*TWO_PI)*(1.f-gcfg->srcparam2.w+floor(gcfg->srcparam2.w))+1.f)*0.5f;
+		    r->weight=(MCX_MATHFUN(cos)((floor(gcfg->srcparam1.w)*rx+floor(gcfg->srcparam2.w)*ry+gcfg->srcparam1.w-floor(gcfg->srcparam1.w))*TWO_PI)*(1.f-gcfg->srcparam2.w+floor(gcfg->srcparam2.w))+1.f)*0.5f;
     #endif
 		origin.x+=(gcfg->srcparam1.x+gcfg->srcparam2.x)*0.5f;
 		origin.y+=(gcfg->srcparam1.y+gcfg->srcparam2.y)*0.5f;
@@ -611,7 +610,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		float4 v2=gcfg->srcparam1;
-		v2.w*=rsqrt(gcfg->srcparam1.x*gcfg->srcparam1.x+gcfg->srcparam1.y*gcfg->srcparam1.y+gcfg->srcparam1.z*gcfg->srcparam1.z);
+		v2.w*=MCX_MATHFUN(rsqrt)(gcfg->srcparam1.x*gcfg->srcparam1.x+gcfg->srcparam1.y*gcfg->srcparam1.y+gcfg->srcparam1.z*gcfg->srcparam1.z);
 		v2.x=v2.w*(gcfg->srcdir.y*gcfg->srcparam1.z - gcfg->srcdir.z*gcfg->srcparam1.y);
 		v2.y=v2.w*(gcfg->srcdir.z*gcfg->srcparam1.x - gcfg->srcdir.x*gcfg->srcparam1.z); 
 		v2.z=v2.w*(gcfg->srcdir.x*gcfg->srcparam1.y - gcfg->srcdir.y*gcfg->srcparam1.x);
@@ -619,9 +618,9 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 		r->p0.y=gcfg->srcpos.y+rx*gcfg->srcparam1.y+ry*v2.y;
 		r->p0.z=gcfg->srcpos.z+rx*gcfg->srcparam1.z+ry*v2.z;
     #if defined(MCX_SRC_FOURIERX2D)
-			r->weight=(sin((gcfg->srcparam2.x*rx+gcfg->srcparam2.z)*TWO_PI)*sin((gcfg->srcparam2.y*ry+gcfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
+			r->weight=(MCX_MATHFUN(sin)((gcfg->srcparam2.x*rx+gcfg->srcparam2.z)*TWO_PI)*MCX_MATHFUN(sin)((gcfg->srcparam2.y*ry+gcfg->srcparam2.w)*TWO_PI)+1.f)*0.5f; //between 0 and 1
     #else
-			r->weight=(cos((gcfg->srcparam2.x*rx+gcfg->srcparam2.y*ry+gcfg->srcparam2.z)*TWO_PI)*(1.f-gcfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
+			r->weight=(MCX_MATHFUN(cos)((gcfg->srcparam2.x*rx+gcfg->srcparam2.y*ry+gcfg->srcparam2.z)*TWO_PI)*(1.f-gcfg->srcparam2.w)+1.f)*0.5f; //between 0 and 1
     #endif
 		origin.x+=(gcfg->srcparam1.x+v2.x)*0.5f;
 		origin.y+=(gcfg->srcparam1.y+v2.y)*0.5f;
@@ -629,22 +628,22 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 #elif defined(MCX_SRC_DISK) || defined(MCX_SRC_GAUSSIAN) // uniform disk distribution or Gaussian-beam
 		float sphi, cphi;
 		float phi=TWO_PI*rand_uniform01(ran);
-		sphi=sin(phi);	cphi=cos(phi);
+		sphi=MCX_MATHFUN(sin)(phi);	cphi=MCX_MATHFUN(cos)(phi);
 		float r0;
     #if defined(MCX_SRC_DISK)
-		    r0=sqrt(rand_uniform01(ran))*gcfg->srcparam1.x;
+		    r0=MCX_MATHFUN(sqrt)(rand_uniform01(ran))*gcfg->srcparam1.x;
     #else
 		if(fabs(gcfg->focus) < 1e-5f || fabs(gcfg->srcparam1.y) < 1e-5f)
-		    r0=sqrt(-log(rand_uniform01(ran)))*gcfg->srcparam1.x;
+		    r0=MCX_MATHFUN(sqrt)(-MCX_MATHFUN(log)((rand_uniform01(ran)))*gcfg->srcparam1.x;
 		else{
 		    float z0=gcfg->srcparam1.x*gcfg->srcparam1.x*M_PI/gcfg->srcparam1.y; //Rayleigh range
-		    r0=sqrt(-log(rand_uniform01(ran))*(1.f+(gcfg->focus*gcfg->focus/(z0*z0))))*gcfg->srcparam1.x;
+		    r0=MCX_MATHFUN(sqrt)(-MCX_MATHFUN(log)((rand_uniform01(ran))*(1.f+(gcfg->focus*gcfg->focus/(z0*z0))))*gcfg->srcparam1.x;
 		}
     #endif
 
 		if(gcfg->srcdir.z>-1.f+EPS && gcfg->srcdir.z<1.f-EPS){
 		    float tmp0=1.f-gcfg->srcdir.z*gcfg->srcdir.z;
-		    float tmp1=r0/sqrt(tmp0);
+		    float tmp1=r0*MCX_MATHFUN(rsqrt)(tmp0);
 		    r->p0.x=gcfg->srcpos.x+tmp1*(gcfg->srcdir.x*gcfg->srcdir.z*cphi - gcfg->srcdir.y*sphi);
 		    r->p0.y=gcfg->srcpos.y+tmp1*(gcfg->srcdir.y*gcfg->srcdir.z*cphi + gcfg->srcdir.x*sphi);
 		    r->p0.z=gcfg->srcpos.z-tmp1*tmp0*cphi;
@@ -655,7 +654,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 #elif defined(MCX_SRC_CONE) || defined(MCX_SRC_ISOTROPIC) || defined(MCX_SRC_ARCSINE) 
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
-		sphi=sin(ang);	cphi=cos(ang);
+		sphi=MCX_MATHFUN(sin)(ang);	cphi=MCX_MATHFUN(cos)(ang);
     #if defined(MCX_SRC_CONE) // a solid-angle section of a uniform sphere
 		        do{
 				ang=(gcfg->srcparam1.y>0) ? TWO_PI*rand_uniform01(ran) : acos(2.f*rand_uniform01(ran)-1.f); //sine distribution
@@ -666,8 +665,8 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 			else
 				ang=M_PI*rand_uniform01(ran); //uniform distribution in zenith angle, arcsine
     #endif
-		stheta=sin(ang);
-		ctheta=cos(ang);
+		stheta=MCX_MATHFUN(sin)(ang);
+		ctheta=MCX_MATHFUN(cos)(ang);
 		r->vec.x=stheta*cphi;
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
@@ -678,10 +677,10 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 #elif defined(MCX_SRC_ZGAUSSIAN)
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
-		sphi=sin(ang);	cphi=cos(ang);
-		ang=sqrt(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran))*gcfg->srcparam1.x;
-		stheta=sin(ang);
-		ctheta=cos(ang);
+		sphi=MCX_MATHFUN(sin)(ang);	cphi=MCX_MATHFUN(cos)(ang);
+		ang=MCX_MATHFUN(sqrt)(-2.f*MCX_MATHFUN(log)((rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran))*gcfg->srcparam1.x;
+		stheta=MCX_MATHFUN(sin)(ang);
+		ctheta=MCX_MATHFUN(cos)(ang);
 		r->vec.x=stheta*cphi;
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
@@ -696,7 +695,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 	              float s,p;
 		      t=1.f-2.f*rand_uniform01(ran);
 		      s=1.f-2.f*rand_uniform01(ran);
-		      p=sqrt(1.f-r->vec.x*r->vec.x-r->vec.y*r->vec.y)*(rand_uniform01(ran)>0.5f ? 1.f : -1.f);
+		      p=MCX_MATHFUN(sqrt)(1.f-r->vec.x*r->vec.x-r->vec.y*r->vec.y)*(rand_uniform01(ran)>0.5f ? 1.f : -1.f);
 		      float3 vv;
 		      vv.x=r->vec.y*p-r->vec.z*s;
 		      vv.y=r->vec.z*t-r->vec.x*p;
@@ -724,7 +723,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
                      r->vec.y=origin.y-r->p0.y;
                      r->vec.z=origin.z-r->p0.z;
 		}
-		Rn2=rsqrt(dot(r->vec,r->vec)); // normalize
+		Rn2=MCX_MATHFUN(rsqrt)(dot(r->vec,r->vec)); // normalize
 		r->vec=r->vec*Rn2;
 	}
 
@@ -790,17 +789,21 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 
 void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global float *weight,
     __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, __constant medium *med,
-    __global float *n_det, __global uint *detectedphoton, __constant float4 *gdetpos, RandType *ran){
+    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran){
 
-	int oldeid,fixcount=0,exitdet=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0.f,0.,0,0};
+	int oldeid,fixcount=0;
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0.f,0,0};
 
 	r.photonid=id;
 
 	/*initialize the photon parameters*/
         launchphoton(gcfg, &r, node, elem, srcelem, ran);
-	ppath[gcfg->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
+	*energytot+=r.weight;
 
+#ifdef MCX_SAVE_DETECTORS
+	if(gcfg->issavedet)
+	    ppath[gcfg->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
+#endif
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 	int pidx;
@@ -816,19 +819,22 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    	  r.eid=-r.eid;
         	  r.faceid=-1;
 	    }
+#ifdef MCX_SAVE_DETECTORS
 	    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
 	            ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
+#endif
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
 	            r.p0=r.pout;
 
 		    oldeid=r.eid;
 	    	    r.eid=((__global int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
-
+#ifdef MCX_DO_REFLECTION
 		    if(gcfg->isreflect && (r.eid==0 || med[type[r.eid-1]].n != med[type[oldeid-1]].n )){
 			if(! (r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ))
 			    reflectray(gcfg,&r.vec,&oldeid,&r.eid,r.faceid,ran,type,normal,med);
 		    }
+#endif
 	    	    if(r.eid==0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(type[oldeid-1]==0 && type[r.eid-1]){
@@ -849,19 +855,23 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
                         }
 		    }
 //		    if(r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ) break;
-	    	    if(r.pout.x!=MMC_UNDEFINED && (gcfg->debuglevel&dlMove))
+	    	    if(r.pout.x!=MMC_UNDEFINED) // && (gcfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(("P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen));
 
 	    	    r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
+#ifdef MCX_SAVE_DETECTORS
 		    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
 			ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
+#endif
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 		       fixphoton(&r.p0,node,(__global int *)(elem+(r.eid-1)*gcfg->elemlen));
                        r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
+#ifdef MCX_SAVE_DETECTORS
 		       if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
 	            		ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
+#endif
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
@@ -876,24 +886,23 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
                        //if(gcfg->debuglevel&dlExit)
         		 MMC_FPRINTF(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
+#ifdef MCX_SAVE_DETECTORS
                        if(gcfg->issavedet && gcfg->issaveexit){                                     /*when issaveexit is set to 1*/
                             copystate(ppath+(gcfg->reclen-2-6),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
                             copystate(ppath+(gcfg->reclen-2-3),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
+#endif
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
                          MMC_FPRINTF(("T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 	    	    }else if(r.eid && r.faceid!=-2  && gcfg->debuglevel&dlEdge){
         		 MMC_FPRINTF(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    }
+#ifdef MCX_SAVE_DETECTORS
 		    if(gcfg->issavedet && r.eid==0){
-		       int i;
-                       if(gcfg->detnum==0 && gcfg->isextdet && type[oldeid-1]==gcfg->maxmedia+1){
-                          exitdet=oldeid;
-                       }else{
-                          //savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,gcfg);
-                          clearpath(ppath,gcfg);
-		       }
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,gcfg);
+                          clearpath(ppath,gcfg->reclen);
 		    }
+#endif
 	    	    break;  /*photon exits boundary*/
 	    }
 	    //if(gcfg->debuglevel&dlMove)
@@ -911,32 +920,29 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    r.slen=r.slen0;
             if(gcfg->ismomentum && type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
                   ppath[(gcfg->maxmedia<<1)-1+type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
-            ppath[type[r.eid-1]-1]+=1.f;                          /*the first medianum block stores the scattering event counts*/
+#ifdef MCX_SAVE_DETECTORS
+             if(gcfg->issavedet)
+	          ppath[type[r.eid-1]-1]+=1.f;                          /*the first medianum block stores the scattering event counts*/
+#endif
 	}
-	if(gcfg->issavedet && exitdet>0){
-		/*uint baseaddr=atomic_inc(detectedphoton);
-		ppath[offset]=exitdet;
-	        copystate(ppath+offset+1,ppath,(gcfg->reclen-1));
-		*/
-	}
-/*
-	if(gcfg->srctype!=stPattern){
-	    absorbweight+=r.Eabsorb;
-	}
-*/
+	*energyesc+=r.weight;
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
     __global float3 *node,__global int *elem,  __global float *weight, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
-    __global uint *n_seed, __global int *progress){
+    __global uint *n_seed, __global int *progress, __global float *energy){
  
  	RandType t[RAND_BUF_LEN];
 	gpu_rng_init(t,n_seed,get_global_id(0));
-    
+        float  energyesc=0.f, energytot=0.f;
+
 	/*launch photons*/
 	for(int i=0;i<nphoton+(get_global_id(0)<ophoton);i++){
-	    onephoton(i,sharedmem+get_local_id(0)*(gcfg->reclen-1),gcfg,node,elem,weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,gdetpos,t);
+	    onephoton(i,sharedmem+get_local_id(0)*(gcfg->reclen-1),gcfg,node,elem,weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t);
 	    //atomicadd(progress,1);
 	}
+	energy[get_global_id(0)<<1]=energyesc;
+	energy[1+(get_global_id(0)<<1)]=energytot;
+	
 }

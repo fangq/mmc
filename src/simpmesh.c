@@ -739,7 +739,6 @@ void tracer_build(raytracer *tracer){
 
 				Rn2=1.f/sqrt(vec_dot(&vN,&vN));
 				vec_mult(&vN,Rn2,&vN);
-
 				vecN[j]=vN.x;
 				vecN[j+4]=vN.y;
 				vecN[j+8]=vN.z;

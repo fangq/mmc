@@ -55,7 +55,6 @@ tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv){
         mcx_initcfg(cfg);
         mcx_parsecmd(argc,argv,cfg);
-	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from commands %d ... ",cfg->isgpuinfo));
 	if(cfg->isgpuinfo==0) mesh_init_from_cfg(mesh,cfg);
         return 0;
 }
@@ -72,7 +71,6 @@ int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, 
 
 int mmc_init_from_json(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, char *jcfg, char *jmesh){
         mcx_initcfg(cfg);
-	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from JSON ... "));
 	mcx_loadfromjson(jcfg,cfg);
 	mesh_init_from_cfg(mesh,cfg); /*need to define mesh load from json*/
 	tracer_init(tracer,mesh,cfg->method);

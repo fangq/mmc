@@ -234,7 +234,7 @@ void mcx_initcfg(mcconfig *cfg){
      memset(&(cfg->detparam2),0,sizeof(float4));
      cfg->detpattern=NULL;
 
-     cfg->optlevel=0;
+     cfg->optlevel=3;
 
      memset(cfg->deviceid,0,MAX_DEVICE);
      memset(cfg->workload,0,MAX_DEVICE*sizeof(float));
@@ -286,6 +286,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->replayweight);
      if(cfg->replaytime)
         free(cfg->replaytime);
+     if(cfg->exportdetected)
+        free(cfg->exportdetected);
      if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)
         fclose(cfg->flog);
 #ifndef MCX_EMBED_CL
