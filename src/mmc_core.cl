@@ -305,7 +305,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
 	S = ((float4)(r->vec.x)*normal[baseid]+(float4)(r->vec.y)*normal[baseid+1]+(float4)(r->vec.z)*normal[baseid+2]);
 	T = normal[baseid+3] - ((float4)(r->p0.x)*normal[baseid]+(float4)(r->p0.y)*normal[baseid+1]+(float4)(r->p0.z)*normal[baseid+2]);
-	T = native_divide(T,S);
+	T = T/S;
 //printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
 
         //S = -convert_float3_rte(isgreaterequal(T,(float4)(0.f)));
@@ -329,7 +329,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
             r->nexteid=((__global int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 //printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
 
-	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : native_divide(r->slen,prop.mus);
+	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
 	    r->isend=(Lmin>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lmin);
 	    r->pout=r->p0+(float3)(Lmin)*r->vec;
@@ -370,13 +370,11 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
                 if(!gcfg->basisorder){
 		     if(gcfg->method==rtBLBadouel){
-/*
 #ifdef USE_ATOMIC
                         if(gcfg->isatomic)
 			    atomicadd(weight+eid+tshift,(double)ww);
                         else
 #endif
-*/
                             weight[eid+tshift]+=ww;
                      }else{
 			    float segloss, w0, dstep;
@@ -791,7 +789,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global float *weight,
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global double *weight,
     __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, __constant medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran){
 
@@ -938,15 +936,17 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCX
     __global uint *n_seed, __global int *progress, __global float *energy){
  
  	RandType t[RAND_BUF_LEN];
-	gpu_rng_init(t,n_seed,get_global_id(0));
+	int idx=get_global_id(0);
+	gpu_rng_init(t,n_seed,idx);
         float  energyesc=0.f, energytot=0.f;
 
 	/*launch photons*/
-	for(int i=0;i<nphoton+(get_global_id(0)<ophoton);i++){
-	    onephoton(i,sharedmem+get_local_id(0)*(gcfg->reclen-1),gcfg,node,elem,weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t);
+	for(int i=0;i<nphoton+(idx<ophoton);i++){
+	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+idx*(gcfg->reclen-1),gcfg,node,elem,
+	        weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t);
 	    //atomicadd(progress,1);
 	}
-	energy[get_global_id(0)<<1]=energyesc;
-	energy[1+(get_global_id(0)<<1)]=energytot;
+	energy[idx<<1]=energyesc;
+	energy[1+(idx<<1)]=energytot;
 	
 }
