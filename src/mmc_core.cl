@@ -17,6 +17,8 @@
   #pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
 #endif
 
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
+
 #ifdef USE_HALF
   #pragma OPENCL EXTENSION cl_khr_fp16 : enable
   #define FLOAT4VEC half4
@@ -224,6 +226,7 @@ inline float atomicadd(volatile __global float* address, const float value){
     while ((old = atomic_xchg(address, atomic_xchg(address, 0.0f)+old))!=0.0f);
     return old;
 }
+
 #endif
 
 void clearpath(__local float *p, int len){
@@ -285,11 +288,11 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
  * \param[out] visit: statistics counters of this thread
  */
 
-float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *elem,__global float *weight,
+float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *elem,__global double *weight,
     int type, __global int *facenb, __global float4 *normal, __constant medium *med){
 
 	float Lmin=1e10f;
-	float Lp0=0.f,currweight,ww,totalloss=0.f;
+	float currweight,ww,totalloss=0.f;
 	int tshift,faceidx=-1,baseid,eid;
 	float4 T,S;
 
@@ -302,7 +305,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
 	S = ((float4)(r->vec.x)*normal[baseid]+(float4)(r->vec.y)*normal[baseid+1]+(float4)(r->vec.z)*normal[baseid+2]);
 	T = normal[baseid+3] - ((float4)(r->p0.x)*normal[baseid]+(float4)(r->p0.y)*normal[baseid+1]+(float4)(r->p0.z)*normal[baseid+2]);
-	T = T/S;
+	T = native_divide(T,S);
 //printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
 
         //S = -convert_float3_rte(isgreaterequal(T,(float4)(0.f)));
@@ -326,10 +329,9 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
             r->nexteid=((__global int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 //printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
 
-	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
-	    Lp0=Lmin;
-	    r->isend=(Lp0>dlen);
-	    r->Lmove=((r->isend) ? dlen : Lp0);
+	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : native_divide(r->slen,prop.mus);
+	    r->isend=(Lmin>dlen);
+	    r->Lmove=((r->isend) ? dlen : Lmin);
 	    r->pout=r->p0+(float3)(Lmin)*r->vec;
 
 	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>=(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
@@ -368,11 +370,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
                 if(!gcfg->basisorder){
 		     if(gcfg->method==rtBLBadouel){
+/*
 #ifdef USE_ATOMIC
                         if(gcfg->isatomic)
-			    atomicadd(weight+eid+tshift,ww);
+			    atomicadd(weight+eid+tshift,(double)ww);
                         else
 #endif
+*/
                             weight[eid+tshift]+=ww;
                      }else{
 			    float segloss, w0, dstep;
@@ -929,7 +933,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
-    __global float3 *node,__global int *elem,  __global float *weight, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
+    __global float3 *node,__global int *elem,  __global double *weight, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy){
  
