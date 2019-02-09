@@ -144,8 +144,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visitor_init(cfg, &master);
 
+
 	t0=StartTimer();
-	
+
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg->issaveseed=0;
 #endif
@@ -158,6 +159,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
             omp_set_num_threads(1);
 #endif
         }
+
+        unsigned int *seeds=NULL;
 
 	/***************************************************************************//**
 	The master thread then spawn multiple work-threads depending on your
@@ -174,6 +177,22 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 #pragma omp parallel private(ran0,ran1,threadid,j)
 {
 	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
+
+#ifdef _OPENMP
+        unsigned int threadnum=omp_get_num_threads();
+#else
+        unsigned int threadnum=1;
+#endif
+
+#pragma omp master
+{
+printf("thread num=%d\n",threadnum);
+        seeds=(unsigned int *)malloc(sizeof(int)*threadnum*RAND_SEED_WORD_LEN);
+	srand(cfg->seed);
+	for(i=0;i<threadnum*RAND_SEED_WORD_LEN;i++)
+	    seeds[i]=rand();
+}
+#pragma omp barrier
 	visit.reclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+2;
 	visitor_init(cfg, &visit);
 	if(cfg->issavedet){
@@ -184,7 +203,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 #ifdef _OPENMP
 	threadid=omp_get_thread_num();
 #endif
-	rng_init(ran0,ran1,(unsigned int *)&(cfg->seed),threadid);
+
+	rng_init(ran0,ran1,seeds,threadid);
 
 	/*launch photons*/
         #pragma omp for reduction(+:raytri,raytri0)
@@ -243,6 +263,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	#pragma omp barrier
 	visitor_clear(&visit);
 }
+        if(seeds) free(seeds);
 
         /** \subsection sreport Post simulation */
 

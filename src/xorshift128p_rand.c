@@ -22,55 +22,55 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    logistic_rand.c
+\file    posix_randr.c
 
-\brief   A Random Number Generator based on coupled chaotic Logistic lattice
+\brief   A POSIX Random Number Generator for multi-threaded applications
 *******************************************************************************/
 
-#ifndef _MMC_SFMT_RAND_H
-#define _MMC_SFMT_RAND_H
+#ifndef _MMC_POSIX_RAND_H
+#define _MMC_POSIX_RAND_H
 
-#include "sfmt_rand.h"
-#include "SFMT/SFMT.h"
+#include <math.h>
+#include <stdio.h>
+#include "xorshift128p_rand.h"
 
 #ifdef MMC_USE_SSE_MATH
 #include "sse_math/sse_math.h"
 #include <smmintrin.h>
 #endif
 
-#define MAX_SFMT_RAND        4294967296           //2^32
-#define R_MAX_SFMT_RAND      2.3283064359966e-10f //1/(2^32+1)
-#define LOG_RNG_MAX          22.1807097779182f    //log(2^32)
-#define INIT_MULT            1812433253
+#define LOG_RNG_MAX             22.1807097779182f
 
-// generate random number for the next zenith angle
-__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tnew[RAND_BUF_LEN]){
+static float xorshift128p_nextf (RandType t[RAND_BUF_LEN]){
+   union {
+        ulong  i;
+	float f[2];
+	uint  u[2];
+   } s1;
+   const ulong s0 = t[1];
+   s1.i = t[0];
+   t[0] = s0;
+   s1.i ^= s1.i << 23; // a
+   t[1] = s1.i ^ s0 ^ (s1.i >> 18) ^ (s0 >> 5); // b, c
+   s1.i = t[1] + s0;
+   s1.u[0] = 0x3F800000U | (s1.u[0] >> 9);
+
+   return s1.f[0] - 1.0f;
 }
 
-__device__ void sfmt_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
-     uint32_t ini[2];
-     ini[0]=n_seed[idx*RAND_SEED_WORD_LEN];
-     ini[1]=n_seed[idx*RAND_SEED_WORD_LEN+1];
-     init_by_array(ini, 2);
-     #pragma omp critical
-     {
-        fill_array32(t,RAND_BUF_LEN);
-     }
+static void xorshift128p_seed (uint *seed,RandType t[RAND_BUF_LEN]){
+    t[0] = (ulong)seed[0] << 32 | seed[1] ;
+    t[1] = (ulong)seed[2] << 32 | seed[3];
 }
+
 // transform into [0,1] random number
 __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
-    static __thread unsigned int pos;
-    if(pos>=RAND_BUF_LEN) {
-        #pragma omp critical
-	{
-	    fill_array32(t,RAND_BUF_LEN);
-	}
-	pos=0;
-    }
-    return t[pos++]*R_MAX_SFMT_RAND;
+    return xorshift128p_nextf(t);
 }
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
-    sfmt_init(t,tnew,n_seed,idx);
+    xorshift128p_seed(n_seed+idx*RAND_SEED_WORD_LEN,t);
+}
+__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]){
 }
 
 #include "rng_common.h"

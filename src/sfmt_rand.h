@@ -42,7 +42,7 @@ typedef unsigned int uint;
 #define MCX_RNG_NAME       "SFMT19937 RNG"
 
 #define RAND_BUF_LEN       1248    //buffer length
-#define RAND_SEED_LEN      2       //
+#define RAND_SEED_WORD_LEN      2       //
 #define MEXP               19937
 
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx);

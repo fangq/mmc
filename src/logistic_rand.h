@@ -45,7 +45,7 @@
 #define MCX_RNG_NAME       "Logistic-Lattice"
 
 #define RAND_BUF_LEN       5        //register arrays
-#define RAND_SEED_LEN      5        //32bit seed length (32*5=160bits)
+#define RAND_SEED_WORD_LEN      5        //32bit seed length (32*5=160bits)
 
 __device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]);
 __device__ void logistic_init(RandType *t,RandType *tnew,uint seed[],uint idx);

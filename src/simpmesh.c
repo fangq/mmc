@@ -783,7 +783,7 @@ void tracer_clear(raytracer *tracer){
 float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg, float *pmom){
 
     float nextslen;
-    float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
+    float sphi=0.f,cphi=0.f,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
 
     rand_need_more(ran,ran0);

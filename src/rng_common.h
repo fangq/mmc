@@ -31,11 +31,11 @@
 #define _MMC_RNG_COMMON_H
 
 #define TWO_PI     (M_PI*2.0)
+#define EPS        1e-6f
 
 //! generate [0,1] random number for the next scattering length
 __device__ float rand_next_scatlen(RandType t[RAND_BUF_LEN]){
-    float ran=rand_uniform01(t);
-    return ((ran==0.f)?LOG_RNG_MAX:(-logf(ran)));
+    return -logf(rand_uniform01(t)+EPS);
 }
 //! generate [0,1] random number for the next arimuthal angle
 __device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]){

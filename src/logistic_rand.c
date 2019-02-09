@@ -91,13 +91,9 @@ __device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_L
 
 __device__ void logistic_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
      int i;
-     uint seed=*n_seed;
-     seed=(uint) ((INIT_MULT * (seed ^ (seed >> 30)) + idx));
-     for(i=0;i<RAND_BUF_LEN;i++){
-	seed=(uint) ((INIT_MULT * (seed ^ (seed >> 30)) + i));
-	t[i]=seed*R_MAX_C_RAND;
-        //printf("t=%d\tseed[%d]=%d %f\n",idx,i,seed,t[i]);
-     }
+     for(i=0;i<RAND_BUF_LEN;i++)
+	t[i]=n_seed[idx*RAND_SEED_WORD_LEN+i]*R_MAX_C_RAND;
+
      for(i=0;i<INIT_LOGISTIC;i++)  /*initial randomization*/
            rand_need_more(t,tnew);
 }

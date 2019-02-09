@@ -211,6 +211,8 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->his.normalizer=1.f;
      memcpy(cfg->his.magic,"MCXH",4);
 
+     memset(&(cfg->srcpos),0,sizeof(float3));
+     memset(&(cfg->srcdir),0,sizeof(float3));
      memset(&(cfg->bary0),0,sizeof(float4));
      memset(&(cfg->srcparam1),0,sizeof(float4));
      memset(&(cfg->srcparam2),0,sizeof(float4));

@@ -42,6 +42,8 @@
   #include "logistic_rand.c"
 #elif defined MMC_SFMT    
   #include "sfmt_rand.c"
+#elif defined MMC_XORSHIFT
+  #include "xorshift128p_rand.c"
 #else
   #include "posix_randr.c"
 #endif

@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "tettracing.h"
+#include "fastmath.h"
 
 /**<  Macro to enable SSE4 based ray-tracers */
 
@@ -200,7 +201,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	medium *prop;
 	int *ee;
 	int i,tshift,eid,faceidx=-1;
-	float w[6],Rv,ww,currweight,dlen=0.f,rc,mus; /*dlen is the physical distance*/
+	float w[6]={0.f},Rv,ww,currweight,dlen=0.f,rc,mus; /*dlen is the physical distance*/
 	unsigned int *wi=(unsigned int*)w;
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
 	float Lp0=0.f,ratio;
