@@ -17,9 +17,6 @@
   #pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
 #endif
 
-#pragma OPENCL EXTENSION cl_khr_fp64: enable
-#pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
-
 #ifdef USE_HALF
   #pragma OPENCL EXTENSION cl_khr_fp16 : enable
   #define FLOAT4VEC half4
@@ -229,6 +226,10 @@ inline float atomicadd(volatile __global float* address, const float value){
 }
 
 /*
+
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
+#pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
+
 inline double atomicadd(__global double *val, const double delta){
   union {
   double f;
@@ -323,12 +324,8 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 	T = T/S;
 //if(r->eid==12898) printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
 
-        //S = -convert_float3_rte(isgreaterequal(T,(float4)(0.f)));
-        //T =  S * T + (isless(T,(float4)(0.f))) 
-	T.x=((T.x<=1e-4f)?1e10f:T.x);
-	T.y=((T.y<=1e-4f)?1e10f:T.y);
-	T.z=((T.z<=1e-4f)?1e10f:T.z);
-	T.w=((T.w<=1e-4f)?1e10f:T.w);
+        S = -convert_float4_rte(isgreaterequal(T,(float4)(1e-4f)));
+        T =  S * T - convert_float4_rte(isless(T,(float4)(1e-4f))) * (float4)(1e10f); 
 
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
 	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
@@ -528,10 +525,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *g
 	tmp0=(1.f-g*g)/(1.f-g+2.f*g*rand_next_zangle(ran));
 	tmp0*=tmp0;
 	tmp0=(1.f+g*g-tmp0)/(2.f*g);
-
-    	// when ran=1, CUDA will give me 1.000002 for tmp0 which produces nan later
-    	if(tmp0> 1.f) tmp0=1.f;
-        if(tmp0<-1.f) tmp0=-1.f;
+	tmp0=clamp(tmp0,-1.f,1.f);
 
 	theta=acos(tmp0);
 	stheta=MCX_MATHFUN(sqrt)(1.f-tmp0*tmp0);

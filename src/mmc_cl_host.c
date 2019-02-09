@@ -249,7 +249,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      OCL_ASSERT(((mcxprogram=clCreateProgramWithSource(mcxcontext, 1,(const char **)&(cfg->clsource), NULL, &status),status)));
 
      if(cfg->optlevel>=1)
-         sprintf(opt,"%s ","-cl-opt-disable -DMCX_USE_NATIVE");
+         sprintf(opt,"%s ","-cl-mad-enable -DMCX_USE_NATIVE");
      if(cfg->optlevel>=3)
          sprintf(opt+strlen(opt),"%s ","-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
      
