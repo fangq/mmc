@@ -1243,7 +1243,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     case 'H':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->maxdetphoton),"int");
                      case 'A':
-                                i=mcx_readarg(argc,argv,i,&(cfg->autopilot),"char");
+                                i=mcx_readarg(argc,argv,i,&(cfg->autopilot),"int");
                                 break;
                      case 'G':
                                 if(mcx_isbinstr(argv[i+1])){

@@ -41,7 +41,7 @@ typedef unsigned int uint;
 
 #define MCX_RNG_NAME       "xorshift128+ RNG"
 #define RAND_BUF_LEN       2        //register arrays
-#define RAND_SEED_LEN      4        //48 bit packed with 64bit length
+#define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx);
 

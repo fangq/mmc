@@ -70,7 +70,7 @@ __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
     return xorshift128p_nextf(t);
 }
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
-    xorshift128p_seed((n_seed+idx*RAND_SEED_LEN),t);
+    xorshift128p_seed((n_seed+idx*RAND_SEED_WORD_LEN),t);
 }
 __device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]){
 }

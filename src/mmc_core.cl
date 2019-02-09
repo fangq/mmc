@@ -18,6 +18,7 @@
 #endif
 
 #pragma OPENCL EXTENSION cl_khr_fp64: enable
+#pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 
 #ifdef USE_HALF
   #pragma OPENCL EXTENSION cl_khr_fp16 : enable
@@ -166,7 +167,7 @@ enum TOutputDomain {odMesh, odGrid};
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 #define RAND_BUF_LEN       2        //register arrays
-#define RAND_SEED_LEN      4        //48 bit packed with 64bit length
+#define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 #define LOG_MT_MAX         22.1807097779182f
 #define IEEE754_DOUBLE_BIAS     0x3FF0000000000000ul /* Added to exponent.  */
 
@@ -204,7 +205,7 @@ static void xorshift128p_seed (__global uint *seed,RandType t[RAND_BUF_LEN]){
 }
 
 static void gpu_rng_init(__private RandType t[RAND_BUF_LEN], __global uint *n_seed, int idx){
-    xorshift128p_seed((n_seed+idx*RAND_SEED_LEN),t);
+    xorshift128p_seed((n_seed+idx*RAND_SEED_WORD_LEN),t);
 }
 
 float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]){
@@ -227,6 +228,20 @@ inline float atomicadd(volatile __global float* address, const float value){
     return old;
 }
 
+/*
+inline double atomicadd(__global double *val, const double delta){
+  union {
+  double f;
+  ulong  i;
+  } old, new;
+
+  do{
+     old.f = *val;
+     new.f = old.f + delta;
+  } while (atom_cmpxchg((volatile __global ulong *)val, old.i, new.i) != old.i);
+  return old.f;
+}
+*/
 #endif
 
 void clearpath(__local float *p, int len){
@@ -288,7 +303,7 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
  * \param[out] visit: statistics counters of this thread
  */
 
-float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *elem,__global double *weight,
+float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *elem,__global float *weight,
     int type, __global int *facenb, __global float4 *normal, __constant medium *med){
 
 	float Lmin=1e10f;
@@ -306,14 +321,14 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 	S = ((float4)(r->vec.x)*normal[baseid]+(float4)(r->vec.y)*normal[baseid+1]+(float4)(r->vec.z)*normal[baseid+2]);
 	T = normal[baseid+3] - ((float4)(r->p0.x)*normal[baseid]+(float4)(r->p0.y)*normal[baseid+1]+(float4)(r->p0.z)*normal[baseid+2]);
 	T = T/S;
-//printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
+//if(r->eid==12898) printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
 
         //S = -convert_float3_rte(isgreaterequal(T,(float4)(0.f)));
         //T =  S * T + (isless(T,(float4)(0.f))) 
-	T.x=((T.x<=1e-5f)?1e10f:T.x);
-	T.y=((T.y<=1e-5f)?1e10f:T.y);
-	T.z=((T.z<=1e-5f)?1e10f:T.z);
-	T.w=((T.w<=1e-5f)?1e10f:T.w);
+	T.x=((T.x<=1e-4f)?1e10f:T.x);
+	T.y=((T.y<=1e-4f)?1e10f:T.y);
+	T.z=((T.z<=1e-4f)?1e10f:T.z);
+	T.w=((T.w<=1e-4f)?1e10f:T.w);
 
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
 	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
@@ -327,7 +342,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
             currweight=r->weight;
 
             r->nexteid=((__global int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-//printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
+//if(r->eid==12898) printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
 
 	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
 	    r->isend=(Lmin>dlen);
@@ -344,7 +359,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
 	    totalloss=1.f-totalloss;
 	    r->slen-=r->Lmove*prop.mus;
-//printf("slen=%e lmove=%e mus=%f\n",r->slen,r->Lmove, prop.mus);
+//if(r->eid==12898) printf("slen=%e lmove=%e mus=%f\n",r->slen,r->Lmove, prop.mus);
 	    if(Lmin>=0.f){
 	        int framelen=(gcfg->basisorder?gcfg->nn:gcfg->ne);
 		if(gcfg->method==rtBLBadouelGrid)
@@ -789,7 +804,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global double *weight,
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global float *weight,
     __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, __constant medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran){
 
@@ -931,7 +946,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
-    __global float3 *node,__global int *elem,  __global double *weight, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
+    __global float3 *node,__global int *elem,  __global float *weight, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy){
  

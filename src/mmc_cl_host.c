@@ -212,12 +212,12 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      clEnqueueUnmapMemObject(mcxqueue[0], gprogress[0], progress, 0, NULL, NULL);
 
      for(i=0;i<workdev;i++){
-       Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_LEN);
+       Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_WORD_LEN);
        energy=(cl_float*)calloc(sizeof(cl_float),gpu[i].autothread<<1);
-       for (j=0; j<gpu[i].autothread*RAND_SEED_LEN;j++)
+       for (j=0; j<gpu[i].autothread*RAND_SEED_WORD_LEN;j++)
 	   Pseed[j]=rand();
-       OCL_ASSERT(((gseed[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_LEN,Pseed,&status),status)));
-       OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(double)*fieldlen,mesh->weight,&status),status)));
+       OCL_ASSERT(((gseed[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_WORD_LEN,Pseed,&status),status)));
+       OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*fieldlen,mesh->weight,&status),status)));
        OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*detreclen,Pdet,&status),status)));
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
@@ -241,7 +241,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
          MMC_FPRINTF(cfg->flog,"- code name: [Vanilla MCXCL] compiled with OpenCL version [%d]\n",
              CL_VERSION_1_0);
 
-     MMC_FPRINTF(cfg->flog,"- compiled with: [RNG] %s [Seed Length] %d\n",MCX_RNG_NAME,RAND_SEED_LEN);
+     MMC_FPRINTF(cfg->flog,"- compiled with: [RNG] %s [Seed Length] %d\n",MCX_RNG_NAME,RAND_SEED_WORD_LEN);
      MMC_FPRINTF(cfg->flog,"initializing streams ...\t");
 
      MMC_FPRINTF(cfg->flog,"init complete : %d ms\n",GetTimeMillis()-tic);fflush(cfg->flog);
@@ -249,7 +249,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      OCL_ASSERT(((mcxprogram=clCreateProgramWithSource(mcxcontext, 1,(const char **)&(cfg->clsource), NULL, &status),status)));
 
      if(cfg->optlevel>=1)
-         sprintf(opt,"%s ","-cl-mad-enable -DMCX_USE_NATIVE");
+         sprintf(opt,"%s ","-cl-opt-disable -DMCX_USE_NATIVE");
      if(cfg->optlevel>=3)
          sprintf(opt+strlen(opt),"%s ","-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
      
@@ -421,9 +421,9 @@ is more than what your have specified (%d), please use the -H option to specify 
         	OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gweight[devid],CL_TRUE,0,sizeof(cl_float)*fieldlen,
 	                                         rawfield, 0, NULL, NULL)));
         	MMC_FPRINTF(cfg->flog,"transfer complete:        %d ms\n",GetTimeMillis()-tic);  fflush(cfg->flog);
-/*	        for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
-	           field[i]=rawfield[i]+rawfield[i+fieldlen];
-*/
+	        for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
+	           field[i]=rawfield[i]; //+rawfield[i+fieldlen];
+
 	        free(rawfield);
 
 /*        	if(cfg->respin>1){
@@ -451,11 +451,11 @@ is more than what your have specified (%d), please use the -H option to specify 
 			cfg->exportfield[i]+=field[i];
         	}
              }
-	     if(cfg->respin>1 && RAND_SEED_LEN>1){
-               Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_LEN);
-               for (i=0; i<gpu[devid].autothread*RAND_SEED_LEN; i++)
+	     if(cfg->respin>1 && RAND_SEED_WORD_LEN>1){
+               Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_WORD_LEN);
+               for (i=0; i<gpu[devid].autothread*RAND_SEED_WORD_LEN; i++)
 		   Pseed[i]=rand();
-               OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gseed[devid],CL_TRUE,0,sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_LEN,
+               OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gseed[devid],CL_TRUE,0,sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_WORD_LEN,
 	                                        Pseed, 0, NULL, NULL)));
 	       OCL_ASSERT((clSetKernelArg(mcxkernel[devid], 15, sizeof(cl_mem), (void*)(gseed+devid))));
 	       free(Pseed);
