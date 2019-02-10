@@ -76,7 +76,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      cl_uint  totalcucore;
      cl_uint  devid=0;
      cl_mem gnode,gelem,gtype,gfacenb,gsrcelem,gnormal,gproperty,gparam,gdetpos; /*read-only buffers*/
-     cl_mem *gweight,*gdetphoton,*gseed,*genergy;          /*read-write buffers*/
+     cl_mem *gweight,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
      cl_mem *gprogress,*gdetected, *gsrcpattern;  /*read-write buffers*/
 
      cl_uint meshlen=(cfg->basisorder? mesh->nn : mesh->ne);
@@ -101,6 +101,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
 		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, cfg->e0, cfg->isextdet};
 
+     MCXReporter reporter={0};
      platform=mcx_list_gpu(cfg,&workdev,devices,&gpu);
 
      if(workdev>MAX_DEVICE)
@@ -126,6 +127,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      gprogress=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gdetected=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gsrcpattern=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     greporter=(cl_mem *)malloc(workdev*sizeof(cl_mem));
 
      /* The block is to move the declaration of prop closer to its use */
      cl_command_queue_properties prop = CL_QUEUE_PROFILING_ENABLE;
@@ -221,6 +223,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
        OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*detreclen,Pdet,&status),status)));
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
+       OCL_ASSERT(((greporter[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(MCXReporter),&reporter,&status),status)));
        if(cfg->srctype==MCX_SRC_PATTERN)
            OCL_ASSERT(((gsrcpattern[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*(int)(cfg->srcparam1.w*cfg->srcparam2.w),cfg->srcpattern,&status),status)));
        else if(cfg->srctype==MCX_SRC_PATTERN3D)
@@ -316,6 +319,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],15, sizeof(cl_mem), (void*)(gseed+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],16, sizeof(cl_mem), (void*)(gprogress))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (void*)(genergy+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],18, sizeof(cl_mem), (void*)(greporter+i))));
 	// OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)(gsrcpattern+i))));
      }
      MMC_FPRINTF(cfg->flog,"set kernel arguments complete : %d ms %d\n",GetTimeMillis()-tic, param.method);fflush(cfg->flog);
@@ -394,9 +398,13 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
                cfg->runtime=tic1-tic;
 
            for(devid=0;devid<workdev;devid++){
+	     MCXReporter rep;
+	     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],greporter[devid],CL_TRUE,0,sizeof(MCXReporter),
+                                            &rep, 0, NULL, waittoread+devid)));
+	     reporter.raytet+=rep.raytet;
              if(cfg->issavedet){
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetected[devid],CL_FALSE,0,sizeof(uint),
-                                            &detected, 0, NULL, waittoread+devid)));
+                                            &detected, 0, NULL, NULL)));
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*cfg->maxdetphoton*detreclen,
 	                                        Pdet, 0, NULL, NULL)));
 		if(detected>cfg->maxdetphoton){
@@ -485,8 +493,8 @@ is more than what your have specified (%d), please use the -H option to specify 
      }
 
      // total energy here equals total simulated photons+unfinished photons for all threads
-     MMC_FPRINTF(cfg->flog,"simulated %d photons (%d) with %d devices (repeat x%d)\nMCX simulation speed: %.2f photon/ms\n",
-             cfg->nphoton,cfg->nphoton,workdev, cfg->respin,(double)cfg->nphoton/toc);
+     MMC_FPRINTF(cfg->flog,"simulated %d photons (%d) with %d devices (ray-tet %d)\nMCX simulation speed: %.2f photon/ms\n",
+             cfg->nphoton,cfg->nphoton,workdev, reporter.raytet,(double)cfg->nphoton/toc);
      MMC_FPRINTF(cfg->flog,"total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
              cfg->energytot,(cfg->energytot-cfg->energyesc)/cfg->energytot*100.f);
      fflush(cfg->flog);
@@ -508,6 +516,7 @@ is more than what your have specified (%d), please use the -H option to specify 
          clReleaseMemObject(gprogress[i]);
          clReleaseMemObject(gdetected[i]);
          clReleaseMemObject(gsrcpattern[i]);
+         clReleaseMemObject(greporter[i]);
          clReleaseKernel(mcxkernel[i]);
      }
      free(gseed);

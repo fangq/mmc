@@ -78,7 +78,7 @@
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
 #define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
 
-typedef struct MMC_ray{
+typedef struct MMC_Ray{
 	float3 p0;                    /**< current photon position */
 	float3 vec;                   /**< current photon direction vector */
 	float3 pout;                  /**< the intersection position of the ray to the enclosing tet */
@@ -97,7 +97,7 @@ typedef struct MMC_ray{
 } ray __attribute__ ((aligned (32)));
 
 
-typedef struct KernelParams {
+typedef struct MMC_Parameter {
   float3 srcpos;
   float3 srcdir;
   float  tstart,tend;
@@ -135,6 +135,9 @@ typedef struct KernelParams {
   //int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
 
+typedef struct MMC_Reporter{
+  uint  raytet;
+} MCXReporter  __attribute__ ((aligned (32)));
 
 typedef struct MMC_medium{
         float mua;                     /**<absorption coeff in 1/mm unit*/
@@ -804,7 +807,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__c
 
 void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__constant float3 *node,__constant int *elem, __global float *weight,
     __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
-    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran){
+    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
 	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0.f,0,0};
@@ -825,6 +828,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 
 	while(1){  /*propagate a photon until exit*/
 	    r.slen=branchless_badouel_raytet(&r, gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
+	    (*raytet)++;
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
@@ -874,6 +878,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    		MMC_FPRINTF(("P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen));
 
 	    	    r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
+		    (*raytet)++;
 #ifdef MCX_SAVE_DETECTORS
 		    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
 			ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
@@ -883,6 +888,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 		       fixphoton(&r.p0,node,(__constant int *)(elem+(r.eid-1)*gcfg->elemlen));
                        r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
+		       (*raytet)++;
 #ifdef MCX_SAVE_DETECTORS
 		       if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
 	            		ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
@@ -946,20 +952,21 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
     __constant float3 *node,__constant int *elem,  __global float *weight, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
-    __global uint *n_seed, __global int *progress, __global float *energy){
+    __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter){
  
  	RandType t[RAND_BUF_LEN];
 	int idx=get_global_id(0);
 	gpu_rng_init(t,n_seed,idx);
         float  energyesc=0.f, energytot=0.f;
+	int raytet=0;
 
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
 	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+idx*(gcfg->reclen-1),gcfg,node,elem,
-	        weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t);
+	        weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t,&raytet);
 	    //atomicadd(progress,1);
 	}
 	energy[idx<<1]=energyesc;
 	energy[1+(idx<<1)]=energytot;
-	
+	reporter->raytet+=raytet;
 }

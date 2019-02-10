@@ -81,6 +81,10 @@ typedef struct GPU_mcconfig{
   //cl_int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
 
+typedef struct GPU_reporter{
+  cl_uint  raytet;
+} MCXReporter  __attribute__ ((aligned (32)));
+
 void mmc_run_cl(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 
 #ifdef  __cplusplus
