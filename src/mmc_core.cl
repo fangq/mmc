@@ -13,6 +13,12 @@
 **          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
+#ifdef __CUDA_ARCH__
+  #define __constant const
+  #define __private 
+  #define __local 
+#endif
+
 #ifdef MCX_SAVE_DETECTORS
   #pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
 #endif
@@ -41,7 +47,6 @@
 #endif
 
 #define R_PI               0.318309886183791f
-#define RAND_MAX           4294967295
 
 #define ONE_PI             3.1415926535897932f     //pi
 #define TWO_PI             6.28318530717959f       //2*pi
@@ -59,7 +64,6 @@
 
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
-#define NULL               0
 #define MAX_ACCUM          1000.f
 #define R_MIN_MUS          1e9f
 #define FIX_PHOTON         1e-3f      /**< offset to the ray to avoid edge/vertex */
@@ -304,8 +308,8 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
  * \param[out] visit: statistics counters of this thread
  */
 
-float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *elem,__global float *weight,
-    int type, __global int *facenb, __global float4 *normal, __constant medium *med){
+float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int *elem,__global float *weight,
+    int type, __constant int *facenb, __constant float4 *normal, __constant medium *med){
 
 	float Lmin=1e10f;
 	float currweight,ww,totalloss=0.f;
@@ -333,12 +337,12 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
 	if(r->faceid>=0 && Lmin>=0){
 	    medium prop;
-	    __global int *ee=(__global int *)(elem+eid*gcfg->elemlen);
+	    __constant int *ee=(__constant int *)(elem+eid*gcfg->elemlen);
 
 	    prop=med[type];
             currweight=r->weight;
 
-            r->nexteid=((__global int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+            r->nexteid=((__constant int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 //if(r->eid==12898) printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
 
 	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
@@ -442,7 +446,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *
 
 #ifdef MCX_DO_REFLECTION
 
-float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,RandType *ran, __global int *type, __global float4 *normal, __constant medium *med){
+float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,RandType *ran, __constant int *type, __constant float4 *normal, __constant medium *med){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f,0.f,0.f};
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -450,9 +454,9 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
 
 	faceid=ifaceorder[faceid];
 	/*calculate the normal direction of the intersecting triangle*/
-	pnorm.x=((__global float*)&(normal[offs]))[faceid];
-	pnorm.y=((__global float*)&(normal[offs]))[faceid+4];
-	pnorm.z=((__global float*)&(normal[offs]))[faceid+8];
+	pnorm.x=((__constant float*)&(normal[offs]))[faceid];
+	pnorm.y=((__constant float*)&(normal[offs]))[faceid+4];
+	pnorm.z=((__constant float*)&(normal[offs]))[faceid+8];
 
 	/*pn pointing outward*/
 
@@ -569,7 +573,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *g
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-void fixphoton(float3 *p,__global float3 *nodes, __global int *ee){
+void fixphoton(float3 *p,__constant float3 *nodes, __constant int *ee){
         float3 c0={0.f,0.f,0.f};
 	int i;
         /*calculate element centroid*/
@@ -591,7 +595,7 @@ void fixphoton(float3 *p,__global float3 *nodes, __global int *ee){
  * \param[in,out] ran: the random number generator states
  */
 
-void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__global int *elem,__global int *srcelem, RandType *ran){
+void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__constant int *elem,__constant int *srcelem, RandType *ran){
         int canfocus=1;
         float3 origin=r->p0;
 
@@ -746,7 +750,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
 	for(is=0;is<gcfg->srcelemlen;is++){
                 float bary[4]={0.f,0.f,0.f,0.f};
 		int include = 1;
-		__global int *elems=(__global int *)(elem+(srcelem[is]-1)*gcfg->elemlen);
+		__constant int *elems=(__constant int *)(elem+(srcelem[is]-1)*gcfg->elemlen);
 		for(i=0;i<4;i++){
 			ea=elems[out[i][0]]-1;
 			eb=elems[out[i][1]]-1;
@@ -798,8 +802,8 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__glo
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global float *weight,
-    __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, __constant medium *med,
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__constant float3 *node,__constant int *elem, __global float *weight,
+    __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran){
 
 	int oldeid,fixcount=0;
@@ -824,7 +828,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
-			fixphoton(&r.p0,node,(__global int *)(elem+(r.eid-1)*gcfg->elemlen));
+			fixphoton(&r.p0,node,(__constant int *)(elem+(r.eid-1)*gcfg->elemlen));
 			continue;
                   }
 	    	  r.eid=-r.eid;
@@ -839,7 +843,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	            r.p0=r.pout;
 
 		    oldeid=r.eid;
-	    	    r.eid=((__global int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
+	    	    r.eid=((__constant int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
 #ifdef MCX_DO_REFLECTION
 		    if(gcfg->isreflect && (r.eid==0 || med[type[r.eid-1]].n != med[type[oldeid-1]].n )){
 			if(! (r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ))
@@ -877,7 +881,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    if(r.faceid==-2) break;
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
-		       fixphoton(&r.p0,node,(__global int *)(elem+(r.eid-1)*gcfg->elemlen));
+		       fixphoton(&r.p0,node,(__constant int *)(elem+(r.eid-1)*gcfg->elemlen));
                        r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
 #ifdef MCX_SAVE_DETECTORS
 		       if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
@@ -940,7 +944,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
-    __global float3 *node,__global int *elem,  __global float *weight, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
+    __constant float3 *node,__constant int *elem,  __global float *weight, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy){
  
