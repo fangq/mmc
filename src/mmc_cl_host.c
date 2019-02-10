@@ -79,7 +79,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      cl_mem *gweight,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
      cl_mem *gprogress,*gdetected, *gsrcpattern;  /*read-write buffers*/
 
-     cl_uint meshlen=(cfg->basisorder? mesh->nn : mesh->ne);
+     cl_uint meshlen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : (cfg->basisorder? mesh->nn : mesh->ne);
 
      cl_float  *field;
 
