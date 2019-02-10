@@ -328,11 +328,11 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	S = ((float4)(r->vec.x)*normal[baseid]+(float4)(r->vec.y)*normal[baseid+1]+(float4)(r->vec.z)*normal[baseid+2]);
 	T = normal[baseid+3] - ((float4)(r->p0.x)*normal[baseid]+(float4)(r->p0.y)*normal[baseid+1]+(float4)(r->p0.z)*normal[baseid+2]);
+        T = -convert_float4_rte(isgreater(T,(float4)(0.f)))*T;
 	T = T/S;
-//if(r->eid==12898) printf("e=%d n3=[%e %e %e] v=[%f %f %f] T=[%f %f %f %f]\n",eid, normal[baseid].y,normal[baseid+1].y,normal[baseid+2].y,r->vec.x,r->vec.y,r->vec.z,T.x,T.y,T.z,T.w);
 
-        S = -convert_float4_rte(isgreaterequal(T,(float4)(1e-4f)));
-        T =  S * T - convert_float4_rte(isless(T,(float4)(1e-4f))) * (float4)(1e10f); 
+        S = -convert_float4_rte(isgreater(T,(float4)(0.f)));
+        T =  S * T - convert_float4_rte(islessequal(T,(float4)(0.f))) * (float4)(1e10f); 
 
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
 	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
@@ -346,7 +346,6 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
             currweight=r->weight;
 
             r->nexteid=((__constant int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
-//if(r->eid==12898) printf("T=[%e %e %e %e];eid=%d [%f %f %f] type=%d S=[%e %d %d] ->%d %f\n",T.x,T.y,T.z,T.w,eid, r->p0.x,r->p0.y,r->p0.z, type, Lmin, faceidx, r->faceid,r->nexteid,gcfg->nout);
 
 	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
 	    r->isend=(Lmin>dlen);
@@ -363,7 +362,6 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	    totalloss=1.f-totalloss;
 	    r->slen-=r->Lmove*prop.mus;
-//if(r->eid==12898) printf("slen=%e lmove=%e mus=%f\n",r->slen,r->Lmove, prop.mus);
 	    if(Lmin>=0.f){
 	        int framelen=(gcfg->basisorder?gcfg->nn:gcfg->ne);
 		if(gcfg->method==rtBLBadouelGrid)
