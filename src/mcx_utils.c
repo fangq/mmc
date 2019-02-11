@@ -172,7 +172,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
 #ifdef USE_OPENCL
-     cfg->method=3;
+     cfg->method=4;
 #else
   #ifndef MMC_USE_SSE
      cfg->method=0;
@@ -1391,7 +1391,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                                to calculate the mua/mus Jacobian matrices\n\
  -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
                                detector (det ID starts from 1), use with -E \n\
- -M [%c|PHBSG] (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+ -M [%c|SG] (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
 			       H - Havel's SSE4 ray-tracing algorithm\n\
 			       B - partial Badouel's method (used by TIM-OS)\n\
@@ -1451,10 +1451,14 @@ where possible parameters include (the first item in [] is the default value)\n\
 \n\
 == Example ==\n\
        %s -n 1000000 -f input.json -s test -b 0 -D TP\n",exename,
-#ifdef MMC_USE_SSE
-'H',
+#ifdef USE_OPENCL
+ 'G',
 #else
-'P',
+ #ifdef MMC_USE_SSE
+ 'H',
+ #else
+ 'P',
+ #endif
 #endif
 exename);
 }

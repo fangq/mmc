@@ -174,96 +174,38 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	mmc_validate_config(&cfg,&mesh);
 
         visitor_init(&cfg, &master);
-	tracer_init(&tracer,&mesh,cfg.method);
-	tracer_prep(&tracer,&cfg);
+	if(cfg.isgpuinfo==0) mmc_prep(&cfg,&mesh,&tracer);
 
         dt=GetTimeMillis();
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",dt-t0));
 
     /** \subsection ssimu Parallel photon transport simulation */
 
-    /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
-#pragma omp parallel private(ran0,ran1,threadid,pidx) shared(errorflag)
-{
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
-	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
-        visitor_init(&cfg, &visit);
-	if(cfg.issavedet){
-            if(cfg.issaveseed)
-                visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
-	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
-        }
-    #ifdef _OPENMP
-	threadid=omp_get_thread_num();	
-    #endif
-	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
-    #ifdef MATLAB_MEX_FILE
-        if((cfg.debuglevel & dlProgress) && threadid==0)
-	  if(usewaitbar)
-             hprop = waitbar_create (0, NULL);
-    #endif
-
-	/*launch photons*/
-	#pragma omp for reduction(+:raytri,raytri0)
-	for(i=0;i<cfg.nphoton;i++){
-            #pragma omp flush (errorflag)
-	    if(errorflag){
-		i=cfg.nphoton;
-		continue;
-	    }
-            try{
-		visit.raytet=0.f;
-                visit.raytet0=0.f;
-                if(cfg.seed==SEED_FROM_FILE)
-                   onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i*RAND_BUF_LEN,ran1,&visit);
-                else
-                   onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
-		raytri+=visit.raytet;
-                raytri0+=visit.raytet0;
-		#pragma omp atomic
-		   ncomplete++;
-
-		if((cfg.debuglevel & dlProgress) && threadid==0 && cfg.nphoton>0){
-#ifdef MATLAB_MEX_FILE
-                    int prog=ncomplete*100/cfg.nphoton;
-                    static int oldprog=-1;
-                    char percent[8]="";
-                    sprintf(percent,"%d%%",prog);
-                    if(prog!=oldprog){
-		       if(usewaitbar)
-                        waitbar_update (((double)ncomplete)/cfg.nphoton, hprop, percent);
-		       else
-		        mcx_progressbar(ncomplete,&cfg);
-                    }
-		    oldprog=prog;
+        try{
+#ifdef USE_OPENCL
+            mmc_run_cl(&cfg,&mesh,&tracer);
 #else
-                    mcx_progressbar(ncomplete,&cfg);
+            mmc_run_mp(&cfg,&mesh,&tracer);
 #endif
-                }
-	    }catch(const char *err){
-        	mexPrintf("Error from thread (%d): %s\n",threadid,err);
-		errorflag++;
-	    }catch(const std::exception &err){
-        	mexPrintf("C++ Error from thread (%d): %s\n",threadid,err.what());
-		errorflag++;
-	    }catch(...){
-        	mexPrintf("Unknown Exception from thread (%d)",threadid);
-		errorflag++;
-	    }
-	}
+        }catch(const char *err){
+    	    mexPrintf("Error from thread (%d): %s\n",threadid,err);
+    	    errorflag++;
+        }catch(const std::exception &err){
+    	    mexPrintf("C++ Error from thread (%d): %s\n",threadid,err.what());
+    	    errorflag++;
+        }catch(...){
+    	    mexPrintf("Unknown Exception from thread (%d)",threadid);
+    	    errorflag++;
+        }
 
         for(pidx=0;pidx<cfg.srcnum;pidx++){
-            #pragma omp atomic
                 master.launchweight[pidx] += visit.launchweight[pidx];
-            #pragma omp atomic
                 master.absorbweight[pidx] += visit.absorbweight[pidx];
         }
 
         /** If no error is detected, generat all output data */
 	if(cfg.issavedet && errorflag==0){
-	    #pragma omp atomic
 		master.detcount+=visit.bufpos;
-            #pragma omp barrier
             if(master.detcount>0){
 	      if(threadid==0){
 		if(nlhs>=2){
@@ -289,8 +231,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
                         master.photonseed=calloc(master.detcount,(sizeof(RandType)*RAND_BUF_LEN));
                 }
 	      }
-              #pragma omp barrier
-              #pragma omp critical
               {
 		memcpy(master.partialpath+master.bufpos*visit.reclen,
 		       visit.partialpath,visit.bufpos*visit.reclen*sizeof(float));
@@ -300,10 +240,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		master.bufpos+=visit.bufpos;
               }
             }
-            #pragma omp barrier
 	    visitor_clear(&visit);
 	}
-}
 
 	/** \subsection sreport Post simulation */
 
@@ -351,17 +289,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		fielddim[2]=cfg.dim.y;
 		fielddim[3]=cfg.dim.z;
 		fielddim[4]=cfg.maxgate;
-        if(cfg.srcnum>1){
-            mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
-        }else{
-            mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
-        }
+		if(cfg.srcnum>1){
+		    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(5,fielddim,mxDOUBLE_CLASS,mxREAL));
+		}else{
+		    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+		}
 	    }else{
-            if(cfg.srcnum>1){
-              mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
-            }else{
-              mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
-            }
+		if(cfg.srcnum>1){
+		  mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+		}else{
+		  mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+		}
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
