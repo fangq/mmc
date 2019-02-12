@@ -78,6 +78,7 @@ typedef struct GPU_mcconfig{
   cl_float4 bary0;
   cl_int    e0;
   cl_int    isextdet;
+  cl_int    framelen;
   //cl_int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
 

@@ -55,7 +55,6 @@ extern cl_event kernelevent;
 void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 
      cl_uint i,j,iter;
-     cl_float  minstep=MIN(MIN(cfg->steps.x,cfg->steps.y),cfg->steps.z);
      cl_float t,twindow0,twindow1;
      cl_float fullload=0.f;
      cl_float *energy;
@@ -96,10 +95,10 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 		     {{cfg->srcparam1.x,cfg->srcparam1.y,cfg->srcparam1.z,cfg->srcparam1.w}},
 		     {{cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w}},
 		     0,cfg->maxgate,(uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen, 
-		     cfg->mcmethod, cfg->method, minstep*R_C0*cfg->unitinmm, cfg->basisorder, cfg->srcpos.w, 
+		     cfg->mcmethod, cfg->method, 1.f/cfg->unitinmm, cfg->basisorder, cfg->srcpos.w, 
 		     mesh->nn, mesh->ne, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout, 
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
-		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, cfg->e0, cfg->isextdet};
+		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, cfg->e0, cfg->isextdet, meshlen};
 
      MCXReporter reporter={0};
      platform=mcx_list_gpu(cfg,&workdev,devices,&gpu);
@@ -107,9 +106,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      if(workdev>MAX_DEVICE)
          workdev=MAX_DEVICE;
 
-     if(devices == NULL){
-         OCL_ASSERT(-1);
-     }
+     if(devices == NULL || workdev==0)
+         mcx_error(-99,(char*)("Unable to find devices!"),__FILE__,__LINE__);
 
      cl_context_properties cps[3]={CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0};
 

@@ -82,18 +82,18 @@ typedef struct MMC_Ray{
 	float3 p0;                    /**< current photon position */
 	float3 vec;                   /**< current photon direction vector */
 	float3 pout;                  /**< the intersection position of the ray to the enclosing tet */
-	float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
 	int eid;                      /**< the index of the enclosing tet (starting from 1) */
 	int faceid;                   /**< the index of the face at which ray intersects with tet */
 	int isend;                    /**< if 1, the scattering event ends before reaching the intersection */
 	int nexteid;                  /**< the index to the neighboring tet to be moved into */
 	float weight;                 /**< photon current weight */
 	float photontimer;            /**< the total time-of-fly of the photon */
-	float slen0;                  /**< initial unitless scattering length = length*mus */
 	float slen;                   /**< the remaining unitless scattering length = length*mus  */
 	float Lmove;                  /**< last photon movement length */
-	unsigned int photonid;        /**< index of the current photon */
-	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
+	//float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
+	//float slen0;                  /**< initial unitless scattering length = length*mus */
+	//unsigned int photonid;        /**< index of the current photon */
+	//unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 } ray __attribute__ ((aligned (32)));
 
 
@@ -132,6 +132,7 @@ typedef struct MMC_Parameter {
   float4 bary0;
   int    e0;
   int    isextdet;
+  int    framelen;
   //int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
 
@@ -314,31 +315,32 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
 float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int *elem,__global float *weight,
     int type, __constant int *facenb, __constant float4 *normal, __constant medium *med){
 
-	float Lmin=1e10f;
+	float Lmin;
 	float currweight,ww,totalloss=0.f;
-	int tshift,faceidx=-1,baseid,eid;
+	int tshift,faceidx=-1,eid;
 	float4 T,S;
 
-	eid=r->eid-1;
-	baseid=eid<<2;
+	eid=(r->eid-1)<<2;
 
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
 
-	S = ((float4)(r->vec.x)*normal[baseid]+(float4)(r->vec.y)*normal[baseid+1]+(float4)(r->vec.z)*normal[baseid+2]);
-	T = normal[baseid+3] - ((float4)(r->p0.x)*normal[baseid]+(float4)(r->p0.y)*normal[baseid+1]+(float4)(r->p0.z)*normal[baseid+2]);
+	S = ((float4)(r->vec.x)*normal[eid]+(float4)(r->vec.y)*normal[eid+1]+(float4)(r->vec.z)*normal[eid+2]);
+	T = normal[eid+3] - ((float4)(r->p0.x)*normal[eid]+(float4)(r->p0.y)*normal[eid+1]+(float4)(r->p0.z)*normal[eid+2]);
         T = -convert_float4_rte(isgreater(T,(float4)(0.f)))*T;
 	T = T/S;
 
         S = -convert_float4_rte(isgreater(T,(float4)(0.f)));
         T =  S * T - convert_float4_rte(islessequal(T,(float4)(0.f))) * (float4)(1e10f); 
 
+	eid=r->eid-1;
+
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
 	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
 	r->faceid=faceorder[faceidx];
 
-	if(r->faceid>=0 && Lmin>=0){
+	if(r->faceid>=0 && Lmin>=0.f){
 	    medium prop;
 	    __constant int *ee=(__constant int *)(elem+eid*gcfg->elemlen);
 
@@ -347,9 +349,9 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
             r->nexteid=((__constant int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 
-	    float dlen=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
-	    r->isend=(Lmin>dlen);
-	    r->Lmove=((r->isend) ? dlen : Lmin);
+	    r->Lmove=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
+	    r->isend=(Lmin>r->Lmove);
+	    r->Lmove=((r->isend) ? r->Lmove : Lmin);
 	    r->pout=r->p0+(float3)(Lmin)*r->vec;
 
 	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>=(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
@@ -362,69 +364,62 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	    totalloss=1.f-totalloss;
 	    r->slen-=r->Lmove*prop.mus;
-	    if(Lmin>=0.f){
-	        int framelen=(gcfg->basisorder?gcfg->nn:gcfg->ne);
-		if(gcfg->method==rtBLBadouelGrid)
-		    framelen=gcfg->crop0.z;
-		ww=currweight-r->weight;
-        	r->photontimer+=r->Lmove*(prop.n*R_C0);
+	    ww=currweight-r->weight;
+            r->photontimer+=r->Lmove*(prop.n*R_C0);
 /*
-		if(gcfg->outputtype==otWL || gcfg->outputtype==otWP)
-			tshift=MIN( ((int)(replaytime[r->photonid]*gcfg->Rtstep)), gcfg->maxgate-1 )*framelen;
-		else
+	    if(gcfg->outputtype==otWL || gcfg->outputtype==otWP)
+		    tshift=MIN( ((int)(replaytime[r->photonid]*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
+	    else
 */
-                	tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*framelen;
+                    tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
 
-        	//if(gcfg->debuglevel&dlAccum)
-		   //MMC_FPRINTF(("A %f %f %f %e %d %e\n",r->p0.x,r->p0.y,r->p0.z,Lmin,eid+1,dlen));
-
-		if(prop.mua>0.f){
-		  if(gcfg->outputtype==otFlux || gcfg->outputtype==otJacobian)
-                     ww/=prop.mua;
-		}
-
-	        r->p0=r->p0+(float3)(r->Lmove)*r->vec;;
-
-                if(!gcfg->basisorder){
-		     if(gcfg->method==rtBLBadouel){
-#ifdef USE_ATOMIC
-                        if(gcfg->isatomic)
-			    atomicadd(weight+eid+tshift,(double)ww);
-                        else
-#endif
-                            weight[eid+tshift]+=ww;
-                     }else{
-			    float segloss, w0, dstep;
-			    int3 idx;
-			    int i, seg=(int)(r->Lmove*gcfg->dstep)+1;
-			    seg=(seg<<1);
-			    dstep=r->Lmove/seg;
-	                    segloss=MCX_MATHFUN(exp)(-prop.mua*dstep);
-			    T.xyz =  r->vec * (float3)(dstep); /*step*/
-			    S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
-			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
-			    w0=ww;
-                            for(i=0; i< seg; i++){
-				idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
-				weight[idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x+tshift]+=w0*totalloss;
-				w0*=segloss;
-			        S += T;
-                            }
-			}
-		  }else{
-                        ww*=(1.f/3.f);
-#ifdef USE_ATOMIC
-                        if(gcfg->isatomic)
-			    for(int i=0;i<3;i++)
-				atomicadd(weight+ee[out[faceidx][i]]-1+tshift, ww);
-                        else
-#endif
-                            for(int i=0;i<3;i++)
-                                weight[ee[out[faceidx][i]]-1+tshift]+=ww;
-		  }
+	    if(prop.mua>0.f){
+	      if(gcfg->outputtype==otFlux || gcfg->outputtype==otJacobian)
+                 ww/=prop.mua;
 	    }
-	}
 
+            if(!gcfg->basisorder){
+		 if(gcfg->method==rtBLBadouel){
+#ifdef USE_ATOMIC
+                    if(gcfg->isatomic)
+			atomicadd(weight+eid+tshift,ww);
+                    else
+#endif
+                        weight[eid+tshift]+=ww;
+                 }else{
+			eid=(int)(r->Lmove*gcfg->dstep)+1;
+			eid=(eid<<1);
+			S.w=r->Lmove/eid;
+	                T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);
+			T.xyz =  r->vec * (float3)(S.w); /*step*/
+			S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
+			totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;
+			S.w=ww;
+                        for(faceidx=0; faceidx< eid; faceidx++){
+			    int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
+			    idx = idx & (idx>=(int3)(0));
+#ifdef USE_ATOMIC
+			    atomicadd(weight+idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x+tshift,S.w*totalloss);
+#else
+			    weight[idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x+tshift]+=S.w*totalloss;
+#endif
+			    S.w*=T.w;
+			    S.xyz += T.xyz;
+                        }
+		    }
+	    }else{
+                    ww*=(1.f/3.f);
+#ifdef USE_ATOMIC
+                    if(gcfg->isatomic)
+			for(eid=0;eid<3;eid++)
+			    atomicadd(weight+ee[out[faceidx][eid]]-1+tshift, ww);
+                    else
+#endif
+                        for(eid=0;eid<3;eid++)
+                            weight[ee[out[faceidx][eid]]-1+tshift]+=ww;
+            }
+	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;;
+	}
 	return ((r->faceid==-2) ? 0.f : r->slen);
 }
 
@@ -615,7 +610,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__c
 		  if(gcfg->srctype==stPattern){
 		    int xsize=(int)gcfg->srcparam1.w;
 		    int ysize=(int)gcfg->srcparam2.w;
-		    r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
+		    //r->posidx=MIN((int)(ry*ysize),ysize-1)*xsize+MIN((int)(rx*xsize),xsize-1);
     #elif defined(MCX_SRC_FOURIER)  // need to prevent rx/ry=1 here
 		    r->weight=(MCX_MATHFUN(cos)((floor(gcfg->srcparam1.w)*rx+floor(gcfg->srcparam2.w)*ry+gcfg->srcparam1.w-floor(gcfg->srcparam1.w))*TWO_PI)*(1.f-gcfg->srcparam2.w+floor(gcfg->srcparam2.w))+1.f)*0.5f;
     #endif
@@ -772,10 +767,12 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__c
 			float s=0.f;
 			for(i=0;i<4;i++){s+=bary[i];}
 			s=1.f/s;
+/*
 			r->bary0.x=bary[0]*s;
 			r->bary0.y=bary[1]*s;
 			r->bary0.z=bary[2]*s;
 			r->bary0.w=bary[3]*s;
+*/
 			for(i=0;i<4;i++){
 				if((bary[i]*s)<1e-4f)
 					r->faceid=ifacemap[i]+1;
@@ -808,9 +805,9 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->bary0,gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0.f,0,0};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f};
 
-	r.photonid=id;
+	//r.photonid=id;
 
 	/*initialize the photon parameters*/
         launchphoton(gcfg, &r, node, elem, srcelem, ran);
@@ -935,8 +932,8 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			break;
 	    }
             float mom=0.f;
-	    r.slen0=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
-	    r.slen=r.slen0;
+	    //r.slen0=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
+	    r.slen=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
             if(gcfg->ismomentum && type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
                   ppath[(gcfg->maxmedia<<1)-1+type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
 #ifdef MCX_SAVE_DETECTORS
