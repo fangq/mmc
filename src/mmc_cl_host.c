@@ -78,7 +78,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      cl_mem *gweight,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
      cl_mem *gprogress,*gdetected, *gsrcpattern;  /*read-write buffers*/
 
-     cl_uint meshlen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : (cfg->basisorder? mesh->nn : mesh->ne);
+     cl_uint meshlen=((cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)<<2; // use 4 copies to reduce racing
 
      cl_float  *field;
 
@@ -217,7 +217,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
        for (j=0; j<gpu[i].autothread*RAND_SEED_WORD_LEN;j++)
 	   Pseed[j]=rand();
        OCL_ASSERT(((gseed[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_WORD_LEN,Pseed,&status),status)));
-       OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*fieldlen,mesh->weight,&status),status)));
+       OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*fieldlen,field,&status),status)));
        OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*detreclen,Pdet,&status),status)));
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
@@ -427,8 +427,9 @@ is more than what your have specified (%d), please use the -H option to specify 
         	OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gweight[devid],CL_TRUE,0,sizeof(cl_float)*fieldlen,
 	                                         rawfield, 0, NULL, NULL)));
         	MMC_FPRINTF(cfg->flog,"transfer complete:        %d ms\n",GetTimeMillis()-tic);  fflush(cfg->flog);
-	        for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
-	           field[i]=rawfield[i]; //+rawfield[i+fieldlen];
+
+                for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
+	            field[(i>>2)]+=rawfield[i]; //+rawfield[i+fieldlen];
 
 	        free(rawfield);
 
@@ -452,10 +453,6 @@ is more than what your have specified (%d), please use the -H option to specify 
                     }
 		    free(energy);
         	}
-		if(cfg->exportfield){
-	            for(i=0;i<fieldlen;i++)
-			cfg->exportfield[i]+=field[i];
-        	}
              }
 	     if(cfg->respin>1 && RAND_SEED_WORD_LEN>1){
                Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_WORD_LEN);
@@ -470,6 +467,22 @@ is more than what your have specified (%d), please use the -H option to specify 
            }// loop over work devices
        }// iteration
      }// time gates
+
+     fieldlen=(fieldlen>>2);
+     field=realloc(field,sizeof(field[0])*fieldlen);
+     if(cfg->exportfield){
+         if(cfg->basisorder==0 || cfg->method==rtBLBadouelGrid){
+             for(i=0;i<fieldlen;i++)
+	         cfg->exportfield[i]+=field[i];
+	 }else{
+             for(i=0;i<cfg->maxgate;i++)
+	       for(j=0;j<mesh->ne;j++){
+		 float ww=field[i*mesh->ne+j]*0.25f;
+	         for(int k=0;k<mesh->elemlen;k++)
+	             cfg->exportfield[i*mesh->nn+mesh->elem[j*mesh->elemlen+k]-1]+=ww;
+	       }
+	 }
+     }
 
      if(cfg->isnormalized){
          MMC_FPRINTF(cfg->flog,"normalizing raw data ...\t");fflush(cfg->flog);

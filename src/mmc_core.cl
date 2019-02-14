@@ -378,47 +378,35 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                  ww/=prop.mua;
 	    }
 
-            if(!gcfg->basisorder){
-		 if(gcfg->method==rtBLBadouel){
+	    if(gcfg->method==rtBLBadouel){
 #ifdef USE_ATOMIC
-                    if(gcfg->isatomic)
-			atomicadd(weight+eid+tshift,ww);
-                    else
+               if(gcfg->isatomic)
+		   atomicadd(weight+(eid<<2)+(tshift & 0x3)+tshift,ww);
+               else
 #endif
-                        weight[eid+tshift]+=ww;
-                 }else{
-			eid=(int)(r->Lmove*gcfg->dstep)+1;
-			eid=(eid<<1);
-			S.w=r->Lmove/eid;
-	                T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);
-			T.xyz =  r->vec * (float3)(S.w); /*step*/
-			S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
-			totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;
-			S.w=ww;
-                        for(faceidx=0; faceidx< eid; faceidx++){
-			    int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
-			    idx = idx & (idx>=(int3)(0));
+                   weight[(eid<<2)+(tshift & 0x3)+tshift]+=ww;
+            }else{
+		   eid=(int)(r->Lmove*gcfg->dstep)+1;
+		   eid=(eid<<1);
+		   S.w=r->Lmove/eid;
+	           T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);
+		   T.xyz =  r->vec * (float3)(S.w); /*step*/
+		   S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
+		   totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;
+		   S.w=ww;
+                   for(faceidx=0; faceidx< eid; faceidx++){
+		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
+		       idx = idx & (idx>=(int3)(0));
 #ifdef USE_ATOMIC
-			    atomicadd(weight+idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x+tshift,S.w*totalloss);
+		       atomicadd(weight+(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2+(tshift & 0x3)+tshift,S.w*totalloss);
 #else
-			    weight[idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x+tshift]+=S.w*totalloss;
+		       weight[(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2+(tshift & 0x3)+tshift]+=S.w*totalloss;
 #endif
-			    S.w*=T.w;
-			    S.xyz += T.xyz;
-                        }
-		    }
-	    }else{
-                    ww*=(1.f/3.f);
-#ifdef USE_ATOMIC
-                    if(gcfg->isatomic)
-			for(eid=0;eid<3;eid++)
-			    atomicadd(weight+ee[out[faceidx][eid]]-1+tshift, ww);
-                    else
-#endif
-                        for(eid=0;eid<3;eid++)
-                            weight[ee[out[faceidx][eid]]-1+tshift]+=ww;
-            }
-	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;;
+		       S.w*=T.w;
+		       S.xyz += T.xyz;
+                   }
+	       }
+	       r->p0=r->p0+(float3)(r->Lmove)*r->vec;
 	}
 	return ((r->faceid==-2) ? 0.f : r->slen);
 }
