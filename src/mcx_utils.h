@@ -225,9 +225,9 @@ void mcx_prep(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP
-  #define MCX_FPRINTF(fp,...) {if(omp_get_thread_num()==0) mexPrintf(__VA_ARGS__);}
+  #define MMC_FPRINTF(fp,...) {if(omp_get_thread_num()==0) mexPrintf(__VA_ARGS__);}
  #else
-  #define MCX_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
+  #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
  #endif
 #else
   #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)

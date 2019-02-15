@@ -1261,9 +1261,9 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                             memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
                             memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                        }
-		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
+		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove)){
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
+	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
