@@ -398,7 +398,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
 #ifdef USE_ATOMIC
-		       atomicadd(weight+(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2+(tshift & 0x3)+tshift,S.w*totalloss);
+		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2)+(tshift & 0x3)+tshift,S.w*totalloss);
 #else
 		       weight[(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2+(tshift & 0x3)+tshift]+=S.w*totalloss;
 #endif
