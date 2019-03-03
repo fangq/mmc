@@ -273,7 +273,7 @@ printf("thread num=%d\n",threadnum);
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
+        MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t"S_BOLD""S_BLUE"%.2f photon/ms"S_RESET", %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
         if(cfg->issavedet)
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
@@ -282,7 +282,7 @@ printf("thread num=%d\n",threadnum);
 	    for(j=0;j<cfg->srcnum;j++){
 	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
           	sum_normalizer += cur_normalizer;
-          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
 		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
   	    }
   	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources

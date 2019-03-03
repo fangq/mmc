@@ -49,6 +49,28 @@
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
 
+#ifndef MCX_CONTAINER
+  #define S_RED     "\x1b[31m"
+  #define S_GREEN   "\x1b[32m"
+  #define S_YELLOW  "\x1b[33m"
+  #define S_BLUE    "\x1b[34m"
+  #define S_MAGENTA "\x1b[35m"
+  #define S_CYAN    "\x1b[36m"
+  #define S_BOLD     "\x1b[1m"
+  #define S_ITALIC   "\x1b[3m"
+  #define S_RESET   "\x1b[0m"
+#else
+  #define S_RED
+  #define S_GREEN
+  #define S_YELLOW
+  #define S_BLUE
+  #define S_MAGENTA
+  #define S_CYAN
+  #define S_BOLD
+  #define S_ITALIC
+  #define S_RESET
+#endif
+
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};

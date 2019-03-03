@@ -136,6 +136,12 @@ const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
     "pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
 
 /**
+ * Flag to decide if parameter has been initialized over command line
+ */
+ 
+char flagset[256]={'\0'};
+
+/**
  * @brief Initializing the simulation configuration with default values
  *
  * Constructor of the simulation configuration, initializing all field to default values
@@ -316,7 +322,7 @@ void mcx_error(const int id,const char *msg,const char *file,const int linenum){
      if(id==MMC_INFO)
         MMC_FPRINTF(stdout,"%s\n",msg);
      else
-        MMC_FPRINTF(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
+        MMC_FPRINTF(stdout,S_RED"\nMMC ERROR(%d):%s in unit %s:%d\n"S_RESET,id,msg,file,linenum);
      exit(id);
 #endif
 }
@@ -433,7 +439,8 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      if(Mesh){
         strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_PATH_LENGTH);
         cfg->e0=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
-        cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
+        if(!flagset['u'])
+	    cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
      }
      if(Optode){
         cJSON *dets, *src=FIND_JSON_OBJ("Source","Optode.Source",Optode);
@@ -459,16 +466,26 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
            subitem=FIND_JSON_OBJ("Param1","Optode.Source.Param1",src);
            if(subitem && cJSON_GetArraySize(subitem)==4){
               cfg->srcparam1.x=subitem->child->valuedouble;
-              cfg->srcparam1.y=subitem->child->next->valuedouble;
-              cfg->srcparam1.z=subitem->child->next->next->valuedouble;
-              cfg->srcparam1.w=subitem->child->next->next->next->valuedouble;
+              if(subitem->child->next){
+		      cfg->srcparam1.y=subitem->child->next->valuedouble;
+                      if(subitem->child->next->next){
+                          cfg->srcparam1.z=subitem->child->next->next->valuedouble;
+			  if(subitem->child->next->next->next)
+                              cfg->srcparam1.w=subitem->child->next->next->next->valuedouble;
+		      }
+	      }
            }
            subitem=FIND_JSON_OBJ("Param2","Optode.Source.Param2",src);
            if(subitem && cJSON_GetArraySize(subitem)==4){
               cfg->srcparam2.x=subitem->child->valuedouble;
-              cfg->srcparam2.y=subitem->child->next->valuedouble;
-              cfg->srcparam2.z=subitem->child->next->next->valuedouble;
-              cfg->srcparam2.w=subitem->child->next->next->next->valuedouble;
+              if(subitem->child->next){
+		      cfg->srcparam2.y=subitem->child->next->valuedouble;
+                      if(subitem->child->next->next){
+                          cfg->srcparam2.z=subitem->child->next->next->valuedouble;
+			  if(subitem->child->next->next->next)
+                              cfg->srcparam2.w=subitem->child->next->next->next->valuedouble;
+		      }
+	      }
            }
         }
         dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);
@@ -503,19 +520,19 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      if(Session){
         char val[1];
         cJSON *ck;
-        if(cfg->seed==0x623F9A9E)      cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
-        if(cfg->nphoton==0)   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
+        if(!flagset['E'])   cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
+        if(!flagset['n'])   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
         if(cfg->session[0]=='\0') strncpy(cfg->session, FIND_JSON_KEY("ID","Session.ID",Session,"default",valuestring), MAX_SESSION_LENGTH);
 
-        if(!cfg->isreflect)   cfg->isreflect=FIND_JSON_KEY("DoMismatch","Session.DoMismatch",Session,cfg->isreflect,valueint);
-        if(cfg->issave2pt)    cfg->issave2pt=FIND_JSON_KEY("DoSaveVolume","Session.DoSaveVolume",Session,cfg->issave2pt,valueint);
-        if(cfg->isnormalized) cfg->isnormalized=FIND_JSON_KEY("DoNormalize","Session.DoNormalize",Session,cfg->isnormalized,valueint);
-        if(!cfg->issavedet)   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
-        if(!cfg->isspecular)  cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
-        if(!cfg->ismomentum)  cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
-        if(!cfg->issaveexit)  cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
-        if(!cfg->issaveseed)  cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
-        if(cfg->basisorder)   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
+        if(!flagset['b'])   cfg->isreflect=FIND_JSON_KEY("DoMismatch","Session.DoMismatch",Session,cfg->isreflect,valueint);
+        if(!flagset['S'])   cfg->issave2pt=FIND_JSON_KEY("DoSaveVolume","Session.DoSaveVolume",Session,cfg->issave2pt,valueint);
+        if(!flagset['U'])   cfg->isnormalized=FIND_JSON_KEY("DoNormalize","Session.DoNormalize",Session,cfg->isnormalized,valueint);
+        if(!flagset['d'])   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
+        if(!flagset['V'])   cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
+        if(!flagset['m'])   cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
+        if(!flagset['X'])   cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
+        if(!flagset['q'])   cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
+        if(!flagset['C'])   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
         if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup((char *)FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
         if(cfg->outputformat<0)
 		MMC_ERROR(-2,"the specified output format is not recognized");
@@ -531,7 +548,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         if(mcx_lookupindex(val, outputtype)){
                 MMC_ERROR(-2,"the specified output data type is not recognized");
         }
-	cfg->outputtype=val[0];
+	if(!flagset['O']) cfg->outputtype=val[0];
         ck=FIND_JSON_OBJ("Checkpoints","Session.Checkpoints",Session);
         if(ck){
             int num=MIN(cJSON_GetArraySize(ck),MAX_CHECKPOINT);
@@ -852,11 +869,11 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
     if(percentage != oldmarker){
         oldmarker=percentage;
 	for(j=0;j<colwidth;j++)     MMC_FPRINTF(stdout,"\b");
-    	MMC_FPRINTF(stdout,"Progress: [");
+    	MMC_FPRINTF(stdout,S_YELLOW"Progress: [");
     	for(j=0;j<percentage;j++)      MMC_FPRINTF(stdout,"=");
     	MMC_FPRINTF(stdout,(percentage<colwidth-18) ? ">" : "=");
     	for(j=percentage;j<colwidth-18;j++) MMC_FPRINTF(stdout," ");
-    	MMC_FPRINTF(stdout,"] %3d%%",percentage*100/(colwidth-18));
+    	MMC_FPRINTF(stdout,"] %3d%%"S_RESET,percentage*100/(colwidth-18));
 #ifdef MCX_CONTAINER
         mcx_matlab_flush();
 #else
@@ -1052,6 +1069,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 				MMC_ERROR(-2,"unsupported verbose option");
 			}
 		}
+		if(argv[i][1]<='z' && argv[i][1]>='A')
+		     flagset[(int)(argv[i][1])]=1;
 	        switch(argv[i][1]){
 		     case 'h':
 		                mcx_usage(argv[0]);
@@ -1224,7 +1243,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::      $");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.3");
 }
 
 /**
@@ -1234,10 +1253,10 @@ void mcx_version(mcconfig *cfg){
  */
 
 void mcx_usage(char *exename){
-     printf("\
+     printf(S_YELLOW"\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
-#          Copyright (c) 2010-2018 Qianqian Fang <q.fang at neu.edu>          #\n\
+#          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #\n\
 #                            http://mcx.space/#mmc                            #\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
@@ -1245,16 +1264,16 @@ void mcx_usage(char *exename){
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::       $ Last $Date::                       $ by $Author::              $\n\
-###############################################################################\n\
+$Rev::      $2019.3 $Date::                       $ by $Author::              $\n\
+###############################################################################"S_RESET"\n\
 \n\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
-\n\
-== Required option ==\n\
+\n"S_BOLD S_CYAN"\
+== Required option ==\n"S_RESET"\
  -f config     (--input)       read an input file in .inp or .json format\n\
-\n\
-== MC options ==\n\
+\n"S_BOLD S_CYAN"\
+== MC options ==\n"S_RESET"\
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
@@ -1277,8 +1296,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
-\n\
-== Output options ==\n\
+\n"S_BOLD S_CYAN"\
+== Output options ==\n"S_RESET"\
  -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
                                J - Jacobian, L - weighted path length, P -\n\
                                weighted scattering count (J,L,P: replay mode)\n\
@@ -1289,14 +1308,14 @@ where possible parameters include (the first item in [] is the default value)\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
-\n\
-== User IO options ==\n\
+\n"S_BOLD S_CYAN"\
+== User IO options ==\n"S_RESET"\
  -i 	       (--interactive) interactive mode\n\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
-\n\
-== Debug options ==\n\
+\n"S_BOLD S_CYAN"\
+== Debug options ==\n"S_RESET"\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
  -D [''|MCBWDIOXATRPE]         1 M  photon movement info\n\
@@ -1315,11 +1334,11 @@ where possible parameters include (the first item in [] is the default value)\n\
       combine multiple items by using a string, or add selected numbers together\n\
  --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
                                a single photon, followed by its index (start 0)\n\
-\n\
-== Additional options ==\n\
+\n"S_BOLD S_CYAN"\
+== Additional options ==\n"S_RESET"\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
-\n\
-== Example ==\n\
+\n"S_BOLD S_CYAN"\
+== Example ==\n"S_RESET"\
        %s -n 1000000 -f input.json -s test -b 0 -D TP\n",exename,
 #ifdef MMC_USE_SSE
 'H',
