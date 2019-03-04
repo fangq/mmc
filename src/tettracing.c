@@ -1689,12 +1689,4 @@ void visitor_clear(visitor* visit){
 	visit->kahanc0=NULL;
 	free(visit->kahanc1);
 	visit->kahanc1=NULL;
-	if(visit->photonseed){
-		free(visit->photonseed);
-		visit->photonseed=NULL;
-	}
-	if(visit->partialpath){
-		free(visit->partialpath);
-		visit->partialpath=NULL;
-	}
 }

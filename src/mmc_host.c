@@ -262,6 +262,10 @@ printf("thread num=%d\n",threadnum);
 	}
 	#pragma omp barrier
 	visitor_clear(&visit);
+	if(visit.partialpath)
+	    free(visit.partialpath);
+	if(cfg->issaveseed && visit.photonseed)
+	    free(visit.photonseed);
 }
         if(seeds) free(seeds);
 
@@ -304,6 +308,9 @@ printf("thread num=%d\n",threadnum);
 			mesh_getdetimage(detimage,master.partialpath,master.bufpos,cfg,mesh);
 			mesh_savedetimage(detimage,cfg);	free(detimage);
 		}
+		free(master.partialpath);
+                if(cfg->issaveseed && master.photonseed)
+		    free(master.photonseed);
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
         visitor_clear(&master);
