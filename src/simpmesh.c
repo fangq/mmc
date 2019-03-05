@@ -892,12 +892,8 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         else
                 sprintf(fweight,"%s.%s",cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
 
-        if(cfg->outputformat==ofBin){
-		if((fp=fopen(fweight,"wb"))==NULL)
-         	        MESH_ERROR("can not open weight file to write");
-		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),datalen*cfg->maxgate*cfg->srcnum,fp)!=datalen*cfg->maxgate*cfg->srcnum)
-			MESH_ERROR("fail to write binary weight file");
-		fclose(fp);
+        if(cfg->method==rtBLBadouelGrid && cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){

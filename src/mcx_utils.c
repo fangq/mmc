@@ -35,6 +35,7 @@
 #include <time.h>
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
+#include "nifti1.h"
 
 /**
  * Macro to load JSON keys
@@ -59,6 +60,10 @@
  */
 #define MMC_ASSERT(id)   mcx_assert(id,__FILE__,__LINE__)
 
+
+#define MIN_HEADER_SIZE 348    /**< Analyze header size */
+#define NII_HEADER_SIZE 352    /**< NIFTI header size */
+#define GL_RGBA32F 0x8814
 
 /**
  * Short command line options
@@ -125,7 +130,7 @@ const char outputtype[]={'x','f','e','j','l','p','\0'};
  * ubj: output volume in unversal binary json format (not implemented)
  */
 
-const char *outputformat[]={"ascii","bin","json","ubjson",""};
+const char *outputformat[]={"ascii","bin","nii","hdr","mc2","tx3","ubj",""};
 
 /**
  * Source type specifier
@@ -260,6 +265,95 @@ void mcx_clearcfg(mcconfig *cfg){
 }
 
 /**
+ * @brief Save volumetric output (fluence etc) to an Nifty format binary file
+ *
+ * @param[in] dat: volumetric data to be saved
+ * @param[in] len: total byte length of the data to be saved
+ * @param[in] name: output file name (will append '.nii')
+ * @param[in] type32bit: type of the data, only support 32bit per record
+ * @param[in] outputformatid: decide if save as nii or analyze format
+ * @param[in] cfg: simulation configuration
+ */
+
+void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg){
+     FILE *fp;
+     char fname[MAX_PATH_LENGTH]={'\0'};
+     nifti_1_header hdr;
+     nifti1_extender pad={{0,0,0,0}};
+     OutputType *logval=dat;
+     size_t i;
+
+     memset((void *)&hdr, 0, sizeof(hdr));
+     hdr.sizeof_hdr = MIN_HEADER_SIZE;
+     hdr.dim[0] = 4;
+     hdr.dim[1] = cfg->dim.x;
+     hdr.dim[2] = cfg->dim.y;
+     hdr.dim[3] = cfg->dim.z;
+     hdr.dim[4] = len/(cfg->dim.x*cfg->dim.y*cfg->dim.z);
+     hdr.datatype = type32bit;
+     hdr.bitpix = (type32bit==NIFTI_TYPE_FLOAT64)?64:32;
+     hdr.pixdim[1] = cfg->unitinmm;
+     hdr.pixdim[2] = cfg->unitinmm;
+     hdr.pixdim[3] = cfg->unitinmm;
+     hdr.intent_code=NIFTI_INTENT_NONE;
+
+     if(type32bit==NIFTI_TYPE_FLOAT32 || type32bit==NIFTI_TYPE_FLOAT64){
+         hdr.pixdim[4] = cfg->tstep*1e6f;
+     }else{
+         short *mask=(short*)logval;
+	 for(i=0;i<len;i++){
+	    mask[i]    =(((unsigned int *)dat)[i]);
+	    mask[i+len]=(((unsigned int *)dat)[i])>>16;
+	 }
+	 hdr.datatype = NIFTI_TYPE_UINT16;
+	 hdr.bitpix = 16;
+         hdr.dim[4] = 2;
+         hdr.pixdim[4] = 1.f;
+     }
+     if (outputformatid==ofNifti){
+	strncpy(hdr.magic, "n+1\0", 4);
+	hdr.vox_offset = (float) NII_HEADER_SIZE;
+     }else{
+	strncpy(hdr.magic, "ni1\0", 4);
+	hdr.vox_offset = (float)0;
+     }
+     hdr.scl_slope = 0.f;
+     hdr.xyzt_units = NIFTI_UNITS_MM | NIFTI_UNITS_USEC;
+
+     sprintf(fname,"%s.%s",name,outputformat[outputformatid]);
+
+     if (( fp = fopen(fname,"wb")) == NULL)
+             mcx_error(-9, "Error opening header file for write",__FILE__,__LINE__);
+
+     if (fwrite(&hdr, MIN_HEADER_SIZE, 1, fp) != 1)
+             mcx_error(-9, "Error writing header file",__FILE__,__LINE__);
+
+     if (outputformatid==ofNifti) {
+         if (fwrite(&pad, 4, 1, fp) != 1)
+             mcx_error(-9, "Error writing header file extension pad",__FILE__,__LINE__);
+
+         if (fwrite(logval, (size_t)(hdr.bitpix>>3), hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4], fp) !=
+	          hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4])
+             mcx_error(-9, "Error writing data to file",__FILE__,__LINE__);
+	 fclose(fp);
+     }else if(outputformatid==ofAnalyze){
+         fclose(fp);  /* close .hdr file */
+
+         sprintf(fname,"%s.img",name);
+
+         fp = fopen(fname,"wb");
+         if (fp == NULL)
+             mcx_error(-9, "Error opening img file for write",__FILE__,__LINE__);
+         if (fwrite(logval, (size_t)(hdr.bitpix>>3), hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4], fp) != 
+	       hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4])
+             mcx_error(-9, "Error writing img file",__FILE__,__LINE__);
+
+         fclose(fp);
+     }else
+         mcx_error(-9, "Output format is not supported",__FILE__,__LINE__);
+}
+
+/**
  * @brief Save volumetric output (fluence etc) to mc2 format binary file
  *
  * @param[in] dat: volumetric data to be saved
@@ -267,12 +361,37 @@ void mcx_clearcfg(mcconfig *cfg){
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savedata(float *dat,int len,mcconfig *cfg){
+void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
-     sprintf(name,"%s.mc2",cfg->session);
-     fp=fopen(name,"wb");
-     fwrite(dat,sizeof(float),len,fp);
+     char fname[MAX_PATH_LENGTH];
+     unsigned int glformat=GL_RGBA32F;
+
+     if(cfg->rootpath[0])
+#ifdef WIN32
+         sprintf(name,"%s\\%s",cfg->rootpath,cfg->session);
+#else
+         sprintf(name,"%s/%s",cfg->rootpath,cfg->session);
+#endif
+
+     else
+         sprintf(name,"%s",cfg->session);
+
+     if(cfg->outputformat==ofNifti || cfg->outputformat==ofAnalyze){
+         mcx_savenii(dat, len, name, NIFTI_TYPE_FLOAT64, cfg->outputformat, cfg);
+         return;
+     }
+     sprintf(fname,"%s.%s",name,outputformat[(int)cfg->outputformat]);
+     fp=fopen(fname,"wb");
+
+     if(fp==NULL){
+	mcx_error(-2,"can not save data to disk",__FILE__,__LINE__);
+     }
+     if(cfg->outputformat==ofTX3){
+	fwrite(&glformat,sizeof(unsigned int),1,fp);
+	fwrite(&(cfg->dim.x),sizeof(int),3,fp);
+     }
+     fwrite(dat,sizeof(OutputType),len,fp);
      fclose(fp);
 }
 
@@ -409,7 +528,7 @@ int mcx_loadfromjson(char *jbuf,mcconfig *cfg){
               MMC_FPRINTF(stderr,"%c",*offs);
               offs++;
            }
-           MMC_FPRINTF(stderr,"<error>%.50s\n",ptrold);
+           MMC_FPRINTF(stderr,S_RED"<error>%.50s\n"S_RESET,ptrold);
         }
         return 1;
      }
@@ -1298,22 +1417,23 @@ where possible parameters include (the first item in [] is the default value)\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
 \n"S_BOLD S_CYAN"\
 == Output options ==\n"S_RESET"\
+ -s sessionid  (--session)     a string used to tag all output file names\n\
  -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
                                J - Jacobian, L - weighted path length, P -\n\
                                weighted scattering count (J,L,P: replay mode)\n\
- -s sessionid  (--session)     a string used to tag all output file names\n\
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
- -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
+ -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
+                               'hdr' (Analyze) or 'nii' (nifti, double)\n\
 \n"S_BOLD S_CYAN"\
 == User IO options ==\n"S_RESET"\
- -i 	       (--interactive) interactive mode\n\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
+ -i 	       (--interactive) interactive mode\n\
 \n"S_BOLD S_CYAN"\
 == Debug options ==\n"S_RESET"\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\

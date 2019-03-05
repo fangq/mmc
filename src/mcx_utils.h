@@ -71,6 +71,9 @@
   #define S_RESET
 #endif
 
+
+typedef double OutputType;
+
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
@@ -82,7 +85,7 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
-enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
+enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
 
 
@@ -220,7 +223,8 @@ typedef struct MMC_config{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void mcx_savedata(float *dat,int len,mcconfig *cfg);
+void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg);
+void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg);
 void mcx_error(const int id,const char *msg,const char *file,const int linenum);
 void mcx_loadconfig(FILE *in, mcconfig *cfg);
 void mcx_saveconfig(FILE *in, mcconfig *cfg);
