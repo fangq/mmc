@@ -1177,7 +1177,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      float np=0.f;
 
      if(argc<=1){
-     	mcx_usage(argv[0]);
+     	mcx_usage(argv[0],cfg);
      	exit(0);
      }
      while(i<argc){
@@ -1192,7 +1192,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     flagset[(int)(argv[i][1])]=1;
 	        switch(argv[i][1]){
 		     case 'h':
-		                mcx_usage(argv[0]);
+		                mcx_usage(argv[0],cfg);
 				exit(0);
 		     case 'i':
 				if(filename[0]){
@@ -1366,13 +1366,13 @@ void mcx_version(mcconfig *cfg){
 }
 
 /**
- * @brief Print MCX help information
+ * @brief Print MCX output header
  *
- * @param[in] exename: path and name of the mcx executable
+ * @param[in] cfg: simulation configuration
  */
 
-void mcx_usage(char *exename){
-     printf(S_YELLOW"\
+void mcx_printheader(mcconfig *cfg){
+    MMC_FPRINTF(cfg->flog,S_YELLOW"\
 ###############################################################################\n\
 #                         Mesh-based Monte Carlo (MMC)                        #\n\
 #          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #\n\
@@ -1384,8 +1384,18 @@ void mcx_usage(char *exename){
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
 $Rev::      $2019.3 $Date::                       $ by $Author::              $\n\
-###############################################################################"S_RESET"\n\
-\n\
+###############################################################################\n"S_RESET);
+}
+
+/**
+ * @brief Print MCX help information
+ *
+ * @param[in] exename: path and name of the mcx executable
+ */
+
+void mcx_usage(char *exename,mcconfig *cfg){
+     mcx_printheader(cfg);
+     printf("\n\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
 \n"S_BOLD S_CYAN"\

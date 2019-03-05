@@ -234,7 +234,7 @@ void mcx_initcfg(mcconfig *cfg);
 void mcx_clearcfg(mcconfig *cfg);
 void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
-void mcx_usage(char *exename);
+void mcx_usage(char *exename,mcconfig *cfg);
 void mcx_loadvolume(char *filename,mcconfig *cfg);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
@@ -248,6 +248,7 @@ int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
+void mcx_printheader(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP
