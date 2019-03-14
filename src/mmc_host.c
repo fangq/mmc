@@ -186,7 +186,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 #pragma omp master
 {
-printf("thread num=%d\n",threadnum);
         seeds=(unsigned int *)malloc(sizeof(int)*threadnum*RAND_SEED_WORD_LEN);
 	srand(cfg->seed);
 	for(i=0;i<threadnum*RAND_SEED_WORD_LEN;i++)
