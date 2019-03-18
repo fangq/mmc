@@ -41,13 +41,14 @@ In addition, we also fixed a number of critical bugs, such as
 * fix a bug for doubling thread number every call to mmc, thanks to Shijie
 * fix mmclab crash due to photo sharing update
 
-# [Yan2019] Shijie Yan, Anh Phong Tran, Qianqian Fang*, “A dual-grid mesh-based \
-Monte Carlo algorithm for efficient photon transport simulations in complex 3-D media,” \
-J. of Biomedical Optics, 24(2), 020503 (2019).
+'''[Yan2019]''' Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based\
+Monte Carlo algorithm for efficient photon transport simulations in complex 3-D media,"\
+J. of Biomedical Optics, 24(2), 020503 (2019). URL: https://doi.org/10.1117/1.JBO.24.2.020503
 
-# [Yao&Yan2019] Ruoyang Yao, Shijie Yan, Xavier Intes, Qianqian Fang,  \
+'''[Yao&Yan2019]''' Ruoyang Yao, Shijie Yan, Xavier Intes, Qianqian Fang,  \
 "Accelerating Monte Carlo forward model with structured light illumination via 'photon sharing'," \
-Photonics West 2019, paper#10874-11, San Francisco, CA, USA.
+Photonics West 2019, paper#10874-11, San Francisco, CA, USA. \
+[https://www.spiedigitallibrary.org/conference-presentations/10874/108740B/Accelerating-Monte-Carlo-forward-model-with-structured-light-illumination-via/10.1117/12.2510291?SSO=1 Full presentation for our invited talk]
 
 ------------------------------------------------------------------------------- 
 
@@ -132,9 +133,9 @@ or DMMC, in the below JBO Letter. This method allows to use separate mesh
 for ray-tracing and fluence storage, and can be 2 to 3 fold faster
 than the original MMC without loss of accuracy. 
 
-  Shijie Yan, Anh Phong Tran, Qianqian Fang*, “A dual-grid mesh-based 
+  Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based 
   Monte Carlo algorithm for efficient photon1transport simulations in 
-  complex 3-D media,” J. of Biomedical Optics, 24(2), 020503 (2019).
+  complex 3-D media," J. of Biomedical Optics, 24(2), 020503 (2019).
 
 The authors of the papers are greatly appreciated if you can cite 
 the above papers as references if you use MMC and related software
