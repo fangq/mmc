@@ -362,7 +362,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
             totalloss=MCX_MATHFUN(exp)(-prop.mua*r->Lmove);
             r->weight*=totalloss;
 
-	    totalloss=1.f-totalloss;
+	    totalloss=1.f-totalloss;    /*remaining fraction*/
 	    r->slen-=r->Lmove*prop.mus;
 	    ww=currweight-r->weight;
             r->photontimer+=r->Lmove*(prop.n*R_C0);
@@ -386,21 +386,21 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 #endif
                    weight[(eid<<2)+(tshift & 0x3)+tshift]+=ww;
             }else{
-		   eid=(int)(r->Lmove*gcfg->dstep)+1;
+		   eid=(int)(r->Lmove*gcfg->dstep)+1;    // number of segments
 		   eid=(eid<<1);
-		   S.w=r->Lmove/eid;
-	           T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);
-		   T.xyz =  r->vec * (float3)(S.w); /*step*/
+		   S.w=r->Lmove/eid;                     // segment length
+	           T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);  // segment loss
+		   T.xyz =  r->vec * (float3)(S.w);      // delta vector
 		   S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
-		   totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;
-		   S.w=ww;
+		   totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;    // fraction of total loss per segment
+		   S.w=ww;                               // S.w is now the current weight
                    for(faceidx=0; faceidx< eid; faceidx++){
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
 #ifdef USE_ATOMIC
 		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2)+(tshift & 0x3)+tshift,S.w*totalloss);
 #else
-		       weight[(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2+(tshift & 0x3)+tshift]+=S.w*totalloss;
+		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2)+(tshift & 0x3)+tshift]+=S.w*totalloss;
 #endif
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
