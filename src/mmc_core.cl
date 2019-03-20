@@ -405,8 +405,8 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
                    }
-	       }
-	       r->p0=r->p0+(float3)(r->Lmove)*r->vec;
+	    }
+	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;
 	}
 	return ((r->faceid==-2) ? 0.f : r->slen);
 }
