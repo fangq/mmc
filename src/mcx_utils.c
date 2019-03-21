@@ -1097,7 +1097,7 @@ int mcx_keylookup(char *key, const char *table[]){
 	i++;
     }
     i=0;
-    while(table[i]!='\0'){
+    while(table[i] && table[i][0]!='\0'){
 	if(strcmp(key,table[i])==0){
 		return i;
 	}
