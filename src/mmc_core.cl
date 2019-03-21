@@ -318,9 +318,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
     int type, __constant int *facenb, __constant float4 *normal, __constant medium *med){
 
 	float Lmin;
-	float currweight,ww,totalloss=0.f;
+	float ww,totalloss=0.f;
 	int tshift,faceidx=-1,eid;
 	float4 T,S;
+	union {
+	    float f;
+	    uint  i;
+	} currweight;
 
 	eid=(r->eid-1)<<2;
 
@@ -347,7 +351,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    __constant int *ee=(__constant int *)(elem+eid*gcfg->elemlen);
 
 	    prop=med[type];
-            currweight=r->weight;
+            currweight.f=r->weight;
 
             r->nexteid=((__constant int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 
@@ -366,7 +370,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	    totalloss=1.f-totalloss;    /*remaining fraction*/
 	    r->slen-=r->Lmove*prop.mus;
-	    ww=currweight-r->weight;
+	    ww=currweight.f-r->weight;
             r->photontimer+=r->Lmove*(prop.n*R_C0);
 /*
 	    if(gcfg->outputtype==otWL || gcfg->outputtype==otWP)
@@ -383,10 +387,10 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    if(gcfg->method==rtBLBadouel){
 #ifdef USE_ATOMIC
                if(gcfg->isatomic)
-		   atomicadd(weight+(eid<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift,ww);
+		   atomicadd(weight+(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift,ww);
                else
 #endif
-                   weight[(eid<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift]+=ww;
+                   weight[(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=ww;
             }else{
 		   eid=(int)(r->Lmove*gcfg->dstep)+1;    // number of segments
 		   eid=(eid<<1);
@@ -400,9 +404,9 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
 #ifdef USE_ATOMIC
-		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift,S.w*totalloss);
+		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift,S.w*totalloss);
 #else
-		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift]+=S.w*totalloss;
+		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=S.w*totalloss;
 #endif
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
