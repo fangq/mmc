@@ -78,7 +78,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      cl_mem *gweight,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
      cl_mem *gprogress,*gdetected, *gsrcpattern;  /*read-write buffers*/
 
-     cl_uint meshlen=((cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)<<2; // use 4 copies to reduce racing
+     cl_uint meshlen=((cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)<<cfg->nbuffer; // use 4 copies to reduce racing
 
      cl_float  *field;
 
@@ -98,14 +98,14 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 		     cfg->mcmethod, cfg->method, 1.f/cfg->unitinmm, cfg->basisorder, cfg->srcpos.w, 
 		     mesh->nn, mesh->ne, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout, 
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
-		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, cfg->e0, cfg->isextdet, meshlen};
+		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, 
+		     cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, ((1 << cfg->nbuffer)-1)};
 
      MCXReporter reporter={0};
      platform=mcx_list_gpu(cfg,&workdev,devices,&gpu);
 
      if(workdev>MAX_DEVICE)
          workdev=MAX_DEVICE;
-
      if(devices == NULL || workdev==0)
          mcx_error(-99,(char*)("Unable to find devices!"),__FILE__,__LINE__);
 
@@ -431,7 +431,7 @@ is more than what your have specified (%d), please use the -H option to specify 
         	MMC_FPRINTF(cfg->flog,"transfer complete:        %d ms\n",GetTimeMillis()-tic);  fflush(cfg->flog);
 
                 for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
-	            field[(i>>2)]+=rawfield[i]; //+rawfield[i+fieldlen];
+	            field[(i>>cfg->nbuffer)]+=rawfield[i]; //+rawfield[i+fieldlen];
 
 	        free(rawfield);
 

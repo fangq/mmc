@@ -78,7 +78,8 @@
 
 const char shortopt[]={'h','E','f','n','A','t','T','s','a','g','b','D','G',
                  'd','r','S','e','U','R','l','L','I','-','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','-','-','J','o','H','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-',
+		 'J','o','H','-','W','\0'};
 		 
 /**
  * Long command line options
@@ -94,7 +95,8 @@ const char *fullopt[]={"--help","--seed","--input","--photon","--autopilot",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton","--compileropt","--optlevel","--maxdetphoton",""};
+                 "--debugphoton","--compileropt","--optlevel","--maxdetphoton",
+		 "--buffer","--workload",""};
 
 extern char pathsep;
 
@@ -263,6 +265,8 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->energyesc=0.f;
      cfg->runtime=0;
      cfg->autopilot=1;
+     cfg->nbuffer=0;
+     cfg->gpuid=0;
 
 #ifdef MCX_EMBED_CL
      cfg->clsource=(char *)mmc_core_cl;
@@ -1065,25 +1069,50 @@ int mcx_readarg(int argc, char *argv[], int id, void *output,const char *type){
          we assume it is 1
      */
      if(strcmp(type,"bool")==0 && (id>=argc-1||(argv[id+1][0]<'0'||argv[id+1][0]>'9'))){
-	*((char*)output)=1;
-	return id;
+        *((char*)output)=1;
+        return id;
      }
      if(id<argc-1){
          if(strcmp(type,"bool")==0)
              *((char*)output)=atoi(argv[id+1]);
          else if(strcmp(type,"char")==0)
              *((char*)output)=argv[id+1][0];
-	 else if(strcmp(type,"int")==0)
+         else if(strcmp(type,"int")==0)
              *((int*)output)=atoi(argv[id+1]);
-	 else if(strcmp(type,"float")==0)
+         else if(strcmp(type,"float")==0)
              *((float*)output)=atof(argv[id+1]);
-	 else if(strcmp(type,"string")==0)
-	     strcpy((char *)output,argv[id+1]);
+         else if(strcmp(type,"string")==0)
+             strcpy((char *)output,argv[id+1]);
+         else if(strcmp(type,"bytenumlist")==0){
+             char *nexttok,*numlist=(char *)output;
+             int len=0,i;  
+             nexttok=strtok(argv[id+1]," ,;");
+             while(nexttok){
+                 numlist[len++]=(char)(atoi(nexttok)); /*device id<256*/
+                 for(i=0;i<len-1;i++) /* remove duplicaetd ids */
+                    if(numlist[i]==numlist[len-1]){
+                       numlist[--len]='\0';
+                       break;
+                    }
+                 nexttok=strtok(NULL," ,;");
+                 /*if(len>=MAX_DEVICE) break;*/
+             }
+         }else if(strcmp(type,"floatlist")==0){
+             char *nexttok;
+             float *numlist=(float *)output;
+             int len=0;   
+             nexttok=strtok(argv[id+1]," ,;");
+             while(nexttok){
+                 numlist[len++]=atof(nexttok); /*device id<256*/
+                 nexttok=strtok(NULL," ,;");
+             }
+         }
      }else{
-     	 MMC_ERROR(-1,"incomplete input");
+         MMC_ERROR(-1,"incomplete input");
      }
      return id+1;
 }
+
 
 /**
  * @brief Test if a long command line option is supported
@@ -1390,15 +1419,17 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                                     i=mcx_readarg(argc,argv,i,cfg->deviceid,"string");
                                     break;
                                 }else{
-				    int gpuid;
-                                    i=mcx_readarg(argc,argv,i,&gpuid,"int");
+                                    i=mcx_readarg(argc,argv,i,&(cfg->gpuid),"int");
                                     memset(cfg->deviceid,'0',MAX_DEVICE);
-                                    if(gpuid>0 && gpuid<MAX_DEVICE)
-                                         cfg->deviceid[gpuid-1]='1';
+                                    if(cfg->gpuid>0 && cfg->gpuid<MAX_DEVICE)
+                                         cfg->deviceid[cfg->gpuid-1]='1';
                                     else
                                          mcx_error(-2,"GPU id can not be more than 256",__FILE__,__LINE__);
                                     break;
                                 }
+                     case 'W':
+                                i=mcx_readarg(argc,argv,i,cfg->workload,"floatlist");
+                                break;
                      case '-':  /*additional verbose parameters*/
                                 if(strcmp(argv[i]+2,"momentum")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->ismomentum),"bool");
@@ -1409,6 +1440,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                     i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
                                 }else if(strcmp(argv[i]+2,"debugphoton")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
+                                }else if(strcmp(argv[i]+2,"buffer")==0){
+		                     i=mcx_readarg(argc,argv,i,&(cfg->nbuffer),"int");
                                 }else
                                      MMC_FPRINTF(cfg->flog,"unknown verbose option: --%s\n",argv[i]+2);
                                 break;

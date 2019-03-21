@@ -253,6 +253,8 @@ typedef struct MMC_config{
 	unsigned int runtime;
         char autopilot;     /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
 	float normalizer;            /**<normalization factor*/
+	unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
+	unsigned int gpuid;
 } mcconfig;
 
 #ifdef	__cplusplus

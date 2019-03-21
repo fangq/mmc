@@ -133,6 +133,8 @@ typedef struct MMC_Parameter {
   int    e0;
   int    isextdet;
   int    framelen;
+  uint   nbuffer;
+  uint   buffermask;
   //int    issaveseed;
 } MCXParam __attribute__ ((aligned (32)));
 
@@ -381,10 +383,10 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    if(gcfg->method==rtBLBadouel){
 #ifdef USE_ATOMIC
                if(gcfg->isatomic)
-		   atomicadd(weight+(eid<<2)+(tshift & 0x3)+tshift,ww);
+		   atomicadd(weight+(eid<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift,ww);
                else
 #endif
-                   weight[(eid<<2)+(tshift & 0x3)+tshift]+=ww;
+                   weight[(eid<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift]+=ww;
             }else{
 		   eid=(int)(r->Lmove*gcfg->dstep)+1;    // number of segments
 		   eid=(eid<<1);
@@ -398,9 +400,9 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
 #ifdef USE_ATOMIC
-		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2)+(tshift & 0x3)+tshift,S.w*totalloss);
+		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift,S.w*totalloss);
 #else
-		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<2)+(tshift & 0x3)+tshift]+=S.w*totalloss;
+		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(tshift & gcfg->buffermask)+tshift]+=S.w*totalloss;
 #endif
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
