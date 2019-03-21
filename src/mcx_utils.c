@@ -1117,7 +1117,7 @@ int mcx_remap(char *opt){
 
 int mcx_lookupindex(char *key, const char *index){
     int i=0;
-    while(index[i] && index[i][0]!='\0'){
+    while(index[i]!='\0'){
         if(tolower(*key)==index[i]){
                 *key=i;
                 return 0;
