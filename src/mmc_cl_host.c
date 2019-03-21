@@ -260,6 +260,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      sprintf(opt+strlen(opt),"%s",cfg->compileropt);
      if(cfg->isatomic)
          sprintf(opt+strlen(opt)," -DUSE_ATOMIC");
+     if(cfg->issave2pt==0)
+         sprintf(opt+strlen(opt)," -DMCX_SKIP_VOLUME");
      if(cfg->issavedet)
          sprintf(opt+strlen(opt)," -DMCX_SAVE_DETECTORS");
      if(cfg->isreflect)

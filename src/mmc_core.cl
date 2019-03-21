@@ -372,7 +372,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    else
 */
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
-
+#ifndef MCX_SKIP_VOLUME
 	    if(prop.mua>0.f){
 	      if(gcfg->outputtype==otFlux || gcfg->outputtype==otJacobian)
                  ww/=prop.mua;
@@ -406,6 +406,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       S.xyz += T.xyz;
                    }
 	    }
+#endif
 	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;
 	}
 	return ((r->faceid==-2) ? 0.f : r->slen);
