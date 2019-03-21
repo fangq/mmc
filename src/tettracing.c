@@ -931,7 +931,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	S = _mm_add_ps(S, _mm_mul_ps(Nz,O));
 	T = _mm_div_ps(T, S);
 
-	O = _mm_cmpge_ps(S,_mm_set1_ps(0.f));
+	O = _mm_cmpgt_ps(S,_mm_set1_ps(0.f));
 	T = _mm_add_ps(_mm_andnot_ps(O,_mm_set1_ps(1e10f)),_mm_and_ps(O,T));
 	S = _mm_movehl_ps(T, T);
 	O = _mm_min_ps(T, S);
