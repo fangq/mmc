@@ -1495,7 +1495,7 @@ void mcx_version(mcconfig *cfg){
 void mcx_printheader(mcconfig *cfg){
     MMC_FPRINTF(cfg->flog,S_YELLOW"\
 ###############################################################################\n\
-#                         Mesh-based Monte Carlo (MMC)                        #\n\
+#                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
 #          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #\n\
 #                            http://mcx.space/#mmc                            #\n\
 #                                                                             #\n\

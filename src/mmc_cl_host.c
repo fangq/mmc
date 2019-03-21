@@ -491,7 +491,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 	 mesh_normalize(mesh,cfg,cfg->energyabs,cfg->energytot,0);
      }
      if(cfg->issave2pt && cfg->parentid==mpStandalone){
-         MMC_FPRINTF(cfg->flog,"saving data to file ... %d %d\t",fieldlen,cfg->maxgate);
+         MMC_FPRINTF(cfg->flog,"saving data to file ...\t");
          mesh_saveweight(mesh,cfg);
          MMC_FPRINTF(cfg->flog,"saving data complete : %d ms\n\n",GetTimeMillis()-tic);
          fflush(cfg->flog);
