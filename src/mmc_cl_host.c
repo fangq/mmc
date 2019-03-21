@@ -470,7 +470,7 @@ is more than what your have specified (%d), please use the -H option to specify 
        }// iteration
      }// time gates
 
-     fieldlen=(fieldlen>>2);
+     fieldlen=(fieldlen>>cfg->nbuffer);
      field=realloc(field,sizeof(field[0])*fieldlen);
      if(cfg->exportfield){
          if(cfg->basisorder==0 || cfg->method==rtBLBadouelGrid){
