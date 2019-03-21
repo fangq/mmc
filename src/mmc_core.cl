@@ -331,8 +331,8 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
         T = -convert_float4_rte(isgreater(T,(float4)(0.f)))*T;
 	T = T/S;
 
-        S = -convert_float4_rte(isgreater(T,(float4)(0.f)));
-        T =  S * T - convert_float4_rte(islessequal(T,(float4)(0.f))) * (float4)(1e10f); 
+        S = -convert_float4_rte(isgreater(S,(float4)(0.f)));
+        T =  S * T + ((float4)(1.f)-S) * (float4)(1e10f);
 
 	eid=r->eid-1;
 
