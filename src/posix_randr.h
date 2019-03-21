@@ -37,7 +37,7 @@
 #define MCX_RNG_NAME       "POSIX Multi-threaded RNG"
 
 #define RAND_BUF_LEN       3        //register arrays
-#define RAND_SEED_WORD_LEN      3
+#define RAND_SEED_WORD_LEN      2
 
 typedef unsigned int uint;
 

@@ -33,7 +33,6 @@
 #include <math.h>
 #include <stdio.h>
 #include "posix_randr.h"
-#include "fastmath.h"
 
 #ifdef MMC_USE_SSE_MATH
 #include "sse_math/sse_math.h"
@@ -50,8 +49,10 @@ __device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
     return (float)ran;
 }
 __device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
-    unsigned short *si=(unsigned short *)n_seed;
-    t[0]=si[0]; t[1]=si[2]; t[2]=(INIT_MULT * (n_seed[0] ^ (n_seed[0] >> 30)) + idx) & 0xFFFF;
+    unsigned short *si=(unsigned short *)(n_seed+idx*RAND_SEED_WORD_LEN);
+    t[0]=si[0]; 
+    t[1]=si[1]; 
+    t[2]=si[2];
     erand48(t);
     erand48(t);
     erand48(t);

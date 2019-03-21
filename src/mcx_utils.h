@@ -50,6 +50,31 @@
 #define MMC_INFO            -99999
 #define MAX_DEVICE          256
 
+#ifndef MCX_CONTAINER
+  #define S_RED     "\x1b[31m"
+  #define S_GREEN   "\x1b[32m"
+  #define S_YELLOW  "\x1b[33m"
+  #define S_BLUE    "\x1b[34m"
+  #define S_MAGENTA "\x1b[35m"
+  #define S_CYAN    "\x1b[36m"
+  #define S_BOLD     "\x1b[1m"
+  #define S_ITALIC   "\x1b[3m"
+  #define S_RESET   "\x1b[0m"
+#else
+  #define S_RED
+  #define S_GREEN
+  #define S_YELLOW
+  #define S_BLUE
+  #define S_MAGENTA
+  #define S_CYAN
+  #define S_BOLD
+  #define S_ITALIC
+  #define S_RESET
+#endif
+
+
+typedef double OutputType;
+
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
@@ -61,7 +86,7 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
-enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
+enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
 enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU};
 enum TMCXParent  {mpStandalone, mpMATLAB};
@@ -233,7 +258,8 @@ typedef struct MMC_config{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void mcx_savedata(float *dat,int len,mcconfig *cfg);
+void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg);
+void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg);
 void mcx_error(const int id,const char *msg,const char *file,const int linenum);
 void mcx_loadconfig(FILE *in, mcconfig *cfg);
 void mcx_saveconfig(FILE *in, mcconfig *cfg);
@@ -243,7 +269,7 @@ void mcx_initcfg(mcconfig *cfg);
 void mcx_clearcfg(mcconfig *cfg);
 void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
-void mcx_usage(mcconfig *cfg, char *exename);
+void mcx_usage(char *exename,mcconfig *cfg);
 void mcx_loadvolume(char *filename,mcconfig *cfg);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
@@ -261,9 +287,9 @@ void mcx_printheader(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP
-  #define MCX_FPRINTF(fp,...) {if(omp_get_thread_num()==0) mexPrintf(__VA_ARGS__);}
+  #define MMC_FPRINTF(fp,...) {if(omp_get_thread_num()==0) mexPrintf(__VA_ARGS__);}
  #else
-  #define MCX_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
+  #define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
  #endif
 #else
   #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)

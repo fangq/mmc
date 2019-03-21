@@ -32,7 +32,6 @@
 
 #include "sfmt_rand.h"
 #include "SFMT/SFMT.h"
-#include "fastmath.h"
 
 #ifdef MMC_USE_SSE_MATH
 #include "sse_math/sse_math.h"
@@ -50,8 +49,8 @@ __device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tnew[RAND_BUF_L
 
 __device__ void sfmt_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
      uint32_t ini[2];
-     ini[0]=n_seed[0];
-     ini[1]=(INIT_MULT * (n_seed[0] ^ (n_seed[0] >> 30)) + idx);
+     ini[0]=n_seed[idx*RAND_SEED_WORD_LEN];
+     ini[1]=n_seed[idx*RAND_SEED_WORD_LEN+1];
      init_by_array(ini, 2);
      #pragma omp critical
      {

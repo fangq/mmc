@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "tettracing.h"
+#include "fastmath.h"
 
 /**<  Macro to enable SSE4 based ray-tracers */
 
@@ -200,7 +201,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	medium *prop;
 	int *ee;
 	int i,tshift,eid,faceidx=-1;
-	float w[6],Rv,ww,currweight,dlen=0.f,rc,mus; /*dlen is the physical distance*/
+	float w[6]={0.f},Rv,ww,currweight,dlen=0.f,rc,mus; /*dlen is the physical distance*/
 	unsigned int *wi=(unsigned int*)w;
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
 	float Lp0=0.f,ratio;
@@ -1260,9 +1261,9 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                             memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
                             memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                        }
-		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove))
+		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove)){
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-	    	    else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
+	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
@@ -1688,12 +1689,4 @@ void visitor_clear(visitor* visit){
 	visit->kahanc0=NULL;
 	free(visit->kahanc1);
 	visit->kahanc1=NULL;
-	if(visit->photonseed){
-		free(visit->photonseed);
-		visit->photonseed=NULL;
-	}
-	if(visit->partialpath){
-		free(visit->partialpath);
-		visit->partialpath=NULL;
-	}
 }

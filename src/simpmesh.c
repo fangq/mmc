@@ -790,7 +790,7 @@ void tracer_clear(raytracer *tracer){
 float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconfig *cfg, float *pmom){
 
     float nextslen;
-    float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
+    float sphi=0.f,cphi=0.f,tmp0,theta,stheta,ctheta,tmp1;
     float3 p;
 
     rand_need_more(ran,ran0);
@@ -899,12 +899,8 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         else
                 sprintf(fweight,"%s.%s",cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
 
-        if(cfg->outputformat==ofBin){
-		if((fp=fopen(fweight,"wb"))==NULL)
-         	        MESH_ERROR("can not open weight file to write");
-		if(fwrite((void*)mesh->weight,sizeof(mesh->weight[0]),datalen*cfg->maxgate*cfg->srcnum,fp)!=datalen*cfg->maxgate*cfg->srcnum)
-			MESH_ERROR("fail to write binary weight file");
-		fclose(fp);
+        if(cfg->method==rtBLBadouelGrid && cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){

@@ -2,7 +2,7 @@ function varargout=mmclab(cfg,type)
 %
 %#############################################################################%
 %         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
-%          Copyright (c) 2010-2018 Qianqian Fang <q.fang at neu.edu>          %
+%          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
 %                            http://mcx.space/#mmc                            %
 %                                                                             %
 % Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
@@ -10,7 +10,7 @@ function varargout=mmclab(cfg,type)
 %                                                                             %
 %               Research funded by NIH/NIGMS grant R01-GM114365               %
 %#############################################################################%
-%$Rev::      $ Last $Date::                       $ by $Author::             $%
+%$Rev::      $2019.3$Date::                       $ by $Author::             $%
 %#############################################################################%
 %
 % Format:
@@ -87,7 +87,10 @@ function varargout=mmclab(cfg,type)
 %                                by srcpos, srcpos+srcparam1(1:3) and srcpos+srcparam2(1:3)
 %                      'pattern' - a 3D quadrilateral pattern illumination, same as above, except
 %                                srcparam1(4) and srcparam2(4) specify the pattern array x/y dimensions,
-%                                and srcpattern is a pattern array, valued between [0-1]. 
+%                                and srcpattern is a floating-point pattern array, with values between [0-1]. 
+%                                if cfg.srcnum>1, srcpattern must be a floating-point array with 
+%                                a dimension of [srcnum srcparam1(4) srcparam2(4)]
+%                                Example: <demo_photon_sharing.m>
 %                      'fourier' - spatial frequency domain source, similar to 'planar', except
 %                                the integer parts of srcparam1(4) and srcparam2(4) represent
 %                                the x/y frequencies; the fraction part of srcparam1(4) multiplies
@@ -109,6 +112,10 @@ function varargout=mmclab(cfg,type)
 %                               the zenith angle
 %      cfg.{srcparam1,srcparam2}: 1x4 vectors, see cfg.srctype for details
 %      cfg.srcpattern: see cfg.srctype for details
+%      cfg.srcnum:     the number of source patterns that are
+%                      simultaneously simulated; only works for 'pattern'
+%                      source, see cfg.srctype='pattern' for details
+%                      Example <demo_photon_sharing.m>
 %      cfg.replaydet:  only works when cfg.outputtype is 'jacobian', 'wl', 'nscat', or 'wp' and cfg.seed is an array
 %                      -1 replay all detectors and save in separate volumes (output has 5 dimensions)
 %                       0 replay all detectors and sum all Jacobians into one volume

@@ -1,5 +1,23 @@
 Change Log
 
+== MMC 1.4.8 (v2019.3, Pork Rinds - beta), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2019-03-05 [10f72ea] support mc2 and nii output for DMMC
+ 2019-03-04 [dbd3617] fix wrong usage of free() on pointer returned by mxGetPr
+ 2019-03-04 [f403303] disable linking with iomp5 to avoid crash in older matlab
+ 2019-03-03 [389d852] add color to command line output, cmd options high priority
+ 2019-03-01*[996f765] add USC 19.5 atlas example, Fig9a in TranYan2019(submitted)
+ 2019-02-09 [84e87e4] add xorshift128+ RNG, seed each thread by host RNG
+ 2019-01-18 [53fda23] fix mmclab crash due to racing in multi-thread, similar to mcx issue #60
+ 2018-11-21*[6c67651] add mcxyz skinvessel benchmark
+ 2018-10-29*[d0d0cbe] add photon sharing example for mmclab
+ 2018-10-21 [6b42e92] add example (validated) for photon sharing
+ 2018-09-07 [2b28159] fix a bug for doubling thread number every call to mmc, thanks to Shijie
+ 2018-09-01*[0eaf31b] add nightly build script for mmc deployment
+ 2018-08-27 [cab6ca6] support clang
+ 2018-08-26*[71df635] add initial webassembly support for web-based mmc
+ 2018-08-19 [feab0bd] link mmclab on windows
+
 == MMC 1.0-Final (v2018, Sachima), Qianqian Fang <q.fang at neu.edu> ==
 
 2018-08-14 [25b323c] fixed discrepancy between DMMC and MCX along the boundary

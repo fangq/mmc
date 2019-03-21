@@ -241,6 +241,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
               }
             }
 	    visitor_clear(&visit);
+	    if(visit.partialpath)
+	        free(visit.partialpath);
+            if(cfg.issaveseed && visit.photonseed)
+	        free(visit.photonseed);
 	}
 
 	/** \subsection sreport Post simulation */
@@ -320,7 +324,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
       mexPrintf("Unknown Exception");
     }
 
-    /** \subsection sclean End the simulation */
+    /** \subsection sclean End the simulation */   
     visitor_clear(&master);
     mesh_clear(&mesh);
     mcx_clearcfg(&cfg);
