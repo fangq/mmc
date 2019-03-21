@@ -205,7 +205,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	/*launch photons*/
 	#pragma omp for reduction(+:raytri,raytri0)
-	for(i=0;i<cfg.nphoton;i++){
+	for(size_t i=0;i<cfg.nphoton;i++){
             #pragma omp flush (errorflag)
 	    if(errorflag){
 		i=cfg.nphoton;

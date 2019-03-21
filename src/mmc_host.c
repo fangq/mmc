@@ -207,7 +207,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	/*launch photons*/
         #pragma omp for reduction(+:raytri,raytri0)
-	for(i=0;i<cfg->nphoton;i++){
+	for(size_t i=0;i<cfg->nphoton;i++){
 		visit.raytet=0.f;
 		visit.raytet0=0.f;
                 if(i==cfg->debugphoton)
