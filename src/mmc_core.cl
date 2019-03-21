@@ -332,12 +332,12 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	T = T/S;
 
         S = -convert_float4_rte(isgreater(T,(float4)(0.f)));
-        T =  S * T - convert_float4_rte(islessequal(T,(float4)(0.f))) * (float4)(1e10f); 
+        T =  S * T - convert_float4_rte(isless(T,(float4)(0.f))) * (float4)(1e10f); 
 
 	eid=r->eid-1;
 
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
-	faceidx=(Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
+	faceidx=((Lmin==1e10f || Lmin==0.f)? 4: Lmin==T.x? 0: (Lmin==T.y? 1 : (Lmin==T.z ? 2 : 3)));
 	r->faceid=faceorder[faceidx];
 
 	if(r->faceid>=0 && Lmin>=0.f){
