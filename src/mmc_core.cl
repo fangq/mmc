@@ -379,19 +379,20 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 */
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
 #ifndef MCX_SKIP_VOLUME
+/*
 	    if(prop.mua>0.f){
 	      if(gcfg->outputtype==otFlux || gcfg->outputtype==otJacobian)
                  ww/=prop.mua;
 	    }
-
-	    if(gcfg->method==rtBLBadouel){
-#ifdef USE_ATOMIC
+*/
+  #ifndef USE_DMMC
+    #ifdef USE_ATOMIC
                if(gcfg->isatomic)
 		   atomicadd(weight+(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift,ww);
                else
-#endif
+    #endif
                    weight[(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=ww;
-            }else{
+  #else
 		   eid=(int)(r->Lmove*gcfg->dstep)+1;    // number of segments
 		   eid=(eid<<1);
 		   S.w=r->Lmove/eid;                     // segment length
@@ -403,15 +404,15 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                    for(faceidx=0; faceidx< eid; faceidx++){
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
-#ifdef USE_ATOMIC
+    #ifdef USE_ATOMIC
 		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift,S.w*totalloss);
-#else
+    #else
 		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=S.w*totalloss;
-#endif
+    #endif
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
                    }
-	    }
+  #endif
 #endif
 	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;
 	}

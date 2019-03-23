@@ -266,6 +266,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
          sprintf(opt+strlen(opt)," -DMCX_SAVE_DETECTORS");
      if(cfg->isreflect)
          sprintf(opt+strlen(opt)," -DMCX_DO_REFLECTION");
+     if(cfg->method==rtBLBadouelGrid)
+         sprintf(opt+strlen(opt)," -DUSE_DMMC");
 
      MMC_FPRINTF(cfg->flog,"Building kernel with option: %s\n",opt);
      status=clBuildProgram(mcxprogram, 0, NULL, opt, NULL, NULL);
