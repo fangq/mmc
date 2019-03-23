@@ -90,6 +90,8 @@ typedef struct MMC_Ray{
 	float photontimer;            /**< the total time-of-fly of the photon */
 	float slen;                   /**< the remaining unitless scattering length = length*mus  */
 	float Lmove;                  /**< last photon movement length */
+	uint oldidx;
+	float oldweight;
 	//float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
 	//float slen0;                  /**< initial unitless scattering length = length*mus */
 	//unsigned int photonid;        /**< index of the current photon */
@@ -378,6 +380,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    else
 */
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
+            {
 #ifndef MCX_SKIP_VOLUME
 /*
 	    if(prop.mua>0.f){
@@ -386,12 +389,18 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    }
 */
   #ifndef USE_DMMC
+               uint newidx=(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift;
+	       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+	       if(newidx!=r->oldidx){
     #ifdef USE_ATOMIC
-               if(gcfg->isatomic)
-		   atomicadd(weight+(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift,ww);
-               else
+		       atomicadd(weight+r->oldidx,r->oldweight);
     #endif
-                   weight[(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=ww;
+                       weight[r->oldidx]+=r->oldweight;
+                   r->oldidx=newidx;
+		   r->oldweight=0.f;
+               }else{
+	           r->oldweight=ww;
+	       }
   #else
 		   eid=(int)(r->Lmove*gcfg->dstep)+1;    // number of segments
 		   eid=(eid<<1);
@@ -404,16 +413,25 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                    for(faceidx=0; faceidx< eid; faceidx++){
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
+		       uint newidx=((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift;
+		       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+		       if(newidx!=r->oldidx){
     #ifdef USE_ATOMIC
-		       atomicadd(weight+((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift,S.w*totalloss);
+		           atomicadd(weight+r->oldidx,r->oldweight);
     #else
-		       weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=S.w*totalloss;
+                           weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=r->oldweight;
     #endif
+                           r->oldidx=newidx;
+			   r->oldweight=0.f;
+                       }else{
+		           r->oldweight=S.w*totalloss;
+		       }
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
                    }
   #endif
 #endif
+            }
 	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;
 	}
 	return ((r->faceid==-2) ? 0.f : r->slen);
@@ -801,7 +819,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0xFFFFFFFF,0.f};
 
 	//r.photonid=id;
 
