@@ -389,7 +389,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    }
 */
   #ifndef USE_DMMC
-               uint newidx=(eid<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift;
+               uint newidx=eid+tshift;
 	       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 	       if(newidx!=r->oldidx){
     #ifdef USE_ATOMIC
@@ -413,13 +413,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                    for(faceidx=0; faceidx< eid; faceidx++){
 		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
-		       uint newidx=((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift;
+		       uint newidx=(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)+tshift;
 		       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 		       if(newidx!=r->oldidx){
     #ifdef USE_ATOMIC
 		           atomicadd(weight+r->oldidx,r->oldweight);
     #else
-                           weight[((idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)<<gcfg->nbuffer)+(currweight.i & gcfg->buffermask)+tshift]+=r->oldweight;
+                           weight[r->oldidx]+=r->oldweight;
     #endif
                            r->oldidx=newidx;
 			   r->oldweight=0.f;
