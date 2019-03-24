@@ -931,7 +931,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	S = _mm_add_ps(S, _mm_mul_ps(Nz,O));
 	T = _mm_div_ps(T, S);
 
-	O = _mm_cmpge_ps(S,_mm_set1_ps(0.f));
+	O = _mm_cmpgt_ps(S,_mm_set1_ps(0.f));
 	T = _mm_add_ps(_mm_andnot_ps(O,_mm_set1_ps(1e10f)),_mm_and_ps(O,T));
 	S = _mm_movehl_ps(T, T);
 	O = _mm_min_ps(T, S);
@@ -1033,11 +1033,18 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
 		     if(cfg->method==rtBLBadouel){
-                        if(cfg->isatomic)
+		        unsigned int newidx=eid+tshift;
+			r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+			if(newidx!=r->oldidx){
+                            if(cfg->isatomic)
 #pragma omp atomic
-			    tracer->mesh->weight[eid+tshift]+=ww;
-                        else
-                            tracer->mesh->weight[eid+tshift]+=ww;
+			        tracer->mesh->weight[r->oldidx]+=ww;
+                            else
+                                tracer->mesh->weight[eid+tshift]+=ww;
+			    r->oldidx=newidx;
+			    r->oldweight=0.0;
+                        }else
+			    r->oldweight+=ww;
                      }else{
 			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
@@ -1058,7 +1065,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                             for(i=0; i< seg; i++){
 				P =_mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
 				_mm_store_si128((__m128i *)&(idx.x),P);
-				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
+				unsigned int newidx=idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift;
+				r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+				if(newidx!=r->oldidx){
+				    tracer->mesh->weight[r->oldidx]+=r->oldweight;
+				    r->oldidx=newidx;
+				    r->oldweight=0.0;
+				}else
+				    r->oldweight+=w0*totalloss;
 				w0*=segloss;
 			        S = _mm_add_ps(S, T);
                             }
@@ -1124,14 +1138,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
+void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 RandType *ran, RandType *ran0, visitor *visit){
 
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1231,7 +1245,7 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 //		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
-	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
+	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1252,7 +1266,7 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
-        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(r.eid==0){
                        if(cfg->debuglevel&dlExit)
         		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
@@ -1262,9 +1276,9 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                             memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                        }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove)){
-                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
-        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(cfg->issavedet && r.eid==0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
@@ -1281,7 +1295,7 @@ void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
-	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f){
 			r.weight*=cfg->roulettesize;

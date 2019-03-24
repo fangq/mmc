@@ -1,5 +1,13 @@
 Change Log
 
+== MMC 1.4.8-1 (v2019.3-1, Pork Rinds - beta, update 1), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2019-03-21*[e57fad3] fix branchless-badouel ray-tracer and dmmc bug, need to make a new release
+ 2019-03-20 [283c3c0] use 64bit integer for total photon number
+ 2019-03-20 [a5680bd] add the missing prop file for dmmc in examples/validation
+ 2019-03-20 [704ca4a] fix empty string test
+
+
 == MMC 1.4.8 (v2019.3, Pork Rinds - beta), Qianqian Fang <q.fang at neu.edu> ==
 
  2019-03-05 [10f72ea] support mc2 and nii output for DMMC

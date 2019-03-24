@@ -82,7 +82,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
   RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
-  unsigned int i;
   unsigned int threadid=0,t0,dt;
   float* detmap;
 

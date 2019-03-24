@@ -5,7 +5,7 @@
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.4.8 (v2019.3, Pork Rinds - beta)
+Version: 1.4.8-1 (v2019.3-1, Pork Rinds - beta, update 1)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------

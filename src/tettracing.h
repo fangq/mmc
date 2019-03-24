@@ -62,6 +62,8 @@ typedef struct MMC_ray{
         void  *photonseed;            /**< pointer to store the photon seed */
 	float focus;                  /**< focal length of the source, if defined */
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
+	unsigned int oldidx;
+	double oldweight;
 } ray;
 
 /***************************************************************************//**
@@ -91,7 +93,7 @@ extern "C" {
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
-void onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
+void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);

@@ -175,6 +175,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 #pragma omp parallel private(ran0,ran1,threadid,j)
 {
 	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
+	size_t id;
 
 #ifdef _OPENMP
         unsigned int threadnum=omp_get_num_threads();
@@ -205,20 +206,20 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	/*launch photons*/
         #pragma omp for reduction(+:raytri,raytri0)
-	for(i=0;i<cfg->nphoton;i++){
+	for(id=0;id<cfg->nphoton;id++){
 		visit.raytet=0.f;
 		visit.raytet0=0.f;
-                if(i==cfg->debugphoton)
+                if(id==cfg->debugphoton)
                     cfg->debuglevel = debuglevel;
 
 		if(cfg->seed==SEED_FROM_FILE)
-		    onephoton(i,tracer,mesh,cfg,((RandType *)cfg->photonseed)+i*RAND_BUF_LEN,ran1,&visit);
+		    onephoton(id,tracer,mesh,cfg,((RandType *)cfg->photonseed)+id*RAND_BUF_LEN,ran1,&visit);
 		else
-		    onephoton(i,tracer,mesh,cfg,ran0,ran1,&visit);
+		    onephoton(id,tracer,mesh,cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
 		raytri0+=visit.raytet0;
 
-                if(i==cfg->debugphoton)
+                if(id==cfg->debugphoton)
                     cfg->debuglevel &= 0xFFFFEA00;
 
 		#pragma omp atomic
@@ -227,7 +228,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 		if((cfg->debuglevel & dlProgress) && threadid==0)
 			mcx_progressbar(ncomplete,cfg);
 		if(cfg->issave2pt && cfg->checkpt[0])
-			mesh_saveweightat(mesh,cfg,i+1);
+			mesh_saveweightat(mesh,cfg,id+1);
 	}
 
 	for(j=0;j<cfg->srcnum;j++){

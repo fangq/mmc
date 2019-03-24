@@ -162,9 +162,7 @@ typedef struct MCXGPUInfo {
 *******************************************************************************/  
 
 typedef struct MMC_config{
-	unsigned int nphoton;          /**<(total simulated photon number) we now use this to \
-	                                   temporarily alias totalmove, as to specify photon \
-			                   number is causing some troubles*/
+	size_t nphoton;                /**<total simulated photon number, max: 2^64-1*/
         int nblocksize;                /**<thread block size*/
 	int nthread;                   /**<num of total threads, multiple of 128*/
 	int seed;                      /**<random number generator seed*/
