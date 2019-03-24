@@ -17,6 +17,129 @@
   #define __constant const
   #define __private 
   #define __local 
+  #define __global
+  #define __kernel __global__
+  #define get_global_id 
+
+  inline __device__ __host__ float3 operator *(float3 a, float3 b){
+      return make_float3(a.x*b.x, a.y*b.y, a.z*b.z);
+  }
+  inline __device__ __host__ float3 operator *(float f, float3 v){
+      return make_float3(v.x*f, v.y*f, v.z*f);
+  }
+  inline __device__ __host__ float3 operator *(float3 v, float f){
+      return make_float3(v.x*f, v.y*f, v.z*f);
+  }
+  inline __device__ __host__ void operator *=(float3 & b, float f){
+      b.x *= f;
+      b.y *= f;
+      b.z *= f;
+  }
+  inline __device__ __host__ float3 operator +(float3 a, float3 b){
+      return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);
+  }
+  inline __device__ __host__ void operator +=(float3 & b, float3 a){
+      b.x += a.x;
+      b.y += a.y;
+      b.z += a.z;
+  }
+  inline __device__ __host__ float3 operator -(float3 a, float3 b){
+      return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);
+  }
+  inline __device__ __host__ void operator -=(float3 & b, float3 a){
+      b.x -= a.x;
+      b.y -= a.y;
+      b.z -= a.z;
+  }
+  inline __device__ __host__ float3 operator /(float3 v, float f){
+      float inv = 1.0f / f;
+      return v * inv;
+  }
+  inline __device__ __host__ void operator /=(float3 & b, float f){
+      float inv = 1.0f / f;
+      b.x *= inv;
+      b.y *= inv;
+      b.z *= inv;
+  }
+
+  inline __device__ __host__ float4 operator *(float4 a, float4 b){
+      return make_float4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w);
+  }
+  inline __device__ __host__ float4 operator *(float f, float4 v){
+      return make_float4(v.x*f, v.y*f, v.z*f, v.w*f);
+  }
+  inline __device__ __host__ float4 operator *(float4 v, float f){
+      return make_float4(v.x*f, v.y*f, v.z*f, v.w*f);
+  }
+  inline __device__ __host__ void operator *=(float4 & b, float f){
+      b.x *= f;
+      b.y *= f;
+      b.z *= f;
+      b.w *= f;
+  }
+  inline __device__ __host__ float4 operator +(float4 a, float4 b){
+      return make_float4(a.x+b.x, a.y+b.y, a.z+b.w, a.w+b.w);
+  }
+  inline __device__ __host__ void operator +=(float4 & b, float4 a){
+      b.x += a.x;
+      b.y += a.y;
+      b.z += a.z;
+      b.w += a.w;
+  }
+  inline __device__ __host__ float4 operator -(float4 a, float4 b){
+      return make_float4(a.x-b.x, a.y-b.y, a.z-b.z, a.w-b.w);
+  }
+  inline __device__ __host__ void operator -=(float4 & b, float4 a){
+      b.x -= a.x;
+      b.y -= a.y;
+      b.z -= a.z;
+      b.w -= a.w;
+  }
+  inline __device__ __host__ float3 operator /(float3 a, float3 b){
+      return make_float3(a.x/b.x, a.y/b.y, a.z/b.z);
+  }
+  inline __device__ __host__ float4 operator /(float4 v, float f){
+      float inv = 1.0f / f;
+      return v * inv;
+  }
+  inline __device__ __host__ void operator /=(float4 & b, float f){
+      float inv = 1.0f / f;
+      b.x *= inv;
+      b.y *= inv;
+      b.z *= inv;
+      b.w *= inv;
+  }
+  inline __device__ __host__ float4 operator /(float4 a, float4 b){
+      return make_float4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w);
+  }
+
+  inline __device__ __host__ float dot(float3 a, float3 b){
+      return a.x * b.x + a.y * b.y + a.z * b.z;
+  }
+  inline __device__ __host__ float dot(float4 a, float4 b){
+      return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  }
+  inline __device__ __host__ float clamp(float f, float a, float b){
+      return max(a, min(f, b));
+  }
+  inline __device__ __host__ float3 clamp(float3 v, float a, float b){
+      return make_float3(clamp(v.x, a, b), clamp(v.y, a, b), clamp(v.z, a, b));
+  }
+
+  inline __device__ __host__ float3 clamp(float3 v, float3 a, float3 b){
+      return make_float3(clamp(v.x, a.x, b.x), clamp(v.y, a.y, b.y), clamp(v.z, a.z, b.z));
+  }
+
+  #define FL4(f) make_float4(f,f,f,f)
+  #define FL3(f) make_float3(f,f,f)
+  #define FLT_EPSILON   1.19209290E-07F
+  #define atomicadd(a,b)  atomicAdd(a,b)
+  #define atomic_add(a,b) atomicAdd(a,b)
+  #define sincos(a,b)     sincosf(a,b)
+
+#else
+  #define FL4(f) ((float4)(f))
+  #define FL3(f) ((float3)(f))
 #endif
 
 #ifdef MCX_SAVE_DETECTORS
@@ -227,6 +350,9 @@ float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]){
 #define rand_do_roulette(t)  rand_uniform01(t) 
 
 #ifdef USE_ATOMIC
+
+#ifndef __CUDA_ARCH__
+
 // OpenCL float atomicadd hack:
 // http://suhorukov.blogspot.co.uk/2011/12/opencl-11-atomic-operations-on-floating.html
 // https://devtalk.nvidia.com/default/topic/458062/atomicadd-float-float-atomicmul-float-float-/
@@ -255,6 +381,8 @@ inline double atomicadd(__global double *val, const double delta){
   return old.f;
 }
 */
+#endif
+
 #endif
 
 void clearpath(__local float *p, int len){
@@ -334,13 +462,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	r->faceid=-1;
 	r->isend=0;
 
-	S = ((float4)(r->vec.x)*normal[eid]+(float4)(r->vec.y)*normal[eid+1]+(float4)(r->vec.z)*normal[eid+2]);
-	T = normal[eid+3] - ((float4)(r->p0.x)*normal[eid]+(float4)(r->p0.y)*normal[eid+1]+(float4)(r->p0.z)*normal[eid+2]);
-        T = -convert_float4_rte(isgreater(T,(float4)(0.f)))*T;
+	S = (FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2]);
+	T = normal[eid+3] - (FL4(r->p0.x)*normal[eid]+FL4(r->p0.y)*normal[eid+1]+FL4(r->p0.z)*normal[eid+2]);
+        T = -convert_float4_rte(isgreater(T,FL4(0.f)))*T;
 	T = T/S;
 
-        S = -convert_float4_rte(isgreater(S,(float4)(0.f)));
-        T =  S * T + ((float4)(1.f)-S) * (float4)(1e10f);
+        S = -convert_float4_rte(isgreater(S,FL4(0.f)));
+        T =  S * T + (FL4(1.f)-S) * FL4(1e10f);
 
 	eid=r->eid-1;
 
@@ -360,7 +488,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    r->Lmove=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
 	    r->isend=(Lmin>r->Lmove);
 	    r->Lmove=((r->isend) ? r->Lmove : Lmin);
-	    r->pout=r->p0+(float3)(Lmin)*r->vec;
+	    r->pout=r->p0+FL3(Lmin)*r->vec;
 
 	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>=(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
 	       r->faceid=-2;
@@ -406,12 +534,12 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		   eid=(eid<<1);
 		   S.w=r->Lmove/eid;                     // segment length
 	           T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);  // segment loss
-		   T.xyz =  r->vec * (float3)(S.w);      // delta vector
-		   S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * (float3)(0.5f)); /*starting point*/
+		   T.xyz =  r->vec * FL3(S.w);      // delta vector
+		   S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * FL3(0.5f)); /*starting point*/
 		   totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;    // fraction of total loss per segment
 		   S.w=ww;                               // S.w is now the current weight
                    for(faceidx=0; faceidx< eid; faceidx++){
-		       int3 idx= convert_int3_rtn(S.xyz * (float3)(gcfg->dstep));
+		       int3 idx= convert_int3_rtn(S.xyz * FL3(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
 		       uint newidx=(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)+tshift;
 		       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
@@ -432,7 +560,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
   #endif
 #endif
             }
-	    r->p0=r->p0+(float3)(r->Lmove)*r->vec;
+	    r->p0=r->p0+FL3(r->Lmove)*r->vec;
 	}
 	return ((r->faceid==-2) ? 0.f : r->slen);
 }
@@ -489,23 +617,23 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
-              *c0+=((float3)(-2.f*Icos))*pnorm;
+              *c0+=(FL3(-2.f*Icos))*pnorm;
               //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal));
 	      *eid=*oldeid; /*stay with the current element*/
 	  }else if(gcfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
-              *c0+=((float3)(-Icos))*pnorm;
-	      *c0=((float3)(tmp2))*pnorm+(float3)(n1/n2)*(*c0);
+              *c0+=(FL3(-Icos))*pnorm;
+	      *c0=(FL3(tmp2))*pnorm+FL3(n1/n2)*(*c0);
               //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal));
 	  }
        }else{ /*total internal reflection*/
-          *c0+=((float3)(-2.f*Icos))*pnorm;
+          *c0+=(FL3(-2.f*Icos))*pnorm;
 	  *eid=*oldeid;
           //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f));
        }
        tmp0=MCX_MATHFUN(rsqrt)(dot(*c0,*c0));
-       (*c0)*=(float3)tmp0;
+       (*c0)*=FL3(tmp0);
        return 1.f;
 }
 
@@ -589,7 +717,7 @@ void fixphoton(float3 *p,__constant float3 *nodes, __constant int *ee){
         /*calculate element centroid*/
 	for(i=0;i<4;i++)
 		c0+=nodes[ee[i]-1];
-	*p+=(c0*(float3)(0.25f)-*p)*((float3)(FIX_PHOTON));
+	*p+=(c0*FL3(0.25f)-*p)*(FL3(FIX_PHOTON));
 }
 
 
@@ -753,50 +881,6 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__c
 	}
 
         r->p0+=r->vec*EPS;
-
-	/*Caluclate intial element id and bary-centric coordinates*/
-	float3 vecS=(float3)(0.f), vecAB, vecAC, vecN;
-	int is,i,ea,eb,ec;
-	for(is=0;is<gcfg->srcelemlen;is++){
-                float bary[4]={0.f,0.f,0.f,0.f};
-		int include = 1;
-		__constant int *elems=(__constant int *)(elem+(srcelem[is]-1)*gcfg->elemlen);
-		for(i=0;i<4;i++){
-			ea=elems[out[i][0]]-1;
-			eb=elems[out[i][1]]-1;
-			ec=elems[out[i][2]]-1;
-			vecAB=node[ea]-node[eb]; //repeated for all photons
-			vecAC=node[ea]-node[ec]; //repeated for all photons
-			vecS=node[ea]-r->p0;
-			vecN=cross(vecAB,vecAC); //repeated for all photons, vecN can be precomputed
-			bary[facemap[i]]=-dot(vecS,vecN);
-		}
-		for(i=0;i<4;i++){
-			if(bary[i]<-1e-4f){
-				include = 0;
-			}
-		}
-		if(include){
-			r->eid=srcelem[is];
-			float s=0.f;
-			for(i=0;i<4;i++){s+=bary[i];}
-			s=1.f/s;
-/*
-			r->bary0.x=bary[0]*s;
-			r->bary0.y=bary[1]*s;
-			r->bary0.z=bary[2]*s;
-			r->bary0.w=bary[3]*s;
-*/
-			for(i=0;i<4;i++){
-				if((bary[i]*s)<1e-4f)
-					r->faceid=ifacemap[i]+1;
-			}
-			break;
-		}
-	}
-	if(is==gcfg->srcelemlen){
-	    return;
-	}
 }
 
 
