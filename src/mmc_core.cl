@@ -399,7 +399,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                    r->oldidx=newidx;
 		   r->oldweight=0.f;
                }else{
-	           r->oldweight=ww;
+	           r->oldweight+=ww;
 	       }
   #else
 		   eid=(int)(r->Lmove*gcfg->dstep)+1;    // number of segments
@@ -424,7 +424,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                            r->oldidx=newidx;
 			   r->oldweight=0.f;
                        }else{
-		           r->oldweight=S.w*totalloss;
+		           r->oldweight+=S.w*totalloss;
 		       }
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
