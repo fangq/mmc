@@ -62,6 +62,8 @@ typedef struct MMC_ray{
         void  *photonseed;            /**< pointer to store the photon seed */
 	float focus;                  /**< focal length of the source, if defined */
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
+	unsigned int oldidx;
+	double oldweight;
 } ray;
 
 /***************************************************************************//**

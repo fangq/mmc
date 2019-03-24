@@ -1033,11 +1033,18 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                 if(cfg->mcmethod==mmMCX){
 		  if(!cfg->basisorder){
 		     if(cfg->method==rtBLBadouel){
-                        if(cfg->isatomic)
+		        unsigned int newidx=eid+tshift;
+			r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+			if(newidx!=r->oldidx){
+                            if(cfg->isatomic)
 #pragma omp atomic
-			    tracer->mesh->weight[eid+tshift]+=ww;
-                        else
-                            tracer->mesh->weight[eid+tshift]+=ww;
+			        tracer->mesh->weight[r->oldidx]+=ww;
+                            else
+                                tracer->mesh->weight[eid+tshift]+=ww;
+			    r->oldidx=newidx;
+			    r->oldweight=0.0;
+                        }else
+			    r->oldweight+=ww;
                      }else{
 			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
@@ -1058,7 +1065,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                             for(i=0; i< seg; i++){
 				P =_mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
 				_mm_store_si128((__m128i *)&(idx.x),P);
-				tracer->mesh->weight[idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift]+=w0*totalloss;
+				unsigned int newidx=idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift;
+				r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+				if(newidx!=r->oldidx){
+				    tracer->mesh->weight[r->oldidx]+=r->oldweight;
+				    r->oldidx=newidx;
+				    r->oldweight=0.0;
+				}else
+				    r->oldweight+=w0*totalloss;
 				w0*=segloss;
 			        S = _mm_add_ps(S, T);
                             }
@@ -1131,7 +1145,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
