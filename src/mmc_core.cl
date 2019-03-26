@@ -549,8 +549,9 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                            weight[r->oldidx]+=r->oldweight;
     #endif
                            r->oldidx=newidx;
-		       }
-                       r->oldweight+=S.w*totalloss;
+                           r->oldweight=S.w*totalloss;
+		       }else
+                           r->oldweight+=S.w*totalloss;
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
                    }
