@@ -1070,7 +1070,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				if(newidx!=r->oldidx){
 				    tracer->mesh->weight[r->oldidx]+=r->oldweight;
 				    r->oldidx=newidx;
-				    r->oldweight=0.0;
+				    r->oldweight=w0*totalloss;
 				}else
 				    r->oldweight+=w0*totalloss;
 				w0*=segloss;
