@@ -478,7 +478,6 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	if(r->faceid>=0 && Lmin>=0.f){
 	    medium prop;
-	    __constant int *ee=(__constant int *)(elem+eid*gcfg->elemlen);
 
 	    prop=med[type];
             currweight.f=r->weight;
@@ -915,7 +914,6 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 #endif
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
-	int pidx;
 
 	while(1){  /*propagate a photon until exit*/
 	    r.slen=branchless_badouel_raytet(&r, gcfg, elem, weight, type[r.eid-1], facenb, normal, med);

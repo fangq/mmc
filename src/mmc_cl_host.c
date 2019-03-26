@@ -508,7 +508,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      }
 
      // total energy here equals total simulated photons+unfinished photons for all threads
-     MMC_FPRINTF(cfg->flog,"simulated %d photons (%d) with %d devices (ray-tet %d)\nMCX simulation speed: %.2f photon/ms\n",
+     MMC_FPRINTF(cfg->flog,"simulated %ld photons (%ld) with %d devices (ray-tet %d)\nMCX simulation speed: %.2f photon/ms\n",
              cfg->nphoton,cfg->nphoton,workdev, reporter.raytet,(double)cfg->nphoton/toc);
      MMC_FPRINTF(cfg->flog,"total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
              cfg->energytot,(cfg->energytot-cfg->energyesc)/cfg->energytot*100.f);
