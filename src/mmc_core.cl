@@ -543,11 +543,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       uint newidx=(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)+tshift;
 		       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 		       if(newidx!=r->oldidx){
+#ifndef DO_NOT_SAVE
     #ifdef USE_ATOMIC
 		           atomicadd(weight+r->oldidx,r->oldweight);
     #else
                            weight[r->oldidx]+=r->oldweight;
     #endif
+#endif
                            r->oldidx=newidx;
                            r->oldweight=S.w*totalloss;
 		       }else
