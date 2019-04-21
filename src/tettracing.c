@@ -276,7 +276,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		       {
 			int *enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-			r->nexteid=enb[r->faceid];
+			r->nexteid=MAX(enb[r->faceid],0);
 #ifdef MMC_USE_SSE
 			int nexteid=(r->nexteid-1)*6;
 	                if(r->nexteid){
@@ -532,7 +532,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
                 if(!r->isend){
 		    enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-                    r->nexteid=enb[r->faceid];
+                    r->nexteid=MAX(enb[r->faceid],0);
 		    if(r->nexteid){
 		        nextenb=(int *)(tracer->m+(r->nexteid-1)*12);
         		_mm_prefetch((char *)(nextenb),_MM_HINT_T0);
@@ -952,7 +952,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
             enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-            r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+            r->nexteid=MAX(enb[r->faceid],0); // if I use nexteid-1, the speed got slower, strange!
 	    if(r->nexteid){
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
@@ -1218,7 +1218,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
 		    oldeid=r.eid;
-	    	    r.eid=enb[r.faceid];
+	    	    r.eid=MAX(enb[r.faceid],0);
 
 		    if(cfg->isreflect && (r.eid==0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
 			if(! (r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))

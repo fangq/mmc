@@ -195,6 +195,7 @@ typedef struct MMC_config{
 	char isgpuinfo;                /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;               /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char issaveseed;               /**<1 save the seed for a detected photon, 0 do not save*/
+	char issaveref;                /**<1 to save diffuse reflectance on surface, 0 no save*/
 	char isatomic;                 /**<1 use atomic operations for weight accumulation, 0 do not use*/
 	char method;                   /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;               /**<0 to use piece-wise-constant basis for fluence, 1, linear*/

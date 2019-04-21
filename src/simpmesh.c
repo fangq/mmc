@@ -80,6 +80,7 @@ const int ifacemap[]={1,2,0,3};
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
+	mesh->nf=0;
 	mesh->prop=0;
 	mesh->elemlen=4;
 	mesh->node=NULL;
@@ -95,6 +96,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->weight=NULL;
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
+	mesh->dref=NULL;
         mesh->nmin.x=VERY_BIG;
 	mesh->nmin.y=VERY_BIG;
 	mesh->nmin.z=VERY_BIG;
@@ -503,6 +505,7 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
 void mesh_clear(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
+	mesh->nf=0;
         mesh->srcelemlen=0;
         mesh->detelemlen=0;
 	if(mesh->node){
@@ -516,6 +519,10 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->facenb){
 		free(mesh->facenb);
 		mesh->facenb=NULL;
+	}
+	if(mesh->dref){
+		free(mesh->dref);
+		mesh->dref=NULL;
 	}
 	if(mesh->type){
 		free(mesh->type);
@@ -585,6 +592,7 @@ void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
  */
 
 void tracer_prep(raytracer *tracer,mcconfig *cfg){
+        int ne=tracer->mesh->ne;
 	if(tracer->n==NULL && tracer->m==NULL && tracer->d==NULL){
 	    if(tracer->mesh!=NULL)
 		tracer_build(tracer);
@@ -620,6 +628,16 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	        bary[i]/=s;
 	    }
 	}
+	ne=tracer->mesh->elemlen*tracer->mesh->elemlen;
+	tracer->mesh->nf=0;
+	for(int i=0;i<ne;i++){
+		if(tracer->mesh->facenb[i]==0)
+		    tracer->mesh->facenb[i]=-(++tracer->mesh->nf);
+	}
+	if(tracer->mesh->dref)
+	    free(tracer->mesh->dref);
+        if(cfg->issaveref)
+            tracer->mesh->dref=(double *)calloc(sizeof(double)*tracer->mesh->nf*cfg->srcnum,cfg->maxgate);
 }
 
 /**

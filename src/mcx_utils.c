@@ -73,7 +73,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','-','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-','X','\0'};
 		 
 /**
  * Long command line options
@@ -89,7 +89,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton",""};
+                 "--debugphoton","--saveref",""};
 
 /**
  * Debug flags
@@ -196,6 +196,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->unitinmm=1.f;
      cfg->srctype=0;
      cfg->isspecular=0;
+     cfg->issaveref=0;
      cfg->outputtype=otFlux;
      cfg->outputformat=ofASCII;
      cfg->ismomentum=0;
@@ -1237,6 +1238,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveexit),"bool");
 				if (cfg->issaveexit) cfg->issavedet=1;
 				break;
+		     case 'X':
+ 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveref),"char");
+ 				if (cfg->issaveref) cfg->issaveref=1;
+ 				break;
 		     case 'C':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"bool");
 		     	        break;
@@ -1436,6 +1441,9 @@ where possible parameters include (the first item in [] is the default value)\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
+ -X [0|1]      (--saveref)     1 to save diffuse reflectance at the air-voxels\n\
+                               right outside of the domain; if non-zero voxels\n\
+			       appear at the boundary, pad 0s before using -X\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
                                'hdr' (Analyze) or 'nii' (nifti, double)\n\

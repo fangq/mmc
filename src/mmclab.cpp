@@ -433,6 +433,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,nout)
     GET_ONE_FIELD(cfg,isref3)
     GET_ONE_FIELD(cfg,isnormalized)
+    GET_ONE_FIELD(cfg,issaveref)
     GET_ONE_FIELD(cfg,debugphoton)
     GET_ONE_FIELD(cfg,minenergy)
     GET_ONE_FIELD(cfg,replaydet)

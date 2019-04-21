@@ -74,6 +74,7 @@ related to an FEM mesh.
 typedef struct MMC_mesh{
 	int nn;                /**< number of nodes */
 	int ne;                /**< number of elements */
+	int nf;                /**< number of surface triangles */
 	int prop;              /**< number of media */
 	int elemlen;           /**< number of nodes per element */
 	float3 *node;          /**< node coordinates */
@@ -87,6 +88,7 @@ typedef struct MMC_mesh{
 	medium *med;           /**< optical property of different media */
 	float *atte;           /**< precomputed attenuation for each media */
 	double *weight;        /**< volumetric fluence for all nodes at all time-gates */
+	double *dref;          /**< surface diffuse reflectance */
 	float *evol;           /**< volume of an element */
 	float *nvol;           /**< voronoi volume of a node */
 	float4 nmin;           /**< lower-corner of the mesh bounding box */
