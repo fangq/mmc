@@ -502,6 +502,9 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	int i,j,k,tshift,*enb=NULL,*nextenb=NULL,eid;
 	__m128 O,T,S;
 
+	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
+		return -1;
+
 	r->p0.w=1.f;
 	r->vec.w=0.f;
 	eid=r->eid-1;
@@ -723,6 +726,9 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	float Lp0=0.f,rc,currweight,dlen,ww,t[4]={1e10f,1e10f,1e10f,1e10f};
 	int i,tshift,faceidx=-1,eid;
 
+	if(tracer->mesh==NULL || tracer->m==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
+		return -1;
+
 	r->p0.w=1.f;
 	r->vec.w=0.f;
 	eid=r->eid-1;
@@ -900,6 +906,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
 	__m128i P;
+
+	if(tracer->mesh==NULL ||tracer->n==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
+		return -1;
 
 	r->p0.w=1.f;
 	r->vec.w=0.f;
