@@ -889,7 +889,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
         if(!found) return;
 	memcpy(sess,cfg->session,MAX_SESSION_LENGTH);
 	sprintf(cfg->session,"%s_%d",sess,id);
-	mesh_saveweight(mesh,cfg);
+	mesh_saveweight(mesh,cfg,0);
 	memcpy(cfg->session,sess,MAX_SESSION_LENGTH);
 }
 
@@ -901,17 +901,23 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
  * @param[in] cfg: the simulation configuration
  */
 
-void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 	FILE *fp;
 	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
+	double *data=mesh->weight;
+
+	if(isref){
+	    data=mesh->dref;
+	    datalen=mesh->nf;
+	}
         if(cfg->rootpath[0])
-                sprintf(fweight,"%s%c%s.%s",cfg->rootpath,pathsep,cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
+                sprintf(fweight,"%s%c%s%s.%s",cfg->rootpath,pathsep,cfg->session,(isref? "_dref": ""), (cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
         else
-                sprintf(fweight,"%s.%s",cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
+                sprintf(fweight,"%s%s.%s",cfg->session,(isref? "_dref": ""), (cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
 
         if(cfg->method==rtBLBadouelGrid && cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
-		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
+		mcx_savedata(data,datalen*cfg->maxgate*cfg->srcnum,cfg);
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){
@@ -920,13 +926,13 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	for(i=0;i<cfg->maxgate;i++){
 	    for(j=0;j<datalen;j++){
 	    	if(1==cfg->srcnum){
-	    	    if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
+	    	    if(fprintf(fp,"%d\t%e\n",j+1,data[i*datalen+j])==0)
 			MESH_ERROR("can not write to weight file");
 	    	}else{  // multiple sources for pattern illumination type
 	    	    int k, shift;
 		    for(k=0;k<cfg->srcnum;k++){
 		    	shift = (i*datalen+j)*cfg->srcnum+k;
-			    if(fprintf(fp,"%d\t%d\t%e\n",j+1,k+1,mesh->weight[shift])==0)
+			    if(fprintf(fp,"%d\t%d\t%e\n",j+1,k+1,data[shift])==0)
 				MESH_ERROR("can not write to weight file");
 		    }
 	    	}
@@ -1097,6 +1103,13 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
 	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
         int datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	
+	if(cfg->issaveref && mesh->dref){
+	    float normalizor=1.f/Etotal;
+            for(i=0;i<cfg->maxgate;i++)
+               for(j=0;j<mesh->nf;j++)
+                  mesh->dref[i*mesh->nf+j]*=normalizor;
+        }
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);

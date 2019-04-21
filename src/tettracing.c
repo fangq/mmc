@@ -276,10 +276,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		       {
 			int *enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-			r->nexteid=MAX(enb[r->faceid],0);
+			r->nexteid=enb[r->faceid];
 #ifdef MMC_USE_SSE
 			int nexteid=(r->nexteid-1)*6;
-	                if(r->nexteid){
+	                if(r->nexteid>0){
         	                _mm_prefetch((char *)&((tracer->m+nexteid)->x),_MM_HINT_T0);
                 	        _mm_prefetch((char *)&((tracer->m+(nexteid)*6+4)->x),_MM_HINT_T0);
                         	_mm_prefetch((char *)&((tracer->d+(nexteid)*6)->x),_MM_HINT_T0);
@@ -535,8 +535,8 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
                 if(!r->isend){
 		    enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-                    r->nexteid=MAX(enb[r->faceid],0);
-		    if(r->nexteid){
+                    r->nexteid=enb[r->faceid];
+		    if(r->nexteid>0){
 		        nextenb=(int *)(tracer->m+(r->nexteid-1)*12);
         		_mm_prefetch((char *)(nextenb),_MM_HINT_T0);
 		        _mm_prefetch((char *)(nextenb+4*16),_MM_HINT_T0);
@@ -961,8 +961,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
             enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
-            r->nexteid=MAX(enb[r->faceid],0); // if I use nexteid-1, the speed got slower, strange!
-	    if(r->nexteid){
+            r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
+	    if(r->nexteid>0){
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
@@ -1216,10 +1216,10 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+(r.eid-1)*mesh->elemlen));
 			continue;
                   }
-	    	  r.eid=-r.eid;
+	    	  r.eid=ID_UNDEFINED;
         	  r.faceid=-1;
 	    }
-	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
+	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
@@ -1227,13 +1227,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
 		    oldeid=r.eid;
-	    	    r.eid=MAX(enb[r.faceid],0);
+	    	    r.eid=enb[r.faceid];
 
-		    if(cfg->isreflect && (r.eid==0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
-			if(! (r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
+		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
+			if(! (r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
-	    	    if(r.eid==0) break;
+	    	    if(r.eid<=0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
                         if(cfg->debuglevel&dlExit)
@@ -1252,7 +1252,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		    break;
                         }
 		    }
-//		    if(r.eid==0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
+//		    if(r.eid!=ID_UNDEFINED && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
@@ -1269,14 +1269,14 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
-			r.eid=-r.eid;
+			r.eid=ID_UNDEFINED;
         		break;
         	    }
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
-        	    if(r.eid==0 && (cfg->debuglevel&dlMove))
+        	    if(r.eid!=ID_UNDEFINED && (cfg->debuglevel&dlMove))
         		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    if(r.eid==0){
+		    if(r.eid!=ID_UNDEFINED){
                        if(cfg->debuglevel&dlExit)
         		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid);
@@ -1288,7 +1288,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    if(cfg->issavedet && r.eid==0){
+		    if(cfg->issaveref && r.eid<0 && mesh->dref){
+		         int tshift=MIN( ((int)((r.photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nf;
+		         mesh->dref[((-r.eid)-1) + tshift]+=r.weight;
+		    }
+		    if(cfg->issavedet && r.eid<0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
                           exitdet=oldeid;

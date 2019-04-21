@@ -49,6 +49,8 @@
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
+#define ID_UNDEFINED  0xFFFFFFFF
+
 #define R_RAND_MAX (1.f/RAND_MAX)
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
@@ -130,7 +132,7 @@ void mesh_build(tetmesh *mesh);
 void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id);
-void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref);
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg);
 void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh);
 void mesh_savedetimage(float *detmap, mcconfig *cfg);

@@ -297,7 +297,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
                     case otFluence:MMCDEBUG(cfg,dlTime,(cfg->flog,"saving fluence ...")); break;
                     case otEnergy: MMCDEBUG(cfg,dlTime,(cfg->flog,"saving energy deposit ...")); break;
 		}
-		mesh_saveweight(mesh,cfg);
+		mesh_saveweight(mesh,cfg,0);
 	}
 	if(cfg->issavedet){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving detected photons ..."));
@@ -311,6 +311,10 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 		free(master.partialpath);
                 if(cfg->issaveseed && master.photonseed)
 		    free(master.photonseed);
+	}
+	if(cfg->issaveref){
+		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving surface diffuse reflectance ..."));
+		mesh_saveweight(mesh,cfg,1);
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
         visitor_clear(&master);
