@@ -502,7 +502,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	int i,j,k,tshift,*enb=NULL,*nextenb=NULL,eid;
 	__m128 O,T,S;
 
-	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
+	if(tracer->mesh==NULL || tracer->m==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
 		return -1;
 
 	r->p0.w=1.f;
@@ -1284,14 +1284,15 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                             memcpy(r.partialpath+(visit->reclen-2-6),&(r.p0.x),sizeof(float)*3);  /*columns 7-5 from the right store the exit positions*/
                             memcpy(r.partialpath+(visit->reclen-2-3),&(r.vec.x),sizeof(float)*3); /*columns 4-2 from the right store the exit dirs*/
                        }
+		       if(cfg->issaveref && r.eid<0 && mesh->dref){
+		            int tshift=MIN( ((int)((r.photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nf;
+		            mesh->dref[((-r.eid)-1) + tshift]+=r.weight;
+		       }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove)){
                          MMC_FPRINTF(cfg->flog,"T %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
-		    if(cfg->issaveref && r.eid<0 && mesh->dref){
-		         int tshift=MIN( ((int)((r.photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*mesh->nf;
-		         mesh->dref[((-r.eid)-1) + tshift]+=r.weight;
-		    }
+
 		    if(cfg->issavedet && r.eid<0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){

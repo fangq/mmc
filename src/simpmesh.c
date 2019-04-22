@@ -628,7 +628,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	        bary[i]/=s;
 	    }
 	}
-	ne=tracer->mesh->elemlen*tracer->mesh->elemlen;
+	ne=tracer->mesh->ne*tracer->mesh->elemlen;
 	tracer->mesh->nf=0;
 	for(int i=0;i<ne;i++){
 		if(tracer->mesh->facenb[i]==0)
