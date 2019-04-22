@@ -8,8 +8,9 @@
 
 % prepare simulation input
 
+clear cfg
 cfg.nphoton=1e6;
-[cfg.node face cfg.elem]=meshabox([0 0 0],[60 60 30],6);
+[cfg.node, face, cfg.elem]=meshabox([0 0 0],[60 60 30],6);
 cfg.elemprop=ones(size(cfg.elem,1),1);
 cfg.srcpos=[30 30 0];
 cfg.srcdir=[0 0 1];
@@ -18,16 +19,24 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
+cfg.issaveref=1;  % in addition to volumetric fluence, also save surface diffuse reflectance
 
-% run the simulation
+%% run the simulation
 
 flux=mmclab(cfg);
 
-% plotting the result
+%% plotting the result
 
-% if you have the SVN version of iso2mesh, use the next line to plot:
-% qmeshcut(cfg.elem(:,1:4),cfg.node(:,1:3),log10(abs(flux.data(:))),'y=30','linestyle','none');
-
+% plot the cross-section of the fluence
+subplot(121);
 plotmesh([cfg.node(:,1:3),log10(abs(flux.data(1:size(cfg.node,1))))],cfg.elem,'y=30','facecolor','interp','linestyle','none')
 view([0 1 0]);
 colorbar;
+
+% plot the surface diffuse reflectance
+if(isfield(cfg,'issaveref') && cfg.issaveref==1)
+    subplot(122);
+    faces=faceneighbors(cfg.elem,'rowmajor');
+    hs=plotmesh(cfg.node,faces,'cdata',log10(flux.dref(:,1)),'linestyle','none');
+    colorbar;
+end

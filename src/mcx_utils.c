@@ -1441,9 +1441,16 @@ where possible parameters include (the first item in [] is the default value)\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
- -X [0|1]      (--saveref)     1 to save diffuse reflectance at the air-voxels\n\
-                               right outside of the domain; if non-zero voxels\n\
-			       appear at the boundary, pad 0s before using -X\n\
+ -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the \n\
+                               exterior surface. The output is stored in a \n\
+                               file named *_dref.dat, and the 2nd column of \n\
+			       the data is resized to [#Nf, #time_gate] where\n\
+			       #Nf is the number of triangles on the surface; \n\
+			       #time_gate is the number of total time gates. \n\
+			       To plot the surface diffuse reflectance, the \n\
+			       output triangle surface mesh can be extracted\n\
+			       by faces=faceneighbors(cfg.elem,'rowmajor');\n\
+                               where 'faceneighbors' is part of Iso2Mesh.\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
                                'hdr' (Analyze) or 'nii' (nifti, double)\n\
