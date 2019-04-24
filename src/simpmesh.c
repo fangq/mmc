@@ -592,7 +592,7 @@ void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
  */
 
 void tracer_prep(raytracer *tracer,mcconfig *cfg){
-        int ne=tracer->mesh->ne;
+        int i, ne=tracer->mesh->ne;
 	if(tracer->n==NULL && tracer->m==NULL && tracer->d==NULL){
 	    if(tracer->mesh!=NULL)
 		tracer_build(tracer);
@@ -601,7 +601,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	}else if(cfg->srctype==stPencil && cfg->e0>0){
             int eid=cfg->e0-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
-	    int i,ea,eb,ec;
+	    int ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
 	    int *elems=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen); // convert int4* to int*
 	    if(eid>=tracer->mesh->ne)
@@ -630,7 +630,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	}
 	ne=tracer->mesh->ne*tracer->mesh->elemlen;
 	tracer->mesh->nf=0;
-	for(int i=0;i<ne;i++){
+	for(i=0;i<ne;i++){
 		if(tracer->mesh->facenb[i]==0)
 		    tracer->mesh->facenb[i]=-(++tracer->mesh->nf);
 	}
