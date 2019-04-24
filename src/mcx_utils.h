@@ -224,7 +224,7 @@ typedef struct MMC_config{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg);
+void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg,int isref);
 void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg);
 void mcx_error(const int id,const char *msg,const char *file,const int linenum);
 void mcx_loadconfig(FILE *in, mcconfig *cfg);

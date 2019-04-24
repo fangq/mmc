@@ -912,12 +912,12 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 	    datalen=mesh->nf;
 	}
         if(cfg->rootpath[0])
-                sprintf(fweight,"%s%c%s%s.%s",cfg->rootpath,pathsep,cfg->session,(isref? "_dref": ""), (cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
+                sprintf(fweight,"%s%c%s%s.dat",cfg->rootpath,pathsep,cfg->session,(isref? "_dref": ""));
         else
-                sprintf(fweight,"%s%s.%s",cfg->session,(isref? "_dref": ""), (cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
+                sprintf(fweight,"%s%s.dat",cfg->session,(isref? "_dref": ""));
 
-        if(cfg->method==rtBLBadouelGrid && cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
-		mcx_savedata(data,datalen*cfg->maxgate*cfg->srcnum,cfg);
+        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+		mcx_savedata(data,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){

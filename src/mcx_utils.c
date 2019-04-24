@@ -366,7 +366,7 @@ void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int out
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg){
+void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg,int isref){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
      char fname[MAX_PATH_LENGTH];
@@ -382,17 +382,17 @@ void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg){
      else
          sprintf(name,"%s",cfg->session);
 
-     if(cfg->outputformat==ofNifti || cfg->outputformat==ofAnalyze){
+     if(!isref && (cfg->outputformat==ofNifti || cfg->outputformat==ofAnalyze)){
          mcx_savenii(dat, len, name, NIFTI_TYPE_FLOAT64, cfg->outputformat, cfg);
          return;
      }
-     sprintf(fname,"%s.%s",name,outputformat[(int)cfg->outputformat]);
+     sprintf(fname,"%s%s.%s",name,(isref ? "_dref" : ""),(isref ? "bin" : outputformat[(int)cfg->outputformat]));
      fp=fopen(fname,"wb");
 
      if(fp==NULL){
 	mcx_error(-2,"can not save data to disk",__FILE__,__LINE__);
      }
-     if(cfg->outputformat==ofTX3){
+     if(!isref && cfg->outputformat==ofTX3){
 	fwrite(&glformat,sizeof(unsigned int),1,fp);
 	fwrite(&(cfg->dim.x),sizeof(int),3,fp);
      }
