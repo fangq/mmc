@@ -221,6 +221,10 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
      cfg->his.normalizer=1.f;
+     cfg->his.respin=1;
+     cfg->his.srcnum=cfg->srcnum;
+     cfg->his.savedetflag=0;
+
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->srcpos),0,sizeof(float3));
