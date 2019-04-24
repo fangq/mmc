@@ -5,7 +5,7 @@
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.4.8-1 (v2019.3-1, Pork Rinds - beta, update 1)
+Version: 1.4.8-2 (v2019.4, Pork Rinds - beta, update 2)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------
@@ -27,7 +27,19 @@ VIII.Reference
 
 O.    What's New
 
-In MMC v2019.3 (1.4.8), we added a list of major new additions, including
+In MMC v2019.4 (1.4.8-2), the follow feature was added
+
+* Support -X/--saveref to save diffuse reflectance/transmittance on mesh surface
+* Speed up DMMC memory operations
+
+It also fixed the below critical bugs:
+
+* fix #35 - incorect mch file header in photon-sharing implementation
+* restore the capability to save mch files without needing --saveexit 1 
+* for Win64, use a newer version of libgomp-1.dll to run mmclab without dependency errors
+
+
+Also, in MMC v2019.3 (1.4.8), we added a list of major new additions, including
 
 * Add 2 built-in complex domain examples - USC_19-5 brain atlas and mcxyz skin-vessel benchmark
 * Initial support of "photon sharing" - a fast approach to simultaneouly simulate multiple pattern src/det, as detailed in our Photoncs West 2019 talk by Ruoyang Yao/Shijie Yan [Yao&Yan2019]
@@ -175,8 +187,8 @@ header files from GnuWin32\include\glibc to C:\cygwin64\usr\include
 when you compile the code (these files typically include
 ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
 and sys/ttydefaults.h). For Mac OS X users, you need to install the
-mp-gcc4.x series from MacPorts and use the instructions below to compile
-the MMC source code.
+mp-gcc4.x series from MacPorts or Homebrew and use the instructions 
+below to compile the MMC source code.
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
@@ -287,7 +299,7 @@ The full command line options of MMC include the following:
 #                                                                             #
 #                Research funded by NIH/NIGMS grant R01-GM114365              #
 ###############################################################################
-$Rev::66a688$2019.3 $Date::2019-02-15 11:55:12 -05$ by $Author::Qianqian Fang $
+$Rev::8270b9$2019.4 $Date::2019-04-24 14:18:58 -04$ by $Author::Qianqian Fang $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...
@@ -329,6 +341,16 @@ where possible parameters include (the first item in [] is the default value)
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
+ -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the 
+                               exterior surface. The output is stored in a 
+                               file named *_dref.dat, and the 2nd column of 
+			       the data is resized to [#Nf, #time_gate] where
+			       #Nf is the number of triangles on the surface; 
+			       #time_gate is the number of total time gates. 
+			       To plot the surface diffuse reflectance, the 
+			       output triangle surface mesh can be extracted
+			       by faces=faceneighbors(cfg.elem,'rowmajor');
+                               where 'faceneighbors' is part of Iso2Mesh.
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) 
                                'hdr' (Analyze) or 'nii' (nifti, double)

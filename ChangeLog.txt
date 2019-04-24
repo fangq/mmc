@@ -1,12 +1,20 @@
 Change Log
 
+== MMC 1.4.8-2 (v2019.4, Pork Rinds - beta, update 2), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2019-04-24 [8270b96] fix #35 - incorect mch file header in photon-sharing implementation
+ 2019-04-22*[6736244] saving dref on surface, support saveref option, add help info and demo
+ 2019-04-16 [492aa3e] restore the capability to save mch files
+ 2019-03-23 [87babe7] dmmc save data only when moving out of a voxel
+ 2019-03-23 [44bd1a5] adding mesh file for dmmc validation example
+ 2019-03-23 [a48cf39] fix the extra char in the shortopt list
+
 == MMC 1.4.8-1 (v2019.3-1, Pork Rinds - beta, update 1), Qianqian Fang <q.fang at neu.edu> ==
 
  2019-03-21*[e57fad3] fix branchless-badouel ray-tracer and dmmc bug, need to make a new release
  2019-03-20 [283c3c0] use 64bit integer for total photon number
  2019-03-20 [a5680bd] add the missing prop file for dmmc in examples/validation
  2019-03-20 [704ca4a] fix empty string test
-
 
 == MMC 1.4.8 (v2019.3, Pork Rinds - beta), Qianqian Fang <q.fang at neu.edu> ==
 

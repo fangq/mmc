@@ -1372,7 +1372,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.3");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.4");
 }
 
 /**
@@ -1393,7 +1393,7 @@ void mcx_printheader(mcconfig *cfg){
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $2019.3a$Date::                       $ by $Author::              $\n\
+$Rev::      $2019.4 $Date::                       $ by $Author::              $\n\
 ###############################################################################\n"S_RESET);
 }
 
