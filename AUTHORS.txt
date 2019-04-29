@@ -16,19 +16,32 @@ Email: <q.fang at neu.edu>
 The follow people had also contributed to this software:
 
 
+* Shijie <yan.shiji at husky.neu.edu> (Fang Lab @ Northeastern University)
+
+Shijie contributed to the systematic validation of DMMC and collaborated
+with Ruoyang and completed "Photon Sharing" feature.
+
+Publication:
+
+*[Yan2019] Shijie Yan, Anh Phong Tran, Qianqian Fang*, “A dual-grid mesh-based Monte Carlo algorithm for efficient photon transport simulations in complex 3-D media,” J. of Biomedical Optics, 24(2), 020503 (2019).
+*Summary: Dual-grid MMC for faster and more accurate mesh-based simulations
+*Download: http://dx.doi.org/10.1117/1.JBO.24.2.020503
+
+
 * Ruoyang Yao <yaoruoyang at gmail.com> (Intes Lab @ RPI)
 
 Ruoyang has contributed to the development of the mesh-retessellation
 based MMC to support wide-field illumination and detection strategies.
 
 Publication:
-[Yao2016] Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for 
-wide-field illumination and detection via mesh retessellation,"
-Biomed. Optics Express, 7(1), 171-184 (2016)
+*[Yao2016] Ruoyang Yao, Xavier Intes, Qianqian Fang*, "Generalized mesh-based Monte Carlo for wide-field illumination and detection via mesh retessellation," Biomed. Optics Express, 7(1), 171-184, (2016)
+*Summary:  Widefield MMC
+*Download: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171
 
-[Yao2018] Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians 
-for diffuse optical tomography using perturbation Monte Carlo-based 
-photon 'replay'," Biomed. Optics Express, in press, (2018)
+*[Yao2018] Ruoyang Yao, Xavier Intes, Qianqian Fang*, "A direct approach to compute Jacobians for diffuse optical tomography using perturbation Monte Carlo-based photon 'replay'," Biomed. Optics Express 9(10), 4588-4603, (2018)
+*Summary:  Building Jacobians with replay in MCX/MMC
+*Download: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-9-10-4588
+
 
 * Jin Chen <kikyouchen at gmail.com> (Intes Lab @ RPI)
 

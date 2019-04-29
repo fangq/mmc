@@ -18,3 +18,9 @@ $Download: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171
 
 # [Yao2018] Ruoyang Yao, Xavier Intes, Qianqian Fang*, "A direct approach to compute Jacobians for diffuse optical tomography using perturbation Monte Carlo-based photon 'replay'," Biomed. Optics Express, in press, (2018)
 $Summary:  Building Jacobians with replay in MCX/MMC
+$Download: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-9-10-4588
+
+# [Yan2019] Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based Monte Carlo algorithm for efficient photon transport simulations in complex 3-D media," J. of Biomedical Optics, 24(2), 020503 (2019).
+$Summary: Dual-grid MMC for faster and more accurate mesh-based simulations
+$Download: http://dx.doi.org/10.1117/1.JBO.24.2.020503
+

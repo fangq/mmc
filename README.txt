@@ -5,13 +5,14 @@
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.0 Final (v2018, Sachima)
+Version: 1.4.8-2 (v2019.4, Pork Rinds - beta, update 2)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------
 
 Table of Content:
 
+O.   What's New
 I.   Introduction
 II.  Downloading and Compiling MMC
 III. Running Simulations
@@ -20,6 +21,46 @@ V.   Known Issues and TODOs
 VI   Getting Involved
 VII. Acknowledgement
 VIII.Reference
+
+
+---------------------------------------------------------------------
+
+O.    What's New
+
+In MMC v2019.4 (1.4.8-2), the follow feature was added
+
+* Support -X/--saveref to save diffuse reflectance/transmittance on mesh surface
+* Speed up DMMC memory operations
+
+It also fixed the below critical bugs:
+
+* fix #35 - incorect mch file header in photon-sharing implementation
+* restore the capability to save mch files without needing --saveexit 1 
+* for Win64, use a newer version of libgomp-1.dll to run mmclab without dependency errors
+
+
+Also, in MMC v2019.3 (1.4.8), we added a list of major new additions, including
+
+* Add 2 built-in complex domain examples - USC_19-5 brain atlas and mcxyz skin-vessel benchmark
+* Initial support of "photon sharing" - a fast approach to simultaneouly simulate multiple pattern src/det, as detailed in our Photoncs West 2019 talk by Ruoyang Yao/Shijie Yan [Yao&Yan2019]
+* Dual-grid MMC (DMMC) paper published [Yan2019], enabled by "-M G" or cfg.method='grid'
+* Add clang compiler support, nightly build compilation script, colored command line output, and more
+
+In addition, we also fixed a number of critical bugs, such as
+
+* fix mmclab gpuinfo output crash using multiple GPUs
+* disable linking to Intel OMP library (libiomp5) to avoid MATLAB 2016-2017 crash
+* fix a bug for doubling thread number every call to mmc, thanks to Shijie
+* fix mmclab crash due to photo sharing update
+
+'''[Yan2019]''' Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based\
+Monte Carlo algorithm for efficient photon transport simulations in complex 3-D media,"\
+J. of Biomedical Optics, 24(2), 020503 (2019). URL: https://doi.org/10.1117/1.JBO.24.2.020503
+
+'''[Yao&Yan2019]''' Ruoyang Yao, Shijie Yan, Xavier Intes, Qianqian Fang,  \
+"Accelerating Monte Carlo forward model with structured light illumination via 'photon sharing'," \
+Photonics West 2019, paper#10874-11, San Francisco, CA, USA. \
+[https://www.spiedigitallibrary.org/conference-presentations/10874/108740B/Accelerating-Monte-Carlo-forward-model-with-structured-light-illumination-via/10.1117/12.2510291?SSO=1 Full presentation for our invited talk]
 
 ------------------------------------------------------------------------------- 
 
@@ -61,10 +102,10 @@ sure you have correctly understood the details of the implementation.
 The details of MMCM can be found in the following paper:
 
   Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
-  in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
+  in PlÃ¼cker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
   URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-1-1-165
 
-While the original MMC paper was based on the Plücker coordinates, a number
+While the original MMC paper was based on the PlÃ¼cker coordinates, a number
 of more efficient SIMD-based ray-tracers, namely, Havel SSE4 ray-tracer, 
 Badouel SSE ray-tracer and branchless-Badouel SSE ray-tracer (fastest) have 
 been added since 2011. These methods can be selected by the -M flag. The 
@@ -98,6 +139,15 @@ Jacobian matrix for solving inverse problems. The technique is called
   Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians for 
   diffuse optical tomography using perturbation Monte Carlo-based 
   photon 'replay'," Biomed. Optics Express, in press, (2018)
+
+In 2019, we published an improved MMC algorithm, named "dual-grid MMC", 
+or DMMC, in the below JBO Letter. This method allows to use separate mesh
+for ray-tracing and fluence storage, and can be 2 to 3 fold faster
+than the original MMC without loss of accuracy. 
+
+  Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based 
+  Monte Carlo algorithm for efficient photon1transport simulations in 
+  complex 3-D media," J. of Biomedical Optics, 24(2), 020503 (2019).
 
 The authors of the papers are greatly appreciated if you can cite 
 the above papers as references if you use MMC and related software
@@ -137,8 +187,8 @@ header files from GnuWin32\include\glibc to C:\cygwin64\usr\include
 when you compile the code (these files typically include
 ieee754.h, features.h, endian.h, bits/, gnu/, sys/cdefs.h, sys/ioctl.h 
 and sys/ttydefaults.h). For Mac OS X users, you need to install the
-mp-gcc4.x series from MacPorts and use the instructions below to compile
-the MMC source code.
+mp-gcc4.x series from MacPorts or Homebrew and use the instructions 
+below to compile the MMC source code.
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
@@ -239,6 +289,19 @@ same direction. Otherwise, MMC will give incorrect results.
 
 The full command line options of MMC include the following:
 <pre>
+###############################################################################
+#                         Mesh-based Monte Carlo (MMC)                        #
+#          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #
+#                            http://mcx.space/#mmc                            #
+#                                                                             #
+#Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
+#            Department of Bioengineering, Northeastern University            #
+#                                                                             #
+#                Research funded by NIH/NIGMS grant R01-GM114365              #
+###############################################################################
+$Rev::8270b9$2019.4 $Date::2019-04-24 14:18:58 -04$ by $Author::Qianqian Fang $
+###############################################################################
+
 usage: mmc <param1> <param2> ...
 where possible parameters include (the first item in [] is the default value)
 
@@ -258,7 +321,7 @@ where possible parameters include (the first item in [] is the default value)
                                to calculate the mua/mus Jacobian matrices
  -P [0|int]    (--replaydet)   replay only the detected photons from a given 
                                detector (det ID starts from 1), use with -E 
- -M [H|PHBSG]  (--method)      choose ray-tracing algorithm (only use 1 letter)
+ -M [H|PHBSG] (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
 			       H - Havel's SSE4 ray-tracing algorithm
 			       B - partial Badouel's method (used by TIM-OS)
@@ -270,22 +333,33 @@ where possible parameters include (the first item in [] is the default value)
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones
 
 == Output options ==
+ -s sessionid  (--session)     a string used to tag all output file names
  -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit
                                J - Jacobian, L - weighted path length, P -
                                weighted scattering count (J,L,P: replay mode)
- -s sessionid  (--session)     a string used to tag all output file names
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
+ -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the 
+                               exterior surface. The output is stored in a 
+                               file named *_dref.dat, and the 2nd column of 
+			       the data is resized to [#Nf, #time_gate] where
+			       #Nf is the number of triangles on the surface; 
+			       #time_gate is the number of total time gates. 
+			       To plot the surface diffuse reflectance, the 
+			       output triangle surface mesh can be extracted
+			       by faces=faceneighbors(cfg.elem,'rowmajor');
+                               where 'faceneighbors' is part of Iso2Mesh.
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
- -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'
+ -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) 
+                               'hdr' (Analyze) or 'nii' (nifti, double)
 
 == User IO options ==
- -i 	       (--interactive) interactive mode
  -h            (--help)        print this message
  -v            (--version)     print MMC version information
  -l            (--log)         print messages to a log file instead
+ -i 	       (--interactive) interactive mode
 
 == Debug options ==
  -D [0|int]    (--debug)       print debug information (you can use an integer
@@ -493,20 +567,20 @@ eid: the index (starting from 1) of the current enclosing element
 
 id: the index of the current photon, from 1 to nphoton
 
-scat: the "normalized" length to read the next scattering site,
+scat: the "normalized" length to read the next scattering site, \
    it is unitless
 
 for -D A (flux accumulation debugging), the output is
 
 A ax ay az ww eid dlen
 
-ax ay az: the location where the accumulation calculation was done
-   (typically, the half-way point of the line segment between the last
+ax ay az: the location where the accumulation calculation was done \
+   (typically, the half-way point of the line segment between the last \
    and current positions)
 
 ww: the photon weight loss for the line segment
 
-dlen=scat/mus of the current element: the distance left to arrive
+dlen=scat/mus of the current element: the distance left to arrive \
    the next scattering site
 
 for -D E

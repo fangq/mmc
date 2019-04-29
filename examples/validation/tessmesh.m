@@ -1,4 +1,4 @@
-sessionid='cube';
+sessionid='cube2';
 
 addpath('../../matlab/');
 

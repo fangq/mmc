@@ -49,6 +49,8 @@
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
+#define ID_UNDEFINED  0xFFFFFFFF
+
 #define R_RAND_MAX (1.f/RAND_MAX)
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
@@ -74,6 +76,7 @@ related to an FEM mesh.
 typedef struct MMC_mesh{
 	int nn;                /**< number of nodes */
 	int ne;                /**< number of elements */
+	int nf;                /**< number of surface triangles */
 	int prop;              /**< number of media */
 	int elemlen;           /**< number of nodes per element */
 	float3 *node;          /**< node coordinates */
@@ -87,6 +90,7 @@ typedef struct MMC_mesh{
 	medium *med;           /**< optical property of different media */
 	float *atte;           /**< precomputed attenuation for each media */
 	double *weight;        /**< volumetric fluence for all nodes at all time-gates */
+	double *dref;          /**< surface diffuse reflectance */
 	float *evol;           /**< volume of an element */
 	float *nvol;           /**< voronoi volume of a node */
 	float4 nmin;           /**< lower-corner of the mesh bounding box */
@@ -128,7 +132,7 @@ void mesh_build(tetmesh *mesh);
 void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);
 void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id);
-void mesh_saveweight(tetmesh *mesh,mcconfig *cfg);
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref);
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg);
 void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh);
 void mesh_savedetimage(float *detmap, mcconfig *cfg);

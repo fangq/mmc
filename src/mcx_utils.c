@@ -35,6 +35,7 @@
 #include <time.h>
 #include <sys/ioctl.h>
 #include "mcx_utils.h"
+#include "nifti1.h"
 
 /**
  * Macro to load JSON keys
@@ -60,6 +61,10 @@
 #define MMC_ASSERT(id)   mcx_assert(id,__FILE__,__LINE__)
 
 
+#define MIN_HEADER_SIZE 348    /**< Analyze header size */
+#define NII_HEADER_SIZE 352    /**< NIFTI header size */
+#define GL_RGBA32F 0x8814
+
 /**
  * Short command line options
  * If a short command line option is '-' that means it only has long/verbose option.
@@ -68,7 +73,7 @@
 
 const char shortopt[]={'h','E','f','n','t','T','s','a','g','b','D',
                  'd','r','S','e','U','R','l','L','I','o','u','C','M',
-                 'i','V','O','-','F','q','x','P','k','v','m','-','-','-','\0'};
+                 'i','V','O','-','F','q','x','P','k','v','m','-','-','X','\0'};
 		 
 /**
  * Long command line options
@@ -84,7 +89,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon",
                  "--method","--interactive","--specular","--outputtype",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
-                 "--debugphoton",""};
+                 "--debugphoton","--saveref",""};
 
 /**
  * Debug flags
@@ -125,7 +130,7 @@ const char outputtype[]={'x','f','e','j','l','p','\0'};
  * ubj: output volume in unversal binary json format (not implemented)
  */
 
-const char *outputformat[]={"ascii","bin","json","ubjson",""};
+const char *outputformat[]={"ascii","bin","nii","hdr","mc2","tx3","ubj",""};
 
 /**
  * Source type specifier
@@ -134,6 +139,12 @@ const char *outputformat[]={"ascii","bin","json","ubjson",""};
 
 const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
     "pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
+
+/**
+ * Flag to decide if parameter has been initialized over command line
+ */
+ 
+char flagset[256]={'\0'};
 
 /**
  * @brief Initializing the simulation configuration with default values
@@ -185,6 +196,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->unitinmm=1.f;
      cfg->srctype=0;
      cfg->isspecular=0;
+     cfg->issaveref=0;
      cfg->outputtype=otFlux;
      cfg->outputformat=ofASCII;
      cfg->ismomentum=0;
@@ -209,6 +221,10 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
      cfg->his.normalizer=1.f;
+     cfg->his.respin=1;
+     cfg->his.srcnum=cfg->srcnum;
+     cfg->his.savedetflag=0;
+
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->srcpos),0,sizeof(float3));
@@ -254,6 +270,95 @@ void mcx_clearcfg(mcconfig *cfg){
 }
 
 /**
+ * @brief Save volumetric output (fluence etc) to an Nifty format binary file
+ *
+ * @param[in] dat: volumetric data to be saved
+ * @param[in] len: total byte length of the data to be saved
+ * @param[in] name: output file name (will append '.nii')
+ * @param[in] type32bit: type of the data, only support 32bit per record
+ * @param[in] outputformatid: decide if save as nii or analyze format
+ * @param[in] cfg: simulation configuration
+ */
+
+void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg){
+     FILE *fp;
+     char fname[MAX_PATH_LENGTH]={'\0'};
+     nifti_1_header hdr;
+     nifti1_extender pad={{0,0,0,0}};
+     OutputType *logval=dat;
+     size_t i;
+
+     memset((void *)&hdr, 0, sizeof(hdr));
+     hdr.sizeof_hdr = MIN_HEADER_SIZE;
+     hdr.dim[0] = 4;
+     hdr.dim[1] = cfg->dim.x;
+     hdr.dim[2] = cfg->dim.y;
+     hdr.dim[3] = cfg->dim.z;
+     hdr.dim[4] = len/(cfg->dim.x*cfg->dim.y*cfg->dim.z);
+     hdr.datatype = type32bit;
+     hdr.bitpix = (type32bit==NIFTI_TYPE_FLOAT64)?64:32;
+     hdr.pixdim[1] = cfg->unitinmm;
+     hdr.pixdim[2] = cfg->unitinmm;
+     hdr.pixdim[3] = cfg->unitinmm;
+     hdr.intent_code=NIFTI_INTENT_NONE;
+
+     if(type32bit==NIFTI_TYPE_FLOAT32 || type32bit==NIFTI_TYPE_FLOAT64){
+         hdr.pixdim[4] = cfg->tstep*1e6f;
+     }else{
+         short *mask=(short*)logval;
+	 for(i=0;i<len;i++){
+	    mask[i]    =(((unsigned int *)dat)[i]);
+	    mask[i+len]=(((unsigned int *)dat)[i])>>16;
+	 }
+	 hdr.datatype = NIFTI_TYPE_UINT16;
+	 hdr.bitpix = 16;
+         hdr.dim[4] = 2;
+         hdr.pixdim[4] = 1.f;
+     }
+     if (outputformatid==ofNifti){
+	strncpy(hdr.magic, "n+1\0", 4);
+	hdr.vox_offset = (float) NII_HEADER_SIZE;
+     }else{
+	strncpy(hdr.magic, "ni1\0", 4);
+	hdr.vox_offset = (float)0;
+     }
+     hdr.scl_slope = 0.f;
+     hdr.xyzt_units = NIFTI_UNITS_MM | NIFTI_UNITS_USEC;
+
+     sprintf(fname,"%s.%s",name,outputformat[outputformatid]);
+
+     if (( fp = fopen(fname,"wb")) == NULL)
+             mcx_error(-9, "Error opening header file for write",__FILE__,__LINE__);
+
+     if (fwrite(&hdr, MIN_HEADER_SIZE, 1, fp) != 1)
+             mcx_error(-9, "Error writing header file",__FILE__,__LINE__);
+
+     if (outputformatid==ofNifti) {
+         if (fwrite(&pad, 4, 1, fp) != 1)
+             mcx_error(-9, "Error writing header file extension pad",__FILE__,__LINE__);
+
+         if (fwrite(logval, (size_t)(hdr.bitpix>>3), hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4], fp) !=
+	          hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4])
+             mcx_error(-9, "Error writing data to file",__FILE__,__LINE__);
+	 fclose(fp);
+     }else if(outputformatid==ofAnalyze){
+         fclose(fp);  /* close .hdr file */
+
+         sprintf(fname,"%s.img",name);
+
+         fp = fopen(fname,"wb");
+         if (fp == NULL)
+             mcx_error(-9, "Error opening img file for write",__FILE__,__LINE__);
+         if (fwrite(logval, (size_t)(hdr.bitpix>>3), hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4], fp) != 
+	       hdr.dim[1]*hdr.dim[2]*hdr.dim[3]*hdr.dim[4])
+             mcx_error(-9, "Error writing img file",__FILE__,__LINE__);
+
+         fclose(fp);
+     }else
+         mcx_error(-9, "Output format is not supported",__FILE__,__LINE__);
+}
+
+/**
  * @brief Save volumetric output (fluence etc) to mc2 format binary file
  *
  * @param[in] dat: volumetric data to be saved
@@ -261,12 +366,37 @@ void mcx_clearcfg(mcconfig *cfg){
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savedata(float *dat,int len,mcconfig *cfg){
+void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg,int isref){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
-     sprintf(name,"%s.mc2",cfg->session);
-     fp=fopen(name,"wb");
-     fwrite(dat,sizeof(float),len,fp);
+     char fname[MAX_PATH_LENGTH];
+     unsigned int glformat=GL_RGBA32F;
+
+     if(cfg->rootpath[0])
+#ifdef WIN32
+         sprintf(name,"%s\\%s",cfg->rootpath,cfg->session);
+#else
+         sprintf(name,"%s/%s",cfg->rootpath,cfg->session);
+#endif
+
+     else
+         sprintf(name,"%s",cfg->session);
+
+     if(!isref && (cfg->outputformat==ofNifti || cfg->outputformat==ofAnalyze)){
+         mcx_savenii(dat, len, name, NIFTI_TYPE_FLOAT64, cfg->outputformat, cfg);
+         return;
+     }
+     sprintf(fname,"%s%s.%s",name,(isref ? "_dref" : ""),(isref ? "bin" : outputformat[(int)cfg->outputformat]));
+     fp=fopen(fname,"wb");
+
+     if(fp==NULL){
+	mcx_error(-2,"can not save data to disk",__FILE__,__LINE__);
+     }
+     if(!isref && cfg->outputformat==ofTX3){
+	fwrite(&glformat,sizeof(unsigned int),1,fp);
+	fwrite(&(cfg->dim.x),sizeof(int),3,fp);
+     }
+     fwrite(dat,sizeof(OutputType),len,fp);
      fclose(fp);
 }
 
@@ -316,7 +446,7 @@ void mcx_error(const int id,const char *msg,const char *file,const int linenum){
      if(id==MMC_INFO)
         MMC_FPRINTF(stdout,"%s\n",msg);
      else
-        MMC_FPRINTF(stdout,"\nMMC ERROR(%d):%s in unit %s:%d\n",id,msg,file,linenum);
+        MMC_FPRINTF(stdout,S_RED"\nMMC ERROR(%d):%s in unit %s:%d\n"S_RESET,id,msg,file,linenum);
      exit(id);
 #endif
 }
@@ -403,7 +533,7 @@ int mcx_loadfromjson(char *jbuf,mcconfig *cfg){
               MMC_FPRINTF(stderr,"%c",*offs);
               offs++;
            }
-           MMC_FPRINTF(stderr,"<error>%.50s\n",ptrold);
+           MMC_FPRINTF(stderr,S_RED"<error>%.50s\n"S_RESET,ptrold);
         }
         return 1;
      }
@@ -433,7 +563,8 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      if(Mesh){
         strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_PATH_LENGTH);
         cfg->e0=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
-        cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
+        if(!flagset['u'])
+	    cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
      }
      if(Optode){
         cJSON *dets, *src=FIND_JSON_OBJ("Source","Optode.Source",Optode);
@@ -459,16 +590,26 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
            subitem=FIND_JSON_OBJ("Param1","Optode.Source.Param1",src);
            if(subitem && cJSON_GetArraySize(subitem)==4){
               cfg->srcparam1.x=subitem->child->valuedouble;
-              cfg->srcparam1.y=subitem->child->next->valuedouble;
-              cfg->srcparam1.z=subitem->child->next->next->valuedouble;
-              cfg->srcparam1.w=subitem->child->next->next->next->valuedouble;
+              if(subitem->child->next){
+		      cfg->srcparam1.y=subitem->child->next->valuedouble;
+                      if(subitem->child->next->next){
+                          cfg->srcparam1.z=subitem->child->next->next->valuedouble;
+			  if(subitem->child->next->next->next)
+                              cfg->srcparam1.w=subitem->child->next->next->next->valuedouble;
+		      }
+	      }
            }
            subitem=FIND_JSON_OBJ("Param2","Optode.Source.Param2",src);
            if(subitem && cJSON_GetArraySize(subitem)==4){
               cfg->srcparam2.x=subitem->child->valuedouble;
-              cfg->srcparam2.y=subitem->child->next->valuedouble;
-              cfg->srcparam2.z=subitem->child->next->next->valuedouble;
-              cfg->srcparam2.w=subitem->child->next->next->next->valuedouble;
+              if(subitem->child->next){
+		      cfg->srcparam2.y=subitem->child->next->valuedouble;
+                      if(subitem->child->next->next){
+                          cfg->srcparam2.z=subitem->child->next->next->valuedouble;
+			  if(subitem->child->next->next->next)
+                              cfg->srcparam2.w=subitem->child->next->next->next->valuedouble;
+		      }
+	      }
            }
         }
         dets=FIND_JSON_OBJ("Detector","Optode.Detector",Optode);
@@ -503,19 +644,19 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      if(Session){
         char val[1];
         cJSON *ck;
-        if(cfg->seed==0x623F9A9E)      cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
-        if(cfg->nphoton==0)   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
+        if(!flagset['E'])   cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
+        if(!flagset['n'])   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
         if(cfg->session[0]=='\0') strncpy(cfg->session, FIND_JSON_KEY("ID","Session.ID",Session,"default",valuestring), MAX_SESSION_LENGTH);
 
-        if(!cfg->isreflect)   cfg->isreflect=FIND_JSON_KEY("DoMismatch","Session.DoMismatch",Session,cfg->isreflect,valueint);
-        if(cfg->issave2pt)    cfg->issave2pt=FIND_JSON_KEY("DoSaveVolume","Session.DoSaveVolume",Session,cfg->issave2pt,valueint);
-        if(cfg->isnormalized) cfg->isnormalized=FIND_JSON_KEY("DoNormalize","Session.DoNormalize",Session,cfg->isnormalized,valueint);
-        if(!cfg->issavedet)   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
-        if(!cfg->isspecular)  cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
-        if(!cfg->ismomentum)  cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
-        if(!cfg->issaveexit)  cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
-        if(!cfg->issaveseed)  cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
-        if(cfg->basisorder)   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
+        if(!flagset['b'])   cfg->isreflect=FIND_JSON_KEY("DoMismatch","Session.DoMismatch",Session,cfg->isreflect,valueint);
+        if(!flagset['S'])   cfg->issave2pt=FIND_JSON_KEY("DoSaveVolume","Session.DoSaveVolume",Session,cfg->issave2pt,valueint);
+        if(!flagset['U'])   cfg->isnormalized=FIND_JSON_KEY("DoNormalize","Session.DoNormalize",Session,cfg->isnormalized,valueint);
+        if(!flagset['d'])   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
+        if(!flagset['V'])   cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
+        if(!flagset['m'])   cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
+        if(!flagset['x'])   cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
+        if(!flagset['q'])   cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
+        if(!flagset['C'])   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
         if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup((char *)FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
         if(cfg->outputformat<0)
 		MMC_ERROR(-2,"the specified output format is not recognized");
@@ -531,7 +672,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         if(mcx_lookupindex(val, outputtype)){
                 MMC_ERROR(-2,"the specified output data type is not recognized");
         }
-	cfg->outputtype=val[0];
+	if(!flagset['O']) cfg->outputtype=val[0];
         ck=FIND_JSON_OBJ("Checkpoints","Session.Checkpoints",Session);
         if(ck){
             int num=MIN(cJSON_GetArraySize(ck),MAX_CHECKPOINT);
@@ -587,17 +728,18 @@ void mcx_writeconfig(char *fname, mcconfig *cfg){
 
 void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates,srctype,itmp;
+     size_t nphoton;
      float dtmp;
      char comment[MAX_PATH_LENGTH],*comm, srctypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
      	MMC_FPRINTF(stdout,"Please specify the total number of photons: [1000000]\n\t");
-     MMC_ASSERT(fscanf(in,"%d", &(i) )==1); 
-     if(cfg->nphoton==0) cfg->nphoton=i;
+     MMC_ASSERT(fscanf(in,"%lu", &(nphoton) )==1);
+     if(cfg->nphoton==0) cfg->nphoton=nphoton;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      
      if(in==stdin)
-     	MMC_FPRINTF(stdout,">> %d\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
+     	MMC_FPRINTF(stdout,">> %lu\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
      if(cfg->seed==0x623F9A9E)
         MMC_ASSERT(fscanf(in,"%d", &(cfg->seed) )==1);
      else
@@ -757,7 +899,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
-     MMC_FPRINTF(out,"%d\n", (cfg->nphoton) ); 
+     MMC_FPRINTF(out,"%lu\n", (cfg->nphoton) ); 
      MMC_FPRINTF(out,"%d\n", (cfg->seed) );
      MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcpos.x),(cfg->srcpos.y),(cfg->srcpos.z) );
      MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcdir.x),(cfg->srcdir.y),(cfg->srcdir.z) );
@@ -852,11 +994,11 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
     if(percentage != oldmarker){
         oldmarker=percentage;
 	for(j=0;j<colwidth;j++)     MMC_FPRINTF(stdout,"\b");
-    	MMC_FPRINTF(stdout,"Progress: [");
+    	MMC_FPRINTF(stdout,S_YELLOW"Progress: [");
     	for(j=0;j<percentage;j++)      MMC_FPRINTF(stdout,"=");
     	MMC_FPRINTF(stdout,(percentage<colwidth-18) ? ">" : "=");
     	for(j=percentage;j<colwidth-18;j++) MMC_FPRINTF(stdout," ");
-    	MMC_FPRINTF(stdout,"] %3d%%",percentage*100/(colwidth-18));
+    	MMC_FPRINTF(stdout,"] %3d%%"S_RESET,percentage*100/(colwidth-18));
 #ifdef MCX_CONTAINER
         mcx_matlab_flush();
 #else
@@ -961,7 +1103,7 @@ int mcx_keylookup(char *key, const char *table[]){
 	i++;
     }
     i=0;
-    while(table[i]!='\0'){
+    while(table[i] && table[i][0]!='\0'){
 	if(strcmp(key,table[i])==0){
 		return i;
 	}
@@ -1041,7 +1183,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
      float np=0.f;
 
      if(argc<=1){
-     	mcx_usage(argv[0]);
+     	mcx_usage(argv[0],cfg);
      	exit(0);
      }
      while(i<argc){
@@ -1052,9 +1194,11 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 				MMC_ERROR(-2,"unsupported verbose option");
 			}
 		}
+		if(argv[i][1]<='z' && argv[i][1]>='A')
+		     flagset[(int)(argv[i][1])]=1;
 	        switch(argv[i][1]){
 		     case 'h':
-		                mcx_usage(argv[0]);
+		                mcx_usage(argv[0],cfg);
 				exit(0);
 		     case 'i':
 				if(filename[0]){
@@ -1068,7 +1212,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 				break;
 		     case 'n':
 		     	        i=mcx_readarg(argc,argv,i,&np,"float");
-				cfg->nphoton=(int)np;
+				cfg->nphoton=(size_t)np;
 		     	        break;
 		     case 't':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->nthread),"int");
@@ -1098,6 +1242,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveexit),"bool");
 				if (cfg->issaveexit) cfg->issavedet=1;
 				break;
+		     case 'X':
+ 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveref),"char");
+ 				if (cfg->issaveref) cfg->issaveref=1;
+ 				break;
 		     case 'C':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"bool");
 		     	        break;
@@ -1224,7 +1372,29 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::      $");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.4");
+}
+
+/**
+ * @brief Print MCX output header
+ *
+ * @param[in] cfg: simulation configuration
+ */
+
+void mcx_printheader(mcconfig *cfg){
+    MMC_FPRINTF(cfg->flog,S_YELLOW"\
+###############################################################################\n\
+#                         Mesh-based Monte Carlo (MMC)                        #\n\
+#          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #\n\
+#                            http://mcx.space/#mmc                            #\n\
+#                                                                             #\n\
+#Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
+#            Department of Bioengineering, Northeastern University            #\n\
+#                                                                             #\n\
+#                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
+###############################################################################\n\
+$Rev::      $2019.4 $Date::                       $ by $Author::              $\n\
+###############################################################################\n"S_RESET);
 }
 
 /**
@@ -1233,28 +1403,16 @@ void mcx_version(mcconfig *cfg){
  * @param[in] exename: path and name of the mcx executable
  */
 
-void mcx_usage(char *exename){
-     printf("\
-###############################################################################\n\
-#                         Mesh-based Monte Carlo (MMC)                        #\n\
-#          Copyright (c) 2010-2018 Qianqian Fang <q.fang at neu.edu>          #\n\
-#                            http://mcx.space/#mmc                            #\n\
-#                                                                             #\n\
-#Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
-#            Department of Bioengineering, Northeastern University            #\n\
-#                                                                             #\n\
-#                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
-###############################################################################\n\
-$Rev::       $ Last $Date::                       $ by $Author::              $\n\
-###############################################################################\n\
-\n\
+void mcx_usage(char *exename,mcconfig *cfg){
+     mcx_printheader(cfg);
+     printf("\n\
 usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
-\n\
-== Required option ==\n\
+\n"S_BOLD S_CYAN"\
+== Required option ==\n"S_RESET"\
  -f config     (--input)       read an input file in .inp or .json format\n\
-\n\
-== MC options ==\n\
+\n"S_BOLD S_CYAN"\
+== MC options ==\n"S_RESET"\
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
  -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.\n\
  -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw\n\
@@ -1277,26 +1435,37 @@ where possible parameters include (the first item in [] is the default value)\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
-\n\
-== Output options ==\n\
+\n"S_BOLD S_CYAN"\
+== Output options ==\n"S_RESET"\
+ -s sessionid  (--session)     a string used to tag all output file names\n\
  -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit\n\
                                J - Jacobian, L - weighted path length, P -\n\
                                weighted scattering count (J,L,P: replay mode)\n\
- -s sessionid  (--session)     a string used to tag all output file names\n\
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
+ -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
+ -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the \n\
+                               exterior surface. The output is stored in a \n\
+                               file named *_dref.dat, and the 2nd column of \n\
+			       the data is resized to [#Nf, #time_gate] where\n\
+			       #Nf is the number of triangles on the surface; \n\
+			       #time_gate is the number of total time gates. \n\
+			       To plot the surface diffuse reflectance, the \n\
+			       output triangle surface mesh can be extracted\n\
+			       by faces=faceneighbors(cfg.elem,'rowmajor');\n\
+                               where 'faceneighbors' is part of Iso2Mesh.\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
- -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'json' or 'ubjson'\n\
-\n\
-== User IO options ==\n\
- -i 	       (--interactive) interactive mode\n\
+ -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
+                               'hdr' (Analyze) or 'nii' (nifti, double)\n\
+\n"S_BOLD S_CYAN"\
+== User IO options ==\n"S_RESET"\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
-\n\
-== Debug options ==\n\
+ -i 	       (--interactive) interactive mode\n\
+\n"S_BOLD S_CYAN"\
+== Debug options ==\n"S_RESET"\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
  -D [''|MCBWDIOXATRPE]         1 M  photon movement info\n\
@@ -1315,11 +1484,11 @@ where possible parameters include (the first item in [] is the default value)\n\
       combine multiple items by using a string, or add selected numbers together\n\
  --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
                                a single photon, followed by its index (start 0)\n\
-\n\
-== Additional options ==\n\
+\n"S_BOLD S_CYAN"\
+== Additional options ==\n"S_RESET"\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
-\n\
-== Example ==\n\
+\n"S_BOLD S_CYAN"\
+== Example ==\n"S_RESET"\
        %s -n 1000000 -f input.json -s test -b 0 -D TP\n",exename,
 #ifdef MMC_USE_SSE
 'H',

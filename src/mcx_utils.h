@@ -49,6 +49,31 @@
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
 
+#ifndef MCX_CONTAINER
+  #define S_RED     "\x1b[31m"
+  #define S_GREEN   "\x1b[32m"
+  #define S_YELLOW  "\x1b[33m"
+  #define S_BLUE    "\x1b[34m"
+  #define S_MAGENTA "\x1b[35m"
+  #define S_CYAN    "\x1b[36m"
+  #define S_BOLD     "\x1b[1m"
+  #define S_ITALIC   "\x1b[3m"
+  #define S_RESET   "\x1b[0m"
+#else
+  #define S_RED
+  #define S_GREEN
+  #define S_YELLOW
+  #define S_BLUE
+  #define S_MAGENTA
+  #define S_CYAN
+  #define S_BOLD
+  #define S_ITALIC
+  #define S_RESET
+#endif
+
+
+typedef double OutputType;
+
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
@@ -60,7 +85,7 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
-enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
+enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
 
 
@@ -97,7 +122,6 @@ typedef struct MMC_history{
 	char magic[4];                 /**< magic bits= 'M','C','X','H' */
 	unsigned int  version;         /**< version of the mch file format */
 	unsigned int  maxmedia;        /**< number of media in the simulation */
-	unsigned int  srcnum;	       /**< number of sources in the simulation*/
 	unsigned int  detnum;          /**< number of detectors in the simulation */
 	unsigned int  colcount;        /**< how many output files per detected photon */
 	unsigned int  totalphoton;     /**< how many total photon simulated */
@@ -106,7 +130,10 @@ typedef struct MMC_history{
 	float unitinmm;                /**< what is the voxel size of the simulation */
 	unsigned int  seedbyte;        /**< how many bytes per RNG seed */
         float normalizer;              /**< what is the normalization factor */
-	int reserved[5];               /**< reserved fields for future extension */
+	int respin;                    /**< if positive, repeat count so total photon=totalphoton*respin; if negative, total number is processed in respin subset */
+	unsigned int  srcnum;          /**< number of sources for simultaneous pattern sources */
+	unsigned int  savedetflag;     /**< number of sources for simultaneous pattern sources */
+	int reserved[2];               /**< reserved fields for future extension */
 } history;
 
 /***************************************************************************//**
@@ -117,9 +144,7 @@ typedef struct MMC_history{
 *******************************************************************************/  
 
 typedef struct MMC_config{
-	unsigned int nphoton;          /**<(total simulated photon number) we now use this to \
-	                                   temporarily alias totalmove, as to specify photon \
-			                   number is causing some troubles*/
+	size_t nphoton;                /**<total simulated photon number, max: 2^64-1*/
         int nblocksize;                /**<thread block size*/
 	int nthread;                   /**<num of total threads, multiple of 128*/
 	int seed;                      /**<random number generator seed*/
@@ -172,6 +197,7 @@ typedef struct MMC_config{
 	char isgpuinfo;                /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;               /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char issaveseed;               /**<1 save the seed for a detected photon, 0 do not save*/
+	char issaveref;                /**<1 to save diffuse reflectance on surface, 0 no save*/
 	char isatomic;                 /**<1 use atomic operations for weight accumulation, 0 do not use*/
 	char method;                   /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;               /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
@@ -198,7 +224,8 @@ typedef struct MMC_config{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void mcx_savedata(float *dat,int len,mcconfig *cfg);
+void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg,int isref);
+void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg);
 void mcx_error(const int id,const char *msg,const char *file,const int linenum);
 void mcx_loadconfig(FILE *in, mcconfig *cfg);
 void mcx_saveconfig(FILE *in, mcconfig *cfg);
@@ -208,7 +235,7 @@ void mcx_initcfg(mcconfig *cfg);
 void mcx_clearcfg(mcconfig *cfg);
 void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
-void mcx_usage(char *exename);
+void mcx_usage(char *exename,mcconfig *cfg);
 void mcx_loadvolume(char *filename,mcconfig *cfg);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
@@ -222,6 +249,7 @@ int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
+void mcx_printheader(mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP

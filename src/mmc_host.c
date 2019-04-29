@@ -55,7 +55,6 @@ tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv){
         mcx_initcfg(cfg);
         mcx_parsecmd(argc,argv,cfg);
-	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from commands ... "));
 	mesh_init_from_cfg(mesh,cfg);
         return 0;
 }
@@ -72,7 +71,6 @@ int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, 
 
 int mmc_init_from_json(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, char *jcfg, char *jmesh){
         mcx_initcfg(cfg);
-	MMCDEBUG(cfg,dlTime,(cfg->flog,"initializing from JSON ... "));
 	mcx_loadfromjson(jcfg,cfg);
 	mesh_init_from_cfg(mesh,cfg); /*need to define mesh load from json*/
 	tracer_init(tracer,mesh,cfg->method);
@@ -147,6 +145,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	t0=StartTimer();
 
+        mcx_printheader(cfg);
+
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg->issaveseed=0;
 #endif
@@ -177,6 +177,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 #pragma omp parallel private(ran0,ran1,threadid,j)
 {
 	visitor visit={0.f,0.f,1.f/cfg->tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
+	size_t id;
 
 #ifdef _OPENMP
         unsigned int threadnum=omp_get_num_threads();
@@ -186,7 +187,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 #pragma omp master
 {
-printf("thread num=%d\n",threadnum);
         seeds=(unsigned int *)malloc(sizeof(int)*threadnum*RAND_SEED_WORD_LEN);
 	srand(cfg->seed);
 	for(i=0;i<threadnum*RAND_SEED_WORD_LEN;i++)
@@ -208,20 +208,20 @@ printf("thread num=%d\n",threadnum);
 
 	/*launch photons*/
         #pragma omp for reduction(+:raytri,raytri0)
-	for(i=0;i<cfg->nphoton;i++){
+	for(id=0;id<cfg->nphoton;id++){
 		visit.raytet=0.f;
 		visit.raytet0=0.f;
-                if(i==cfg->debugphoton)
+                if(id==cfg->debugphoton)
                     cfg->debuglevel = debuglevel;
 
 		if(cfg->seed==SEED_FROM_FILE)
-		    onephoton(i,tracer,mesh,cfg,((RandType *)cfg->photonseed)+i*RAND_BUF_LEN,ran1,&visit);
+		    onephoton(id,tracer,mesh,cfg,((RandType *)cfg->photonseed)+id*RAND_BUF_LEN,ran1,&visit);
 		else
-		    onephoton(i,tracer,mesh,cfg,ran0,ran1,&visit);
+		    onephoton(id,tracer,mesh,cfg,ran0,ran1,&visit);
 		raytri+=visit.raytet;
 		raytri0+=visit.raytet0;
 
-                if(i==cfg->debugphoton)
+                if(id==cfg->debugphoton)
                     cfg->debuglevel &= 0xFFFFEA00;
 
 		#pragma omp atomic
@@ -230,7 +230,7 @@ printf("thread num=%d\n",threadnum);
 		if((cfg->debuglevel & dlProgress) && threadid==0)
 			mcx_progressbar(ncomplete,cfg);
 		if(cfg->issave2pt && cfg->checkpt[0])
-			mesh_saveweightat(mesh,cfg,i+1);
+			mesh_saveweightat(mesh,cfg,id+1);
 	}
 
 	for(j=0;j<cfg->srcnum;j++){
@@ -262,6 +262,10 @@ printf("thread num=%d\n",threadnum);
 	}
 	#pragma omp barrier
 	visitor_clear(&visit);
+	if(visit.partialpath)
+	    free(visit.partialpath);
+	if(cfg->issaveseed && visit.photonseed)
+	    free(visit.photonseed);
 }
         if(seeds) free(seeds);
 
@@ -273,7 +277,7 @@ printf("thread num=%d\n",threadnum);
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t%.2f photon/ms, %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
+        MMCDEBUG(cfg,dlTime,(cfg->flog,"speed ...\t"S_BOLD""S_BLUE"%.2f photon/ms"S_RESET", %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg->nphoton/dt,raytri,raytri0,raytri/dt));
         if(cfg->issavedet)
            fprintf(cfg->flog,"detected %d photons\n",master.detcount);
 
@@ -282,7 +286,7 @@ printf("thread num=%d\n",threadnum);
 	    for(j=0;j<cfg->srcnum;j++){
 	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
           	sum_normalizer += cur_normalizer;
-          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
+          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
 		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
   	    }
   	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
@@ -293,17 +297,24 @@ printf("thread num=%d\n",threadnum);
                     case otFluence:MMCDEBUG(cfg,dlTime,(cfg->flog,"saving fluence ...")); break;
                     case otEnergy: MMCDEBUG(cfg,dlTime,(cfg->flog,"saving energy deposit ...")); break;
 		}
-		mesh_saveweight(mesh,cfg);
+		mesh_saveweight(mesh,cfg,0);
 	}
 	if(cfg->issavedet){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving detected photons ..."));
-		if(cfg->issaveexit==1)
+		if(cfg->issaveexit!=2)
 			mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg);
-		else if(cfg->issaveexit==2){
+		else{
 			float *detimage=(float*)calloc(cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,sizeof(float));
 			mesh_getdetimage(detimage,master.partialpath,master.bufpos,cfg,mesh);
 			mesh_savedetimage(detimage,cfg);	free(detimage);
 		}
+		free(master.partialpath);
+                if(cfg->issaveseed && master.photonseed)
+		    free(master.photonseed);
+	}
+	if(cfg->issaveref){
+		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving surface diffuse reflectance ..."));
+		mesh_saveweight(mesh,cfg,1);
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
         visitor_clear(&master);
