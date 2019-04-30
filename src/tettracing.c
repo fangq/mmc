@@ -1597,7 +1597,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 
         vec_mult_add(&(r->p0),&(r->vec),1.f,EPS,&(r->p0));
 
-	/*Caluclate intial element id and bary-centric coordinates*/
+	/*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
 	float3 vecS={0.f}, *nodes=mesh->node, vecAB, vecAC, vecN;
 	int is,i,ea,eb,ec;
 	float bary[4]={0.f};
