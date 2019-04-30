@@ -1540,9 +1540,8 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
 		canfocus=0;
-                if(cfg->srctype==stIsotropic)
-                    if(r->eid>0)
-                        return;
+                if(r->eid>0)
+		    return;
 	}else if(cfg->srctype==stZGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
