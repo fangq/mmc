@@ -1540,9 +1540,8 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		r->vec.y=stheta*sphi;
 		r->vec.z=ctheta;
 		canfocus=0;
-                if(cfg->srctype==stIsotropic)
-                    if(r->eid>0)
-                        return;
+                if(r->eid>0)
+		    return;
 	}else if(cfg->srctype==stZGaussian){
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
@@ -1598,7 +1597,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 
         vec_mult_add(&(r->p0),&(r->vec),1.f,EPS,&(r->p0));
 
-	/*Caluclate intial element id and bary-centric coordinates*/
+	/*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
 	float3 vecS={0.f}, *nodes=mesh->node, vecAB, vecAC, vecN;
 	int is,i,ea,eb,ec;
 	float bary[4]={0.f};

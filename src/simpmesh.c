@@ -336,8 +336,10 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
         mesh->srcelemlen=0;
         mesh->detelemlen=0;
 	for(i=0;i<mesh->ne;i++){
-		if(mesh->type[i]==-1)	/*number of elements in the initial candidate list*/
+		if(mesh->type[i]==-1){	/*number of elements in the initial candidate list*/
 			mesh->srcelemlen++;
+			cfg->e0=(cfg->e0==0) ? i+1 : cfg->e0;
+		}
 		if(mesh->type[i]==-2){	/*number of elements in the initial candidate list*/
 			mesh->detelemlen++;
 			cfg->isextdet=1;
@@ -598,7 +600,7 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 		tracer_build(tracer);
 	    else
 	    	MESH_ERROR("tracer is not associated with a mesh");
-	}else if(cfg->srctype==stPencil && cfg->e0>0){
+	}else if( (cfg->srctype==stPencil || cfg->srctype==stIsotropic || cfg->srctype==stCone || cfg->srctype==stArcSin)  && cfg->e0>0){
             int eid=cfg->e0-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
 	    int ea,eb,ec;
