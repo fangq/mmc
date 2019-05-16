@@ -87,7 +87,7 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
-
+enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h

@@ -1230,7 +1230,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    r.eid=enb[r.faceid];
 
 		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
-			if(! (r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
+			if(! (r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
 	    	    if(r.eid<=0) break;
@@ -1409,7 +1409,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	tmp1=n2*n2;
         tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
-        if(tmp2>0.f){ /*if no total internal reflection*/
+        if(tmp2>0.f && cfg->isreflect!=bcMirror){ /*if no total internal reflection*/
           Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
 	  tmp2=sqrt(tmp2); /*to save one sqrt*/
           Im=2.f*n1*n2*Icos*tmp2;
