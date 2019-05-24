@@ -1409,7 +1409,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	tmp1=n2*n2;
         tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
-        if(tmp2>0.f && (*eid<=0 && cfg->isreflect!=bcMirror)){ /*if no total internal reflection*/
+        if(tmp2>0.f && !(*eid<=0 && cfg->isreflect==bcMirror)){ /*if no total internal reflection*/
           Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
 	  tmp2=sqrt(tmp2); /*to save one sqrt*/
           Im=2.f*n1*n2*Icos*tmp2;
