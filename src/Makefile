@@ -1,5 +1,5 @@
 ROOTDIR = ..
-BINARY=mmcx
+BINARY=mmcl
 
 FILES=xorshift128p_rand simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host highordermesh mmc_cl_utils mmc_cl_host
 CLPROGRAM=mmc_core
