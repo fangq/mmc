@@ -27,7 +27,7 @@ function [data, headerstruct, photonseed]=loadmch(fname,format,endian)
 %                    [detid(1) nscat(M) ppath(M) mom(M) p(3) v(3) w0(1)]
 %        header: file header info, a structure has the following fields
 %                [version,medianum,detnum,recordnum,totalphoton,detectedphoton,
-%                 savedphoton,lengthunit,seedbyte,normalizer,respin]
+%                 savedphoton,lengthunit,seedbyte,normalizer,respin,srcnum,savedetflag]
 %        photonseed: (optional) if the mch file contains a seed section, this
 %                returns the seed data for each detected photon. Each row of 
 %                photonseed is a byte array, which can be used to initialize a  
@@ -63,15 +63,25 @@ while(~feof(fid))
 	end
 	hd=fread(fid,7,'uint'); % version, maxmedia, detnum, colcount, totalphoton, detected, savedphoton
 	if(hd(1)~=1) error('version higher than 1 is not supported'); end
-        unitmm=fread(fid,1,'float32');
+    unitmm=fread(fid,1,'float32');
 	seedbyte=fread(fid,1,'uint');
-        normalizer=fread(fid,1,'float32');
+    normalizer=fread(fid,1,'float32');
 	respin=fread(fid,1,'int');
-	junk=fread(fid,4,'uint');
+	srcnum=fread(fid,1,'uint');
+	savedetflag=fread(fid,1,'uint');
+	junk=fread(fid,2,'uint');
 
-	dat=fread(fid,hd(7)*hd(4),format);
-	dat=reshape(dat,[hd(4),hd(7)])';
-	dat(:,3:(2+hd(2)))=dat(:,3:(2+hd(2)))*unitmm;
+    detflag=dec2bin(bitand(savedetflag,63))-'0';
+    datalen=[1 hd(2) hd(2) hd(2) 3 3 1];
+    datlen=detflag.*datalen(1:length(detflag));
+
+    dat=fread(fid,hd(7)*hd(4),format);
+    dat=reshape(dat,[hd(4),hd(7)])';
+    if(savedetflag && length(detflag)>2 && detflag(3)>0)
+	    dat(:,sum(datlen(1:2))+1:sum(datlen(1:3)))=dat(:,sum(datlen(1:2))+1:sum(datlen(1:3)))*unitmm;
+    else
+        dat(:,2+hd(2):(1+2*hd(2)))=dat(:,2+hd(2):(1+2*hd(2)))*unitmm;
+    end
 	data=[data;dat];
         if(seedbyte>0)
             try
@@ -104,5 +114,5 @@ if(nargout>=2)
                        'recordnum',header(4),'totalphoton',header(5),...
                        'detectedphoton',header(6),'savedphoton',header(7),...
                        'lengthunit',header(8),'seedbyte',seedbyte,'normalizer',normalizer,...
-		       'respin',respin);
+		       'respin',respin,'srcnum',srcnum,'savedetflag',savedetflag);
 end
