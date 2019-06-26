@@ -20,7 +20,7 @@
 
 clc
 clear
-load("head_atlas.mat");
+load('head_atlas.mat');
 %% prepare cfg for MMCLAB simulation
 clear cfg
 cfg.nphoton=1e7; %takes ~240s on Intel i7-8700K(12 threads)

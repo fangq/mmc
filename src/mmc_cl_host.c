@@ -235,13 +235,13 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      mcx_printheader(cfg);
 
      tic=StartTimer();
-     if(cfg->issavedet)
+     if(cfg->issavedet){
          MMC_FPRINTF(cfg->flog,"- variant name: [%s] compiled with OpenCL version [%d]\n",
              "Detective MCXCL",CL_VERSION_1_0);
-     else
+     }else{
          MMC_FPRINTF(cfg->flog,"- code name: [Vanilla MCXCL] compiled with OpenCL version [%d]\n",
              CL_VERSION_1_0);
-
+     }
      MMC_FPRINTF(cfg->flog,"- compiled with: [RNG] %s [Seed Length] %d\n",MCX_RNG_NAME,RAND_SEED_WORD_LEN);
      MMC_FPRINTF(cfg->flog,"initializing streams ...\t");
 
@@ -496,7 +496,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      }
      if(cfg->issave2pt && cfg->parentid==mpStandalone){
          MMC_FPRINTF(cfg->flog,"saving data to file ...\t");
-         mesh_saveweight(mesh,cfg);
+         mesh_saveweight(mesh,cfg,0);
          MMC_FPRINTF(cfg->flog,"saving data complete : %d ms\n\n",GetTimeMillis()-tic);
          fflush(cfg->flog);
      }
@@ -506,7 +506,10 @@ is more than what your have specified (%d), please use the -H option to specify 
          cfg->his.detected=cfg->detectedcount;
          mesh_savedetphoton(cfg->exportdetected,NULL,cfg->detectedcount,(sizeof(RandType)*RAND_BUF_LEN),cfg);
      }
-
+     if(cfg->issaveref){
+	MMC_FPRINTF(cfg->flog,"saving surface diffuse reflectance ...");
+	mesh_saveweight(mesh,cfg,1);
+     }
      // total energy here equals total simulated photons+unfinished photons for all threads
      MMC_FPRINTF(cfg->flog,"simulated %ld photons (%ld) with %d devices (ray-tet %d)\nMCX simulation speed: %.2f photon/ms\n",
              cfg->nphoton,cfg->nphoton,workdev, reporter.raytet,(double)cfg->nphoton/toc);

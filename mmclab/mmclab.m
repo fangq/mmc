@@ -10,7 +10,7 @@ function varargout=mmclab(cfg,type)
 %                                                                             %
 %               Research funded by NIH/NIGMS grant R01-GM114365               %
 %#############################################################################%
-%$Rev::      $2019.3$Date::                       $ by $Author::             $%
+%$Rev::      $2019.4$Date::                       $ by $Author::             $%
 %#############################################################################%
 %
 % Format:
@@ -140,7 +140,14 @@ function varargout=mmclab(cfg,type)
 %                       '-': search both directions
 %
 %== Output control ==
-%      cfg.issaveexit:  [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
+%      cfg.issaveexit: [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
+%      cfg.issaveref:  [0]-save diffuse reflectance/transmittance on the exterior surfaces.
+%                      The output is stored as flux.dref in a 2D array of size [#Nf,  #time_gate]
+%                      where #Nf is the number of triangles on the surface; #time_gate is the
+%                      number of total time gates. To plot the surface diffuse reflectance, the output
+%                      triangle surface mesh can be extracted by faces=faceneighbors(cfg.elem,'rowmajor');
+%                      where 'faceneighbors' can be found in the iso2mesh toolbox.
+%                      Example: see <demo_mmclab_basic.m>
 %      cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
 %      cfg.isatomic:    [1]-use atomic operations for saving fluence, 0-no atomic operations
 %      cfg.outputtype:  'flux' - output fluence-rate
@@ -169,6 +176,10 @@ function varargout=mmclab(cfg,type)
 %            depending on cfg.outputtype) at each mesh node and time-gate.
 %            In the "replay" mode, if cfg.replaydet is set to -1 and multiple 
 %            detectors exist, fluence.data will add a 5th dimension for the detector number.
+%
+%            If cfg.issaveref is set to 1, fluence(i).dref is not empty, and stores
+%            the surface diffuse reflectance (normalized by default). The surface mesh
+%            that the dref output is attached can be obtained by faces=faceneighbors(cfg.elem,'rowmajor');
 %      detphoton: (optional) a struct array, with a length equals to that of cfg.
 %            Starting from v2016.5, the detphoton contains the below subfields:
 %              detphoton.detid: the ID(>0) of the detector that captures the photon

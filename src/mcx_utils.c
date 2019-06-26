@@ -79,7 +79,7 @@
 const char shortopt[]={'h','E','f','n','A','t','T','s','a','g','b','D','G',
                  'd','r','S','e','U','R','l','L','I','-','u','C','M',
                  'i','V','O','-','F','q','x','P','k','v','m','-','-',
-		 'J','o','H','-','W','\0'};
+		 'J','o','H','-','W','X','\0'};
 		 
 /**
  * Long command line options
@@ -96,10 +96,9 @@ const char *fullopt[]={"--help","--seed","--input","--photon","--autopilot",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
                  "--debugphoton","--compileropt","--optlevel","--maxdetphoton",
-		 "--buffer","--workload",""};
+		 "--buffer","--workload","--saveref",""};
 
 extern char pathsep;
-
 
 /**
  * Debug flags
@@ -210,6 +209,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->unitinmm=1.f;
      cfg->srctype=0;
      cfg->isspecular=0;
+     cfg->issaveref=0;
      cfg->outputtype=otFlux;
      cfg->outputformat=ofASCII;
      cfg->ismomentum=0;
@@ -234,6 +234,10 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->his.version=1;
      cfg->his.unitinmm=1.f;
      cfg->his.normalizer=1.f;
+     cfg->his.respin=1;
+     cfg->his.srcnum=cfg->srcnum;
+     cfg->his.savedetflag=0;
+
      memcpy(cfg->his.magic,"MCXH",4);
 
      memset(&(cfg->srcpos),0,sizeof(float3));
@@ -411,7 +415,7 @@ void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int out
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg){
+void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg,int isref){
      FILE *fp;
      char name[MAX_PATH_LENGTH];
      char fname[MAX_PATH_LENGTH];
@@ -427,17 +431,17 @@ void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg){
      else
          sprintf(name,"%s",cfg->session);
 
-     if(cfg->outputformat==ofNifti || cfg->outputformat==ofAnalyze){
+     if(!isref && (cfg->outputformat==ofNifti || cfg->outputformat==ofAnalyze)){
          mcx_savenii(dat, len, name, NIFTI_TYPE_FLOAT64, cfg->outputformat, cfg);
          return;
      }
-     sprintf(fname,"%s.%s",name,outputformat[(int)cfg->outputformat]);
+     sprintf(fname,"%s%s.%s",name,(isref ? "_dref" : ""),(isref ? "bin" : outputformat[(int)cfg->outputformat]));
      fp=fopen(fname,"wb");
 
      if(fp==NULL){
 	mcx_error(-2,"can not save data to disk",__FILE__,__LINE__);
      }
-     if(cfg->outputformat==ofTX3){
+     if(!isref && cfg->outputformat==ofTX3){
 	fwrite(&glformat,sizeof(unsigned int),1,fp);
 	fwrite(&(cfg->dim.x),sizeof(int),3,fp);
      }
@@ -699,7 +703,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         if(!flagset['d'])   cfg->issavedet=FIND_JSON_KEY("DoPartialPath","Session.DoPartialPath",Session,cfg->issavedet,valueint);
         if(!flagset['V'])   cfg->isspecular=FIND_JSON_KEY("DoSpecular","Session.DoSpecular",Session,cfg->isspecular,valueint);
         if(!flagset['m'])   cfg->ismomentum=FIND_JSON_KEY("DoDCS","Session.DoDCS",Session,cfg->ismomentum,valueint);
-        if(!flagset['X'])   cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
+        if(!flagset['x'])   cfg->issaveexit=FIND_JSON_KEY("DoSaveExit","Session.DoSaveExit",Session,cfg->issaveexit,valueint);
         if(!flagset['q'])   cfg->issaveseed=FIND_JSON_KEY("DoSaveSeed","Session.DoSaveSeed",Session,cfg->issaveseed,valueint);
         if(!flagset['C'])   cfg->basisorder=FIND_JSON_KEY("BasisOrder","Session.BasisOrder",Session,cfg->basisorder,valueint);
         if(!cfg->outputformat)  cfg->outputformat=mcx_keylookup((char *)FIND_JSON_KEY("OutputFormat","Session.OutputFormat",Session,"ascii",valuestring),outputformat);
@@ -1326,6 +1330,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveexit),"bool");
 				if (cfg->issaveexit) cfg->issavedet=1;
 				break;
+		     case 'X':
+ 		                i=mcx_readarg(argc,argv,i,&(cfg->issaveref),"char");
+ 				if (cfg->issaveref) cfg->issaveref=1;
+ 				break;
 		     case 'C':
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->basisorder),"bool");
 		     	        break;
@@ -1517,7 +1525,7 @@ void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.3");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.4");
 }
 
 /**
@@ -1538,7 +1546,7 @@ void mcx_printheader(mcconfig *cfg){
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $2019.3a$Date::                       $ by $Author::              $\n\
+$Rev::      $2019.4 $Date::                       $ by $Author::              $\n\
 ###############################################################################\n"S_RESET);
 }
 
@@ -1596,6 +1604,16 @@ where possible parameters include (the first item in [] is the default value)\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions\n\
                                setting -x to 1 also implies setting '-d' to 1\n\
+ -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the \n\
+                               exterior surface. The output is stored in a \n\
+                               file named *_dref.dat, and the 2nd column of \n\
+			       the data is resized to [#Nf, #time_gate] where\n\
+			       #Nf is the number of triangles on the surface; \n\
+			       #time_gate is the number of total time gates. \n\
+			       To plot the surface diffuse reflectance, the \n\
+			       output triangle surface mesh can be extracted\n\
+			       by faces=faceneighbors(cfg.elem,'rowmajor');\n\
+                               where 'faceneighbors' is part of Iso2Mesh.\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
  -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
                                'hdr' (Analyze) or 'nii' (nifti, double)\n\

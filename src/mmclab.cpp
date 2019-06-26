@@ -92,6 +92,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        usewaitbar=1;
   int        errorflag=0;
   const char       *outputtag[]={"data"};
+  const char       *datastruct[]={"data","dref"};
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop;
 #endif
@@ -121,7 +122,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
    * The function can return 1-3 outputs (i.e. the LHS)
    */
   if(nlhs>=1)
-      plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
+      plhs[0] = mxCreateStructMatrix(ncfg,1,2,datastruct);
   if(nlhs>=2)
       plhs[1] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=3)
@@ -306,6 +307,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
+	    
+            if(cfg.issaveref){        /** save diffuse reflectance */
+		fielddim[1]=mesh.nf;
+	        mxSetFieldByNumber(plhs[0],jstruct,1, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+                memcpy((double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,1)),mesh.dref,fielddim[1]*fielddim[2]*sizeof(double));
+	    }
 	}
 	if(nlhs>=2 && cfg.issaveexit==2){
 	    float *detimage=(float*)calloc(cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
@@ -371,6 +378,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,nout)
     GET_ONE_FIELD(cfg,isref3)
     GET_ONE_FIELD(cfg,isnormalized)
+    GET_ONE_FIELD(cfg,issaveref)
     GET_ONE_FIELD(cfg,debugphoton)
     GET_ONE_FIELD(cfg,minenergy)
     GET_ONE_FIELD(cfg,replaydet)
