@@ -237,9 +237,9 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      tic=StartTimer();
      if(cfg->issavedet){
          MMC_FPRINTF(cfg->flog,"- variant name: [%s] compiled with OpenCL version [%d]\n",
-             "Detective MCXCL",CL_VERSION_1_0);
+             "MMC-OpenCL",CL_VERSION_1_0);
      }else{
-         MMC_FPRINTF(cfg->flog,"- code name: [Vanilla MCXCL] compiled with OpenCL version [%d]\n",
+         MMC_FPRINTF(cfg->flog,"- code name: [MMC-OpenCL] compiled with OpenCL version [%d]\n",
              CL_VERSION_1_0);
      }
      MMC_FPRINTF(cfg->flog,"- compiled with: [RNG] %s [Seed Length] %d\n",MCX_RNG_NAME,RAND_SEED_WORD_LEN);
