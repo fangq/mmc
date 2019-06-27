@@ -196,6 +196,7 @@
 #define MCX_DEBUG_MOVE      2
 #define MCX_DEBUG_PROGRESS  4
 #define MMC_UNDEFINED      (3.40282347e+38F)
+#define ID_UNDEFINED  0xFFFFFFFF
 
 #define MIN(a,b)           ((a)<(b)?(a):(b))
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
@@ -455,6 +456,9 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    float f;
 	    uint  i;
 	} currweight;
+
+	if(r->eid<=0) 
+		return -1;
 
 	eid=(r->eid-1)<<2;
 
@@ -927,7 +931,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			fixphoton(&r.p0,node,(__constant int *)(elem+(r.eid-1)*gcfg->elemlen));
 			continue;
                   }
-	    	  r.eid=-r.eid;
+	    	  r.eid=ID_UNDEFINED;
         	  r.faceid=-1;
 	    }
 #ifdef MCX_SAVE_DETECTORS
@@ -946,7 +950,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			    reflectray(gcfg,&r.vec,&oldeid,&r.eid,r.faceid,ran,type,normal,med);
 		    }
 #endif
-	    	    if(r.eid==0) break;
+	    	    if(r.eid<=0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(type[oldeid-1]==0 && type[r.eid-1]){
                         //if(gcfg->debuglevel&dlExit)
@@ -988,14 +992,14 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
-			r.eid=-r.eid;
+			r.eid=ID_UNDEFINED;
         		break;
         	    }
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    //if(r.eid==0 && (gcfg->debuglevel&dlMove))
         		 MMC_FPRINTF(("B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
-		    if(r.eid==0){
+		    if(r.eid!=ID_UNDEFINED){
                        //if(gcfg->debuglevel&dlExit)
         		 MMC_FPRINTF(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
