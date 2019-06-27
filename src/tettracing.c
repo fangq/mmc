@@ -372,7 +372,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				if(prop->mua>0.f){
 				  ratio=r->Lmove/Lp0;
 				  r->Eabsorb+=ww;
-				  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+				  if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
 				      ww/=prop->mua;
 				  if(cfg->outputtype==otWL || cfg->outputtype==otWP)
 				      tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
@@ -591,7 +591,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+		  if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
                      ww/=prop->mua;
 		}
 
@@ -848,7 +848,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                      else
                         tracer->mesh->weight[eid+tshift]+=ww;
 		  }else{
-	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+	                if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
                            ww/=prop->mua;
                         ww*=1.f/3.f;
                         if(cfg->isatomic)
@@ -1031,7 +1031,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+		  if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
                      ww/=prop->mua;
 		}
 
