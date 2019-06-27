@@ -10,6 +10,8 @@ clear cfg flux
 
 %% create the skin-vessel benchmark mesh
 [no,fc]=latticegrid([0 200],[0 200],[20 32 200]); % create a 3-layer tissue
+no(end,:)=no(end,:)+1e-5;
+
 fc2=cell2mat(fc);
 fc=[fc2(:,[1 2 3]); fc2(:,[1 3 4])];
 
@@ -20,11 +22,11 @@ c0=[10,100,150,26]';
 seeds=[ones(4,2)*100, c0];  % define the regions by index
 
 %ISO2MESH_TETGENOPT='-Y -A'
-[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds); % creating the merged mesh domain
+[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[]); % creating the merged mesh domain
 
 cfg.unitinmm=0.005;
 cfg.node=cfg.node*cfg.unitinmm;
-%cfg.method='grid';
+cfg.method='grid';
 
 figure; 
 subplot(121);
@@ -49,7 +51,6 @@ cfg.tend=5e-8;
 cfg.tstep=5e-8;
 % cfg.outputtype='energy'; %energy deposition in mmc varys with elem volume
 cfg.outputtype='flux';
-cfg.unitinmm=1;
 cfg.minenergy=0.01;
 
 cfg.srctype='disk';
