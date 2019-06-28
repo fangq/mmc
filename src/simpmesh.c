@@ -81,7 +81,6 @@ const int ifacemap[]={1,2,0,3};
 void mesh_init(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
-	mesh->nf=0;
 	mesh->prop=0;
 	mesh->elemlen=4;
 	mesh->node=NULL;
@@ -98,7 +97,6 @@ void mesh_init(tetmesh *mesh){
 	mesh->weight=NULL;
 	mesh->evol=NULL;
 	mesh->nvol=NULL;
-	mesh->dref=NULL;
         mesh->nmin.x=VERY_BIG;
 	mesh->nmin.y=VERY_BIG;
 	mesh->nmin.z=VERY_BIG;
@@ -340,10 +338,8 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
         mesh->srcelemlen=0;
         mesh->detelemlen=0;
 	for(i=0;i<mesh->ne;i++){
-		if(mesh->type[i]==-1){	/*number of elements in the initial candidate list*/
+		if(mesh->type[i]==-1)	/*number of elements in the initial candidate list*/
 			mesh->srcelemlen++;
-			cfg->e0=(cfg->e0==0) ? i+1 : cfg->e0;
-		}
 		if(mesh->type[i]==-2){	/*number of elements in the initial candidate list*/
 			mesh->detelemlen++;
 			cfg->isextdet=1;
@@ -511,7 +507,6 @@ void mesh_loadseedfile(tetmesh *mesh, mcconfig *cfg){
 void mesh_clear(tetmesh *mesh){
 	mesh->nn=0;
 	mesh->ne=0;
-	mesh->nf=0;
         mesh->srcelemlen=0;
         mesh->detelemlen=0;
 	if(mesh->node){
@@ -529,10 +524,6 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->facenb){
 		free(mesh->facenb);
 		mesh->facenb=NULL;
-	}
-	if(mesh->dref){
-		free(mesh->dref);
-		mesh->dref=NULL;
 	}
 	if(mesh->type){
 		free(mesh->type);
@@ -602,16 +593,15 @@ void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
  */
 
 void tracer_prep(raytracer *tracer,mcconfig *cfg){
-        int i, ne=tracer->mesh->ne;
 	if(tracer->n==NULL && tracer->m==NULL && tracer->d==NULL){
 	    if(tracer->mesh!=NULL)
 		tracer_build(tracer);
 	    else
 	    	MESH_ERROR("tracer is not associated with a mesh");
-	}else if( (cfg->srctype==stPencil || cfg->srctype==stIsotropic || cfg->srctype==stCone || cfg->srctype==stArcSin)  && cfg->e0>0){
+	}else if(cfg->srctype==stPencil && cfg->e0>0){
             int eid=cfg->e0-1;
 	    float3 vecS={0.f}, *nodes=tracer->mesh->node, vecAB, vecAC, vecN;
-	    int ea,eb,ec;
+	    int i,ea,eb,ec;
 	    float s=0.f, *bary=&(cfg->bary0.x);
 	    int *elems=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen); // convert int4* to int*
 	    if(eid>=tracer->mesh->ne)
@@ -638,16 +628,6 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	        bary[i]/=s;
 	    }
 	}
-	ne=tracer->mesh->ne*tracer->mesh->elemlen;
-	tracer->mesh->nf=0;
-	for(i=0;i<ne;i++){
-		if(tracer->mesh->facenb[i]==0)
-		    tracer->mesh->facenb[i]=-(++tracer->mesh->nf);
-	}
-	if(tracer->mesh->dref)
-	    free(tracer->mesh->dref);
-        if(cfg->issaveref)
-            tracer->mesh->dref=(double *)calloc(sizeof(double)*tracer->mesh->nf*cfg->srcnum,cfg->maxgate);
 }
 
 /**
@@ -898,7 +878,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
         if(!found) return;
 	memcpy(sess,cfg->session,MAX_SESSION_LENGTH);
 	sprintf(cfg->session,"%s_%d",sess,id);
-	mesh_saveweight(mesh,cfg,0);
+	mesh_saveweight(mesh,cfg);
 	memcpy(cfg->session,sess,MAX_SESSION_LENGTH);
 }
 
@@ -910,23 +890,17 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
  * @param[in] cfg: the simulation configuration
  */
 
-void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
+void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
 	char fweight[MAX_PATH_LENGTH];
-	double *data=mesh->weight;
-
-	if(isref){
-	    data=mesh->dref;
-	    datalen=mesh->nf;
-	}
         if(cfg->rootpath[0])
-                sprintf(fweight,"%s%c%s%s.dat",cfg->rootpath,pathsep,cfg->session,(isref? "_dref": ""));
+                sprintf(fweight,"%s%c%s.%s",cfg->rootpath,pathsep,cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
         else
-                sprintf(fweight,"%s%s.dat",cfg->session,(isref? "_dref": ""));
+                sprintf(fweight,"%s.%s",cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
 
-        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
-		mcx_savedata(data,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
+        if(cfg->method==rtBLBadouelGrid && cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){
@@ -935,13 +909,13 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 	for(i=0;i<cfg->maxgate;i++){
 	    for(j=0;j<datalen;j++){
 	    	if(1==cfg->srcnum){
-	    	    if(fprintf(fp,"%d\t%e\n",j+1,data[i*datalen+j])==0)
+	    	    if(fprintf(fp,"%d\t%e\n",j+1,mesh->weight[i*datalen+j])==0)
 			MESH_ERROR("can not write to weight file");
 	    	}else{  // multiple sources for pattern illumination type
 	    	    int k, shift;
 		    for(k=0;k<cfg->srcnum;k++){
 		    	shift = (i*datalen+j)*cfg->srcnum+k;
-			    if(fprintf(fp,"%d\t%d\t%e\n",j+1,k+1,data[shift])==0)
+			    if(fprintf(fp,"%d\t%d\t%e\n",j+1,k+1,mesh->weight[shift])==0)
 				MESH_ERROR("can not write to weight file");
 		    }
 	    	}
@@ -1112,13 +1086,6 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
 	double energydeposit=0.f, energyelem,normalizor;
 	int *ee;
         int datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-	
-	if(cfg->issaveref && mesh->dref){
-	    float normalizor=1.f/Etotal;
-            for(i=0;i<cfg->maxgate;i++)
-               for(j=0;j<mesh->nf;j++)
-                  mesh->dref[i*mesh->nf+j]*=normalizor;
-        }
 
 	if(cfg->seed==SEED_FROM_FILE && (cfg->outputtype==otJacobian || cfg->outputtype==otWL || cfg->outputtype==otWP)){
             float normalizor=1.f/(DELTA_MUA*cfg->nphoton);

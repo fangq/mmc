@@ -90,7 +90,7 @@ enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
 enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU};
 enum TMCXParent  {mpStandalone, mpMATLAB};
-enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
+
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -125,6 +125,7 @@ typedef struct MMC_history{
 	char magic[4];                 /**< magic bits= 'M','C','X','H' */
 	unsigned int  version;         /**< version of the mch file format */
 	unsigned int  maxmedia;        /**< number of media in the simulation */
+	unsigned int  srcnum;	       /**< number of sources in the simulation*/
 	unsigned int  detnum;          /**< number of detectors in the simulation */
 	unsigned int  colcount;        /**< how many output files per detected photon */
 	unsigned int  totalphoton;     /**< how many total photon simulated */
@@ -133,10 +134,7 @@ typedef struct MMC_history{
 	float unitinmm;                /**< what is the voxel size of the simulation */
 	unsigned int  seedbyte;        /**< how many bytes per RNG seed */
         float normalizer;              /**< what is the normalization factor */
-	int respin;                    /**< if positive, repeat count so total photon=totalphoton*respin; if negative, total number is processed in respin subset */
-	unsigned int  srcnum;          /**< number of sources for simultaneous pattern sources */
-	unsigned int  savedetflag;     /**< number of sources for simultaneous pattern sources */
-	int reserved[2];               /**< reserved fields for future extension */
+	int reserved[5];               /**< reserved fields for future extension */
 } history;
 
 
@@ -217,7 +215,6 @@ typedef struct MMC_config{
 	char isgpuinfo;                /**<1 to print gpu info when attach, 0 do not print*/
 	char isspecular;               /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
 	char issaveseed;               /**<1 save the seed for a detected photon, 0 do not save*/
-	char issaveref;                /**<1 to save diffuse reflectance on surface, 0 no save*/
 	char isatomic;                 /**<1 use atomic operations for weight accumulation, 0 do not use*/
 	char method;                   /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
 	char basisorder;               /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
@@ -261,7 +258,7 @@ typedef struct MMC_config{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg,int isref);
+void mcx_savedata(OutputType *dat,size_t len,mcconfig *cfg);
 void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int outputformatid, mcconfig *cfg);
 void mcx_error(const int id,const char *msg,const char *file,const int linenum);
 void mcx_loadconfig(FILE *in, mcconfig *cfg);

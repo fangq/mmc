@@ -138,8 +138,8 @@
   #define sincos(a,b)     sincosf(a,b)
 
 #else
-  #define FL4(f) (f)
-  #define FL3(f) (f)
+  #define FL4(f) ((float4)(f))
+  #define FL3(f) ((float3)(f))
 #endif
 
 #ifdef MCX_SAVE_DETECTORS
@@ -196,7 +196,6 @@
 #define MCX_DEBUG_MOVE      2
 #define MCX_DEBUG_PROGRESS  4
 #define MMC_UNDEFINED      (3.40282347e+38F)
-#define ID_UNDEFINED  0xFFFFFFFF
 
 #define MIN(a,b)           ((a)<(b)?(a):(b))
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
@@ -457,16 +456,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    uint  i;
 	} currweight;
 
-	if(r->eid<=0) 
-		return -1;
-
 	eid=(r->eid-1)<<2;
 
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
 
-	S = FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2];
+	S = (FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2]);
 	T = normal[eid+3] - (FL4(r->p0.x)*normal[eid]+FL4(r->p0.y)*normal[eid+1]+FL4(r->p0.z)*normal[eid+2]);
         T = -convert_float4_rte(isgreater(T,FL4(0.f)))*T;
 	T = T/S;
@@ -655,7 +651,7 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-float mc_next_scatter(float g, float3 *dir,__private RandType *ran, __constant MCXParam *gcfg, float *pmom){
+float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *gcfg, float *pmom){
 
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
@@ -737,7 +733,7 @@ void fixphoton(float3 *p,__constant float3 *nodes, __constant int *ee){
  * \param[in,out] ran: the random number generator states
  */
 
-void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__constant int *elem,__constant int *srcelem, __private RandType *ran){
+void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__constant int *elem,__constant int *srcelem, RandType *ran){
         int canfocus=1;
         float3 origin=r->p0;
 
@@ -904,7 +900,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__c
 
 void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__constant float3 *node,__constant int *elem, __global float *weight,
     __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
-    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, __private RandType *ran, int *raytet){
+    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
 	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0xFFFFFFFF,0.f};
@@ -931,7 +927,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			fixphoton(&r.p0,node,(__constant int *)(elem+(r.eid-1)*gcfg->elemlen));
 			continue;
                   }
-	    	  r.eid=ID_UNDEFINED;
+	    	  r.eid=-r.eid;
         	  r.faceid=-1;
 	    }
 #ifdef MCX_SAVE_DETECTORS
@@ -950,7 +946,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			    reflectray(gcfg,&r.vec,&oldeid,&r.eid,r.faceid,ran,type,normal,med);
 		    }
 #endif
-	    	    if(r.eid<=0) break;
+	    	    if(r.eid==0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(type[oldeid-1]==0 && type[r.eid-1]){
                         //if(gcfg->debuglevel&dlExit)
@@ -992,14 +988,14 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
-			r.eid=ID_UNDEFINED;
+			r.eid=-r.eid;
         		break;
         	    }
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    //if(r.eid==0 && (gcfg->debuglevel&dlMove))
         		 MMC_FPRINTF(("B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
-		    if(r.eid!=ID_UNDEFINED){
+		    if(r.eid==0){
                        //if(gcfg->debuglevel&dlExit)
         		 MMC_FPRINTF(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
