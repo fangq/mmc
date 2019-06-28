@@ -212,10 +212,8 @@ typedef struct MMC_Ray{
 	float photontimer;            /**< the total time-of-fly of the photon */
 	float slen;                   /**< the remaining unitless scattering length = length*mus  */
 	float Lmove;                  /**< last photon movement length */
-#ifdef USE_DMMC
 	uint oldidx;
 	float oldweight;
-#endif
 	//int nexteid;                  /**< the index to the neighboring tet to be moved into */
 	//float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
 	//float slen0;                  /**< initial unitless scattering length = length*mus */
@@ -903,11 +901,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,1.f,0.f,0.f,0.f
-#ifdef USE_DMMC
-	,0xFFFFFFFF,0.f
-#endif
-	};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,1.f,0.f,0.f,0.f,0xFFFFFFFF,0.f};
 
 	//r.photonid=id;
 
