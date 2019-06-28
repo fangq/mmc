@@ -708,16 +708,20 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
 
         if(cfg->debuglevel==0)
            cfg->debuglevel=mcx_parsedebugopt((char *)FIND_JSON_KEY("DebugFlag","Session.DebugFlag",Session,"",valuestring));
-        strncpy(val,FIND_JSON_KEY("RayTracer","Session.RayTracer",Session,raytracing+cfg->method,valuestring),1);
-        if(mcx_lookupindex(val, raytracing)){
-		MMC_ERROR(-2,"the specified ray-tracing method is not recognized");
-	}
-	cfg->method=val[0];
-        strncpy(val,FIND_JSON_KEY("OutputType","Session.OutputType",Session,outputtype+cfg->outputtype,valuestring),1);
-        if(mcx_lookupindex(val, outputtype)){
-                MMC_ERROR(-2,"the specified output data type is not recognized");
+        if(!flagset['M']) {
+	    strncpy(val,FIND_JSON_KEY("RayTracer","Session.RayTracer",Session,raytracing+cfg->method,valuestring),1);
+	    if(mcx_lookupindex(val, raytracing)){
+		    MMC_ERROR(-2,"the specified ray-tracing method is not recognized");
+	    }
+	    cfg->method=val[0];
         }
-	if(!flagset['O']) cfg->outputtype=val[0];
+        if(!flagset['O']){
+	    strncpy(val,FIND_JSON_KEY("OutputType","Session.OutputType",Session,outputtype+cfg->outputtype,valuestring),1);
+	    if(mcx_lookupindex(val, outputtype)){
+		    MMC_ERROR(-2,"the specified output data type is not recognized");
+	    }
+	    cfg->outputtype=val[0];
+	}
         ck=FIND_JSON_OBJ("Checkpoints","Session.Checkpoints",Session);
         if(ck){
             int num=MIN(cJSON_GetArraySize(ck),MAX_CHECKPOINT);
