@@ -37,7 +37,7 @@ clear cfg
 
 cfg.nphoton=3e6;
 cfg.seed=1648335518;
-cfg.srcpos=[30.5,30.5,0];
+cfg.srcpos=[30,30.1,0];
 cfg.srcdir=[0 0 1];
 cfg.tstart=0;
 cfg.tend=5e-9;
@@ -74,10 +74,10 @@ ISO2MESH_SESSION='dmmc2_';
 
 [no,fc]=mergemesh(nsph_10,fsph_10,nsph_23,fsph_23,nsph_25,fsph_25);
 [no,fc]=removeisolatednode(no,fc);
-srcpos=[30.5 30.5 0.];
+srcpos=cfgs(1).srcpos;
 [cfgs(2).node,cfgs(2).elem,face2]=surf2mesh(no,fc,[0 0 0],[60 60 60],1,0.25,[1 1 1 0.1;30 30 6 0.1;30 30 17 0.1;30 30 30 0.1],[],[1 1 1 1 1 1 1 1]);
 [cfgs(2).node,cfgs(2).elem]=sortmesh(srcpos,cfgs(2).node,cfgs(2).elem,1:4);
 cfgs(2).method='havel';
 
-mmc2json(cfgs(1),'dmmc_sphshell.json');
-mmc2json(cfgs(2),'sphshell.json');
+mmc2json(cfgs(1),'dmmc_sphshells.json');
+mmc2json(cfgs(2),'sphshells.json');
