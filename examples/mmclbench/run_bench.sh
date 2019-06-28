@@ -64,13 +64,13 @@ then
     cd ../colin27
 
     echo testing benchmark B3 mmc mode with mmc
-    ./run_mmc.sh -s b3_mmc $OPT -G -1 -M S $EXTRA $CPUEXTRA
+    ./run_test.sh -s b3_mmc $OPT -G -1 -M S $EXTRA $CPUEXTRA
 
     echo testing benchmark B3 mmc mode with mmcl
-    ./run_mmc.sh -s b3_mmcl $OPT -G 1 -M S $EXTRA
+    ./run_test.sh -s b3_mmcl $OPT -G 1 -M S $EXTRA
 
-    echo testing benchmark B3 dmmc mode with mmc
-    ./run_dmmc.sh -s b3_dmmc $OPT -G -1 -M G $EXTRA $CPUEXTRA
+    #echo testing benchmark B3 dmmc mode with mmc
+    #./run_test.sh -s b3_dmmc $OPT -G -1 -M G $EXTRA $CPUEXTRA
 
     #echo testing benchmark B3 dmmc mode with mmcl
     #./run_dmmc.sh -s b3_dmmcl $OPT -G 1 -M G $EXTRA
