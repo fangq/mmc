@@ -208,13 +208,15 @@ typedef struct MMC_Ray{
 	int eid;                      /**< the index of the enclosing tet (starting from 1) */
 	int faceid;                   /**< the index of the face at which ray intersects with tet */
 	int isend;                    /**< if 1, the scattering event ends before reaching the intersection */
-	int nexteid;                  /**< the index to the neighboring tet to be moved into */
 	float weight;                 /**< photon current weight */
 	float photontimer;            /**< the total time-of-fly of the photon */
 	float slen;                   /**< the remaining unitless scattering length = length*mus  */
 	float Lmove;                  /**< last photon movement length */
+#ifdef USE_DMMC
 	uint oldidx;
 	float oldweight;
+#endif
+	//int nexteid;                  /**< the index to the neighboring tet to be moved into */
 	//float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
 	//float slen0;                  /**< initial unitless scattering length = length*mus */
 	//unsigned int photonid;        /**< index of the current photon */
@@ -275,12 +277,12 @@ typedef struct MMC_medium{
 } medium __attribute__ ((aligned (32)));
 
 __constant int faceorder[]={1,3,2,0,-1};
-__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
-__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 __constant int ifaceorder[]={3,0,2,1};
-__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
-__constant int facemap[]={2,0,1,3};
-__constant int ifacemap[]={1,2,0,3};
+//__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
+//__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
+//__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+//__constant int facemap[]={2,0,1,3};
+//__constant int ifacemap[]={1,2,0,3};
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
@@ -481,8 +483,6 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	    prop=med[type];
             currweight.f=r->weight;
-
-            r->nexteid=((__constant int *)(facenb+eid*gcfg->elemlen))[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 
 	    r->Lmove=(prop.mus <= EPS) ? R_MIN_MUS : r->slen/prop.mus;
 	    r->isend=(Lmin>r->Lmove);
@@ -903,7 +903,11 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,-1,1.f,0.f,0.f,0.f,0xFFFFFFFF,0.f};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,1.f,0.f,0.f,0.f
+#ifdef USE_DMMC
+	,0xFFFFFFFF,0.f
+#endif
+	};
 
 	//r.photonid=id;
 

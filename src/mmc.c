@@ -61,11 +61,11 @@ int main(int argc, char**argv){
            The core simulation loop is executed in the mmc_run_mp() function where
 	   multiple threads are executed to simulate all photons.
          */
-#ifdef USE_OPENCL
-        mmc_run_cl(&cfg,&mesh,&tracer);
-#else
-        mmc_run_mp(&cfg,&mesh,&tracer);
-#endif
+	if(cfg.gpuid>MAX_DEVICE)
+            mmc_run_mp(&cfg,&mesh,&tracer);
+	else
+            mmc_run_cl(&cfg,&mesh,&tracer);
+
 	/** 
            Once all photon simulations are complete, we clean up all allocated memory
 	   and finish the execution.
