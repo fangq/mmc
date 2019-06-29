@@ -3,7 +3,7 @@
 		"ID": "dmmc_sphshells",
 		"DoMismatch": 1,
 		"DebugFlag": "TP",
-		"RayTracer": "grid",
+		"RayTracer": "g",
 		"RNGSeed": 1648335518,
 		"Photons": 3000000
 	},

@@ -65,7 +65,7 @@ fbox=volface(ebox);
 ISO2MESH_TETGENOPT='-A -q -Y'
 [cfgs(1).node,cfgs(1).elem]=surf2mesh(no,fc,[0 0 0],[60.1 60.1 60.1],1,100,[1 1 1;30 30 6;30 30 15;30 30 30]);%thin layer
 % [cfgs(1).node,cfgs(1).elem]=surf2mesh(no,fc,[0 0 0],[60.1 60.1 60.1],1,100,[1 1 1;30 30 6;30 30 17;30 30 30]);%thick layer
-cfgs(1).method='grid';
+cfgs(1).method='g';
 
 % generate a refined volumetric mesh from triangular surfaces of 
 % three spheres with an additional bounding box for MMC
@@ -77,7 +77,7 @@ ISO2MESH_SESSION='dmmc2_';
 srcpos=cfgs(1).srcpos;
 [cfgs(2).node,cfgs(2).elem,face2]=surf2mesh(no,fc,[0 0 0],[60 60 60],1,0.25,[1 1 1 0.1;30 30 6 0.1;30 30 17 0.1;30 30 30 0.1],[],[1 1 1 1 1 1 1 1]);
 [cfgs(2).node,cfgs(2).elem]=sortmesh(srcpos,cfgs(2).node,cfgs(2).elem,1:4);
-cfgs(2).method='havel';
+cfgs(2).method='s';
 
 mmc2json(cfgs(1),'dmmc_sphshells.json');
 mmc2json(cfgs(2),'sphshells.json');
