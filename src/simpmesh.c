@@ -899,8 +899,15 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         else
                 sprintf(fweight,"%s.%s",cfg->session,(cfg->method==rtBLBadouelGrid ? "mc2" : "dat"));
 
-        if(cfg->method==rtBLBadouelGrid && cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+	        uint3 dim0=cfg->dim;
+	        if(cfg->method!=rtBLBadouelGrid){
+		    cfg->dim.x=datalen;
+		    cfg->dim.y=cfg->maxgate;
+		    cfg->dim.z=cfg->srcnum;
+		}
 		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
+		cfg->dim=dim0;
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){
