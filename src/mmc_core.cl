@@ -183,7 +183,7 @@
 #define SAME_VOXEL         -9999.f                 //scatter within a voxel
 #define NO_LAUNCH          9999                    //when fail to launch, for debug
 #define MAX_PROP           2000                     /*maximum property number*/
-#define OUTSIDE_VOLUME     0xFFFFFFFF              /**< flag indicating the index is outside of the volume */
+#define ID_UNDEFINED       0xFFFFFFFFU              /**< flag indicating the index is outside of the volume */
 
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
@@ -507,15 +507,13 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
             {
 #ifndef MCX_SKIP_VOLUME
-/*
 	    if(prop.mua>0.f){
-	      if(gcfg->outputtype==otFlux || gcfg->outputtype==otJacobian)
+	      if(gcfg->outputtype!=otEnergy && gcfg->outputtype!=otWP)
                  ww/=prop.mua;
 	    }
-*/
   #ifndef USE_DMMC
                uint newidx=eid+tshift;
-	       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+	       r->oldidx=(r->oldidx==ID_UNDEFINED)? newidx: r->oldidx;
 	       if(newidx!=r->oldidx){
     #ifdef USE_ATOMIC
 		       atomicadd(weight+r->oldidx,r->oldweight);
@@ -539,7 +537,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 		       int3 idx= convert_int3_rtn(S.xyz * FL3(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
 		       uint newidx=(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)+tshift;
-		       r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
+		       r->oldidx=(r->oldidx==ID_UNDEFINED)? newidx: r->oldidx;
 		       if(newidx!=r->oldidx){
 #ifndef DO_NOT_SAVE
     #ifdef USE_ATOMIC
@@ -901,7 +899,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
-	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,1.f,0.f,0.f,0.f,0xFFFFFFFF,0.f};
+	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,1.f,0.f,0.f,0.f,ID_UNDEFINED,0.f};
 
 	//r.photonid=id;
 

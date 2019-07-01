@@ -1,4 +1,4 @@
-function varargout=mmclab(cfg,type)
+function varargout=mmclab(varargin)
 %
 %#############################################################################%
 %         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
@@ -228,9 +228,44 @@ function varargout=mmclab(cfg,type)
 % License: GNU General Public License version 3, please read LICENSE.txt for details
 %
 
-if(nargin==0)
-    error('input field cfg must be defined');
+try
+    defaultocl=evalin('base','USE_MCXCL');
+catch
+    defaultocl=1;
 end
+
+useopencl=defaultocl;
+
+if(nargin==2 && ischar(varargin{2}))
+    if(strcmp(varargin{2},'preview'))
+        [varargout{1:nargout}]=mcxpreview(varargin{1});
+	    return;
+    elseif(strcmp(varargin{2},'cuda'))
+        useopencl=0;
+    end
+end
+
+if(isstruct(varargin{1}))
+    for i=1:length(varargin{1})
+        castlist={'srcpattern','srcpos','detpos','prop','workload','srcdir'};
+        for j=1:length(castlist)
+            if(isfield(varargin{1}(i),castlist{j}))
+                varargin{1}(i).(castlist{j})=double(varargin{1}(i).(castlist{j}));
+            end
+        end
+    end
+end
+
+
+if(nargin==0)
+    return;
+end
+
+cfg=varargin{1};
+if(length(varargin)>=2)
+    type=varargin{2};
+end
+    
 if(~isstruct(cfg))
     error('cfg must be a struct or struct array');
 end
@@ -340,7 +375,9 @@ if(nargout>=3)
     varargout{nargout}=cfg;
 end
 
-if(nargin<2)
+if(useopencl==1)
+    [varargout{1:nargout}]=mmcl(cfg);
+elseif(length(varargin)<2)
     [varargout{1:mmcout}]=mmc(cfg);
 elseif(strcmp(type,'omp'))
     [varargout{1:mmcout}]=mmc(cfg);

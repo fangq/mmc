@@ -284,8 +284,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	    for(j=0;j<cfg->srcnum;j++){
 	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
           	sum_normalizer += cur_normalizer;
-          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
-		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
+          	MMCDEBUG(cfg,dlTime,(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
+		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer));
   	    }
   	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
 	}

@@ -5,7 +5,7 @@
 
 OPT="-F bin -n 1e6 -D T"
 EXTRA=${@:2}
-CPUEXTRA="-n 1e7 -G -1"
+CPUEXTRA="-n 1e8 -G -1"
 #CPUEXTRA=-L
 
 hostid=$(hostname -s)

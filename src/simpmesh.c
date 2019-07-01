@@ -902,9 +902,9 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg){
         if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
 	        uint3 dim0=cfg->dim;
 	        if(cfg->method!=rtBLBadouelGrid){
-		    cfg->dim.x=datalen;
+		    cfg->dim.x=cfg->srcnum;
 		    cfg->dim.y=cfg->maxgate;
-		    cfg->dim.z=cfg->srcnum;
+		    cfg->dim.z=datalen;
 		}
 		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
 		cfg->dim=dim0;

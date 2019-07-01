@@ -34,11 +34,19 @@
 #include "tettracing.h"
 #include "mcx_utils.h"
 
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv);
 int mmc_init_from_json(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, char *jcfg, char *jmesh);
 int mmc_reset(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 int mmc_cleanup(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif
