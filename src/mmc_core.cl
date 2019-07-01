@@ -245,7 +245,6 @@ typedef struct MMC_Parameter {
   int    mcmethod;
   int    method;
   float  dstep;
-  int    basisorder;
   float  focus;
   int    nn, ne;
   float3 nmin;
@@ -507,20 +506,23 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
             {
 #ifndef MCX_SKIP_VOLUME
-	    if(prop.mua>0.f){
-	      if(gcfg->outputtype!=otEnergy && gcfg->outputtype!=otWP)
-                 ww/=prop.mua;
-	    }
+	       if(prop.mua>0.f){
+	           if(gcfg->outputtype!=otEnergy && gcfg->outputtype!=otWP)
+                      ww/=prop.mua;
+	       }
   #ifndef USE_DMMC
                uint newidx=eid+tshift;
 	       r->oldidx=(r->oldidx==ID_UNDEFINED)? newidx: r->oldidx;
 	       if(newidx!=r->oldidx){
+#ifndef DO_NOT_SAVE
     #ifdef USE_ATOMIC
-		       atomicadd(weight+r->oldidx,r->oldweight);
+                   atomicadd(weight+r->oldidx,r->oldweight);
+    #else
+                   weight[r->oldidx]+=r->oldweight;
     #endif
-                       weight[r->oldidx]+=r->oldweight;
+#endif
                    r->oldidx=newidx;
-		   r->oldweight=0.f;
+		   r->oldweight=ww;
                }else{
 	           r->oldweight+=ww;
 	       }

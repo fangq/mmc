@@ -66,7 +66,6 @@ typedef struct GPU_mcconfig{
   cl_int    mcmethod;
   cl_int    method;
   cl_float  dstep;
-  cl_int    basisorder;
   cl_float  focus;
   cl_int    nn, ne;
   cl_float3 nmin;

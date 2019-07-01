@@ -222,7 +222,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             fielddim[0]=cfg.srcnum;
             fielddim[1]=datalen;
 	    fielddim[2]=cfg.maxgate; fielddim[3]=0; fielddim[4]=0; 
-printf("dim=[%d %d %d] m=%d\n",fielddim[0],fielddim[1],fielddim[2], cfg.method);
 	    if(cfg.method==rtBLBadouelGrid){
 		fielddim[0]=cfg.srcnum;
 		fielddim[1]=cfg.dim.x;
