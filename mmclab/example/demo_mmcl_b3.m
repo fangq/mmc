@@ -13,6 +13,8 @@ if(~exist('MMC_Collins_Atlas_Mesh_Version_2L.mat','file'))
 end
 
 load MMC_Collins_Atlas_Mesh_Version_2L.mat
+
+clear cfg
 cfg.node=node;
 cfg.elem=elem(:,1:4);
 cfg.elemprop=elem(:,5);
@@ -45,27 +47,28 @@ cfg.method='grid';
 %%
 cfg.gpuid=1;
 
-b1gpu=mmclab(cfg);
-b1gpu=sum(b1gpu.data,4);
+b3gpu=mmclab(cfg);
+b3gpu=sum(b3gpu.data,4)*cfg.tstep;
 %%
 cfg.gpuid=-1;
 
-b1cpu=mmclab(cfg);
-b1cpu=sum(b1cpu.data,4);
+b3cpu=mmclab(cfg);
+b3cpu=sum(b3cpu.data,4)*cfg.tstep;
 
 
 %%-----------------------------------------------------------------
 %% generate a contour plot along y=30.2
 %%-----------------------------------------------------------------
 figure
-clines = 0:-0.5:-8;
+
+clines = 8:-0.5:-2;
 
 hold on
-[c h2]=contourf(log10(squeeze(b1cpu*cfg.tstep)), clines, 'k-' );
-contour(log10(abs(b1gpu*cfg.tstep)),clines,'r:')
+[c h2]=contourf(log10(squeeze(b3cpu(75,:,:))),clines,'k-');
+contour(log10(abs(squeeze(b3gpu(75,:,:)))),clines,'y--')
 
 axis equal  
-set(gca,'xlim',[1 60])
+set(gca,'xlim',[1 182])
 set(gca,'fontsize',20)
 xlabel('x (mm)')
 ylabel('z (mm)')

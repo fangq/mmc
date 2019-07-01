@@ -95,3 +95,27 @@ b4dgpu=sum(b4dgpu,4);
 cfg.gpuid=-1;
 b4dcpu=mmclab(cfg);
 b4dcpu=sum(b4dcpu,4);
+
+%%-----------------------------------------------------------------
+%% generate a contour plot along y=30.2
+%%-----------------------------------------------------------------
+figure
+clines = 0:-0.5:-8;
+[xi,yi]=meshgrid(0:2:60,0:2:60);
+srcs=[30.1,30.2,0];
+dets=[xi(:) 30.2*ones(size(xi(:))) yi(:)];
+
+hold on
+[c h2]=contourf(xi,yi, log10(max(squeeze(Phicpu*cfg.tstep),1e-8)), clines, 'k-' );
+contour(xi,yi,log10(abs(Phigpu*cfg.tstep)),clines,'r:')
+contour(xi,yi,log10(abs(squeeze(b4dcpu(1:2:end,30,1:2:end))'*cfg.tstep)),clines,'b--')
+contour(xi,yi,log10(abs(squeeze(b4dgpu(1:2:end,30,1:2:end))'*cfg.tstep)),clines,'y--')
+
+axis equal  
+set(gca,'xlim',[1 60])
+set(gca,'fontsize',20)
+xlabel('x (mm)')
+ylabel('z (mm)')
+legend('MMC','MMCL','D-MMC','D-MMCL')
+legend boxoff;
+box on;
