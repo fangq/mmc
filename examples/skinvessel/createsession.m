@@ -16,7 +16,7 @@ seeds=[ones(4,2)*100, c0];  % define the regions by index
 
 cfg.unitinmm=0.005;
 cfg.node=cfg.node*cfg.unitinmm;
-cfg.method='grid';
+cfg.method='g';
 
 figure; 
 subplot(121);

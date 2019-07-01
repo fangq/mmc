@@ -3,7 +3,7 @@
 # format:
 #    ./run_bench.sh  1234cpugpu <more mmcl parameters>
 
-OPT="-F bin -n 1e6 -D T"
+OPT="-F nii -n 1e8 -D T"
 EXTRA=${@:2}
 CPUEXTRA="-n 1e8 -G -1"
 #CPUEXTRA=-L
@@ -85,8 +85,8 @@ then
 	echo testing benchmark B3 mmc mode with mmc
 	./run_test.sh -s b3_mmc $OPT -M S $EXTRA $CPUEXTRA > $OUTPUTDIR/b3_mmc.log
 
-	#echo testing benchmark B3 dmmc mode with mmc
-	#./run_test.sh -s b3_dmmc $OPT -M G -F nii $EXTRA $CPUEXTRA > $OUTPUTDIR/b3_dmmc.log
+	echo testing benchmark B3 dmmc mode with mmc
+	./run_test.sh -s b3_dmmc $OPT -M G -F nii $EXTRA $CPUEXTRA > $OUTPUTDIR/b3_dmmc.log
     fi
 
     if [ $# -eq 0 ] || [[ $1 =~ "gpu" ]]
@@ -94,8 +94,8 @@ then
 	echo testing benchmark B3 mmc mode with mmcl
 	./run_test.sh -s b3_mmcl $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b3_mmcl.log
 
-	#echo testing benchmark B3 dmmc mode with mmcl
-	#./run_dmmc.sh -s b3_dmmcl $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b3_dmmcl.log
+	echo testing benchmark B3 dmmc mode with mmcl
+	./run_test.sh -s b3_dmmcl $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b3_dmmcl.log
     fi
 fi
 

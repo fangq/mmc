@@ -4,7 +4,7 @@
 		"DoMismatch": 0,
 		"OutputType": "flux",
 		"DebugFlag": "TP",
-		"RayTracer": "grid",
+		"RayTracer": "g",
 		"RNGSeed": 1648335518,
 		"Photons": 10000000
 	},
