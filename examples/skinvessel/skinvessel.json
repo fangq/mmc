@@ -9,7 +9,6 @@
 		"Photons": 10000000
 	},
 	"Mesh": {
-		"LengthUnit": 0.005,
 		"MeshID": "skinvessel",
 		"InitElem": 466437
 	},
