@@ -61,11 +61,11 @@ b3cpu=sum(b3cpu.data,4)*cfg.tstep;
 %%-----------------------------------------------------------------
 figure
 
-clines = 8:-0.5:-2;
+clines = 8:-0.5:-8;
 
 hold on
-[c h2]=contourf(log10(squeeze(b3cpu(75,:,:))),clines,'k-');
-contour(log10(abs(squeeze(b3gpu(75,:,:)))),clines,'y--')
+[c h2]=contourf(log10(squeeze(b3cpu(75,:,:))'),clines,'k-');
+contour(log10(abs(squeeze(b3gpu(75,:,:)))'),clines,'y--')
 
 axis equal  
 set(gca,'xlim',[1 182])

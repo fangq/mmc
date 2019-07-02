@@ -19,7 +19,7 @@
 addpath('../../matlab/');
 
 clear cfg
-cfg.nphoton=1e7;
+cfg.nphoton=1e8;
 cfg.seed=1648335518;
 [cfg.node,cfg.elem]=genT5mesh(0:2:60,0:2:60,0:2:60);
 cfg.elemprop=ones(size(cfg.elem,1),1);
@@ -93,7 +93,7 @@ dets=[xi(:) 30.2*ones(size(xi(:))) yi(:)];
 
 hold on
 [c h2]=contourf(xi,yi, log10(max(squeeze(Phicpu*cfg.tstep),1e-8)), clines, 'k-', 'linewidth', 2);
-contour(xi,yi,log10(abs(Phigpu*cfg.tstep)),clines,'m:','linewidth',2)
+contour(xi,yi,log10(abs(Phigpu*cfg.tstep)),clines,'m:','linecolor',[0.9100    0.4100    0.1700],'linewidth',2)
 contour(xi,yi,log10(abs(squeeze(Phidcpu(1:end-1,31,1:end-1))'*cfg.tstep)),clines,'b--','linewidth',2)
 contour(xi,yi,log10(abs(squeeze(Phidgpu(1:end-1,31,1:end-1))'*cfg.tstep)),clines,'g--','linewidth',2)
 
