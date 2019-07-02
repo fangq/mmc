@@ -92,16 +92,16 @@ srcs=[30.1,30.2,0];
 dets=[xi(:) 30.2*ones(size(xi(:))) yi(:)];
 
 hold on
-[c h2]=contourf(xi,yi, log10(max(squeeze(Phicpu*cfg.tstep),1e-8)), clines, 'k-' );
-contour(xi,yi,log10(abs(Phigpu*cfg.tstep)),clines,'r:')
-contour(xi,yi,log10(abs(squeeze(Phidcpu(1:end-1,31,1:end-1))'*cfg.tstep)),clines,'b--')
-contour(xi,yi,log10(abs(squeeze(Phidgpu(1:end-1,31,1:end-1))'*cfg.tstep)),clines,'y--')
+[c h2]=contourf(xi,yi, log10(max(squeeze(Phicpu*cfg.tstep),1e-8)), clines, 'k-', 'linewidth', 2);
+contour(xi,yi,log10(abs(Phigpu*cfg.tstep)),clines,'m:','linewidth',2)
+contour(xi,yi,log10(abs(squeeze(Phidcpu(1:end-1,31,1:end-1))'*cfg.tstep)),clines,'b--','linewidth',2)
+contour(xi,yi,log10(abs(squeeze(Phidgpu(1:end-1,31,1:end-1))'*cfg.tstep)),clines,'g--','linewidth',2)
 
 axis equal  
 set(gca,'xlim',[0.5 59.5])
 set(gca,'fontsize',20)
 xlabel('x (mm)')
 ylabel('z (mm)')
-legend('MMC','MMCL','D-MMC','D-MMCL')
+legend('B1-MMC','B1-MMCL','B1D-MMC','B1D-MMCL')
 legend boxoff;
 box on;

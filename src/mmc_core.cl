@@ -506,6 +506,10 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->framelen;
             {
 #ifndef MCX_SKIP_VOLUME
+	       if(prop.mua>0.f){
+	           if(gcfg->outputtype!=otEnergy && gcfg->outputtype!=otWP)
+                      ww/=prop.mua;
+	       }
   #ifndef USE_DMMC
                uint newidx=eid+tshift;
 	       r->oldidx=(r->oldidx==ID_UNDEFINED)? newidx: r->oldidx;

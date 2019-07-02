@@ -475,29 +475,16 @@ is more than what your have specified (%d), please use the -H option to specify 
      fieldlen=(fieldlen>>cfg->nbuffer);
      field=realloc(field,sizeof(field[0])*fieldlen);
      if(cfg->exportfield){
-         if(cfg->method==rtBLBadouelGrid){
+         if(cfg->basisorder==0 || cfg->method==rtBLBadouelGrid){
              for(i=0;i<fieldlen;i++)
 	         cfg->exportfield[i]+=field[i];
 	 }else{
-             float ww;
-	     if(cfg->basisorder==0){
-		 for(i=0;i<cfg->maxgate;i++)
-		   for(j=0;j<mesh->ne;j++){
-		     ww=field[i*mesh->ne+j];
-		     if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
-                         ww*=(mesh->med[mesh->type[j]].mua<=0.f) ? 0.f : (1.f/mesh->med[mesh->type[j]].mua);
-                     cfg->exportfield[i*mesh->nn+j]+=ww;
-		   }
-	     }else{
-		 for(i=0;i<cfg->maxgate;i++)
-		   for(j=0;j<mesh->ne;j++){
-		     ww=field[i*mesh->ne+j]*0.25f;
-		     if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
-                         ww*=(mesh->med[mesh->type[j]].mua<=0.f) ? 0.f : (1.f/mesh->med[mesh->type[j]].mua);
-		     for(int k=0;k<mesh->elemlen;k++)
-			 cfg->exportfield[i*mesh->nn+mesh->elem[j*mesh->elemlen+k]-1]+=ww;
-		   }
-	     }
+             for(i=0;i<cfg->maxgate;i++)
+	       for(j=0;j<mesh->ne;j++){
+		 float ww=field[i*mesh->ne+j]*0.25f;
+	         for(int k=0;k<mesh->elemlen;k++)
+	             cfg->exportfield[i*mesh->nn+mesh->elem[j*mesh->elemlen+k]-1]+=ww;
+	       }
 	 }
      }
 
