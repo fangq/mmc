@@ -1206,6 +1206,7 @@ int mcx_isbinstr(const char * str){
  */
 
 void mcx_validatecfg(mcconfig *cfg){
+     int i;
      if(cfg->nphoton<=0){
          MMC_ERROR(-2,"cfg.nphoton must be a positive number");
      }
@@ -1232,7 +1233,7 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->method==rtBLBadouelGrid){
 	cfg->basisorder=0;
      }
-     for(int i=0;i<MAX_DEVICE;i++)
+     for(i=0;i<MAX_DEVICE;i++)
         if(cfg->deviceid[i]=='0')
            cfg->deviceid[i]='\0';
 }

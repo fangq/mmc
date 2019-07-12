@@ -31,7 +31,7 @@ MAKE       := make
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL=-lOpenCL
-EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR) -lOpenCL
+EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
@@ -62,7 +62,14 @@ ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
     MKMEXOPT    =-f mexopts_cygwin64_gcc.bat COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
     DLLFLAG     =
+else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+  INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
+  LIBOPENCL=-framework OpenCL
+  LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
 endif
+
+INCLUDEDIR+=$(INCLUDEDIRS)
+EXTRALIB+=$(LIBOPENCL)
 
 NACL_SDK_ROOT ?= ../../../nacl
 OSNAME := $(shell echo $(PLATFORM) | tr A-Z a-z)

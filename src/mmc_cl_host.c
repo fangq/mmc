@@ -277,9 +277,10 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      clGetProgramBuildInfo(mcxprogram,devices[devid],CL_PROGRAM_BUILD_LOG,0,NULL,&len);
      if(len>0){
          char *msg;
+	 int i;
          msg=(char *)calloc(len,1);
          clGetProgramBuildInfo(mcxprogram,devices[devid],CL_PROGRAM_BUILD_LOG,len,msg,NULL);
-         for(int i=0;i<(int)len;i++)
+         for(i=0;i<(int)len;i++)
              if(msg[i]<='z' && msg[i]>='A'){
                  MMC_FPRINTF(cfg->flog,"Kernel build log:\n%s\n", msg);
                  break;
@@ -482,7 +483,8 @@ is more than what your have specified (%d), please use the -H option to specify 
              for(i=0;i<cfg->maxgate;i++)
 	       for(j=0;j<mesh->ne;j++){
 		 float ww=field[i*mesh->ne+j]*0.25f;
-	         for(int k=0;k<mesh->elemlen;k++)
+		 int k;
+	         for(k=0;k<mesh->elemlen;k++)
 	             cfg->exportfield[i*mesh->nn+mesh->elem[j*mesh->elemlen+k]-1]+=ww;
 	       }
 	 }
