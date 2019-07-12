@@ -128,11 +128,11 @@ mex mexsse:     AROUTPUT=-output
 mex mexsse:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 mexsse:         BINARY=mmc_sse
 
-oct:            BINARY=mmc.mex
+oct:            BINARY=mmcl.mex
 octsse:         BINARY=mmc_sse.mex
 oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 oct octsse:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(LFLAGS)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
-oct octsse:     USERARFLAGS=-o $(BINDIR)/mmc
+oct octsse:     USERARFLAGS=-o $(BINDIR)/mmcl
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 
