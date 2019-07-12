@@ -38,6 +38,7 @@
 
 typedef unsigned long RandType;
 typedef unsigned int uint;
+typedef unsigned long ulong;
 
 #define MCX_RNG_NAME       "xorshift128+ RNG"
 #define RAND_BUF_LEN       2        //register arrays
