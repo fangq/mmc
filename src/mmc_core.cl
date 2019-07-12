@@ -709,7 +709,7 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *g
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-void fixphoton(float3 *p,__constant float3 *nodes, __constant int *ee){
+void fixphoton(float3 *p,__global float3 *nodes, __constant int *ee){
         float3 c0={0.f,0.f,0.f};
 	int i;
         /*calculate element centroid*/
@@ -731,7 +731,7 @@ void fixphoton(float3 *p,__constant float3 *nodes, __constant int *ee){
  * \param[in,out] ran: the random number generator states
  */
 
-void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__constant int *elem,__constant int *srcelem, RandType *ran){
+void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__constant int *elem,__constant int *srcelem, RandType *ran){
         int canfocus=1;
         float3 origin=r->p0;
 
@@ -896,7 +896,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __constant float3 *node,__c
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__constant float3 *node,__constant int *elem, __global float *weight,
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,
     __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
 
@@ -1040,7 +1040,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
-    __constant float3 *node,__constant int *elem,  __global float *weight, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
+    __global float3 *node,__constant int *elem,  __global float *weight, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter){
  
