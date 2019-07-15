@@ -66,6 +66,7 @@ else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
   INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
   LIBOPENCL=-framework OpenCL
   LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
+  OPENMPLIB=-static-libgcc /opt/local/lib/gcc49/libgomp.a
 endif
 
 INCLUDEDIR+=$(INCLUDEDIRS)
