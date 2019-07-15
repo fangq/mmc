@@ -19,7 +19,7 @@
 addpath('../../matlab/');
 
 clear cfg
-cfg.nphoton=1e7;
+cfg.nphoton=1e6;
 cfg.seed=1648335518;
 [cfg.node,cfg.elem]=genT5mesh(0:2:60,0:2:60,0:2:60);
 cfg.elemprop=ones(size(cfg.elem,1),1);
