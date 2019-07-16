@@ -284,6 +284,7 @@ void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
 void mcx_printheader(mcconfig *cfg);
+void mcx_cleargpuinfo(GPUInfo **gpuinfo);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP

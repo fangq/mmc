@@ -256,6 +256,10 @@ if(isstruct(varargin{1}))
     end
 end
 
+if(nargin==1 && ischar(varargin{1}) && strcmp(varargin{1},'gpuinfo'))
+    varargout{1}=mmcl('gpuinfo');
+    return;
+end
 
 if(nargin==0)
     return;

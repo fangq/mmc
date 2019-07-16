@@ -61,6 +61,9 @@
 //! Macro to read one 4-element vector member of cfg
 #define GET_VEC4_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];u->v.w=val[3];\
                                  printf("mmcl.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
+/**<  Macro to output GPU parameters as field */
+#define SET_GPU_INFO(output,id,v)  mxSetField(output,id,#v,mxCreateDoubleScalar(gpuinfo[i].v));
+
 #define ABS(a)    ((a)<0?-(a):(a))                        //! Macro to calculate the absolute value
 #define MAX(a,b)  ((a)>(b)?(a):(b))                       //! Macro to calculate the max of two floating points
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
@@ -82,6 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
   unsigned int threadid=0,t0,dt;
+  GPUInfo *gpuinfo=NULL;
 
   mxArray    *tmp;
   int        ifield, jstruct;
@@ -89,7 +93,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   dimtype     fielddim[5];
   int        usewaitbar=1;
   int        errorflag=0;
+  cl_uint    workdev;
+
   const char       *outputtag[]={"data"};
+  const char       *gpuinfotag[]={"name","id","devcount","major","minor","globalmem",
+                                  "constmem","sharedmem","regcount","clock","sm","core",
+                                  "autoblock","autothread","maxgate"};
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop=NULL;
 #endif
@@ -100,6 +109,52 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if (nrhs==0){
      mmclab_usage();
      return;
+  }
+
+  /**
+   * If a single string is passed, and if this string is 'gpuinfo', this function 
+   * returns the list of GPUs on this host and return.
+   */
+  if(nrhs==1 && mxIsChar(prhs[0])){
+        char shortcmd[MAX_SESSION_LENGTH];
+        mxGetString(prhs[0], shortcmd, MAX_SESSION_LENGTH);
+        shortcmd[MAX_SESSION_LENGTH-1]='\0';
+        if(strcmp(shortcmd,"gpuinfo")==0){
+            mcx_initcfg(&cfg);
+            cfg.isgpuinfo=3;
+	    try{
+              mcx_list_gpu(&cfg,&workdev,NULL,&gpuinfo);
+            }catch(...){
+	      mexErrMsgTxt("OpenCL is not supported or not fully installed on your system");
+	    }
+            if(!workdev){
+                mexErrMsgTxt("no active GPU device found");
+            }
+            if(workdev>MAX_DEVICE)
+                workdev=MAX_DEVICE;
+
+            plhs[0] = mxCreateStructMatrix(gpuinfo[0].devcount,1,15,gpuinfotag);
+            for(cl_uint i=0;i<workdev;i++){
+		mxSetField(plhs[0],i,"name",mxCreateString(gpuinfo[i].name));
+		SET_GPU_INFO(plhs[0],i,id);
+		SET_GPU_INFO(plhs[0],i,devcount);
+		SET_GPU_INFO(plhs[0],i,major);
+		SET_GPU_INFO(plhs[0],i,minor);
+		SET_GPU_INFO(plhs[0],i,globalmem);
+		SET_GPU_INFO(plhs[0],i,constmem);
+		SET_GPU_INFO(plhs[0],i,sharedmem);
+		SET_GPU_INFO(plhs[0],i,regcount);
+		SET_GPU_INFO(plhs[0],i,clock);
+		SET_GPU_INFO(plhs[0],i,sm);
+		SET_GPU_INFO(plhs[0],i,core);
+		SET_GPU_INFO(plhs[0],i,autoblock);
+		SET_GPU_INFO(plhs[0],i,autothread);
+		SET_GPU_INFO(plhs[0],i,maxgate);
+            }
+            mcx_cleargpuinfo(&gpuinfo);
+            mcx_clearcfg(&cfg);
+	}
+	return;
   }
 
   /**

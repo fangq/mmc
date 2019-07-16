@@ -315,6 +315,19 @@ void mcx_clearcfg(mcconfig *cfg){
 }
 
 /**
+ * @brief Reset and clear the GPU information data structure
+ *
+ * Clearing the GPU information data structure
+ */
+
+void mcx_cleargpuinfo(GPUInfo **gpuinfo){
+    if(*gpuinfo){
+        free(*gpuinfo);
+        *gpuinfo=NULL;
+    }
+}
+
+/**
  * @brief Save volumetric output (fluence etc) to an Nifty format binary file
  *
  * @param[in] dat: volumetric data to be saved
