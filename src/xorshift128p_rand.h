@@ -39,7 +39,7 @@
 typedef unsigned long long RandType;
 typedef unsigned int uint;
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 typedef unsigned long long ulong;
 #endif
 
