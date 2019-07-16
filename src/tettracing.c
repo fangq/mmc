@@ -1038,11 +1038,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			if(newidx!=r->oldidx){
                             if(cfg->isatomic)
 #pragma omp atomic
-			        tracer->mesh->weight[r->oldidx]+=r->oldweight;
+			        tracer->mesh->weight[r->oldidx]+=ww;
                             else
-                                tracer->mesh->weight[r->oldidx]+=r->oldweight;
+                                tracer->mesh->weight[eid+tshift]+=ww;
 			    r->oldidx=newidx;
-			    r->oldweight=ww;
+			    r->oldweight=0.0;
                         }else
 			    r->oldweight+=ww;
                      }else{
