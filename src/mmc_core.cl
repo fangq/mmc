@@ -463,10 +463,10 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 	S = (FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2]);
 	T = normal[eid+3] - (FL4(r->p0.x)*normal[eid]+FL4(r->p0.y)*normal[eid+1]+FL4(r->p0.z)*normal[eid+2]);
-        T = -convert_float4_rte(isgreater(T,FL4(0.f)))*T;
+        T = -convert_float4_rte(isgreater(T,FL4(0.f))*2)*FL4(0.5f)*T;
 	T = T/S;
 
-        S = -convert_float4_rte(isgreater(S,FL4(0.f)));
+        S = -convert_float4_rte(isgreater(S,FL4(0.f))*2)*FL4(0.5f);
         T =  S * T + (FL4(1.f)-S) * FL4(1e10f);
 
 	eid=r->eid-1;
