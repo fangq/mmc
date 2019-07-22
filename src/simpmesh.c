@@ -1151,12 +1151,12 @@ float mesh_normalize(tetmesh *mesh,mcconfig *cfg, float Eabsorb, float Etotal, i
 	  }else{
             for(i=0;i<datalen;i++)
 	      for(j=0;j<cfg->maxgate;j++)
-	         energydeposit+=mesh->weight[(i*cfg->maxgate+j)*cfg->srcnum+pair];
+	         energydeposit+=mesh->weight[(j*datalen+i)*cfg->srcnum+pair];
 
             for(i=0;i<datalen;i++){
 	      energyelem=mesh->evol[i]*mesh->med[mesh->type[i]].mua;
               for(j=0;j<cfg->maxgate;j++)
-        	mesh->weight[(i*cfg->maxgate+j)*cfg->srcnum+pair]/=energyelem;
+        	mesh->weight[(j*datalen+i)*cfg->srcnum+pair]/=energyelem;
 	    }
             normalizor=Eabsorb/(Etotal*energydeposit); /*scaling factor*/
 	  }

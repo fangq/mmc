@@ -372,7 +372,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				if(prop->mua>0.f){
 				  ratio=r->Lmove/Lp0;
 				  r->Eabsorb+=ww;
-				  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+				  if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
 				      ww/=prop->mua;
 				  if(cfg->outputtype==otWL || cfg->outputtype==otWP)
 				      tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->nn;
@@ -591,7 +591,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+		  if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
                      ww/=prop->mua;
 		}
 
@@ -848,7 +848,7 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
                      else
                         tracer->mesh->weight[eid+tshift]+=ww;
 		  }else{
-	                if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+	                if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
                            ww/=prop->mua;
                         ww*=1.f/3.f;
                         if(cfg->isatomic)
@@ -1031,7 +1031,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 		if(prop->mua>0.f){
 		  r->Eabsorb+=ww;
-		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+		  if(cfg->outputtype!=otEnergy && cfg->outputtype!=otWP)
                      ww/=prop->mua;
 		}
 
@@ -1047,11 +1047,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			if(newidx!=r->oldidx){
                             if(cfg->isatomic)
 #pragma omp atomic
-			        tracer->mesh->weight[r->oldidx]+=ww;
+			        tracer->mesh->weight[r->oldidx]+=r->oldweight;
                             else
-                                tracer->mesh->weight[eid+tshift]+=ww;
+                                tracer->mesh->weight[r->oldidx]+=r->oldweight;
 			    r->oldidx=newidx;
-			    r->oldweight=0.0;
+			    r->oldweight=ww;
                         }else
 			    r->oldweight+=ww;
                      }else{
@@ -1230,7 +1230,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    r.eid=enb[r.faceid];
 
 		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
-			if(! (r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
+			if(! (r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
 	    	    if(r.eid<=0) break;
@@ -1409,7 +1409,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	tmp1=n2*n2;
         tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
-        if(tmp2>0.f){ /*if no total internal reflection*/
+        if(tmp2>0.f && !(*eid<=0 && cfg->isreflect==bcMirror)){ /*if no total internal reflection*/
           Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
 	  tmp2=sqrt(tmp2); /*to save one sqrt*/
           Im=2.f*n1*n2*Icos*tmp2;

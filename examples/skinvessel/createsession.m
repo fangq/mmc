@@ -1,13 +1,4 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  mcxyz skinvessel benchmark
-%
-%  must change mcxyz maketissue.m boundaryflag variable from 2 to 1 to get
-%  comparable absorption fraction (40%), otherwise, mcxyz obtains slightly
-%  higher absorption (~42%) with boundaryflag=2
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-clear cfg flux
-
+function createsession
 %% create the skin-vessel benchmark mesh
 [no,fc]=latticegrid([0 200],[0 200],[20 32 200]); % create a 3-layer tissue
 no(end,:)=no(end,:)+1e-5;
@@ -21,8 +12,7 @@ fc=[fc2(:,[1 2 3]); fc2(:,[1 3 4])];
 c0=[10,100,150,26]';
 seeds=[ones(4,2)*100, c0];  % define the regions by index
 
-%ISO2MESH_TETGENOPT='-Y -A'
-[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[]); % creating the merged mesh domain
+[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[],'-Y -A'); % creating the merged mesh domain
 
 cfg.unitinmm=0.005;
 cfg.node=cfg.node*cfg.unitinmm;
@@ -75,22 +65,17 @@ cfg.seed=1648335518;
 cfg.debuglevel='TP';
 cfg.isreflect=0;
 
-%% mmc simulation
+%% saving coarse mesh
+mmc2json(cfg,'dmmc_skinvessel.json');
 
-flux=mmclab(cfg);
-flux=flux.data;
-fluxcw=sum(flux,2)*cfg.tstep*100;
+%% regenerate the mesh using fine mesh
+[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[]); % creating the merged mesh domain
+cfg.node=cfg.node*cfg.unitinmm;
+cfg.elemprop=cfg.elem(:,5);
+cfg.elem=cfg.elem(:,1:4);
 
-%% plot simulated photon profiles
+[cfg.node,cfg.elem] = mmcaddsrc(cfg.node,[cfg.elem cfg.elemprop],...
+    mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]));
 
-subplot(122);
-hold on;
-qmeshcut(cfg.elem(cfg.elemprop>0,1:4),cfg.node,log10(fluxcw),'x=0.5','linestyle','none'); 
-view([1 0 0]);
-set(gca,'zlim',[0 1],'ylim',[0 1],'zdir','reverse')
+mmc2json(cfg,'skinvessel.json');
 
-box on;
-axis equal
-title('MMC fluence rate (W/mm^2) per W simulated')
-colorbar;
-colormap(jet)
