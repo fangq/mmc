@@ -1,6 +1,8 @@
 addpath('../../matlab/');
 addpath('..');
 
+clear cfg
+
 [node,face,c0]=latticegrid([0 60],[0 60],[0 5 10]);
 c0(:,4)=[2;3];   % maximum element size for bottom (label 1) and top (label 2) layers
 [node,elem]=surf2mesh(node,face,[],[],1,[],c0);
@@ -36,7 +38,7 @@ cfg.seed = 12345678;
 cfg.debuglevel = 'TP';
 cfg.issaveexit = 2;
 
-[flux,detp,~,~]=mmclab(cfg);
+[flux,detp]=mmclab(cfg);
 
 figure;
 imagesc(sum(detp.data,3)');

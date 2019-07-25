@@ -271,7 +271,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 
         if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
-           for(i=1;i<mesh->prop;i++){
+           for(i=1;i<=mesh->prop;i++){
                    mesh->med[i].mus*=cfg->unitinmm;
                    mesh->med[i].mua*=cfg->unitinmm;
            }

@@ -193,7 +193,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** Enclose all simulation calls inside a try/catch construct for exception handling */
     try{
         printf("Running simulations for configuration #%d ...\n", jstruct+1);
-        float raytri=0.f,raytri0=0.f;;
 
         /** Initialize cfg with default values first */
 	t0=StartTimer();
@@ -258,9 +257,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	}
 #endif
 	dt=GetTimeMillis()-dt;
-	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg.nphoton/dt,raytri,raytri0,raytri/dt));
 
     /** Clear up simulation data structures by calling the destructors */
 
@@ -272,6 +268,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	tracer_clear(&tracer);
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
+	/** if the 2nd output presents, output the detected photon partialpath data */
+	if(nlhs>=2){
+	  if(cfg.issaveexit!=2){
+            int hostdetreclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+            fielddim[0]=hostdetreclen; fielddim[1]=cfg.detectedcount; 
+            fielddim[2]=0; fielddim[3]=0;
+            if(cfg.detectedcount>0){
+                    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+                    memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0)),cfg.exportdetected,
+                         fielddim[0]*fielddim[1]*sizeof(float));
+            }
+	  }else{
+            fielddim[0]=cfg.detparam1.w; fielddim[1]=cfg.detparam2.w; fielddim[2]=cfg.maxgate; fielddim[3]=0;
+	    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(3,fielddim,mxSINGLE_CLASS,mxREAL));
+	    float *detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+	    memset(detmap,cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
+	    mesh_getdetimage(detmap,cfg.exportdetected,cfg.detectedcount,&cfg,&mesh);
+	  }
+	  free(cfg.exportdetected);
+	  cfg.exportdetected=NULL;
+	}
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
             fielddim[0]=cfg.srcnum;

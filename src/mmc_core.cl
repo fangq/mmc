@@ -192,9 +192,9 @@
 #define FIX_PHOTON         1e-3f      /**< offset to the ray to avoid edge/vertex */
 #define MAX_TRIAL          3          /**< number of fixes when a photon hits an edge/vertex */
 
-#define MCX_DEBUG_RNG       1                   /**< MCX debug flags */
-#define MCX_DEBUG_MOVE      2
-#define MCX_DEBUG_PROGRESS  4
+#define MCX_DEBUG_MOVE      1
+#define MCX_DEBUG_PROGRESS  2048
+
 #define MMC_UNDEFINED      (3.40282347e+38F)
 
 #define MIN(a,b)           ((a)<(b)?(a):(b))
@@ -263,7 +263,7 @@ typedef struct MMC_Parameter {
 } MCXParam __attribute__ ((aligned (32)));
 
 typedef struct MMC_Reporter{
-  uint  raytet;
+  float  raytet;
 } MCXReporter  __attribute__ ((aligned (32)));
 
 typedef struct MMC_medium{
@@ -404,18 +404,20 @@ uint finddetector(float3 *p0,__constant float4 *gdetpos,__constant MCXParam *gcf
 }
 
 void savedetphoton(__global float *n_det,__global uint *detectedphoton,
-                   __local float *ppath,float3 *p0,float3 *v,__constant float4 *gdetpos,__constant MCXParam *gcfg){
-      uint detid=finddetector(p0,gdetpos,gcfg);
+                   __local float *ppath,float3 *p0,float3 *v,__constant float4 *gdetpos,
+		   int extdetid, __constant MCXParam *gcfg){
+      uint detid=(extdetid<0)? finddetector(p0,gdetpos,gcfg) : extdetid;
       if(detid){
 	 uint baseaddr=atomic_inc(detectedphoton);
 	 if(baseaddr<gcfg->maxdetphoton){
 	    uint i;
-	    baseaddr*=gcfg->reclen;
+	    baseaddr*=(gcfg->reclen+1);
 	    n_det[baseaddr++]=detid;
 	    for(i=0;i<(gcfg->maxmedia<<1);i++)
-		n_det[baseaddr+i]=ppath[i]; // save partial pathlength to the memory
+		n_det[baseaddr++]=ppath[i]; // save partial pathlength to the memory
+	    for(i=0;i<gcfg->ismomentum*gcfg->maxmedia;i++)
+		n_det[baseaddr++]=ppath[i+(gcfg->maxmedia<<1)]; // save partial pathlength to the memory
 	    if(gcfg->issaveexit){
-                baseaddr+=(gcfg->maxmedia<<1);
 	        n_det[baseaddr++]=p0->x;
 		n_det[baseaddr++]=p0->y;
 		n_det[baseaddr++]=p0->z;
@@ -423,6 +425,7 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
 		n_det[baseaddr++]=v->y;
 		n_det[baseaddr++]=v->z;
 	    }
+            n_det[baseaddr++]=ppath[gcfg->reclen-1]; // save partial pathlength to the memory
 	 }
       }
 }
@@ -486,7 +489,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    r->Lmove=((r->isend) ? r->Lmove : Lmin);
 	    r->pout=r->p0+FL3(Lmin)*r->vec;
 
-	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>=(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(gcfg->tend-r->photontimer)/(prop.n*R_C0)-1e-4f;
@@ -911,7 +914,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 
 #ifdef MCX_SAVE_DETECTORS
 	if(gcfg->issavedet)
-	    ppath[gcfg->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
+	    ppath[gcfg->reclen-1] = r.weight; /*last record in partialpath is the initial photon weight*/
 #endif
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
@@ -930,7 +933,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    }
 #ifdef MCX_SAVE_DETECTORS
 	    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
-	            ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
+	            ppath[gcfg->maxmedia+type[r.eid-1]-1]+=r.Lmove;  /*second medianum block is the partial path*/
 #endif
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
@@ -971,7 +974,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    (*raytet)++;
 #ifdef MCX_SAVE_DETECTORS
 		    if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
-			ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
+			ppath[gcfg->maxmedia+type[r.eid-1]-1]+=r.Lmove;
 #endif
 		    if(r.faceid==-2) break;
 		    fixcount=0;
@@ -981,7 +984,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		       (*raytet)++;
 #ifdef MCX_SAVE_DETECTORS
 		       if(gcfg->issavedet && r.Lmove>0.f && type[r.eid-1]>0)
-	            		ppath[gcfg->maxmedia-1+type[r.eid-1]]+=r.Lmove;
+	            		ppath[gcfg->maxmedia+type[r.eid-1]-1]+=r.Lmove;
 #endif
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
@@ -999,8 +1002,8 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
 #ifdef MCX_SAVE_DETECTORS
                        if(gcfg->issavedet && gcfg->issaveexit){                                     /*when issaveexit is set to 1*/
-                            copystate(ppath+(gcfg->reclen-2-6),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
-                            copystate(ppath+(gcfg->reclen-2-3),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
+                            copystate(ppath+(gcfg->reclen-6),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
+                            copystate(ppath+(gcfg->reclen-3),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
 #endif
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
@@ -1009,9 +1012,13 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
         		 MMC_FPRINTF(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    }
 #ifdef MCX_SAVE_DETECTORS
-		    if(gcfg->issavedet && r.eid==0){
-                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,gcfg);
-                          clearpath(ppath,gcfg->reclen);
+		    if(r.eid==0){
+                       if(gcfg->isextdet && type[oldeid-1]==gcfg->maxmedia+1){
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,oldeid,gcfg);
+                       }else{
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,-1,gcfg);
+		       }
+                       clearpath(ppath,gcfg->reclen);
 		    }
 #endif
 	    	    break;  /*photon exits boundary*/
@@ -1027,12 +1034,11 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			break;
 	    }
             float mom=0.f;
-	    //r.slen0=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
 	    r.slen=mc_next_scatter(med[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
-            if(gcfg->ismomentum && type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
-                  ppath[(gcfg->maxmedia<<1)-1+type[r.eid-1]]+=mom; /*the third medianum block stores the momentum transfer*/
 #ifdef MCX_SAVE_DETECTORS
-             if(gcfg->issavedet)
+            if(gcfg->ismomentum && type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
+                  ppath[(gcfg->maxmedia<<1)+type[r.eid-1]-1]+=mom; /*the third medianum block stores the momentum transfer*/
+            if(gcfg->issavedet)
 	          ppath[type[r.eid-1]-1]+=1.f;                          /*the first medianum block stores the scattering event counts*/
 #endif
 	}
@@ -1052,11 +1058,13 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCX
 
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
-	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+idx*(gcfg->reclen-1),gcfg,node,elem,
+	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+get_local_id(0)*gcfg->reclen,gcfg,node,elem,
 	        weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t,&raytet);
-	    //atomicadd(progress,1);
 	}
 	energy[idx<<1]=energyesc;
 	energy[1+(idx<<1)]=energytot;
-	atomic_add(&(reporter->raytet),raytet);
+
+        if(gcfg->debuglevel & MCX_DEBUG_PROGRESS)
+            atomic_inc(progress);
+	atomicadd(&(reporter->raytet),raytet);
 }
