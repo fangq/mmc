@@ -489,7 +489,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    r->Lmove=((r->isend) ? r->Lmove : Lmin);
 	    r->pout=r->p0+FL3(Lmin)*r->vec;
 
-	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>(int)((gcfg->tend-gcfg->tstart)*gcfg->Rtstep)){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*(prop.n*R_C0)-gcfg->tstart)*gcfg->Rtstep)>gcfg->maxgate-1){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(gcfg->tend-r->photontimer)/(prop.n*R_C0)-1e-4f;
