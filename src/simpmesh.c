@@ -964,7 +964,13 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	   cfg->his.seedbyte=seedbyte;
         }
         cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+3*/
-
+	
+	if(count>0 && cfg->exportdetected==NULL){
+            cfg->detectedcount=count;
+            cfg->exportdetected=(float*)malloc(cfg->his.colcount*cfg->detectedcount*sizeof(float));
+        }
+        memcpy(cfg->exportdetected,ppath,count*cfg->his.colcount*sizeof(float));
+	
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
 	if(cfg->issaveseed && seeds!=NULL)
