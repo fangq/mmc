@@ -585,7 +585,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 #ifdef MCX_DO_REFLECTION
 
-float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,RandType *ran, __constant int *type, __constant float4 *normal, __constant medium *med){
+float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,__private RandType *ran, __constant int *type, __constant float4 *normal, __constant medium *med){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f,0.f,0.f};
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -652,7 +652,7 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-float mc_next_scatter(float g, float3 *dir,RandType *ran, __constant MCXParam *gcfg, float *pmom){
+float mc_next_scatter(float g, float3 *dir,__private RandType *ran, __constant MCXParam *gcfg, float *pmom){
 
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
@@ -734,7 +734,7 @@ void fixphoton(float3 *p,__global float3 *nodes, __constant int *ee){
  * \param[in,out] ran: the random number generator states
  */
 
-void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__constant int *elem,__constant int *srcelem, RandType *ran){
+void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__constant int *elem,__constant int *srcelem, __private RandType *ran){
         int canfocus=1;
         float3 origin=r->p0;
 
@@ -901,7 +901,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
 
 void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,
     __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
-    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, RandType *ran, int *raytet){
+    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, __private RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
 	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},gcfg->e0,0,0,1.f,0.f,0.f,0.f,ID_UNDEFINED,0.f};
