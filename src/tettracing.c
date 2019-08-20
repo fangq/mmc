@@ -1293,7 +1293,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
         		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 
-		    if(cfg->issavedet && r.eid<0){
+		    if(cfg->issavedet && r.eid<=0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
                           exitdet=oldeid;
