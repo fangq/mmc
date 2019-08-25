@@ -169,7 +169,7 @@ void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i,datalen;
+	int tmp,len,i;
 	char fnode[MAX_PATH_LENGTH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
@@ -187,8 +187,6 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
         if(cfg->method==rtBLBadouelGrid)
 	        mesh_createdualmesh(mesh,cfg);
-	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate*cfg->srcnum);
 }
 
 void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
@@ -286,7 +284,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i,j;
+	int tmp,len,i,j,datalen;
 	int *pe;
 	char felem[MAX_PATH_LENGTH];
 
@@ -303,9 +301,9 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 
 	mesh->elem=(int *)malloc(sizeof(int)*mesh->elemlen*mesh->ne);
 	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
-	if(!cfg->basisorder)
-	  if(cfg->method==rtBLBadouel)
-	    mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate*cfg->srcnum);
+	
+	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate*cfg->srcnum);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i*mesh->elemlen;
