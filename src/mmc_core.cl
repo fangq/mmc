@@ -1002,8 +1002,8 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
 #ifdef MCX_SAVE_DETECTORS
                        if(gcfg->issavedet && gcfg->issaveexit){                                     /*when issaveexit is set to 1*/
-                            copystate(ppath+(gcfg->reclen-6),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
-                            copystate(ppath+(gcfg->reclen-3),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
+                            copystate(ppath+(gcfg->reclen-7),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
+                            copystate(ppath+(gcfg->reclen-4),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
 #endif
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
