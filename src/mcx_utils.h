@@ -125,7 +125,6 @@ typedef struct MMC_history{
 	char magic[4];                 /**< magic bits= 'M','C','X','H' */
 	unsigned int  version;         /**< version of the mch file format */
 	unsigned int  maxmedia;        /**< number of media in the simulation */
-	unsigned int  srcnum;	       /**< number of sources in the simulation*/
 	unsigned int  detnum;          /**< number of detectors in the simulation */
 	unsigned int  colcount;        /**< how many output files per detected photon */
 	unsigned int  totalphoton;     /**< how many total photon simulated */
@@ -134,7 +133,8 @@ typedef struct MMC_history{
 	float unitinmm;                /**< what is the voxel size of the simulation */
 	unsigned int  seedbyte;        /**< how many bytes per RNG seed */
         float normalizer;              /**< what is the normalization factor */
-	int reserved[5];               /**< reserved fields for future extension */
+	unsigned int  srcnum;	       /**< number of sources in the simulation*/
+	int reserved[4];               /**< reserved fields for future extension */
 } history;
 
 
