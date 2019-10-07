@@ -932,7 +932,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 		    cfg->dim.y=cfg->maxgate;
 		    cfg->dim.z=datalen;
 		}
-		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg);
+		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
 		cfg->dim=dim0;
 		return;
 	}

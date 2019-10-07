@@ -134,7 +134,9 @@ typedef struct MMC_history{
 	unsigned int  seedbyte;        /**< how many bytes per RNG seed */
         float normalizer;              /**< what is the normalization factor */
 	unsigned int  srcnum;	       /**< number of sources in the simulation*/
-	int reserved[4];               /**< reserved fields for future extension */
+	int respin;                    /**< if positive, repeat count so total photon=totalphoton*respin; if negative, total number is processed in respin subset */
+	unsigned int  savedetflag;     /**<  */
+	int reserved[2];               /**< reserved fields for future extension */
 } history;
 
 

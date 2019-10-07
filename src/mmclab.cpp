@@ -96,6 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   cl_uint    workdev;
 
   const char       *outputtag[]={"data"};
+  const char       *datastruct[]={"data","dref"};
   const char       *gpuinfotag[]={"name","id","devcount","major","minor","globalmem",
                                   "constmem","sharedmem","regcount","clock","sm","core",
                                   "autoblock","autothread","maxgate"};
