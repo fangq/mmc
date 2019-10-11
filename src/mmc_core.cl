@@ -246,7 +246,7 @@ typedef struct MMC_Parameter {
   int    method;
   float  dstep;
   float  focus;
-  int    nn, ne;
+  int    nn, ne, nf;
   float3 nmin;
   float  nout;
   uint   roulettesize;
@@ -902,7 +902,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,__global float *dref,
     __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, __private RandType *ran, int *raytet){
 
@@ -945,8 +945,8 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    oldeid=r.eid;
 	    	    r.eid=((__constant int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
 #ifdef MCX_DO_REFLECTION
-		    if(gcfg->isreflect && (r.eid==0 || med[type[r.eid-1]].n != med[type[oldeid-1]].n )){
-			if(! (r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ))
+		    if(gcfg->isreflect && (r.eid<=0 || (r.eid>0 && med[type[r.eid-1]].n != med[type[oldeid-1]].n ))){
+			if(! (r.eid<=0 && med[type[oldeid-1]].n == gcfg->nout ))
 			    reflectray(gcfg,&r.vec,&oldeid,&r.eid,r.faceid,ran,type,normal,med);
 		    }
 #endif
@@ -1009,13 +1009,19 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
                             copystate(ppath+(gcfg->reclen-4),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
 #endif
+#ifdef MCX_SAVE_DREF
+                       if(gcfg->issaveref && r.eid<0 && dref){
+		            int tshift=MIN( ((int)((r.photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->nf;
+                            dref[((-r.eid)-1) + tshift]+=r.weight;
+		       }
+#endif
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
                          MMC_FPRINTF(("T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 	    	    }else if(r.eid && r.faceid!=-2  && gcfg->debuglevel&dlEdge){
         		 MMC_FPRINTF(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    }
 #ifdef MCX_SAVE_DETECTORS
-		    if(r.eid==0){
+		    if(r.eid<0){
                        if(gcfg->isextdet && type[oldeid-1]==gcfg->maxmedia+1){
                           savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,oldeid,gcfg);
                        }else{
@@ -1049,7 +1055,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
-    __global float3 *node,__constant int *elem,  __global float *weight, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
+    __global float3 *node,__constant int *elem,  __global float *weight, __global float *dref, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter){
  
@@ -1062,7 +1068,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCX
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
 	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+get_local_id(0)*gcfg->reclen,gcfg,node,elem,
-	        weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t,&raytet);
+	        weight,dref,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t,&raytet);
 	}
 	energy[idx<<1]=energyesc;
 	energy[1+(idx<<1)]=energytot;
