@@ -30,6 +30,8 @@ cfg.tstep=1e-10;
 cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0];
 cfg.debuglevel='TP';
 cfg.isreflect=0;
+cfg.gpuid=-1;
+cfg.method='havel';
 
 cube=mmclab(cfg);
 %cube=mmclab(cfg,'sse'); % this is faster

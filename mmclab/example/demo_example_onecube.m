@@ -32,6 +32,7 @@ cfg.nphoton=100;
 cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-10;
+cfg.gpuid=-1;
 
 %%-----------------------------------------------------------------
 %% run simulation and print out photon movement

@@ -37,6 +37,7 @@ cfg.nphoton = 1e6;
 cfg.seed = 12345678;
 cfg.debuglevel = 'TP';
 cfg.issaveexit = 2;
+cfg.gpuid=-1;
 
 [flux,detp]=mmclab(cfg);
 

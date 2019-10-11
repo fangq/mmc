@@ -27,6 +27,7 @@ cfg.tstep=5e-10;
 cfg.prop=[0 0 1 1;0.002 1.0 0.01 1.37;0.050 0 1 1.37];
 cfg.debuglevel='TP';
 cfg.isreflect=1;
+cfg.gpuid=-1;
 
 cfgs=[cfg cfg];
 

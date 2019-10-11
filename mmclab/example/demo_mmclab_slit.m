@@ -22,6 +22,8 @@ cfg.unitinmm=1;
 cfg.srctype='slit';
 cfg.srcparam1=[30 0 0 0];
 cfg.srcparam2=[0 0 0 0];
+cfg.gpuid=-1;
+cfg.method='havel';
 
 % run the simulation
 

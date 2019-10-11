@@ -17,6 +17,8 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=1e-10;
 cfg.debuglevel='TP';
+cfg.gpuid=-1;
+cfg.method='havel';
 
 %% 5 patterns represented by a 3D matrix
 

@@ -49,6 +49,8 @@ cfg.tstep=1e-10;
 cfg.prop=[0 0 1 1;0.002 1.0 0.01 1.37;0.050 5.0 0.9 1.37];
 cfg.debuglevel='TP';
 cfg.isreflect=0;
+cfg.gpuid=-1;
+cfg.method='havel';
 
 cfg=[cfg cfg cfg];
 

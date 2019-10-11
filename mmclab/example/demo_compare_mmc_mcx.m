@@ -52,6 +52,8 @@ cfg.tstep=1e-10;
 cfg.debuglevel='TP';
 cfg.isreflect=1;
 cfg.detpos=[0 30 30 2];
+cfg.gpuid=-1;
+cfg.method='havel';
 
 % define wide-field planar source
 

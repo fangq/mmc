@@ -23,6 +23,8 @@ cfg.detpos=[30.1 25.2 0. 1.0];
 cfg.issaveexit=1;  % save detected photon exit position and angles
 cfg.issaveseed=1;  % save detected photon seeds to replay later
 cfg.isnormalized=1;
+cfg.gpuid=-1;
+cfg.method='havel';
 
 % albedo method
 cfg.mcmethod=1; 

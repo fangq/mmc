@@ -19,7 +19,7 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
-%cfg.issaveref=1;  % in addition to volumetric fluence, also save surface diffuse reflectance
+cfg.issaveref=1;  % in addition to volumetric fluence, also save surface diffuse reflectance
 
 %% run the simulation
 
@@ -27,10 +27,10 @@ flux=mmclab(cfg);
 
 %% plotting the result
 
-% plot the cross-section of the fluence
+% plot the fluence in log10 scale
 subplot(121);
-plotmesh([cfg.node(:,1:3),log10(abs(flux.data(1:size(cfg.node,1))))],cfg.elem,'y=30','facecolor','interp','linestyle','none')
-view([0 1 0]);
+flux_dmmc=flux.data(1:end-1,1:end-1,1:end-1);
+imagesc(log10(abs(squeeze(flux_dmmc(:,31,:)))));
 colorbar;
 
 % plot the surface diffuse reflectance
