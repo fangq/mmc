@@ -77,7 +77,7 @@ ISO2MESH_SESSION='dmmc2_';
 srcpos=[30.5 30.5 0.];
 [cfgs(2).node,cfgs(2).elem,face2]=surf2mesh(no,fc,[0 0 0],[60 60 60],1,0.25,[1 1 1 0.1;30 30 6 0.1;30 30 17 0.1;30 30 30 0.1],[],[1 1 1 1 1 1 1 1]);
 [cfgs(2).node,cfgs(2).elem]=sortmesh(srcpos,cfgs(2).node,cfgs(2).elem,1:4);
-cfgs(2).method='havel';
+cfgs(2).method='elem';
 
 % % 3D view of the cross-section of the mesh: 'y>30'
 % figure;plotmesh(cfgs(1).node,cfgs(1).elem,'y>30');view(3);

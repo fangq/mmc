@@ -710,7 +710,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         mexErrMsgTxt("multiple source simulation is currently not supported under replay mode");
 
      if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
-        for(i=1;i<mesh->prop;i++){
+        for(i=1;i<=mesh->prop;i++){
 		mesh->med[i].mus*=cfg->unitinmm;
 		mesh->med[i].mua*=cfg->unitinmm;
         }
