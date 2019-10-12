@@ -913,10 +913,6 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
 			r->eid=srcelem[is];
 			float s=0.f;
 			for(i=0;i<4;i++){s+=bary[i];}
-// 			r->bary0.x=bary[0]/s;
-// 			r->bary0.y=bary[1]/s;
-// 			r->bary0.z=bary[2]/s;
-// 			r->bary0.w=bary[3]/s;
 			for(i=0;i<4;i++){
 				if((bary[i]/s)<1e-4f)
 					r->faceid=ifacemap[i]+1;
@@ -924,22 +920,6 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
 			break;
 		}
 	}
-// 	if(is==mesh->srcelemlen){
-// #pragma omp critical
-// {
-// 		MMC_FPRINTF(cfg->flog,"all tetrahedra (%d) labeled with -1 do not enclose the source!\n",mesh->srcelemlen);
-// 		if(mesh->srcelemlen){
-// 		  int *elems=(int *)(mesh->elem+(mesh->srcelem[0]-1)*mesh->elemlen);
-// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[0],mesh->node[elems[0]-1].x,mesh->node[elems[0]-1].y,mesh->node[elems[0]-1].z);
-// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[1],mesh->node[elems[1]-1].x,mesh->node[elems[1]-1].y,mesh->node[elems[1]-1].z);
-// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[2],mesh->node[elems[2]-1].x,mesh->node[elems[2]-1].y,mesh->node[elems[2]-1].z);
-// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[3],mesh->node[elems[3]-1].x,mesh->node[elems[3]-1].y,mesh->node[elems[3]-1].z);
-// 		  MMC_FPRINTF(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
-// 		  MMC_FPRINTF(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
-// 		}
-// }
-// 		MESH_ERROR("initial element does not enclose the source!");
-// 	}
 #endif		
 }
 
