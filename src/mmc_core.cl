@@ -277,9 +277,9 @@ __constant int faceorder[]={1,3,2,0,-1};
 __constant int ifaceorder[]={3,0,2,1};
 //__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 //__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-//__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
-//__constant int facemap[]={2,0,1,3};
-//__constant int ifacemap[]={1,2,0,3};
+__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+__constant int facemap[]={2,0,1,3};
+__constant int ifacemap[]={1,2,0,3};
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
@@ -885,6 +885,62 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
 	}
 
         r->p0+=r->vec*EPS;
+
+#if defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D)	
+	/*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
+	float3 vecS=FL3(0.f), vecAB, vecAC, vecN;
+	int is,i,ea,eb,ec;
+	float bary[4]={0.f};
+	for(is=0;is<gcfg->srcelemlen;is++){
+		int include = 1;
+		constant int *elems=elem+(srcelem[is]-1)*gcfg->elemlen;
+		for(i=0;i<4;i++){
+			ea=elems[out[i][0]]-1;
+			eb=elems[out[i][1]]-1;
+			ec=elems[out[i][2]]-1;
+			vecAB=node[eb]-node[ea];
+			vecAC=node[ec]-node[ea];
+			vecS=r->p0-node[ea];
+			vecN=cross(vecAB,vecAC);
+			bary[facemap[i]]=-dot(vecS,vecN);	
+		}
+		for(i=0;i<4;i++){
+			if(bary[i]<-1e-4f){
+				include = 0;
+			}
+		}
+		if(include){
+			r->eid=srcelem[is];
+			float s=0.f;
+			for(i=0;i<4;i++){s+=bary[i];}
+// 			r->bary0.x=bary[0]/s;
+// 			r->bary0.y=bary[1]/s;
+// 			r->bary0.z=bary[2]/s;
+// 			r->bary0.w=bary[3]/s;
+			for(i=0;i<4;i++){
+				if((bary[i]/s)<1e-4f)
+					r->faceid=ifacemap[i]+1;
+			}
+			break;
+		}
+	}
+// 	if(is==mesh->srcelemlen){
+// #pragma omp critical
+// {
+// 		MMC_FPRINTF(cfg->flog,"all tetrahedra (%d) labeled with -1 do not enclose the source!\n",mesh->srcelemlen);
+// 		if(mesh->srcelemlen){
+// 		  int *elems=(int *)(mesh->elem+(mesh->srcelem[0]-1)*mesh->elemlen);
+// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[0],mesh->node[elems[0]-1].x,mesh->node[elems[0]-1].y,mesh->node[elems[0]-1].z);
+// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[1],mesh->node[elems[1]-1].x,mesh->node[elems[1]-1].y,mesh->node[elems[1]-1].z);
+// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[2],mesh->node[elems[2]-1].x,mesh->node[elems[2]-1].y,mesh->node[elems[2]-1].z);
+// 		  MMC_FPRINTF(cfg->flog,"elem %d %d [%f %f %f] \n",mesh->srcelem[0],elems[3],mesh->node[elems[3]-1].x,mesh->node[elems[3]-1].y,mesh->node[elems[3]-1].z);
+// 		  MMC_FPRINTF(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
+// 		  MMC_FPRINTF(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
+// 		}
+// }
+// 		MESH_ERROR("initial element does not enclose the source!");
+// 	}
+#endif		
 }
 
 
@@ -914,7 +970,6 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	/*initialize the photon parameters*/
         launchphoton(gcfg, &r, node, elem, srcelem, ran);
 	*energytot+=r.weight;
-
 #ifdef MCX_SAVE_DETECTORS
 	if(gcfg->issavedet)
 	    ppath[gcfg->reclen-1] = r.weight; /*last record in partialpath is the initial photon weight*/
