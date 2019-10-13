@@ -138,8 +138,8 @@
   #define sincos(a,b)     sincosf(a,b)
 
 #else
-  #define FL4(f) ((float4)(f))
-  #define FL3(f) ((float3)(f))
+  #define FL4(f) (f)
+  #define FL3(f) (f)
 #endif
 
 #ifdef MCX_SAVE_DETECTORS
@@ -246,7 +246,7 @@ typedef struct MMC_Parameter {
   int    method;
   float  dstep;
   float  focus;
-  int    nn, ne;
+  int    nn, ne, nf;
   float3 nmin;
   float  nout;
   uint   roulettesize;
@@ -277,9 +277,9 @@ __constant int faceorder[]={1,3,2,0,-1};
 __constant int ifaceorder[]={3,0,2,1};
 //__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 //__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-//__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
-//__constant int facemap[]={2,0,1,3};
-//__constant int ifacemap[]={1,2,0,3};
+__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+__constant int facemap[]={2,0,1,3};
+__constant int ifacemap[]={1,2,0,3};
 
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
@@ -458,13 +458,16 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	    uint  i;
 	} currweight;
 
+	if(r->eid<=0) 
+		return -1;
+
 	eid=(r->eid-1)<<2;
 
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
 
-	S = (FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2]);
+	S = FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2];
 	T = normal[eid+3] - (FL4(r->p0.x)*normal[eid]+FL4(r->p0.y)*normal[eid+1]+FL4(r->p0.z)*normal[eid+2]);
         T = -convert_float4_rte(isgreater(T,FL4(0.f))*2)*FL4(0.5f)*T;
 	T = T/S;
@@ -882,6 +885,42 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
 	}
 
         r->p0+=r->vec*EPS;
+
+#if defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D)	
+	/*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
+	float3 vecS=FL3(0.f), vecAB, vecAC, vecN;
+	int is,i,ea,eb,ec;
+	float bary[4]={0.f};
+	for(is=0;is<gcfg->srcelemlen;is++){
+		int include = 1;
+		constant int *elems=elem+(srcelem[is]-1)*gcfg->elemlen;
+		for(i=0;i<4;i++){
+			ea=elems[out[i][0]]-1;
+			eb=elems[out[i][1]]-1;
+			ec=elems[out[i][2]]-1;
+			vecAB=node[eb]-node[ea];
+			vecAC=node[ec]-node[ea];
+			vecS=r->p0-node[ea];
+			vecN=cross(vecAB,vecAC);
+			bary[facemap[i]]=-dot(vecS,vecN);	
+		}
+		for(i=0;i<4;i++){
+			if(bary[i]<-1e-4f){
+				include = 0;
+			}
+		}
+		if(include){
+			r->eid=srcelem[is];
+			float s=0.f;
+			for(i=0;i<4;i++){s+=bary[i];}
+			for(i=0;i<4;i++){
+				if((bary[i]/s)<1e-4f)
+					r->faceid=ifacemap[i]+1;
+			}
+			break;
+		}
+	}
+#endif		
 }
 
 
@@ -899,7 +938,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,
+void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,__global float *dref,
     __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, __private RandType *ran, int *raytet){
 
@@ -911,7 +950,6 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	/*initialize the photon parameters*/
         launchphoton(gcfg, &r, node, elem, srcelem, ran);
 	*energytot+=r.weight;
-
 #ifdef MCX_SAVE_DETECTORS
 	if(gcfg->issavedet)
 	    ppath[gcfg->reclen-1] = r.weight; /*last record in partialpath is the initial photon weight*/
@@ -928,7 +966,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 			fixphoton(&r.p0,node,(__constant int *)(elem+(r.eid-1)*gcfg->elemlen));
 			continue;
                   }
-	    	  r.eid=-r.eid;
+	    	  r.eid=ID_UNDEFINED;
         	  r.faceid=-1;
 	    }
 #ifdef MCX_SAVE_DETECTORS
@@ -942,12 +980,12 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    oldeid=r.eid;
 	    	    r.eid=((__constant int *)(facenb+(r.eid-1)*gcfg->elemlen))[r.faceid];
 #ifdef MCX_DO_REFLECTION
-		    if(gcfg->isreflect && (r.eid==0 || med[type[r.eid-1]].n != med[type[oldeid-1]].n )){
-			if(! (r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ))
+		    if(gcfg->isreflect && (r.eid<=0 || (r.eid>0 && med[type[r.eid-1]].n != med[type[oldeid-1]].n ))){
+			if(! (r.eid<=0 && med[type[oldeid-1]].n == gcfg->nout ))
 			    reflectray(gcfg,&r.vec,&oldeid,&r.eid,r.faceid,ran,type,normal,med);
 		    }
 #endif
-	    	    if(r.eid==0) break;
+	    	    if(r.eid<=0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(type[oldeid-1]==0 && type[r.eid-1]){
                         //if(gcfg->debuglevel&dlExit)
@@ -989,14 +1027,14 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    }
         	    if(r.pout.x==MMC_UNDEFINED){
         		/*possibily hit an edge or miss*/
-			r.eid=-r.eid;
+			r.eid=ID_UNDEFINED;
         		break;
         	    }
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    //if(r.eid==0 && (gcfg->debuglevel&dlMove))
         		 MMC_FPRINTF(("B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
-		    if(r.eid==0){
+		    if(r.eid!=ID_UNDEFINED){
                        //if(gcfg->debuglevel&dlExit)
         		 MMC_FPRINTF(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
@@ -1006,13 +1044,19 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
                             copystate(ppath+(gcfg->reclen-4),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
 #endif
+#ifdef MCX_SAVE_DREF
+                       if(gcfg->issaveref && r.eid<0 && dref){
+		            int tshift=MIN( ((int)((r.photontimer-gcfg->tstart)*gcfg->Rtstep)), gcfg->maxgate-1 )*gcfg->nf;
+                            dref[((-r.eid)-1) + tshift]+=r.weight;
+		       }
+#endif
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
                          MMC_FPRINTF(("T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 	    	    }else if(r.eid && r.faceid!=-2  && gcfg->debuglevel&dlEdge){
         		 MMC_FPRINTF(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    }
 #ifdef MCX_SAVE_DETECTORS
-		    if(r.eid==0){
+		    if(r.eid<0){
                        if(gcfg->isextdet && type[oldeid-1]==gcfg->maxmedia+1){
                           savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gdetpos,oldeid,gcfg);
                        }else{
@@ -1046,7 +1090,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
-    __global float3 *node,__constant int *elem,  __global float *weight, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
+    __global float3 *node,__constant int *elem,  __global float *weight, __global float *dref, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
     __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter){
  
@@ -1059,7 +1103,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCX
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
 	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+get_local_id(0)*gcfg->reclen,gcfg,node,elem,
-	        weight,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t,&raytet);
+	        weight,dref,type,facenb,srcelem, normal,med,n_det,detectedphoton,&energytot,&energyesc,gdetpos,t,&raytet);
 	}
 	energy[idx<<1]=energyesc;
 	energy[1+(idx<<1)]=energytot;

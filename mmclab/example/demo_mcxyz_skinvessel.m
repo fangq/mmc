@@ -25,8 +25,7 @@ seeds=[ones(4,2)*100, c0];  % define the regions by index
 [cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[]); % creating the merged mesh domain
 
 cfg.unitinmm=0.005;
-cfg.node=cfg.node*cfg.unitinmm;
-cfg.method='grid';
+cfg.method='elem';
 
 figure; 
 subplot(121);
@@ -43,7 +42,7 @@ cfg.prop=[0.0000         0.0    1.0000    1
     0.0458   35.6541    0.9000    1.3700
     1.6572   37.5940    0.9000    1.3700];
 
-cfg.srcpos=[100 100 -1]*cfg.unitinmm;
+cfg.srcpos=[100 100 -1];
 cfg.srcdir=[0 0 1];
 
 cfg.tstart=0;
@@ -54,7 +53,7 @@ cfg.outputtype='flux';
 cfg.minenergy=0.01;
 
 cfg.srctype='disk';
-cfg.srcparam1=[0.3 0 0 0];
+cfg.srcparam1=[0.3 0 0 0]/cfg.unitinmm; % in grid unit
 
 %% define wide-field disk source by extending the mesh to the widefield src
 srcdef=struct('srctype',cfg.srctype,'srcpos',cfg.srcpos,'srcdir',cfg.srcdir,...
@@ -85,7 +84,7 @@ fluxcw=sum(flux,2)*cfg.tstep*100;
 
 subplot(122);
 hold on;
-qmeshcut(cfg.elem(cfg.elemprop>0,1:4),cfg.node,log10(fluxcw),'x=0.5','linestyle','none'); 
+qmeshcut(cfg.elem(cfg.elemprop>0,1:4),cfg.node*cfg.unitinmm,log10(fluxcw),'x=0.5','linestyle','none'); 
 view([1 0 0]);
 set(gca,'zlim',[0 1],'ylim',[0 1],'zdir','reverse')
 

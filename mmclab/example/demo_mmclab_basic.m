@@ -19,7 +19,8 @@ cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
-%cfg.issaveref=1;  % in addition to volumetric fluence, also save surface diffuse reflectance
+cfg.issaveref=1;  % in addition to volumetric fluence, also save surface diffuse reflectance
+cfg.method='elem';
 
 %% run the simulation
 

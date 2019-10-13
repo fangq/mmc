@@ -72,7 +72,7 @@ typedef struct GPU_mcconfig{
   cl_int    method;
   cl_float  dstep;
   cl_float  focus;
-  cl_int    nn, ne;
+  cl_int    nn, ne, nf;
   cl_float3 nmin;
   cl_float  nout;
   cl_uint   roulettesize;

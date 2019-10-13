@@ -75,12 +75,12 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      cl_uint  totalcucore;
      cl_uint  devid=0;
      cl_mem gnode,gelem,gtype,gfacenb,gsrcelem,gnormal,gproperty,gparam,gdetpos; /*read-only buffers*/
-     cl_mem *gweight,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
+     cl_mem *gweight,*gdref,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
      cl_mem *gprogress=NULL,*gdetected, *gsrcpattern;  /*read-write buffers*/
 
      cl_uint meshlen=((cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)<<cfg->nbuffer; // use 4 copies to reduce racing
-
-     cl_float  *field;
+     
+     cl_float  *field,*dref=NULL;
 
      cl_uint   *Pseed;
      float  *Pdet;
@@ -95,9 +95,9 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 		     cfg->maxdetphoton, mesh->prop, cfg->detnum, (uint)cfg->voidtime, (uint)cfg->srctype, 
 		     {{cfg->srcparam1.x,cfg->srcparam1.y,cfg->srcparam1.z,cfg->srcparam1.w}},
 		     {{cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w}},
-		     0,cfg->maxgate,(uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen, 
+		     cfg->issaveref,cfg->maxgate,(uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen, 
 		     cfg->mcmethod, cfg->method, 1.f/cfg->unitinmm, cfg->srcpos.w, 
-		     mesh->nn, mesh->ne, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout, 
+		     mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout,
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
 		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, 
 		     cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, ((1 << cfg->nbuffer)-1)};
@@ -121,6 +121,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 
      gseed=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gweight=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gdref=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gdetphoton=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      genergy=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gprogress=(cl_mem *)malloc(workdev*sizeof(cl_mem));
@@ -170,6 +171,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      }
      cfg->maxgate=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
      param.maxgate=cfg->maxgate;
+     cl_uint nflen=mesh->nf*cfg->maxgate;
 
      fullload=0.f;
      for(i=0;i<workdev;i++)
@@ -182,6 +184,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      }
 
      field=(cl_float *)calloc(sizeof(cl_float)*meshlen,cfg->maxgate);
+     dref=(cl_float *)calloc(sizeof(cl_float)*mesh->nf,cfg->maxgate);
      Pdet=(float*)calloc(cfg->maxdetphoton*sizeof(float),hostdetreclen);
 
      fieldlen=meshlen*cfg->maxgate;
@@ -222,6 +225,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	   Pseed[j]=rand();
        OCL_ASSERT(((gseed[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_WORD_LEN,Pseed,&status),status)));
        OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*fieldlen,field,&status),status)));
+       OCL_ASSERT(((gdref[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*nflen,dref,&status),status)));
        OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*hostdetreclen,Pdet,&status),status)));
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
@@ -241,9 +245,9 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
      tic=StartTimer();
      if(cfg->issavedet){
          MMC_FPRINTF(cfg->flog,"- variant name: [%s] compiled with OpenCL version [%d]\n",
-             "Detective MCXCL",CL_VERSION_1_0);
+             "MMC-OpenCL",CL_VERSION_1_0);
      }else{
-         MMC_FPRINTF(cfg->flog,"- code name: [Vanilla MCXCL] compiled with OpenCL version [%d]\n",
+         MMC_FPRINTF(cfg->flog,"- code name: [MMC-OpenCL] compiled with OpenCL version [%d]\n",
              CL_VERSION_1_0);
      }
      MMC_FPRINTF(cfg->flog,"- compiled with: [RNG] %s [Seed Length] %d\n",MCX_RNG_NAME,RAND_SEED_WORD_LEN);
@@ -268,6 +272,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
          sprintf(opt+strlen(opt)," -DMCX_SKIP_VOLUME");
      if(cfg->issavedet)
          sprintf(opt+strlen(opt)," -DMCX_SAVE_DETECTORS");
+     if(cfg->issaveref)
+         sprintf(opt+strlen(opt)," -DMCX_SAVE_DREF");
      if(cfg->isreflect)
          sprintf(opt+strlen(opt)," -DMCX_DO_REFLECTION");
      if(cfg->method==rtBLBadouelGrid)
@@ -315,18 +321,19 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)&gnode)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)&gelem)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 6, sizeof(cl_mem), (void*)(gweight+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 7, sizeof(cl_mem), (void*)&gtype)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)&gfacenb)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 9, sizeof(cl_mem), (void*)&gsrcelem)));	 
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],10, sizeof(cl_mem), (void*)&gnormal)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],11, sizeof(cl_mem), (void*)&gproperty)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],12, sizeof(cl_mem), (void*)&gdetpos)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],13, sizeof(cl_mem), (void*)(gdetphoton+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],14, sizeof(cl_mem), (void*)(gdetected+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],15, sizeof(cl_mem), (void*)(gseed+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],16, sizeof(cl_mem), (void*)(gprogress))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (void*)(genergy+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],18, sizeof(cl_mem), (void*)(greporter+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 7, sizeof(cl_mem), (void*)(gdref+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)&gtype)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 9, sizeof(cl_mem), (void*)&gfacenb)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],10, sizeof(cl_mem), (void*)&gsrcelem)));	 
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],11, sizeof(cl_mem), (void*)&gnormal)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],12, sizeof(cl_mem), (void*)&gproperty)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],13, sizeof(cl_mem), (void*)&gdetpos)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],14, sizeof(cl_mem), (void*)(gdetphoton+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],15, sizeof(cl_mem), (void*)(gdetected+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],16, sizeof(cl_mem), (void*)(gseed+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (void*)(gprogress))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],18, sizeof(cl_mem), (void*)(genergy+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],19, sizeof(cl_mem), (void*)(greporter+i))));
 	// OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)(gsrcpattern+i))));
      }
      MMC_FPRINTF(cfg->flog,"set kernel arguments complete : %d ms %d\n",GetTimeMillis()-tic, param.method);fflush(cfg->flog);
@@ -424,6 +431,14 @@ is more than what your have specified (%d), please use the -H option to specify 
                         cfg->detectedcount+=detected;
 		}
 	     }
+	     if(cfg->issaveref){
+	        float *rawdref=(float*)calloc(sizeof(float),nflen);
+	        OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdref[devid],CL_TRUE,0,sizeof(float)*nflen,
+	                                        rawdref, 0, NULL, NULL)));
+		for(i=0;i<nflen;i++)  //accumulate field, can be done in the GPU
+	            dref[i]+=rawdref[i]; //+rawfield[i+fieldlen];
+	        free(rawdref);			
+	     }
 	     //handling the 2pt distributions
              if(cfg->issave2pt){
                 float *rawfield=(float*)malloc(sizeof(float)*fieldlen);
@@ -488,6 +503,11 @@ is more than what your have specified (%d), please use the -H option to specify 
 	       }
 	 }
      }
+     
+     if(cfg->issaveref && mesh->dref){
+        for(i=0;i<nflen;i++)
+	   mesh->dref[i]+=dref[i];
+     }
 
      if(cfg->isnormalized){
          MMC_FPRINTF(cfg->flog,"normalizing raw data ...\t");fflush(cfg->flog);
@@ -497,7 +517,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      }
      if(cfg->issave2pt && cfg->parentid==mpStandalone){
          MMC_FPRINTF(cfg->flog,"saving data to file ...\t");
-         mesh_saveweight(mesh,cfg);
+         mesh_saveweight(mesh,cfg,0);
          MMC_FPRINTF(cfg->flog,"saving data complete : %d ms\n\n",GetTimeMillis()-tic);
          fflush(cfg->flog);
      }
@@ -507,7 +527,10 @@ is more than what your have specified (%d), please use the -H option to specify 
          cfg->his.detected=cfg->detectedcount;
          mesh_savedetphoton(cfg->exportdetected,NULL,cfg->detectedcount,(sizeof(RandType)*RAND_BUF_LEN),cfg);
      }
-
+     if(cfg->issaveref){
+	MMC_FPRINTF(cfg->flog,"saving surface diffuse reflectance ...");
+	mesh_saveweight(mesh,cfg,1);
+     }
      // total energy here equals total simulated photons+unfinished photons for all threads
      MMC_FPRINTF(cfg->flog,"simulated %ld photons (%ld) with %d devices (ray-tet %.0f)\nMCX simulation speed: %.2f photon/ms\n",
              cfg->nphoton,cfg->nphoton,workdev, reporter.raytet,(double)cfg->nphoton/toc);
@@ -529,6 +552,7 @@ is more than what your have specified (%d), please use the -H option to specify 
          clReleaseMemObject(gseed[i]);
          clReleaseMemObject(gdetphoton[i]);
          clReleaseMemObject(gweight[i]);
+	 clReleaseMemObject(gdref[i]);
          clReleaseMemObject(genergy[i]);
          clReleaseMemObject(gprogress[i]);
          clReleaseMemObject(gdetected[i]);
@@ -539,6 +563,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      free(gseed);
      free(gdetphoton);
      free(gweight);
+     free(gdref);
      free(genergy);
      free(gprogress);
      free(gdetected);
@@ -560,4 +585,6 @@ is more than what your have specified (%d), please use the -H option to specify 
      clReleaseEvent(kernelevent);
 #endif
      free(field);
+     if(Pdet)free(Pdet);
+     free(dref);
 }

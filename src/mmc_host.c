@@ -145,6 +145,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	t0=StartTimer();
 
+        mcx_printheader(cfg);
+
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
 	cfg->issaveseed=0;
 #endif
@@ -295,13 +297,13 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
                     case otFluence:MMCDEBUG(cfg,dlTime,(cfg->flog,"saving fluence ...")); break;
                     case otEnergy: MMCDEBUG(cfg,dlTime,(cfg->flog,"saving energy deposit ...")); break;
 		}
-		mesh_saveweight(mesh,cfg);
+		mesh_saveweight(mesh,cfg,0);
 	}
 	if(cfg->issavedet){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving detected photons ..."));
-		if(cfg->issaveexit==1 || cfg->issaveexit==2)
+		if(cfg->issaveexit)
 			mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg);
-		else if(cfg->issaveexit==2){
+		if(cfg->issaveexit==2){
 			float *detimage=(float*)calloc(cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,sizeof(float));
 			mesh_getdetimage(detimage,master.partialpath,master.bufpos,cfg,mesh);
 			mesh_savedetimage(detimage,cfg);	free(detimage);
@@ -309,6 +311,10 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 		free(master.partialpath);
                 if(cfg->issaveseed && master.photonseed)
 		    free(master.photonseed);
+	}
+	if(cfg->issaveref){
+		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving surface diffuse reflectance ..."));
+		mesh_saveweight(mesh,cfg,1);
 	}
         MMCDEBUG(cfg,dlTime,(cfg->flog,"\tdone\t%d\n",GetTimeMillis()-t0));
         visitor_clear(&master);

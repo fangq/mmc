@@ -237,10 +237,7 @@ end
 useopencl=defaultocl;
 
 if(nargin==2 && ischar(varargin{2}))
-    if(strcmp(varargin{2},'preview'))
-        [varargout{1:nargout}]=mcxpreview(varargin{1});
-	    return;
-    elseif(strcmp(varargin{2},'cuda'))
+    if(strcmp(varargin{2},'preview') || strcmp(varargin{2},'prep') || strcmp(varargin{2},'cuda'))        
         useopencl=0;
     end
 end

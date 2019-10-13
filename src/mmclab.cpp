@@ -96,6 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   cl_uint    workdev;
 
   const char       *outputtag[]={"data"};
+  const char       *datastruct[]={"data","dref"};
   const char       *gpuinfotag[]={"name","id","devcount","major","minor","globalmem",
                                   "constmem","sharedmem","regcount","clock","sm","core",
                                   "autoblock","autothread","maxgate"};
@@ -174,7 +175,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
    * The function can return 1-3 outputs (i.e. the LHS)
    */
   if(nlhs>=1)
-      plhs[0] = mxCreateStructMatrix(ncfg,1,1,outputtag);
+      plhs[0] = mxCreateStructMatrix(ncfg,1,2,datastruct);
   if(nlhs>=2)
       plhs[1] = mxCreateStructMatrix(ncfg,1,1,outputtag);
   if(nlhs>=3)
@@ -314,6 +315,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
+	    
+            if(cfg.issaveref){        /** save diffuse reflectance */
+		fielddim[1]=mesh.nf;
+		fielddim[2]=cfg.maxgate;
+	        mxSetFieldByNumber(plhs[0],jstruct,1, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+                memcpy((double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,1)),mesh.dref,fielddim[1]*fielddim[2]*sizeof(double));
+	    }
 	}
         if(errorflag)
             mexErrMsgTxt("MMCLAB Terminated due to exception!");
@@ -375,6 +383,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,nout)
     GET_ONE_FIELD(cfg,isref3)
     GET_ONE_FIELD(cfg,isnormalized)
+    GET_ONE_FIELD(cfg,issaveref)
     GET_ONE_FIELD(cfg,debugphoton)
     GET_ONE_FIELD(cfg,minenergy)
     GET_ONE_FIELD(cfg,replaydet)
@@ -701,7 +710,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         mexErrMsgTxt("multiple source simulation is currently not supported under replay mode");
 
      if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
-        for(i=1;i<mesh->prop;i++){
+        for(i=1;i<=mesh->prop;i++){
 		mesh->med[i].mus*=cfg->unitinmm;
 		mesh->med[i].mua*=cfg->unitinmm;
         }
