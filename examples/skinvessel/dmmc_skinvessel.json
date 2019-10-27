@@ -10,7 +10,7 @@
 	},
 	"Mesh": {
 		"MeshID": "dmmc_skinvessel",
-		"InitElem": 6429
+		"InitElem": 6178
 	},
 	"Forward": {
 		"T0": 0,

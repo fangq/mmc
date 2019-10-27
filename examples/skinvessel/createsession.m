@@ -11,7 +11,7 @@ fc=[fc2(:,[1 2 3]); fc2(:,[1 3 4])];
 c0=[10,100,150,26]';
 seeds=[ones(4,2)*100, c0];  % define the regions by index
 
-[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[],'-Y -A'); % creating the merged mesh domain
+[cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[],'-YY -A'); % creating the merged mesh domain
 
 voxellen=0.005;
 cfg.node=cfg.node*voxellen;
