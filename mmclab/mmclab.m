@@ -14,17 +14,23 @@ function varargout=mmclab(varargin)
 %#############################################################################%
 %
 % Format:
-%    [fluence,detphoton,ncfg,seeds]=mmclab(cfg,type);
+%    [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
 %          or
 %    fluence=mmclab(cfg);
 %    newcfg=mmclab(cfg,'prep');
-%    [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
+%    [fluence,detphoton,ncfg,seeds]=mmclab(cfg, options);
 %
 % Input:
 %    cfg: a struct, or struct array. Each element in cfg defines 
 %         a set of parameters for a simulation. 
 %
-%         It may contain the following fields:
+%    option: (optional), options is a string, specifying additional options
+%         option='preview': this plots the domain configuration using mcxpreview(cfg)
+%         option='opencl':  force using OpenCL (set cfg.gpuid=1 if not set)
+%                           instead of SSE on CPUs/GPUs that support OpenCL
+%
+%
+%    cfg may contain the following fields:
 %
 %== Required ==
 %     *cfg.nphoton:     the total number of photons to be simulated (integer)
@@ -53,6 +59,8 @@ function varargout=mmclab(varargin)
 %                       if set to a uint8 array, the binary data in each column is used 
 %                       to seed a photon (i.e. the "replay" mode), default value: 1648335518
 %      cfg.isreflect:   [1]-consider refractive index mismatch, 0-matched index
+%                       2 - total absorption on exterior surface
+%                       3 - prefect reflection (mirror) on exterior surface
 %      cfg.isnormalized:[1]-normalize the output fluence to unitary source, 0-no reflection
 %      cfg.isspecular:  [1]-calculate specular reflection if source is outside
 %      cfg.ismomentum:  [0]-save momentum transfer for each detected photon
@@ -237,7 +245,7 @@ end
 useopencl=defaultocl;
 
 if(nargin==2 && ischar(varargin{2}))
-    if(strcmp(varargin{2},'preview') || strcmp(varargin{2},'prep') || strcmp(varargin{2},'cuda'))        
+    if(strcmp(varargin{2},'preview') || strcmp(varargin{2},'prep') || strcmp(varargin{2},'cuda'))
         useopencl=0;
     end
 end

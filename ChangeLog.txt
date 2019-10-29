@@ -1,5 +1,138 @@
 Change Log
 
+== MMC 1.9 (v2019.10, Moon Cake - alpha), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2019-10-29 [a9c4732] rename mmcl executable to mmc
+ 2019-10-29*[0c3f19f] Merge branch 'mmcl' to 'master', now mmcl is official!
+ 2019-10-27 [206bedf] fix skinvessel example
+ 2019-10-18 [a3823b8] add the missing -d 1 flag
+ 2019-10-14 [4940761] fix end-of-line markers
+ 2019-10-14 [2139721] fix example file permissions and end-of-line markers
+ 2019-10-12 [373459a] remove commented lines
+ 2019-10-12 [e321340] add initial element search for wide-field sources; update mmcl examples
+ 2019-10-11 [8e6f561] bug fixing; update mmclab examples
+ 2019-10-11*[1a8e81f] bug fixing; add support of surface diffuse reflectance for mmcl
+ 2019-10-07 [3262326] resolve some compiling issues,e.g. missing argument in functions; missing fields in data struct
+ 2019-10-07 [261fe69] manually resolve merge conflicts
+ 2019-09-09 [9a2ad2a] download colin27 mesh from github instead
+ 2019-08-31 [7e8ad7a] fix .mch file header due to wrong history data structure
+ 2019-08-24 [4dc1228] fix memory crash due to wrong output data length for plucker, havel & badouel ray-tracer when basisorder is 0
+ 2019-08-20 [ca4d675] allow photons that exit into 0-label elements to be detected
+ 2019-08-20 [26477c7] add gpu parameter specifier to make RGA happy
+ 2019-07-26*[9e800e0] fix output detected photon information for SSE-MMCL and GPU-MMCL
+ 2019-07-25 [a3b7714] fix maximum time gate rounding bug
+ 2019-07-24 [eb109e0] return detected photon info in mmclabcl,print progress bar
+ 2019-07-18 [7995941] compile on new mac
+ 2019-07-18 [9f50a7f] hacky workaround to avoid convert_float error for -1 returned by vectorized isgreater on Intel GPU
+ 2019-07-16 [ef0ef3f] use mmclab('gpuinfo') to query gpu devices
+ 2019-07-16 [a45f5a1] undo the revert
+ 2019-07-16 [cfe52b4] fix rng bug on mac
+ 2019-07-16 [72ce3a2] fix RNG error for SSE MMC on windows - long is 32bit on windows
+ 2019-07-16 [c242112] long is only 32bit on windows, fix incorrect mmc results
+ 2019-07-15 [c8c1cb9] Merge branch 'master' into mmcx
+ 2019-07-12 [04565c2] compile for mac with static gcc and gomp
+ 2019-07-12 [afcfda1] mac opencl does not accept more than 8 constant inputs
+ 2019-07-12 [57880f1] allow to compile on windows
+ 2019-07-12 [1e5455d] changes to compile on mac
+ 2019-07-12 [3621fc9] make mmcl compile on mac
+ 2019-07-12 [167ec74] output oct file with correct name
+ 2019-07-12 [95f65bf] disable dref demo as mmcl has not fully merged with master
+ 2019-07-08 [9e622d5] fix index issue for branchless ray-tracer 0-basisorder
+ 2019-07-05 [23f1159] merge with master
+ 2019-07-04 [a78760b] fix normalization indexing bug
+ 2019-07-03 [522e21b] add matlab scripts to create plots for the paper, paper ready to submit
+ 2019-07-02 [7779235] change line color
+ 2019-07-02 [9fc9d0a] revert the mua change made yesterday for dmmc, thanks to Shijie
+ 2019-07-01 [5f58a5f] update benchmark 4, correct alignment in benchmark 1
+ 2019-07-01 [d3ebb41] change prefix in mmclab printing
+ 2019-07-01 [a36c408] update run benchmark script
+ 2019-07-01 [e1e567f] update mmcl bench mmclab script
+ 2019-07-01 [f5aeac9] add benchmark scripts for mmcl
+ 2019-07-01 [c1ec5f1] group 1/mua to normalization
+ 2019-06-30 [5a29aa0] fix double summation and oldidx bug in method=elem
+ 2019-06-30*[4d9013f] mmclabcl is working
+ 2019-06-29 [acba8db] save nii for non-grid ray-tracers
+ 2019-06-29 [fe9c83d] add b2 run_mmc script
+ 2019-06-29 [727e89d] change b2 mesh
+ 2019-06-28 [e537021] further update benchmark script
+ 2019-06-28*[5b7e840] benchmark script to run on different host
+ 2019-06-28 [3fb9a9c] fix param priority from command line
+ 2019-06-28 [5325e53] fix cl build error
+ 2019-06-28 [4fd89e3] make dual-mode mmc again, remove unneeded registers
+ 2019-06-28 [ad13d2a] revert code back to 03/28 version
+ 2019-06-28 [fba4b95] update benchmark script
+ 2019-06-27 [420c0d4] b3 test script
+ 2019-06-27 [d2f193f] update script
+ 2019-06-27 [8b7e3ff] save output to bin
+ 2019-06-27 [827b30d] add mmcl benchmark master script
+ 2019-06-27 [d87e999] reduce colin27 photon
+ 2019-06-27 [7f1e3ee] add spherical_shell demo
+ 2019-06-27 [b971de3] add DMMC paper figure 1 mmclab demo script
+ 2019-06-27 [f1876ba] add dmmc example mesh file
+ 2019-06-27 [422a9da] add skinvessel mmc and dmmc example
+ 2019-06-27 [02f208a] add mmc2json script to convert mmclab cfg to json
+ 2019-06-27 [f0ff69b] fix the ray-tracer after dref related changes in the master branch
+ 2019-06-26 [454de4f] update code variant name
+ 2019-06-26*[d81fd9a] dualmode mmc - support both SSE4+cpu (-G -1) and CPU, rename to mmcl
+ 2019-06-26 [4c65a21] merge with the latest master branch
+ 2019-06-26 [90d0d20] fix outputtype=fluence and wp output, fix #36
+ 2019-06-26 [45d3711] make mmc functions compatible with mcx output
+ 2019-05-24 [0494f23] 2nd attempt to fix the reflection when mirror bc is used
+ 2019-05-24 [a7ac195] allow internal reflections when mirror bc is set
+ 2019-05-16*[24e2bb0] use isreflect=2 for total absorption on outer surf, 3 for perfect mirror
+ 2019-04-30 [a2dda44] allow point sources to use initial elements
+ 2019-04-30 [cbdcb1e] avoid initial elem search in cone/arcsine source launch
+ 2019-04-24 [caa0a65] fix output format in both dmmc and mmc mode
+ 2019-04-24 [cb93d6c] remove mac compilation error
+ 2019-04-22 [565ad68] fix bugs and finally get diffuse reflectance output to work
+ 2019-04-21 [5b79f08] save diffuse reflectance on surface
+ 2019-04-21 [44d1865] copy initial test from plucker to other 3 ray tracers
+ 2019-04-21 [ed8dbdd] saving dref on surface, support saveref option, feature incomplete
+ 2019-04-17 [f3623ff] minor update to function parameter type
+ 2019-04-16 [492aa3e] restore the capability to save mch files
+ 2019-04-02 [6407e74] update loadmch to support user defined output
+ 2019-03-28 [5312319] use DO_NOT_SAVE flag to remove memory operations
+ 2019-03-26 [22fe07f] remove unused variables
+ 2019-03-26 [eeccd6d] fix a bug found by Shijie
+ 2019-03-25 [fb51a41] fix the missing energy loss for the first step in new voxel
+ 2019-03-24 [78622ef] merge with master from github
+ 2019-03-24 [2508642] first step to make mmc cl kernel cuda compatible
+ 2019-03-23 [0e0f96f] fix bug in writing compression
+ 2019-03-23 [752753d] use atomic call to return raytet counts
+ 2019-03-23 [3676918] disable buffer fanning in the kernel
+ 2019-03-23 [3f52cb2] only write to memory when moving out of a voxel
+ 2019-03-23 [370e91d] use macro to dynamically select dmmc vs elem-mmc
+ 2019-03-21 [0b647e7] fix export data length
+ 2019-03-21 [109910e] use a better random number to distribute the writing location
+ 2019-03-21 [1b9d645] use --buffer to set copy of memory to reduce racing
+ 2019-03-21 [2f2aec3] matching the branchless badouel algorithm in mmc, thanks to Shijie
+ 2019-03-21 [0477ade] avoid mac compiler error
+ 2019-03-21 [9f5eaf9] fix a critical bug for dmmc ray-tracer
+ 2019-03-21 [c6c0721] disable volume saving if --save2pt is set to 0
+ 2019-03-21 [bc67cc8] fix incorrect results on AMD devices
+ 2019-03-21 [4ec96ed] update printed program name
+ 2019-03-20 [5dd80a1] no need to convert char lookup in string
+ 2019-03-20 [cfaf43b] merge with mmc v2019.3 master branch
+ 2019-03-20 [4efb7b7] fix OpenCL-precision-induced ray-tracing accuracy issue in Branchless-badouel ray-tracer
+ 2019-03-05 [ae6de41] update change log and README for v2019.3 release
+ 2019-03-05 [10f72ea] support mc2 and nii output for DMMC
+ 2019-03-04 [f403303] disable linking with iomp5 to avoid crash in older matlab
+ 2019-03-01 [996f765] add USC 19.5 atlas example, Fig9a in TranYan2019(submitted)
+ 2019-02-11 [8acc8d7] really reduce register count, fix DMMC output crash
+ 2019-02-10*[61ef773] fix dmmc, 5x speed increase from normal mmc
+ 2019-02-10 [2417416] fix infinite loop, thanks Shijie!
+ 2019-02-10 [5ef4499] return total ray-tet intersection counts
+ 2019-02-09 [7fab7dd] moving node,elem,type,facenb,normal,srcelem to constant mem
+ 2019-02-09 [ec0e183] optimized based on vtune profiling on intel cpu
+ 2019-02-09 [84e87e4] add xorshift128+ RNG, seed each thread by host RNG
+ 2019-02-06 [fe76503] convert output weight to double
+ 2019-01-31*[5c571cf] now can run on cuda and cpu
+ 2019-01-30 [29ae3e1] need debugging, but very close to bug free for the ray-tracing
+ 2019-01-27 [75fbcde] mmcx now can compile, no error
+ 2019-01-18 [53fda23] fix mmclab crash due to racing in multi-thread, similar to mcx issue #60
+ 2019-01-17 [2f61bfe] a very rough draft of the cl kernel, converted ray-tracer from SIMD to float3
+ 2019-01-14*[43aae8f] sync internal mmcx branch with master, mmcx branch was started in 2018
+
 == MMC 1.4.8-2 (v2019.4, Pork Rinds - beta, update 2), Qianqian Fang <q.fang at neu.edu> ==
 
  2019-04-24 [8270b96] fix #35 - incorect mch file header in photon-sharing implementation

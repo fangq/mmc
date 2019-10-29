@@ -1,11 +1,11 @@
 ===============================================================================
 =                       Mesh-based Monte Carlo (MMC)                          =
-=                     Multi-threaded Edition with SSE4                        =
+=            Supporting both OpenCL and Multi-threading with SSE4             =
 ===============================================================================
 
 Author:  Qianqian Fang <q.fang at neu.edu>
 License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.4.8-2 (v2019.4, Pork Rinds - beta, update 2)
+Version: 1.9 (v2019.10, Moon Cake - alpha)
 URL:     http://mcx.space/mmc
 
 -------------------------------------------------------------------------------
@@ -27,40 +27,40 @@ VIII.Reference
 
 O.    What's New
 
-In MMC v2019.4 (1.4.8-2), the follow feature was added
+MMC v2019.10 (1.9) is a major update to MMC. For the first time, MMC adds
+GPU support via the newly implemented OpenCL version. The released package
+simultaneously supports CPU-only multi-threading with SSE4 (standard MMC)
+and OpenCL-based MMC on a wide variety of CPU/GPU devices across vendors.
+Using up-to-date GPU hardware, the MMC simulation speed was increased by
+100x to 400x compared to single-threaded SSE4-based MMC simulation. The detailed
+description of the GPU accelerated MMC can be found in the below in-press
+paper [Fang2019] and its preprint online.
 
-* Support -X/--saveref to save diffuse reflectance/transmittance on mesh surface
-* Speed up DMMC memory operations
+One can choose between the SSE4 and OpenCL based simulation modes using
+the -G or cfg.gpuid input options. A device ID of -1 enables SSE4 CPU based
+MMC, and a number 1 or above chooses the supported OpenCL device (using 
+"mmc -L" or "mmclab('gpuinfo')" to list).
 
-It also fixed the below critical bugs:
+A detailed (long) list of updates can be found in the ChangeLog.txt or
+the Github commit history: https://github.com/fangq/mmc/commits/master
 
-* fix #35 - incorect mch file header in photon-sharing implementation
-* restore the capability to save mch files without needing --saveexit 1 
-* for Win64, use a newer version of libgomp-1.dll to run mmclab without dependency errors
+To highlight a few most important updates:
 
+* Supported GPU using OpenCL in both binary and mmclab
+* GPU MMC (or MMCL) had been rigirously validated across a range of benchmarks
+* Charactrized the speed improvement of MMCL simulations over standard MMC
+* Created "mmc" and "octave-mmclab" official Fedora packages and disseminate via Fedora repositories
+* Implemented xorshift128+ RNG unit and used as default for both CPU/GPU MMC
+* Fixed a list of bugs in both SSE4/OpenCL MMC
+* Created 6 standard benchmarks (B1:cube60, B1D:d-cube60, B2:sphshells, B2D:d-sphshells, B3:colin27, B4:skin-vessel) for comparisons
 
-Also, in MMC v2019.3 (1.4.8), we added a list of major new additions, including
+Please file bug reports to https://github.com/fangq/mmc/issues
 
-* Add 2 built-in complex domain examples - USC_19-5 brain atlas and mcxyz skin-vessel benchmark
-* Initial support of "photon sharing" - a fast approach to simultaneouly simulate multiple pattern src/det, as detailed in our Photoncs West 2019 talk by Ruoyang Yao/Shijie Yan [Yao&Yan2019]
-* Dual-grid MMC (DMMC) paper published [Yan2019], enabled by "-M G" or cfg.method='grid'
-* Add clang compiler support, nightly build compilation script, colored command line output, and more
+Reference:
 
-In addition, we also fixed a number of critical bugs, such as
-
-* fix mmclab gpuinfo output crash using multiple GPUs
-* disable linking to Intel OMP library (libiomp5) to avoid MATLAB 2016-2017 crash
-* fix a bug for doubling thread number every call to mmc, thanks to Shijie
-* fix mmclab crash due to photo sharing update
-
-'''[Yan2019]''' Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based\
-Monte Carlo algorithm for efficient photon transport simulations in complex 3-D media,"\
-J. of Biomedical Optics, 24(2), 020503 (2019). URL: https://doi.org/10.1117/1.JBO.24.2.020503
-
-'''[Yao&Yan2019]''' Ruoyang Yao, Shijie Yan, Xavier Intes, Qianqian Fang,  \
-"Accelerating Monte Carlo forward model with structured light illumination via 'photon sharing'," \
-Photonics West 2019, paper#10874-11, San Francisco, CA, USA. \
-[https://www.spiedigitallibrary.org/conference-presentations/10874/108740B/Accelerating-Monte-Carlo-forward-model-with-structured-light-illumination-via/10.1117/12.2510291?SSO=1 Full presentation for our invited talk]
+'''[Fang2019]''' Qianqian Fang* and Shijie Yan, "GPU-accelerated mesh-based \
+Monte Carlo photon transport simulations," J. of Biomedical Optics, in press, 2019. \
+Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
 
 ------------------------------------------------------------------------------- 
 
@@ -75,9 +75,10 @@ mesh to represent curved boundaries and complex structures, making it
 even more accurate, flexible, and memory efficient. MMC uses the
 state-of-the-art ray-tracing techniques to simulate photon propagation in 
 a mesh space. It has been extensively optimized for excellent computational
-efficiency and portability. MMC currently supports both multi-threaded 
-parallel computing and Single Instruction Multiple Data (SIMD) parallism 
-to maximize performance on a multi-core processor.
+efficiency and portability. MMC currently supports multi-threaded 
+parallel computing via OpenMP, Single Instruction Multiple Data (SIMD) 
+parallism via SSE and, starting from v2019.10, OpenCL to support a wide
+range of CPUs/GPUs from nearly all vendors.
 
 To run an MMC simulation, one has to prepare an FE mesh first to
 discretize the problem domain. Image-based 3D mesh generation has been 
@@ -91,6 +92,13 @@ this code to CUDA and OpenCL. This is expected to produce a hundred-
 or even thousand-fold acceleration in speed similar to what we 
 have observed in our GPU-accelerated Monte Carlo software (Monte Carlo 
 eXtreme, or MCX [2]).
+
+The most relevant publication describing this work is the GPU-accelerated
+MMC paper:
+
+  Qianqian Fang and Shijie Yan, "GPU-accelerated mesh-based Monte Carlo 
+  photon transport simulations," J. of Biomedical Optics, in press, 2019.
+  Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
 
 Please keep in mind that MMC is only a partial implementation of the 
 general Mesh-based Monte Carlo Method (MMCM). The limitations and issues
@@ -195,16 +203,16 @@ and type
 
   make
 
-this will create a fully optimized, multi-threaded and SSE4 enabled 
-mmc executable, located under the mmc/src/bin/ folder.
+this will create a fully optimized OpenCL based mmc executable, 
+located under the mmc/src/bin/ folder.
 
 Other compilation options include
 
+  make ssemath  # this uses SSE4 for both vector operations and math functions
   make omp      # this compiles a multi-threaded binary using OpenMP
   make release  # create a single-threaded optimized binary
   make prof     # this makes a binary to produce profiling info for gprof
   make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
-  make ssemath  # this uses SSE4 for both vector operations and math functions
 
 if you want to generate a portable binary that does not require external 
 library files, you may use (only works for Linux and Windows with gcc)
@@ -290,7 +298,7 @@ same direction. Otherwise, MMC will give incorrect results.
 The full command line options of MMC include the following:
 <pre>
 ###############################################################################
-#                         Mesh-based Monte Carlo (MMC)                        #
+#                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
 #          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #
 #                            http://mcx.space/#mmc                            #
 #                                                                             #
@@ -299,7 +307,7 @@ The full command line options of MMC include the following:
 #                                                                             #
 #                Research funded by NIH/NIGMS grant R01-GM114365              #
 ###############################################################################
-$Rev::8270b9$2019.4 $Date::2019-04-24 14:18:58 -04$ by $Author::Qianqian Fang $
+$Rev::57e5d6$2019.10$Date::Qianqian Fang          $ by $Author::Qianqian Fang $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...
@@ -321,7 +329,7 @@ where possible parameters include (the first item in [] is the default value)
                                to calculate the mua/mus Jacobian matrices
  -P [0|int]    (--replaydet)   replay only the detected photons from a given 
                                detector (det ID starts from 1), use with -E 
- -M [H|PHBSG] (--method)      choose ray-tracing algorithm (only use 1 letter)
+ -M [G|SG] (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
 			       H - Havel's SSE4 ray-tracing algorithm
 			       B - partial Badouel's method (used by TIM-OS)
@@ -330,6 +338,11 @@ where possible parameters include (the first item in [] is the default value)
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
+ -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable
+ -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto
+      or
+ -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)
+ -W '50,30,20' (--workload)    workload for active devices; normalized by sum
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones
 
 == Output options ==
@@ -338,6 +351,7 @@ where possible parameters include (the first item in [] is the default value)
                                J - Jacobian, L - weighted path length, P -
                                weighted scattering count (J,L,P: replay mode)
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
+ -H [1000000] (--maxdetphoton) max number of detected photons
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
