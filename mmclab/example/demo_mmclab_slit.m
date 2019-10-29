@@ -19,6 +19,7 @@ cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
 cfg.unitinmm=1;
+cfg.method='elem';
 cfg.srctype='slit';
 cfg.srcparam1=[30 0 0 0];
 cfg.srcparam2=[0 0 0 0];

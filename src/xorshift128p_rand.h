@@ -36,8 +36,12 @@
 
 #define __device__ static inline
 
-typedef unsigned long RandType;
+typedef unsigned long long RandType;
 typedef unsigned int uint;
+
+#if defined(_WIN32) || defined(__APPLE__)
+typedef unsigned long long ulong;
+#endif
 
 #define MCX_RNG_NAME       "xorshift128+ RNG"
 #define RAND_BUF_LEN       2        //register arrays

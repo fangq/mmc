@@ -55,7 +55,7 @@ nfull=[no;fixednodes];
 [cfgs(2).node,cfgs(2).elem,face2]=surf2mesh([nfull,nodesize],el,[0 0 0],[60.1 60.1 60.1],1,2,[30 30 30],[],[1 1 1 1 1 1 1 1]);
 [cfgs(2).node,cfgs(2).elem]=sortmesh(srcpos,cfgs(2).node,cfgs(2).elem,1:4);
 cfgs(2).elem(:,5)=cfgs(2).elem(:,5)+1;
-cfgs(2).method='havel';
+cfgs(2).method='elem';
 
 %% running simulation with 1x1x1 mm input volume (60x60x60 grid)
 phimmc=mmclab(cfgs);

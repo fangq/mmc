@@ -39,7 +39,7 @@
 typedef unsigned int RandType;
 typedef unsigned int uint;
 
-#define MCX_RNG_NAME       "SFMT19937 RNG"
+#define MCX_RNG_NAME       "xorshift128+ RNG"
 
 #define RAND_BUF_LEN       1248    //buffer length
 #define RAND_SEED_WORD_LEN      2       //

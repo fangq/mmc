@@ -1,15 +1,8 @@
 ROOTDIR = ..
-BINARY=mmc
+BINARY=mmcl
 
-FILES=posix_randr simpmesh tettracing mcx_utils tictoc mmc mmc_host cjson/cJSON
-
-PLATFORM = $(shell uname -s)        
-ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-  FILES+=drand48_r_libgw32c
-endif
-ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
-  FILES+=drand48_r_libgw32c
-endif
+FILES=xorshift128p_rand simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host highordermesh mmc_cl_utils mmc_cl_host
+CLPROGRAM=mmc_core
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
   EXTRALIB:=-static-libgcc -lgcc_eh
@@ -18,7 +11,7 @@ endif
 
 DOXYCFG=mmcdoxy.cfg
 
-USERCCFLAGS=-DUSE_OS_TIMER
+USERCCFLAGS=-DUSE_OS_TIMER -DUSE_OPENCL
 
 DUMMY:=$(shell mkdir -p built/cjson)
 

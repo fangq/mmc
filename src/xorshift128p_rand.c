@@ -33,13 +33,15 @@
 #include <math.h>
 #include <stdio.h>
 #include "xorshift128p_rand.h"
+#include "fastmath.h"
 
 #ifdef MMC_USE_SSE_MATH
 #include "sse_math/sse_math.h"
 #include <smmintrin.h>
 #endif
 
-#define LOG_RNG_MAX             22.1807097779182f
+#define LOG_RNG_MAX         22.1807097779182f
+#define IEEE754_DOUBLE_BIAS     0x3FF0000000000000ul /* Added to exponent.  */
 
 static float xorshift128p_nextf (RandType t[RAND_BUF_LEN]){
    union {

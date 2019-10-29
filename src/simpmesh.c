@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 #include <string.h>
+#include "highordermesh.h"
 
 #ifdef WIN32
          char pathsep='\\';  /**< path separator on Windows */
@@ -85,6 +86,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->elemlen=4;
 	mesh->node=NULL;
 	mesh->elem=NULL;
+	mesh->elem2=NULL;
 	mesh->srcelemlen=0;
 	mesh->srcelem=NULL;
 	mesh->detelemlen=0;
@@ -117,6 +119,8 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_init(mesh);
         mesh_loadnode(mesh,cfg);
         mesh_loadelem(mesh,cfg);
+	if(cfg->basisorder==2)
+	  mesh_10nodetet(mesh,cfg);
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
@@ -267,7 +271,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 
         if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
-           for(i=1;i<mesh->prop;i++){
+           for(i=1;i<=mesh->prop;i++){
                    mesh->med[i].mus*=cfg->unitinmm;
                    mesh->med[i].mua*=cfg->unitinmm;
            }
@@ -516,6 +520,10 @@ void mesh_clear(tetmesh *mesh){
 		free(mesh->elem);
 		mesh->elem=NULL;
 	}
+	if(mesh->elem2){
+		free(mesh->elem2);
+		mesh->elem2=NULL;
+	}
 	if(mesh->facenb){
 		free(mesh->facenb);
 		mesh->facenb=NULL;
@@ -749,7 +757,6 @@ void tracer_build(raytracer *tracer){
 
 				Rn2=1.f/sqrt(vec_dot(&vN,&vN));
 				vec_mult(&vN,Rn2,&vN);
-
 				vecN[j]=vN.x;
 				vecN[j+4]=vN.y;
 				vecN[j+8]=vN.z;
@@ -917,7 +924,14 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
                 sprintf(fweight,"%s%s.dat",cfg->session,(isref? "_dref": ""));
 
         if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
-		mcx_savedata(data,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
+	        uint3 dim0=cfg->dim;
+	        if(cfg->method!=rtBLBadouelGrid){
+		    cfg->dim.x=cfg->srcnum;
+		    cfg->dim.y=cfg->maxgate;
+		    cfg->dim.z=datalen;
+		}
+		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
+		cfg->dim=dim0;
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){
@@ -974,7 +988,13 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	   cfg->his.seedbyte=seedbyte;
         }
         cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+3*/
-
+	
+	if(count>0 && cfg->exportdetected==NULL){
+            cfg->detectedcount=count;
+            cfg->exportdetected=(float*)malloc(cfg->his.colcount*cfg->detectedcount*sizeof(float));
+        }
+        memcpy(cfg->exportdetected,ppath,count*cfg->his.colcount*sizeof(float));
+	
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
 	if(cfg->issaveseed && seeds!=NULL)

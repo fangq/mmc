@@ -4,12 +4,11 @@
 		"DoMismatch": 0,
 		"OutputType": "flux",
 		"DebugFlag": "TP",
-		"RayTracer": "grid",
+		"RayTracer": "g",
 		"RNGSeed": 1648335518,
 		"Photons": 10000000
 	},
 	"Mesh": {
-		"LengthUnit": 0.005,
 		"MeshID": "dmmc_skinvessel",
 		"InitElem": 6429
 	},

@@ -38,6 +38,8 @@
 #include <smmintrin.h>
 #endif
 
+#ifndef USE_OPENCL
+
 #ifdef MMC_LOGISTIC
   #include "logistic_rand.c"
 #elif defined MMC_SFMT    
@@ -46,6 +48,12 @@
   #include "xorshift128p_rand.c"
 #else
   #include "posix_randr.c"
+#endif
+
+#else
+
+  #include "xorshift128p_rand.c"
+
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
@@ -81,6 +89,7 @@ typedef struct MMC_mesh{
 	int elemlen;           /**< number of nodes per element */
 	float3 *node;          /**< node coordinates */
 	int  *elem;            /**< element indices */
+	int  *elem2;            /**< element indices */
 	int  *srcelem;	       /**< candidate list of elements containing the source*/
 	int  srcelemlen;       /**< length of the elements that may contain the source*/
 	int  *detelem;	       /**< candidate list of elements containing a widefield detector*/

@@ -1,4 +1,3 @@
-function createsession
 %% create the skin-vessel benchmark mesh
 [no,fc]=latticegrid([0 200],[0 200],[20 32 200]); % create a 3-layer tissue
 no(end,:)=no(end,:)+1e-5;
@@ -14,9 +13,9 @@ seeds=[ones(4,2)*100, c0];  % define the regions by index
 
 [cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[],'-Y -A'); % creating the merged mesh domain
 
-cfg.unitinmm=0.005;
-cfg.node=cfg.node*cfg.unitinmm;
-cfg.method='grid';
+voxellen=0.005;
+cfg.node=cfg.node*voxellen;
+cfg.method='g';
 
 figure; 
 subplot(121);
@@ -33,7 +32,7 @@ cfg.prop=[0.0000         0.0    1.0000    1
     0.0458   35.6541    0.9000    1.3700
     1.6572   37.5940    0.9000    1.3700];
 
-cfg.srcpos=[100 100 -1]*cfg.unitinmm;
+cfg.srcpos=[100 100 -1]*voxellen;
 cfg.srcdir=[0 0 1];
 
 cfg.tstart=0;
@@ -70,7 +69,7 @@ mmc2json(cfg,'dmmc_skinvessel.json');
 
 %% regenerate the mesh using fine mesh
 [cfg.node,cfg.elem]=s2m(newnode,newelem(:,1:3),1,30,'tetgen',seeds,[]); % creating the merged mesh domain
-cfg.node=cfg.node*cfg.unitinmm;
+cfg.node=cfg.node*voxellen;
 cfg.elemprop=cfg.elem(:,5);
 cfg.elem=cfg.elem(:,1:4);
 

@@ -36,6 +36,7 @@ extern "C" {
 
 unsigned int StartTimer ();
 unsigned int GetTimeMillis ();
+void sleep_ms(int milliseconds);
 
 #ifdef	__cplusplus
 }

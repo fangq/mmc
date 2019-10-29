@@ -31,7 +31,7 @@
 #define _MMC_UTILITIES_H
 
 #include <stdio.h>
-#include <vector_types.h>
+#include "vector_types.h"
 #include "cjson/cJSON.h"
 
 #ifdef _OPENMP                      ///< use multi-threading for running simulation on multiple GPUs
@@ -48,6 +48,7 @@
 #define MIN(a,b)            ((a)<(b)?(a):(b))            /**< macro to get the min values of two numbers */
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
+#define MAX_DEVICE          256
 
 #ifndef MCX_CONTAINER
   #define S_RED     "\x1b[31m"
@@ -87,6 +88,8 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
+enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU};
+enum TMCXParent  {mpStandalone, mpMATLAB};
 enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
 
 /***************************************************************************//**
@@ -130,11 +133,28 @@ typedef struct MMC_history{
 	float unitinmm;                /**< what is the voxel size of the simulation */
 	unsigned int  seedbyte;        /**< how many bytes per RNG seed */
         float normalizer;              /**< what is the normalization factor */
+	unsigned int  srcnum;	       /**< number of sources in the simulation*/
 	int respin;                    /**< if positive, repeat count so total photon=totalphoton*respin; if negative, total number is processed in respin subset */
-	unsigned int  srcnum;          /**< number of sources for simultaneous pattern sources */
-	unsigned int  savedetflag;     /**< number of sources for simultaneous pattern sources */
+	unsigned int  savedetflag;     /**<  */
 	int reserved[2];               /**< reserved fields for future extension */
 } history;
+
+
+typedef struct MCXGPUInfo {
+        char name[MAX_SESSION_LENGTH];
+        int id;
+	int devcount;
+        int platformid;
+        int major, minor;
+        size_t globalmem, constmem, sharedmem;
+        int regcount;
+        int clock;
+        int sm, core;
+        size_t autoblock, autothread;
+        int maxgate;
+        int maxmpthread;  /**< maximum thread number per multi-processor */
+        enum TDeviceVendor vendor;
+} GPUInfo;
 
 /***************************************************************************//**
 \struct MMC_config mcx_utils.h
@@ -219,6 +239,23 @@ typedef struct MMC_config{
 	float *replayweight;           /**< pointer to the detected photon weight array */
 	float *replaytime;             /**< pointer to the detected photon time-of-fly array */
         char seedfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
+        char deviceid[MAX_DEVICE];
+        float workload[MAX_DEVICE];
+	char compileropt[MAX_PATH_LENGTH];
+        char kernelfile[MAX_SESSION_LENGTH];
+	char *clsource;
+	int parentid;
+	int optlevel;
+        unsigned int maxdetphoton; /*anticipated maximum detected photons*/
+	double *exportfield;     /*memory buffer when returning the flux to external programs such as matlab*/
+	float *exportdetected;  /*memory buffer when returning the partial length info to external programs such as matlab*/
+	double energytot, energyabs, energyesc;
+	unsigned int detectedcount; /**<total number of detected photons*/
+	unsigned int runtime;
+        char autopilot;     /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
+	float normalizer;            /**<normalization factor*/
+	unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
+	unsigned int gpuid;
 } mcconfig;
 
 #ifdef	__cplusplus
@@ -250,6 +287,7 @@ void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
 void mcx_printheader(mcconfig *cfg);
+void mcx_cleargpuinfo(GPUInfo **gpuinfo);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP

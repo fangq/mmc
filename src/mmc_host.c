@@ -55,7 +55,7 @@ tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv){
         mcx_initcfg(cfg);
         mcx_parsecmd(argc,argv,cfg);
-	mesh_init_from_cfg(mesh,cfg);
+	if(cfg->isgpuinfo==0) mesh_init_from_cfg(mesh,cfg);
         return 0;
 }
 
@@ -286,8 +286,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	    for(j=0;j<cfg->srcnum;j++){
 	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
           	sum_normalizer += cur_normalizer;
-          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
-		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
+          	MMCDEBUG(cfg,dlTime,(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
+		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer));
   	    }
   	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
 	}
@@ -301,9 +301,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	}
 	if(cfg->issavedet){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving detected photons ..."));
-		if(cfg->issaveexit!=2)
+		if(cfg->issaveexit)
 			mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg);
-		else{
+		if(cfg->issaveexit==2){
 			float *detimage=(float*)calloc(cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,sizeof(float));
 			mesh_getdetimage(detimage,master.partialpath,master.bufpos,cfg,mesh);
 			mesh_savedetimage(detimage,cfg);	free(detimage);

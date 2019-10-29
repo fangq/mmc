@@ -978,7 +978,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    T = _mm_add_ps(T, S);
 	    _mm_store_ps(&(r->pout.x),T);
 
-	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>cfg->maxgate-1){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;

@@ -1,0 +1,25 @@
+{
+	"Session": {
+		"ID": "dmmc_sphshells",
+		"DoMismatch": 1,
+		"DebugFlag": "TP",
+		"RayTracer": "g",
+		"RNGSeed": 1648335518,
+		"Photons": 3000000
+	},
+	"Mesh": {
+		"MeshID": "dmmc_sphshells",
+		"InitElem": 4916
+	},
+	"Forward": {
+		"T0": 0,
+		"T1": 5e-09,
+		"Dt": 5e-10
+	},
+	"Optode": {
+		"Source": {
+			"Pos": [30,30.1,0],
+			"Dir": [0,0,1]
+		}
+	}
+}
