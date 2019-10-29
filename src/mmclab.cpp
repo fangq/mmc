@@ -45,22 +45,22 @@
 #include "waitmex/waitmex.c"
 
 //! Macro to read the 1st scalar cfg member
-#define GET_1ST_FIELD(x,y)  if(strcmp(name,#y)==0) {double *val=mxGetPr(item);x->y=val[0];printf("mmcl.%s=%g;\n",#y,(float)(x->y));}
+#define GET_1ST_FIELD(x,y)  if(strcmp(name,#y)==0) {double *val=mxGetPr(item);x->y=val[0];printf("mmc.%s=%g;\n",#y,(float)(x->y));}
 
 //! Macro to read one scalar cfg member
 #define GET_ONE_FIELD(x,y)  else GET_1ST_FIELD(x,y)
 
 //! Macro to read one 3-element vector member of cfg
 #define GET_VEC3_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];\
-                                 printf("mmcl.%s=[%g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z));}
+                                 printf("mmc.%s=[%g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z));}
 
 //! Macro to read one 3- or 4-element vector member of cfg
 #define GET_VEC34_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];if(mxGetNumberOfElements(item)==4) u->v.w=val[3];\
-                                 printf("mmcl.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
+                                 printf("mmc.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
 
 //! Macro to read one 4-element vector member of cfg
 #define GET_VEC4_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];u->v.w=val[3];\
-                                 printf("mmcl.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
+                                 printf("mmc.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
 /**<  Macro to output GPU parameters as field */
 #define SET_GPU_INFO(output,id,v)  mxSetField(output,id,#v,mxCreateDoubleScalar(gpuinfo[i].v));
 
@@ -400,7 +400,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     else if(strcmp(name,"e0")==0){
         double *val=mxGetPr(item);
 	cfg->e0=val[0];
-        printf("mmcl.e0=%d;\n",cfg->e0);
+        printf("mmc.e0=%d;\n",cfg->e0);
     }else if(strcmp(name,"node")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]!=3)
@@ -412,7 +412,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<3;j++)
           for(i=0;i<mesh->nn;i++)
              ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
-        printf("mmcl.nn=%d;\n",mesh->nn);
+        printf("mmc.nn=%d;\n",mesh->nn);
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]<4)
@@ -425,7 +425,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<mesh->elemlen;j++)
           for(i=0;i<mesh->ne;i++)
              mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
-        printf("mmcl.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
+        printf("mmc.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -436,7 +436,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	mesh->type=(int  *)malloc(sizeof(int )*mesh->ne);
         for(i=0;i<mesh->ne;i++)
            mesh->type[i]=val[i];
-        printf("mmcl.ne=%d;\n",mesh->ne);
+        printf("mmc.ne=%d;\n",mesh->ne);
     }else if(strcmp(name,"facenb")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]<4)
@@ -449,7 +449,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<arraydim[1];j++)
           for(i=0;i<mesh->ne;i++)
              mesh->facenb[i*arraydim[1]+j]=val[j*mesh->ne+i];
-        printf("mmcl.facenb=[%d,%d];\n",mesh->ne,mesh->elemlen);
+        printf("mmc.facenb=[%d,%d];\n",mesh->ne,mesh->elemlen);
     }else if(strcmp(name,"evol")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -460,7 +460,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         mesh->evol=(float *)malloc(sizeof(float)*mesh->ne);
         for(i=0;i<mesh->ne;i++)
            mesh->evol[i]=val[i];
-        printf("mmcl.evol=%d;\n",mesh->ne);
+        printf("mmc.evol=%d;\n",mesh->ne);
     }else if(strcmp(name,"detpos")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]>0 && arraydim[1]!=4)
@@ -472,7 +472,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<4;j++)
           for(i=0;i<cfg->detnum;i++)
              ((float *)(&cfg->detpos[i]))[j]=val[j*cfg->detnum+i];
-        printf("mmcl.detnum=%d;\n",cfg->detnum);
+        printf("mmc.detnum=%d;\n",cfg->detnum);
     }else if(strcmp(name,"prop")==0){
         arraydim=mxGetDimensions(item);
         if(arraydim[0]>0 && arraydim[1]!=4)
@@ -489,7 +489,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	/*for(i=0;i<=mesh->prop;i++)
              mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
 	cfg->his.maxmedia=mesh->prop;
-        printf("mmcl.prop=%d;\n",mesh->prop);
+        printf("mmc.prop=%d;\n",mesh->prop);
     }else if(strcmp(name,"debuglevel")==0){
         int len=mxGetNumberOfElements(item);
 	char buf[MAX_SESSION_LENGTH];
@@ -501,7 +501,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         if (status != 0)
              mexWarnMsgTxt("not enough space. string is truncated.");
         cfg->debuglevel=mcx_parsedebugopt(buf);
-	printf("mmcl.debuglevel='%s';\n",buf);
+	printf("mmc.debuglevel='%s';\n",buf);
     }else if(strcmp(name,"srctype")==0){
         int len=mxGetNumberOfElements(item);
         const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar","pattern","fourier","arcsine","disk","fourierx","fourierx2d","zgaussian","line","slit",""};
@@ -516,7 +516,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->srctype=mcx_keylookup(strtypestr,srctypeid);
         if(cfg->srctype==-1)
              mexErrMsgTxt("the specified source type is not supported");
-	printf("mmcl.srctype='%s';\n",strtypestr);
+	printf("mmc.srctype='%s';\n",strtypestr);
     }else if(strcmp(name,"session")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
@@ -527,7 +527,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         if (status != 0)
              mexWarnMsgTxt("not enough space. string is truncated.");
 
-	printf("mmcl.session='%s';\n",cfg->session);
+	printf("mmc.session='%s';\n",cfg->session);
     }else if(strcmp(name,"srcpattern")==0){
         arraydim=mxGetDimensions(item);
         double *val=mxGetPr(item);
@@ -539,7 +539,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*cfg->srcnum*sizeof(float));
         for(k=0;k<arraydim[0]*arraydim[1]*cfg->srcnum;k++)
              cfg->srcpattern[k]=val[k];
-        printf("mmcl.srcpattern=[%d %d %d];\n",arraydim[0],arraydim[1],cfg->srcnum);
+        printf("mmc.srcpattern=[%d %d %d];\n",arraydim[0],arraydim[1],cfg->srcnum);
     }else if(strcmp(name,"method")==0){
         int len=mxGetNumberOfElements(item);
         const char *methods[]={"plucker","havel","badouel","elem","grid",""};
@@ -555,7 +555,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->method=mcx_keylookup(methodstr,methods);
         if(cfg->method==-1)
              mexErrMsgTxt("the specified method is not supported");
-	printf("mmcl.method='%s';\n",methodstr);
+	printf("mmc.method='%s';\n",methodstr);
     }else if(strcmp(name,"outputtype")==0){
         int len=mxGetNumberOfElements(item);
         const char *outputtype[]={"flux","fluence","energy","jacobian","wl","wp",""};
@@ -571,7 +571,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->outputtype=mcx_keylookup(outputstr,outputtype);
         if(cfg->outputtype==-1)
              mexErrMsgTxt("the specified output type is not supported");
-	printf("mmcl.outputtype='%s';\n",outputstr);
+	printf("mmc.outputtype='%s';\n",outputstr);
     }else if(strcmp(name,"shapes")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
@@ -587,7 +587,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         if(!mxIsUint8(item)){
             double *val=mxGetPr(item);
             cfg->seed=val[0];
-            printf("mmcl.seed=%d;\n",cfg->seed);
+            printf("mmc.seed=%d;\n",cfg->seed);
         }else{
 	    cfg->photonseed=malloc(arraydim[0]*arraydim[1]);
             if(arraydim[0]!=(sizeof(RandType)*RAND_BUF_LEN))
@@ -595,7 +595,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             memcpy(cfg->photonseed,mxGetData(item),arraydim[0]*arraydim[1]);
             cfg->seed=SEED_FROM_FILE;
             cfg->nphoton=arraydim[1];
-            printf("mmcl.nphoton=%d;\n",cfg->nphoton);
+            printf("mmc.nphoton=%d;\n",cfg->nphoton);
 	}
     }else if(strcmp(name,"replayweight")==0){
         arraydim=mxGetDimensions(item);
@@ -604,7 +604,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	cfg->his.detected=arraydim[0]*arraydim[1];
 	cfg->replayweight=(float *)malloc(cfg->his.detected*sizeof(float));
         memcpy(cfg->replayweight,mxGetData(item),cfg->his.detected*sizeof(float));
-        printf("mmcl.replayweight=%d;\n",cfg->his.detected);
+        printf("mmc.replayweight=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"replaytime")==0){
 	arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -612,7 +612,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	cfg->his.detected=arraydim[0]*arraydim[1];
 	cfg->replaytime=(float *)malloc(cfg->his.detected*sizeof(float));
         memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
-        printf("mmcl.replaytime=%d;\n",cfg->his.detected);
+        printf("mmc.replaytime=%d;\n",cfg->his.detected);
     }else if(strcmp(name,"gpuid")==0){
         int len=mxGetNumberOfElements(item);
 
@@ -625,7 +625,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
            if (status != 0)
         	mexWarnMsgTxt("not enough space. string is truncated.");
 
-           printf("mmcl.gpuid='%s';\n",cfg->deviceid);
+           printf("mmc.gpuid='%s';\n",cfg->deviceid);
 	}else{
            double *val=mxGetPr(item);
 	   cfg->gpuid=val[0];
@@ -634,7 +634,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
                 memset(cfg->deviceid,'0',cfg->gpuid-1);
            	cfg->deviceid[cfg->gpuid-1]='1';
            }
-           printf("mmcl.gpuid=%d;\n",cfg->gpuid);
+           printf("mmc.gpuid=%d;\n",cfg->gpuid);
 	}
         for(int i=0;i<MAX_DEVICE;i++)
            if(cfg->deviceid[i]=='0')
@@ -646,7 +646,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	     mexErrMsgTxt("the workload list can not be longer than 256");
 	for(i=0;i<arraydim[0]*arraydim[1];i++)
 	     cfg->workload[i]=val[i];
-        printf("mmcl.workload=<<%d>>;\n",arraydim[0]*arraydim[1]);
+        printf("mmc.workload=<<%d>>;\n",arraydim[0]*arraydim[1]);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{

@@ -254,7 +254,7 @@ if(isstruct(varargin{1}))
 end
 
 if(nargin==1 && ischar(varargin{1}) && strcmp(varargin{1},'gpuinfo'))
-    varargout{1}=mmcl('gpuinfo');
+    varargout{1}=mmc('gpuinfo');
     return;
 end
 
@@ -377,7 +377,10 @@ if(nargout>=3)
 end
 
 if(useopencl==1)
-    [varargout{1:nargout}]=mmcl(cfg);
+    if(isfield(cfg,'gpuid') && cfg.gpuid<0)
+	cfg.gpuid=1;
+    end
+    [varargout{1:nargout}]=mmc(cfg);
 elseif(length(varargin)<2)
     [varargout{1:mmcout}]=mmc(cfg);
 elseif(strcmp(type,'omp'))

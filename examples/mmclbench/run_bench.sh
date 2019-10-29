@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # format:
-#    ./run_bench.sh  1234cpugpu <more mmcl parameters>
+#    ./run_bench.sh  1234cpugpu <more mmc parameters>
 
 OPT="-F nii -n 1e8 -D T"
 EXTRA=${@:2}
@@ -36,11 +36,11 @@ then
 
     if [ $# -eq 0 ] || [[ $1 =~ "gpu" ]]
     then    
-	echo testing benchmark B1 mmc mode with mmcl
-	./run_test.sh -s b1_mmcl $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b1_mmcl.log
+	echo testing benchmark B1 mmc mode with mmc
+	./run_test.sh -s b1_mmc $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b1_mmc.log
 
-	echo testing benchmark B1 dmmc mode with mmcl
-	./run_tess.sh -s b1_dmmcl $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b1_dmmcl.log
+	echo testing benchmark B1 dmmc mode with mmc
+	./run_tess.sh -s b1_dmmc $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b1_dmmc.log
     fi
 fi
 
@@ -63,11 +63,11 @@ then
 
     if [ $# -eq 0 ] || [[ $1 =~ "gpu" ]]
     then    
-	echo testing benchmark B2 mmc mode with mmcl
-	./run_mmc.sh -s b2_mmcl $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b2_mmcl.log
+	echo testing benchmark B2 mmc mode with mmc
+	./run_mmc.sh -s b2_mmc $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b2_mmc.log
 
-	echo testing benchmark B2 dmmc mode with mmcl
-	./run_dmmc.sh -s b2_dmmcl $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b2_dmmcl.log
+	echo testing benchmark B2 dmmc mode with mmc
+	./run_dmmc.sh -s b2_dmmc $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b2_dmmc.log
     fi
 fi
 
@@ -91,11 +91,11 @@ then
 
     if [ $# -eq 0 ] || [[ $1 =~ "gpu" ]]
     then    
-	echo testing benchmark B3 mmc mode with mmcl
-	./run_test.sh -s b3_mmcl $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b3_mmcl.log
+	echo testing benchmark B3 mmc mode with mmc
+	./run_test.sh -s b3_mmc $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b3_mmc.log
 
-	echo testing benchmark B3 dmmc mode with mmcl
-	./run_test.sh -s b3_dmmcl $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b3_dmmcl.log
+	echo testing benchmark B3 dmmc mode with mmc
+	./run_test.sh -s b3_dmmc $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b3_dmmc.log
     fi
 fi
 
@@ -118,11 +118,11 @@ then
 
     if [ $# -eq 0 ] || [[ $1 =~ "gpu" ]]
     then    
-	echo testing benchmark B4 mmc mode with mmcl
-	./run_mmc.sh -s b4_mmcl $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b4_mmcl.log
+	echo testing benchmark B4 mmc mode with mmc
+	./run_mmc.sh -s b4_mmc $OPT -G 1 -M S $EXTRA > $OUTPUTDIR/b4_mmc.log
 
-	#echo testing benchmark B4 dmmc mode with mmcl
-	#./run_dmmc.sh -s b4_dmmcl $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b4_dmmcl.log
+	#echo testing benchmark B4 dmmc mode with mmc
+	#./run_dmmc.sh -s b4_dmmc $OPT -G 1 -M G -F nii $EXTRA > $OUTPUTDIR/b4_dmmc.log
     fi
 fi
 
