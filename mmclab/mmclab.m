@@ -423,6 +423,9 @@ if(mmcout>=2)
             end
             newdetp.w0=detp(end,:)';  % last column is the initial packet weight
             newdetp.prop=cfg(i).prop;
+	    if(isfield(cfg(i),'unitinmm'))
+		newdetp.unitinmm=cfg(i).unitinmm;
+	    end
             newdetp.data=detp;      % enable this line for compatibility
             newdetpstruct(i)=newdetp;
         else
