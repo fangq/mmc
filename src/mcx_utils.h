@@ -40,6 +40,8 @@
 
 #define MAX_PROP            256                          /**< max optical property count */
 #define MAX_DETECTORS       256                          /**< max number of detectors */
+
+#define MAX_FULL_PATH       2048                         /**< max characters in a full file name string */
 #define MAX_PATH_LENGTH     1024                         /**< max characters in a full file name string */
 #define MAX_SESSION_LENGTH  256                          /**< max session name length */
 #define MAX_CHECKPOINT      16                           /**< max number of photon save points */

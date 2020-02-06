@@ -15,7 +15,7 @@
 
 #include "tictoc.h"
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #ifndef USE_OS_TIMER
 

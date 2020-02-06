@@ -155,7 +155,7 @@ void mesh_error(const char *msg,const char *file,const int linenum){
  */
 
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
-	char filename[MAX_PATH_LENGTH];
+	char filename[MAX_FULL_PATH];
 	sprintf(filename,format,cfg->meshtag);
 
 	if(cfg->rootpath[0]) 
@@ -174,7 +174,7 @@ void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
-	char fnode[MAX_PATH_LENGTH];
+	char fnode[MAX_FULL_PATH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
 		MESH_ERROR("can not open node file");
@@ -236,7 +236,7 @@ void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
-	char fmed[MAX_PATH_LENGTH];
+	char fmed[MAX_FULL_PATH];
 	mesh_filenames("prop_%s.dat",fmed,cfg);
 	if((fp=fopen(fmed,"rt"))==NULL){
 		MESH_ERROR("can not open media property file");
@@ -290,7 +290,7 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,datalen;
 	int *pe;
-	char felem[MAX_PATH_LENGTH];
+	char felem[MAX_FULL_PATH];
 
 	mesh_filenames("elem_%s.dat",felem,cfg);
 	if((fp=fopen(felem,"rt"))==NULL){
@@ -376,7 +376,7 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,*ee;
-	char fvelem[MAX_PATH_LENGTH];
+	char fvelem[MAX_FULL_PATH];
 	mesh_filenames("velem_%s.dat",fvelem,cfg);
 	if((fp=fopen(fvelem,"rt"))==NULL){
 		MESH_ERROR("can not open element volume file");
@@ -411,7 +411,7 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int len,i,j;
 	int *pe;
-	char ffacenb[MAX_PATH_LENGTH];
+	char ffacenb[MAX_FULL_PATH];
 	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
@@ -911,7 +911,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 	FILE *fp;
 	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-	char fweight[MAX_PATH_LENGTH];
+	char fweight[MAX_FULL_PATH];
 	double *data=mesh->weight;
 
 	if(isref){
@@ -967,7 +967,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg){
 	FILE *fp;
-	char fhistory[MAX_PATH_LENGTH];
+	char fhistory[MAX_FULL_PATH];
         if(cfg->rootpath[0])
                 sprintf(fhistory,"%s%c%s.mch",cfg->rootpath,pathsep,cfg->session);
         else
@@ -1063,7 +1063,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	
 	FILE *fp;
-	char fhistory[MAX_PATH_LENGTH];
+	char fhistory[MAX_FULL_PATH];
         if(cfg->rootpath[0])
                 sprintf(fhistory,"%s%c%s.img",cfg->rootpath,pathsep,cfg->session);
         else

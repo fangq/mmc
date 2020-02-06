@@ -430,8 +430,8 @@ void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int out
 
 void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg,int isref){
      FILE *fp;
-     char name[MAX_PATH_LENGTH];
-     char fname[MAX_PATH_LENGTH];
+     char name[MAX_FULL_PATH];
+     char fname[MAX_FULL_PATH];
      unsigned int glformat=GL_RGBA32F;
 
      if(cfg->rootpath[0])
@@ -796,7 +796,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      int i,gates,srctype,itmp;
      size_t nphoton;
      float dtmp;
-     char comment[MAX_PATH_LENGTH],*comm, srctypestr[MAX_SESSION_LENGTH]={'\0'};
+     char comment[MAX_FULL_PATH],*comm, srctypestr[MAX_SESSION_LENGTH]={'\0'};
      
      if(in==stdin)
      	MMC_FPRINTF(stdout,"Please specify the total number of photons: [1000000]\n\t");
@@ -1517,7 +1517,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 
 void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mcconfig *cfg){
 	FILE *fp;
-	char fhistory[MAX_PATH_LENGTH];
+	char fhistory[MAX_FULL_PATH];
         if(cfg->rootpath[0])
                 sprintf(fhistory,"%s%c%s.mch",cfg->rootpath,pathsep,cfg->session);
         else
