@@ -96,7 +96,12 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 		     {{cfg->srcparam1.x,cfg->srcparam1.y,cfg->srcparam1.z,cfg->srcparam1.w}},
 		     {{cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w}},
 		     cfg->issaveref,cfg->maxgate,(uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen, 
-		     cfg->mcmethod, cfg->method, 1.f/cfg->unitinmm, cfg->srcpos.w, 
+		     cfg->mcmethod, cfg->method, 1.f/cfg->unitinmm, 
+#ifdef MMC_USE_SSE
+                     cfg->srcpos.w, 
+#else
+                     0.f,
+#endif
 		     mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout,
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
 		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, 
