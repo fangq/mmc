@@ -103,11 +103,11 @@ OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
 
 release:   CCFLAGS+= -O3
-sse ssemath mex oct mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
-sse ssemath omp mex oct mexsse octsse:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+sse ssemath mex oct: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
+sse ssemath omp mex oct mexomp octomp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
-ssemath mexsse octsse:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
-mex mexsse:        ARFLAGS+=$(MKMEXOPT)
+ssemath:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
+mex mexomp:        ARFLAGS+=$(MKMEXOPT)
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
 
@@ -127,20 +127,18 @@ web: BINDIR:=webmmc
 web: AR=emcc
 web: EXTRALIB=-s SIMD=1 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
-mex oct mexsse octsse:   EXTRALIB=
-mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
-mex oct mexsse octsse:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
-mex oct mexsse octsse:   BINDIR=../mmclab
-mex mexsse:     AR=$(MKMEX)
-mex mexsse:     AROUTPUT=-output
-mex mexsse:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
-mexsse:         BINARY=mmc_sse
+mex oct mexomp octomp:   EXTRALIB=
+mex oct mexomp octomp:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp:   BINDIR=../mmclab
+mex mexomp:     AR=$(MKMEX)
+mex mexomp:     AROUTPUT=-output
+mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 
 oct:            BINARY=mmc.mex
-octsse:         BINARY=mmc_sse.mex
-oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
-oct octsse:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(LFLAGS)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
-oct octsse:     USERARFLAGS=-o $(BINDIR)/mmc
+oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
+oct octomp:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(LFLAGS)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
+oct octomp:     USERARFLAGS=-o $(BINDIR)/mmc
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 
@@ -158,7 +156,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-all release sse ssemath prof omp mex oct mexsse octsse pnacl web: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp mex oct mexomp octomp pnacl web: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
