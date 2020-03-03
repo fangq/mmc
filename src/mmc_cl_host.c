@@ -97,7 +97,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 		     {{cfg->srcparam2.x,cfg->srcparam2.y,cfg->srcparam2.z,cfg->srcparam2.w}},
 		     cfg->issaveref,cfg->maxgate,(uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen, 
 		     cfg->mcmethod, cfg->method, 1.f/cfg->unitinmm, 
-#ifdef MMC_USE_SSE
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
                      cfg->srcpos.w, 
 #else
                      0.f,

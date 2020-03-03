@@ -730,7 +730,7 @@ void tracer_build(raytracer *tracer){
 				Rn2*=Rn2;
 				vec_mult(vecN+1,Rn2,vecN+1);
                                 vec_mult(vecN+2,Rn2,vecN+2);
-#ifdef MMC_USE_SSE
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
 				vecN->w    = vec_dot(vecN,  &nodes[ea]);
 				(vecN+1)->w=-vec_dot(vecN+1,&nodes[ea]);
                                 (vecN+2)->w=-vec_dot(vecN+2,&nodes[ea]);
@@ -760,7 +760,7 @@ void tracer_build(raytracer *tracer){
 				vecN[j]=vN.x;
 				vecN[j+4]=vN.y;
 				vecN[j+8]=vN.z;
-#ifdef MMC_USE_SSE
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
 				vecN[j+12]    = vec_dot(&vN, &nodes[ea]);
 #endif
 			}
