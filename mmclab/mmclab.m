@@ -284,7 +284,7 @@ for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
         error('cfg.node or cfg.elem is missing');
     end
-    if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
+    if(size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
