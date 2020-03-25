@@ -1551,7 +1551,7 @@ void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::57e5d6$2019.4");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.4");
 }
 
 /**
@@ -1572,7 +1572,7 @@ void mcx_printheader(mcconfig *cfg){
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::57e5d6$2019.10$Date::Qianqian Fang          $ by $Author::Qianqian Fang $\n\
+$Rev::      $2019.10$Date::                       $ by $Author::              $\n\
 ###############################################################################\n"S_RESET);
 }
 
