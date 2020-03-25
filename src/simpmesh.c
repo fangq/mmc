@@ -217,9 +217,9 @@ void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
 	mesh->nmax.y+=EPS;
 	mesh->nmax.z+=EPS;
 
-	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->unitinmm)+1;
-	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->unitinmm)+1;
-	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->unitinmm)+1;
+	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->steps.x)+1;
+	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->steps.y)+1;
+	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->steps.z)+1;
 
 	cfg->crop0.x=cfg->dim.x;
         cfg->crop0.y=cfg->dim.y*cfg->dim.x;

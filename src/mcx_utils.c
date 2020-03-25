@@ -79,7 +79,7 @@
 const char shortopt[]={'h','E','f','n','A','t','T','s','a','g','b','D','G',
                  'd','r','S','e','U','R','l','L','I','-','u','C','M',
                  'i','V','O','-','F','q','x','P','k','v','m','-','-',
-		 'J','o','H','-','W','X','\0'};
+		 'J','o','H','-','W','X','-','\0'};
 		 
 /**
  * Long command line options
@@ -96,7 +96,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon","--autopilot",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
                  "--debugphoton","--compileropt","--optlevel","--maxdetphoton",
-		 "--buffer","--workload","--saveref",""};
+		 "--buffer","--workload","--saveref","--gridsize",""};
 
 extern char pathsep;
 
@@ -169,6 +169,9 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->dim.x=0;
      cfg->dim.y=0;
      cfg->dim.z=0;
+     cfg->steps.x=1.f;
+     cfg->steps.y=1.f;
+     cfg->steps.z=1.f;
      cfg->nblocksize=64;
      cfg->nphoton=0;
      cfg->nthread=1024*8;
@@ -359,9 +362,9 @@ void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int out
      hdr.dim[4] = len/(cfg->dim.x*cfg->dim.y*cfg->dim.z);
      hdr.datatype = type32bit;
      hdr.bitpix = (type32bit==NIFTI_TYPE_FLOAT64)?64:32;
-     hdr.pixdim[1] = cfg->unitinmm;
-     hdr.pixdim[2] = cfg->unitinmm;
-     hdr.pixdim[3] = cfg->unitinmm;
+     hdr.pixdim[1] = cfg->steps.x;
+     hdr.pixdim[2] = cfg->steps.y;
+     hdr.pixdim[3] = cfg->steps.z;
      hdr.intent_code=NIFTI_INTENT_NONE;
 
      if(type32bit==NIFTI_TYPE_FLOAT32 || type32bit==NIFTI_TYPE_FLOAT64){
@@ -1233,6 +1236,9 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->tstep>cfg->tend-cfg->tstart){
          cfg->tstep=cfg->tend-cfg->tstart;
      }
+     if(cfg->steps.x!=cfg->steps.y || cfg->steps.y!=cfg->steps.z)
+         MMC_ERROR(-2,"MMC dual-grid algorithm currently does not support anisotropic voxels");
+
      if(fabs(cfg->srcdir.x*cfg->srcdir.x+cfg->srcdir.y*cfg->srcdir.y+cfg->srcdir.z*cfg->srcdir.z - 1.f)>1e-4)
          MMC_ERROR(-2,"field 'srcdir' must be a unitary vector (tolerance is 1e-4)");
      if(cfg->tend<=cfg->tstart)
@@ -1467,6 +1473,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
                                 }else if(strcmp(argv[i]+2,"buffer")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->nbuffer),"int");
+                                }else if(strcmp(argv[i]+2,"gridsize")==0){
+		                     i=mcx_readarg(argc,argv,i,&(cfg->steps.x),"int");
+				     cfg->steps.y=cfg->steps.x;
+				     cfg->steps.z=cfg->steps.x;
                                 }else
                                      MMC_FPRINTF(cfg->flog,"unknown verbose option: --%s\n",argv[i]+2);
                                 break;
@@ -1541,7 +1551,7 @@ void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.4");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::57e5d6$2019.4");
 }
 
 /**
@@ -1562,7 +1572,7 @@ void mcx_printheader(mcconfig *cfg){
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $2019.10$Date::                       $ by $Author::              $\n\
+$Rev::57e5d6$2019.10$Date::Qianqian Fang          $ by $Author::Qianqian Fang $\n\
 ###############################################################################\n"S_RESET);
 }
 
@@ -1662,6 +1672,7 @@ where possible parameters include (the first item in [] is the default value)\n\
 \n"S_BOLD S_CYAN"\
 == Additional options ==\n"S_RESET"\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
+ --gridsize     [1|float]      if -M G is used, this sets the grid size in mm\n\
 \n"S_BOLD S_CYAN"\
 == Example ==\n"S_RESET"\
        %s -n 1000000 -f input.json -s test -b 0 -D TP\n",exename,

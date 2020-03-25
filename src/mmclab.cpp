@@ -487,8 +487,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<4;j++)
           for(i=0;i<=mesh->prop;i++)
              ((float *)(&mesh->med[i]))[j]=val[j*(mesh->prop+1)+i];
-	/*for(i=0;i<=mesh->prop;i++)
-             mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
 	cfg->his.maxmedia=mesh->prop;
         printf("mmc.prop=%d;\n",mesh->prop);
     }else if(strcmp(name,"debuglevel")==0){
@@ -717,6 +715,10 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         }
      }
      cfg->his.unitinmm=cfg->unitinmm;
+
+     if(cfg->steps.x!=cfg->steps.y || cfg->steps.y!=cfg->steps.z)
+        MEXERROR("MMC dual-grid algorithm currently does not support anisotropic voxels");
+
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }

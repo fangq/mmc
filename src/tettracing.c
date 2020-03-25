@@ -1057,7 +1057,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                      }else{
 			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
-			    int i, seg=(int)(r->Lmove/cfg->unitinmm)+1;
+			    int i, seg=(int)(r->Lmove/cfg->steps.x)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
 #ifdef __INTEL_COMPILER
@@ -1068,7 +1068,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
 			    O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
 			    S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
-			    dstep=1.f/cfg->unitinmm;
+			    dstep=1.f/cfg->steps.x;
 			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
 			    w0=ww;
                             for(i=0; i< seg; i++){
