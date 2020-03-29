@@ -19,7 +19,7 @@
 
 #ifndef USE_OS_TIMER
 
-#ifdef MCX_OPENCL
+#ifdef USE_OPENCL
 
 #include <CL/cl.h>
 /* use OpenCL timer */
@@ -69,7 +69,7 @@ unsigned int StartTimer () {
 #else
 
 static unsigned int timerRes;
-#ifndef _WIN32
+#ifndef _MSC_VER
 #if _POSIX_C_SOURCE >= 199309L
 #include <time.h>   // for nanosleep
 #else

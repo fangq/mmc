@@ -48,7 +48,7 @@ extern "C" {
 
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 
-typedef struct GPU_mcconfig{
+typedef struct PRE_ALIGN(32) GPU_mcconfig{
   cl_float3 srcpos;
   cl_float3 srcdir;
   cl_float  tstart,tend;
@@ -86,11 +86,11 @@ typedef struct GPU_mcconfig{
   cl_uint   nbuffer;
   cl_uint   buffermask;
   //cl_int    issaveseed;
-} MCXParam __attribute__ ((aligned (32)));
+} MCXParam POST_ALIGN(32);
 
-typedef struct GPU_reporter{
+typedef struct POST_ALIGN(32) GPU_reporter{
   float  raytet;
-} MCXReporter  __attribute__ ((aligned (32)));
+} MCXReporter  POST_ALIGN(32);
 
 void mmc_run_cl(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 
