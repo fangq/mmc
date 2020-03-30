@@ -53,15 +53,17 @@ MKOCT      :=mkoctfile
 DLLFLAG=-fPIC
 
 PLATFORM = $(shell uname -s)
-ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-    MKMEX      :=cmd //c mex.bat
-    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH)
-    DLLFLAG     =
+ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
+    MKMEX      :=cmd /c mex.bat
+    LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
+    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH)
+    EXTRALIB   +="-static"
+    #DLLFLAG    =
 endif
 ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
     MKMEXOPT    =-f mexopts_cygwin64_gcc.bat COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
-    DLLFLAG     =
+    #DLLFLAG     =
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
   INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
   LIBOPENCL=-framework OpenCL
