@@ -33,7 +33,11 @@
 #include <math.h>
 #include <ctype.h>
 #include <time.h>
-#include <sys/ioctl.h>
+#ifdef __MINGW32__
+    #include <termcap.h>
+#else
+    #include <sys/ioctl.h>
+#endif
 #include "mcx_utils.h"
 #include "mcx_const.h"
 
@@ -1053,9 +1057,11 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
     struct winsize ttys={0,0,0,0};
     ioctl(0, TIOCGWINSZ, &ttys);
     colwidth=ttys.ws_col;
+  #elif defined(NCURSES_CONST)
+    colwidth=tgetnum("co");
+  #endif
     if(colwidth==0)
           colwidth=79;
-  #endif
 #endif
 
     percentage=(float)n*(colwidth-18)/cfg->nphoton;
