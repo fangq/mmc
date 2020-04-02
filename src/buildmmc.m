@@ -26,7 +26,9 @@ function buildmmc(varargin)
 %    https://www.mathworks.com/matlabcentral/fileexchange/52848-matlab-support-for-mingw-w64-c-c-compiler
 %  2.After installation of MATLAB MinGW support, you must type "mex -setup"
 %    in MATLAB and select "MinGW64 Compiler (C)". 
-%  3.File C:\Windows\System32\OpenCL.dll must exist. You can obtain this
+%  3.Once you select the MingW C compiler, you should run "mex -setup"
+%    again in MATLAB and select "MinGW64 Compiler (C++)" to compile C++.
+%  4.File C:\Windows\System32\OpenCL.dll must exist. You can obtain this
 %    file by installing your graphics driver or install CUDA/AMD GPU SDK
 %    and copy OpenCL.dll to the C:\Windows\System32 folder.
 %
@@ -73,14 +75,14 @@ if(~exist('OCTAVE_VERSION','builtin'))
         if(regexp(filelist{i},'\.[Cc][Pp][Pp]$'))
             flag='CXXFLAGS';
         end
-        disp(sprintf('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i}));
+        disp('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i});
         eval(sprintf('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i}));
     end
     if(isfield(opt,'lib'))
         linkflags=[linkflags ' ' opt.lib];
     end
     fn=dir('*.o');
-    disp(sprintf('mex %s -output %s -outdir ../%slab %s=''%s'' ',strjoin({fn.name}),pname,pname,linkvar,linkflags));
+    fprintf('mex %s -output %s -outdir ../%slab %s=''%s'' \n',strjoin({fn.name}),pname,pname,linkvar,linkflags);
     eval(sprintf('mex %s -output %s -outdir ../%slab %s=''%s'' ',strjoin({fn.name}),pname,pname,linkvar,linkflags));
 else
     linkflags=regexprep(linkflags,['[\\]*\$' linkvar],'');
