@@ -18,6 +18,7 @@ function buildmmc(varargin)
 %      'lib': a string made of sequences of ' -L"/folder/path" ' and '
 %           -llibrary' that can be added for linking (format similar to -L
 %           and -l flags for gcc)
+%      'filelist': a user-defined list of source file names
 %
 % Dependency (Windows only):
 %  1.To compile mmclab in MATLAB R2017a or earlier on Windows, you must 
@@ -35,14 +36,16 @@ function buildmmc(varargin)
 %
 
 cd(fileparts(which(mfilename)));
-if(~isempty(dir('*.o')))
-    delete('*.o'); 
+if(nargin==1 && strcmp(varargin{1},'clean'))
+    if(~isempty(dir('*.o')))
+        delete('*.o'); 
+    end
+    return;
 end
 opt=struct(varargin{:});
 pname='mmc';
 
 cflags='-c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -fopenmp  -DUSE_OS_TIMER -DUSE_OPENCL';
-linkflags='$LINKLIBS -fopenmp -lstdc++ -static';
 
 filelist={'xorshift128p_rand.c','simpmesh.c','tettracing.c',...
     'mcx_utils.c','tictoc.c','cjson/cJSON.c','mmc_host.c',...
@@ -54,8 +57,15 @@ if(isfield(opt,'include'))
     cflags=[cflags ' ' opt.include];
 end
 if(ispc)
+    linkflags='$LINKLIBS -fopenmp -lstdc++ -static';
     cflags=[cflags ' -I./mingw64/include -I"$MINGWROOT/opt/include"'];
-    linkflags=[linkflags ' "C:\Windows\System32\OpenCL.dll"'];
+    linkflags=[linkflags ' ''C:\Windows\System32\OpenCL.dll'' '];
+    linkvar='LINKLIBS';
+else
+    linkflags='\$CLIBS -fopenmp -static-libgcc -static-libstdc++';
+    cflags=[cflags ' -fPIC '];
+    linkflags=[linkflags ' -lOpenCL '];
+    linkvar='CLIBS';
 end
 if(~exist('OCTAVE_VERSION','builtin'))
     for i=1:length(filelist)
@@ -63,17 +73,22 @@ if(~exist('OCTAVE_VERSION','builtin'))
         if(regexp(filelist{i},'\.[Cc][Pp][Pp]$'))
             flag='CXXFLAGS';
         end
+        disp(sprintf('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i}));
         eval(sprintf('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i}));
     end
     if(isfield(opt,'lib'))
         linkflags=[linkflags ' ' opt.lib];
     end
-    eval(sprintf('mex *.o -output %s -outdir ../%slab LINKLIBS=''%s'' ',pname,pname,linkflags));
+    fn=dir('*.o');
+    disp(sprintf('mex %s -output %s -outdir ../%slab %s=''%s'' ',strjoin({fn.name}),pname,pname,linkvar,linkflags));
+    eval(sprintf('mex %s -output %s -outdir ../%slab %s=''%s'' ',strjoin({fn.name}),pname,pname,linkvar,linkflags));
 else
+    linkflags=regexprep(linkflags,['[\\]*\$' linkvar],'');
     for i=1:length(filelist)
         cmd=sprintf('mex %s -c ''%s'' ',cflags,filelist{i});
         disp(cmd);
         eval(cmd);
     end
-    eval(sprintf('mex *.o -o ../%slab/%s LINKLIBS=''%s'' ',pname,pname,linkflags));
+    fn=dir('*.o');
+    eval(sprintf('mex %s -o ../%slab/%s %s ',strjoin({fn.name}),pname,pname,linkflags));
 end
