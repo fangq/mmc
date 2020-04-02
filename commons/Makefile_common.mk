@@ -54,11 +54,12 @@ DLLFLAG=-fPIC
 
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
+    MW_MINGW64_LOC=/c/msys64/usr/
     MKMEX      :=cmd //c mex.bat -v
-    INCLUDEDIRS+=-I"C:\msys64\mingw64\include"
+    INCLUDEDIRS+=-I"./mingw64/include"
     LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
-    MKMEXOPT    =-f mexopts_cygwin64_gcc.bat COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
-    EXTRALIB   +="-static"
+    MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    EXTRALIB   +=-static
     DLLFLAG    =
 endif
 ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)

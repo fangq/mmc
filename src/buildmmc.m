@@ -75,7 +75,7 @@ if(~exist('OCTAVE_VERSION','builtin'))
         if(regexp(filelist{i},'\.[Cc][Pp][Pp]$'))
             flag='CXXFLAGS';
         end
-        disp('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i});
+        disp(sprintf('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i}));
         eval(sprintf('mex OBJEXT=.o %s=''%s'' -c ''%s'' ',flag,cflags,filelist{i}));
     end
     if(isfield(opt,'lib'))

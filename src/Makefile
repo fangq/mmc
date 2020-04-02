@@ -11,7 +11,7 @@ endif
 
 DOXYCFG=mmcdoxy.cfg
 
-USERCCFLAGS=-DUSE_OS_TIMER -DUSE_OPENCL
+USERCCFLAGS=-DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT
 
 DUMMY:=$(shell mkdir -p built/cjson)
 
