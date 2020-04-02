@@ -154,8 +154,8 @@ void mesh_error(const char *msg,const char *file,const int linenum){
  * @param[in] cfg: the simulation configuration structure
  */
 
-void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
-	char filename[MAX_FULL_PATH];
+void mesh_filenames(const char format[64],char *foutput,mcconfig *cfg){
+	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
 
 	if(cfg->rootpath[0]) 
@@ -870,36 +870,6 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
     dir->z=p.z;
     return nextslen;
 }
-
-/**
- * @brief Save a snapshot of the simulation output
- *
- * save snapshot of the simulation output during a lengthy simulation
- * the snapshots are specified by a set of "check-points", i.e. the index 
- * of the photons that being completed.
- *
- * @param[in] mesh: the mesh object
- * @param[in] cfg: the simulation configuration
- * @param[in] id: the index of the current photon
- */
-
-void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
-	char sess[MAX_SESSION_LENGTH];
-	int i,found=0;
-	for(i=0;i<MAX_CHECKPOINT;i++){
-           if(cfg->checkpt[i]==0)  return;
-	   if(id==cfg->checkpt[i]) {
-		found=1;
-		break;
-	   }
-	}
-        if(!found) return;
-	memcpy(sess,cfg->session,MAX_SESSION_LENGTH);
-	sprintf(cfg->session,"%s_%d",sess,id);
-	mesh_saveweight(mesh,cfg,0);
-	memcpy(cfg->session,sess,MAX_SESSION_LENGTH);
-}
-
 
 /**
  * @brief Save the fluence output to a file

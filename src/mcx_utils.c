@@ -7,7 +7,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pl¨¹cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -438,7 +438,7 @@ void mcx_savenii(OutputType *dat, size_t len, char* name, int type32bit, int out
 void mcx_savedata(OutputType *dat, size_t len, mcconfig *cfg,int isref){
      FILE *fp;
      char name[MAX_FULL_PATH];
-     char fname[MAX_FULL_PATH];
+     char fname[MAX_FULL_PATH+20];
      unsigned int glformat=GL_RGBA32F;
 
      if(cfg->rootpath[0])
@@ -573,7 +573,7 @@ void mcx_readconfig(char *fname, mcconfig *cfg){
         }
         fclose(fp);
         if(cfg->session[0]=='\0'){
-		strncpy(cfg->session,fname,MAX_SESSION_LENGTH);
+		strncpy(cfg->session,fname,MAX_SESSION_LENGTH-1);
 	}
      }
 }
@@ -630,7 +630,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
      Forward = cJSON_GetObjectItem(root,"Forward");
 
      if(Mesh){
-        strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_PATH_LENGTH);
+        strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID","Mesh.MeshID",Mesh,(MMC_ERROR(-1,"You must specify mesh files"),""),valuestring), MAX_SESSION_LENGTH-1);
         cfg->e0=FIND_JSON_KEY("InitElem","Mesh.InitElem",Mesh,(MMC_ERROR(-1,"InitElem must be given"),0.0),valueint);
         if(!flagset['u'])
 	    cfg->unitinmm=FIND_JSON_KEY("LengthUnit","Mesh.LengthUnit",Mesh,1.0,valuedouble);
@@ -711,7 +711,7 @@ int mcx_loadjson(cJSON *root, mcconfig *cfg){
         }
      }
      if(Session){
-        char val[1];
+        char val[2]={'\0','\0'};
         cJSON *ck;
         if(!flagset['E'])   cfg->seed=FIND_JSON_KEY("RNGSeed","Session.RNGSeed",Session,-1,valueint);
         if(!flagset['n'])   cfg->nphoton=FIND_JSON_KEY("Photons","Session.Photons",Session,0,valueint);
@@ -858,7 +858,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 #else
          sprintf(comment,"%s/%s",cfg->rootpath,cfg->meshtag);
 #endif
-         strncpy(cfg->meshtag,comment,MAX_PATH_LENGTH);
+         memcpy(cfg->meshtag,comment,MAX_SESSION_LENGTH);
      }
      comm=fgets(comment,MAX_PATH_LENGTH,in);
 
@@ -1440,7 +1440,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		     	        i=mcx_readarg(argc,argv,i,&(cfg->optlevel),"int");
 		     	        break;
                      case 'D':
-				if(i+1<argc && isalpha(argv[i+1][0]) )
+				if(i+1<argc && isalpha((int)argv[i+1][0]) )
 					cfg->debuglevel=mcx_parsedebugopt(argv[++i]);
 				else
 	                                i=mcx_readarg(argc,argv,i,&(cfg->debuglevel),"int");

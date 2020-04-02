@@ -43,7 +43,7 @@
 
 #define MAX_FULL_PATH       2048                         /**< max characters in a full file name string */
 #define MAX_PATH_LENGTH     1024                         /**< max characters in a full file name string */
-#define MAX_SESSION_LENGTH  256                          /**< max session name length */
+#define MAX_SESSION_LENGTH  64                           /**< max session name length */
 #define MAX_CHECKPOINT      16                           /**< max number of photon save points */
 #define DET_PHOTON_BUF      100000                       /**< initialize number of detected photons */
 #define SEED_FROM_FILE      -999                         /**< special flag indicating to load seeds from history file */
@@ -206,7 +206,7 @@ typedef struct MMC_config{
 				           0 for wide-field detection pattern*/
 	unsigned char *vol;            /**<pointer to the volume*/
 	char session[MAX_SESSION_LENGTH];/**<session id, a string*/
-        char meshtag[MAX_PATH_LENGTH];   /**<a string to tag all input mesh files*/
+        char meshtag[MAX_SESSION_LENGTH];/**<a string to tag all input mesh files*/
 	char isrowmajor;               /**<1 for C-styled array in vol, 0 for matlab-styled array*/
 	char isreflect;                /**<1 for reflecting photons at boundary,0 for exiting*/
         char isref3;                   /**<1 considering maximum 3 ref. interfaces; 0 max 2 ref*/

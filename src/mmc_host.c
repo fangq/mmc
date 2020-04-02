@@ -229,8 +229,6 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 		if((cfg->debuglevel & dlProgress) && threadid==0)
 			mcx_progressbar(ncomplete,cfg);
-		if(cfg->issave2pt && cfg->checkpt[0])
-			mesh_saveweightat(mesh,cfg,id+1);
 	}
 
 	for(j=0;j<cfg->srcnum;j++){

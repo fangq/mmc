@@ -7,7 +7,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pl¨¹cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -447,7 +447,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	mesh->elemlen=arraydim[1];
 	if(mesh->facenb) free(mesh->facenb);
         mesh->facenb=(int *)malloc(sizeof(int)*arraydim[1]*mesh->ne);
-        for(j=0;j<arraydim[1];j++)
+        for(dimtype j=0;j<arraydim[1];j++)
           for(i=0;i<mesh->ne;i++)
              mesh->facenb[i*arraydim[1]+j]=val[j*mesh->ne+i];
         printf("mmc.facenb=[%d,%d];\n",mesh->ne,mesh->elemlen);
@@ -643,7 +643,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	arraydim=mxGetDimensions(item);
 	if(arraydim[0]*arraydim[1]>MAX_DEVICE)
 	     mexErrMsgTxt("the workload list can not be longer than 256");
-	for(i=0;i<arraydim[0]*arraydim[1];i++)
+	for(dimtype i=0;i<arraydim[0]*arraydim[1];i++)
 	     cfg->workload[i]=val[i];
         printf("mmc.workload=<<%d>>;\n",arraydim[0]*arraydim[1]);
     }else if(strcmp(name,"isreoriented")==0){
