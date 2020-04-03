@@ -1254,7 +1254,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 //		    if(r.eid!=ID_UNDEFINED && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
-	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %I64u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
+	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %zu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1275,7 +1275,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid!=ID_UNDEFINED && (cfg->debuglevel&dlMove))
-        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %I64u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(r.eid!=ID_UNDEFINED){
                        if(cfg->debuglevel&dlExit)
         		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
@@ -1289,9 +1289,9 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		            mesh->dref[((-r.eid)-1) + tshift]+=r.weight;
 		       }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove)){
-                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %I64u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
-        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %I64u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 
 		    if(cfg->issavedet && r.eid<=0){
 		       int i;
@@ -1309,7 +1309,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
-	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %I64u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f){
 			r.weight*=cfg->roulettesize;

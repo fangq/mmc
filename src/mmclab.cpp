@@ -598,7 +598,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             memcpy(cfg->photonseed,mxGetData(item),arraydim[0]*arraydim[1]);
             cfg->seed=SEED_FROM_FILE;
             cfg->nphoton=arraydim[1];
-            printf("mmc.nphoton=%I64d;\n",cfg->nphoton);
+            printf("mmc.nphoton=%zu;\n",cfg->nphoton);
 	}
     }else if(strcmp(name,"replayweight")==0){
         arraydim=mxGetDimensions(item);
@@ -649,7 +649,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	     mexErrMsgTxt("the workload list can not be longer than 256");
 	for(dimtype i=0;i<arraydim[0]*arraydim[1];i++)
 	     cfg->workload[i]=val[i];
-        printf("mmc.workload=<<%I64d>>;\n",arraydim[0]*arraydim[1]);
+        printf("mmc.workload=<<%zu>>;\n",arraydim[0]*arraydim[1]);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{

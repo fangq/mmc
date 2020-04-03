@@ -803,12 +803,12 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      
      if(in==stdin)
      	MMC_FPRINTF(stdout,"Please specify the total number of photons: [1000000]\n\t");
-     MMC_ASSERT(fscanf(in,"%I64u", &(nphoton) )==1);
+     MMC_ASSERT(fscanf(in,"%zu", &(nphoton) )==1);
      if(cfg->nphoton==0) cfg->nphoton=nphoton;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      
      if(in==stdin)
-     	MMC_FPRINTF(stdout,">> %I64u\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
+     	MMC_FPRINTF(stdout,">> %zu\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
      if(cfg->seed==0x623F9A9E)
         MMC_ASSERT(fscanf(in,"%d", &(cfg->seed) )==1);
      else
@@ -968,7 +968,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
-     MMC_FPRINTF(out,"%I64u\n", (cfg->nphoton) ); 
+     MMC_FPRINTF(out,"%zu\n", (cfg->nphoton) ); 
      MMC_FPRINTF(out,"%d\n", (cfg->seed) );
      MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcpos.x),(cfg->srcpos.y),(cfg->srcpos.z) );
      MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcdir.x),(cfg->srcdir.y),(cfg->srcdir.z) );
