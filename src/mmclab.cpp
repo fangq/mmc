@@ -7,7 +7,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Pl¨¹cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pl¡§1cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -91,7 +91,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ifield, jstruct;
   int        ncfg, nfields;
   dimtype     fielddim[5];
+#ifdef MATLAB_MEX_FILE
   int        usewaitbar=1;
+#endif
   int        errorflag=0;
   cl_uint    workdev;
 
@@ -181,10 +183,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if(nlhs>=3)
       plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
 
+#ifdef MATLAB_MEX_FILE
   if(mexEvalString("mmclab_waitbar_handle=figure('visible','off');")) // waitbar is not supported with nojvm after matlab R2013a
       usewaitbar=0;
   else
       mexEvalString("close(mmclab_waitbar_handle);");
+#endif
 
   /**
    * Loop over each element of the struct if it is an array, each element is a simulation
@@ -538,7 +542,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*cfg->srcnum*sizeof(float));
         for(k=0;k<arraydim[0]*arraydim[1]*cfg->srcnum;k++)
              cfg->srcpattern[k]=val[k];
-        printf("mmc.srcpattern=[%d %d %d];\n",arraydim[0],arraydim[1],cfg->srcnum);
+        printf("mmc.srcpattern=[%d %d %d];\n",(int)arraydim[0],(int)arraydim[1],cfg->srcnum);
     }else if(strcmp(name,"method")==0){
         int len=mxGetNumberOfElements(item);
         const char *methods[]={"plucker","havel","badouel","elem","grid",""};
@@ -594,7 +598,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             memcpy(cfg->photonseed,mxGetData(item),arraydim[0]*arraydim[1]);
             cfg->seed=SEED_FROM_FILE;
             cfg->nphoton=arraydim[1];
-            printf("mmc.nphoton=%d;\n",cfg->nphoton);
+            printf("mmc.nphoton=%I64d;\n",cfg->nphoton);
 	}
     }else if(strcmp(name,"replayweight")==0){
         arraydim=mxGetDimensions(item);
@@ -645,7 +649,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	     mexErrMsgTxt("the workload list can not be longer than 256");
 	for(dimtype i=0;i<arraydim[0]*arraydim[1];i++)
 	     cfg->workload[i]=val[i];
-        printf("mmc.workload=<<%d>>;\n",arraydim[0]*arraydim[1]);
+        printf("mmc.workload=<<%I64d>>;\n",arraydim[0]*arraydim[1]);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{

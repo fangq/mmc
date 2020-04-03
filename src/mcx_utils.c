@@ -7,7 +7,7 @@
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Pl¨¹cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pl¡§1cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -807,12 +807,12 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
      
      if(in==stdin)
      	MMC_FPRINTF(stdout,"Please specify the total number of photons: [1000000]\n\t");
-     MMC_ASSERT(fscanf(in,"%lu", &(nphoton) )==1);
+     MMC_ASSERT(fscanf(in,"%I64u", &(nphoton) )==1);
      if(cfg->nphoton==0) cfg->nphoton=nphoton;
      comm=fgets(comment,MAX_PATH_LENGTH,in);
      
      if(in==stdin)
-     	MMC_FPRINTF(stdout,">> %lu\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
+     	MMC_FPRINTF(stdout,">> %I64u\nPlease specify the random number generator seed: [123456789]\n\t",cfg->nphoton);
      if(cfg->seed==0x623F9A9E)
         MMC_ASSERT(fscanf(in,"%d", &(cfg->seed) )==1);
      else
@@ -972,7 +972,7 @@ void mcx_loadconfig(FILE *in, mcconfig *cfg){
 void mcx_saveconfig(FILE *out, mcconfig *cfg){
      int i;
 
-     MMC_FPRINTF(out,"%lu\n", (cfg->nphoton) ); 
+     MMC_FPRINTF(out,"%I64u\n", (cfg->nphoton) ); 
      MMC_FPRINTF(out,"%d\n", (cfg->seed) );
      MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcpos.x),(cfg->srcpos.y),(cfg->srcpos.z) );
      MMC_FPRINTF(out,"%f %f %f\n", (cfg->srcdir.x),(cfg->srcdir.y),(cfg->srcdir.z) );

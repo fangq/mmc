@@ -218,8 +218,8 @@ cl_platform_id mcx_list_gpu(mcconfig *cfg,unsigned int *activedev,cl_device_id *
                                      printf(" Stream Processor:\t%d\n",cuinfo.core);
                                 }
                 		printf(" Vendor name    :\t%s\n",VendorList[cuinfo.vendor]);
-                		printf(" Auto-thread    :\t%ld\n",cuinfo.autothread);
-                		printf(" Auto-block     :\t%ld\n",cuinfo.autoblock);
+                		printf(" Auto-thread    :\t%d\n",(uint)cuinfo.autothread);
+                		printf(" Auto-block     :\t%d\n",(uint)cuinfo.autoblock);
                       	  }
 		          if(activedevlist!=NULL){
 			     if(cfg->deviceid[cuid++]=='1'){

@@ -21,12 +21,27 @@ function buildmmc(varargin)
 %      'filelist': a user-defined list of source file names
 %
 % Dependency (Windows only):
-%  1.To compile mmclab in MATLAB R2017a or earlier on Windows, you must 
+%  1.If you have MATLAB R2017b or later, you may skip this step.
+%    To compile mmclab in MATLAB R2017a or earlier on Windows, you must 
 %    pre-install the MATLAB support for MinGW-w64 compiler 
 %    https://www.mathworks.com/matlabcentral/fileexchange/52848-matlab-support-for-mingw-w64-c-c-compiler
-%  2.After installation of MATLAB MinGW support, you must type "mex -setup"
-%    in MATLAB and select "MinGW64 Compiler (C)". 
-%  3.Once you select the MingW C compiler, you should run "mex -setup"
+%
+%    Note: it appears that installing the above Add On is no longer working
+%    and may give an error at the download stage. In this case, you should
+%    install MSYS2 from https://www.msys2.org/. Once you install MSYS2,
+%    run MSYS2.0 MinGW 64bit from Start menu, in the popup terminal window,
+%    type
+%
+%       pacman -Syu
+%       pacman -S base-devel gcc git mingw-w64-x86_64-opencl-headers
+%
+%    Then, start MATLAB, and in the command window, run
+%
+%       setenv('MW_MINGW64_LOC','C:\msys64\usr');
+%
+%  2.After installation of MATLAB MinGW support, you must type 
+%    "mex -setup C" in MATLAB and select "MinGW64 Compiler (C)". 
+%  3.Once you select the MingW C compiler, you should run "mex -setup C++"
 %    again in MATLAB and select "MinGW64 Compiler (C++)" to compile C++.
 %  4.File C:\Windows\System32\OpenCL.dll must exist. You can obtain this
 %    file by installing your graphics driver or install CUDA/AMD GPU SDK
