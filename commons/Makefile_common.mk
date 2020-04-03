@@ -61,16 +61,17 @@ ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
     MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
     EXTRALIB   +=-static
     DLLFLAG    =
-endif
-ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
+else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
-    MKMEXOPT    =-f mexopts_cygwin64_gcc.bat COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
+    INCLUDEDIRS+=-I"./mingw64/include"
     DLLFLAG     =
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-  INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
-  LIBOPENCL=-framework OpenCL
-  LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
-  OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
+    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
+    LIBOPENCL=-framework OpenCL
+    LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
+    OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
 endif
 
 INCLUDEDIR+=$(INCLUDEDIRS)

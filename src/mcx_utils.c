@@ -33,11 +33,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <time.h>
-#ifdef __MINGW32__
-    #include <termcap.h>
-#else
-    #include <sys/ioctl.h>
-#endif
+#include <sys/ioctl.h>
 #include "mcx_utils.h"
 #include "mcx_const.h"
 
