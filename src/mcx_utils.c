@@ -33,7 +33,9 @@
 #include <math.h>
 #include <ctype.h>
 #include <time.h>
-#include <sys/ioctl.h>
+#ifdef _POSIX_SOURCE
+    #include <sys/ioctl.h>
+#endif
 #include "mcx_utils.h"
 #include "mcx_const.h"
 

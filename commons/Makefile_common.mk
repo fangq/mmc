@@ -66,6 +66,7 @@ else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
     LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
     INCLUDEDIRS+=-I"./mingw64/include"
+    EXTRALIB   +=-static
     DLLFLAG     =
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
     INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
