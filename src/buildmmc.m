@@ -103,9 +103,13 @@ else
     linkflags=regexprep(linkflags,['[\\]*\$' linkvar],'');
     for i=1:length(filelist)
         cmd=sprintf('mex %s -c ''%s'' ',cflags,filelist{i});
-        disp(cmd);
+        fprintf(stdout,'%s\n',cmd);
+	fflush(stdout);
         eval(cmd);
     end
     fn=dir('*.o');
-    eval(sprintf('mex %s -o ../%slab/%s %s ',strjoin({fn.name}),pname,pname,linkflags));
+    cmd=sprintf('mex %s -o ../%slab/%s %s ',strjoin({fn.name}),pname,pname,linkflags);
+    fprintf(stdout,'%s\n',cmd);
+    fflush(stdout);
+    eval(cmd);
 end
