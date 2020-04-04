@@ -97,7 +97,7 @@ if(~exist('OCTAVE_VERSION','builtin'))
         linkflags=[linkflags ' ' opt.lib];
     end
     fn=dir('*.o');
-    fprintf('mex %s -output %s -outdir ../%slab %s=''%s'' \n',strjoin({fn.name}),pname,pname,linkvar,linkflags);
+    fprintf(1,  'mex %s -output %s -outdir ../%slab %s=''%s''\n',strjoin({fn.name}),pname,pname,linkvar,linkflags);
     eval(sprintf('mex %s -output %s -outdir ../%slab %s=''%s'' ',strjoin({fn.name}),pname,pname,linkvar,linkflags));
 else
     linkflags=regexprep(linkflags,['[\\]*\$' linkvar],'');
@@ -109,7 +109,7 @@ else
     end
     fn=dir('*.o');
     cmd=sprintf('mex %s -o ../%slab/%s %s ',strjoin({fn.name}),pname,pname,linkflags);
-    fprintf(stdout,'%s\n',cmd);
-    fflush(stdout);
+    fprintf(1,'%s\n',cmd);
+    fflush(1);
     eval(cmd);
 end
