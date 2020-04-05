@@ -30,7 +30,7 @@ AROUTPUT   += -o
 MAKE       := make
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
-LIBOPENCL=-lOpenCL
+LIBOPENCL  ?=-lOpenCL
 EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 
 OPENMP     := -fopenmp
@@ -48,7 +48,7 @@ endif
 MEXLINKOPT +=$(OPENMPLIB)
 MKMEX      :=mex
 MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXLIBS='$$CXXLIBS $(LIBOPENCL)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='-L$$TMW_ROOT$$MATLABROOT/sys/os/$$ARCH $$LDFLAGS $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
-MKOCT      :=mkoctfile
+MKOCT      :=mkoctfile -v
 
 DLLFLAG=-fPIC
 
@@ -143,7 +143,7 @@ mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 
 oct:            BINARY=mmc.mex
 oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
-oct octomp:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(LFLAGS)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
+oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
 oct octomp:     USERARFLAGS=-o $(BINDIR)/mmc
 
 TARGETSUFFIX:=$(suffix $(BINARY))
