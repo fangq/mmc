@@ -1,7 +1,7 @@
 function buildmmc(varargin)
 %
 % Format:
-%    buildmex or buildmex('option1',value1,'option2',value2,...)
+%    buildmmc or buildmmc('option1',value1,'option2',value2,...)
 %
 % Compiling script for mmclab mex file in MATLAB and GNU Octave. 
 % If compiled successfully, the output mex file can be found in the 
