@@ -385,7 +385,7 @@ if(nargout>=3)
 end
 
 if(useopencl==1)
-    if(isfield(cfg,'gpuid') && cfg.gpuid<-1)
+    if(isfield(cfg,'gpuid') && ~ischar(cfg.gpuid) && cfg.gpuid<-1)
 	cfg.gpuid=1;
     end
     [varargout{1:nargout}]=mmc(cfg);
