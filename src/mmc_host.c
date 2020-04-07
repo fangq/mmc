@@ -133,7 +133,7 @@ int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
  * \param[out] tracer: the ray-tracer data structure
  */
 
-int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
+int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, void (*progressfun)(float, void *),void *handle){
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         unsigned int i,j;
@@ -142,6 +142,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visitor_init(cfg, &master);
 
+        if(progressfun==NULL)
+            cfg->debuglevel=cfg->debuglevel & (~dlProgress);
 
 	t0=StartTimer();
 
@@ -151,7 +153,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	cfg->issaveseed=0;
 #endif
         dt=GetTimeMillis();
-        MMCDEBUG(cfg,dlTime,(cfg->flog,"seed=%u\nsimulating ... ",cfg->seed));
+        MMCDEBUG(cfg,dlTime,(cfg->flog,"seed=%u\nsimulating ... \n",cfg->seed));
         if(cfg->debugphoton>=0){
             debuglevel=cfg->debuglevel;
             cfg->debuglevel &= 0xFFFFEA00;
@@ -206,6 +208,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	rng_init(ran0,ran1,seeds,threadid);
 
+	if((cfg->debuglevel & dlProgress) && threadid==0)
+		progressfun(-0.f,handle);
+
 	/*launch photons*/
         #pragma omp for reduction(+:raytri,raytri0)
 	for(id=0;id<cfg->nphoton;id++){
@@ -228,7 +233,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 		   ncomplete++;
 
 		if((cfg->debuglevel & dlProgress) && threadid==0)
-			mcx_progressbar(ncomplete,cfg);
+			progressfun((float)ncomplete/cfg->nphoton,handle);
 	}
 
 	for(j=0;j<cfg->srcnum;j++){
@@ -270,7 +275,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         /** \subsection sreport Post simulation */
 
 	if((cfg->debuglevel & dlProgress))
-		mcx_progressbar(cfg->nphoton,cfg);
+		progressfun(1.f,handle);
 
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));

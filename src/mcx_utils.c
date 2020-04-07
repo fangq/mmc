@@ -1046,7 +1046,7 @@ int mcx_parsedebugopt(char *debugopt){
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_progressbar(unsigned int n, mcconfig *cfg){
+void mcx_progressbar(float percent, void *cfg){
     unsigned int percentage, j,colwidth=79;
     static unsigned int oldmarker=0xFFFFFFFF;
 
@@ -1062,16 +1062,19 @@ void mcx_progressbar(unsigned int n, mcconfig *cfg){
           colwidth=79;
 #endif
 
-    percentage=(float)n*(colwidth-18)/cfg->nphoton;
+    percent=MIN(percent,1.f);
+
+    percentage=percent*(colwidth-18);
 
     if(percentage != oldmarker){
+        if(percent!=-0.f)
+	    for(j=0;j<colwidth;j++)     MMC_FPRINTF(stdout,"\b");
         oldmarker=percentage;
-	for(j=0;j<colwidth;j++)     MMC_FPRINTF(stdout,"\b");
-    	MMC_FPRINTF(stdout,S_YELLOW"Progress: [");
-    	for(j=0;j<percentage;j++)      MMC_FPRINTF(stdout,"=");
-    	MMC_FPRINTF(stdout,(percentage<colwidth-18) ? ">" : "=");
-    	for(j=percentage;j<colwidth-18;j++) MMC_FPRINTF(stdout," ");
-    	MMC_FPRINTF(stdout,"] %3d%%"S_RESET,percentage*100/(colwidth-18));
+        MMC_FPRINTF(stdout,S_YELLOW"Progress: [");
+        for(j=0;j<percentage;j++)      MMC_FPRINTF(stdout,"=");
+        MMC_FPRINTF(stdout,(percentage<colwidth-18) ? ">" : "=");
+        for(j=percentage;j<colwidth-18;j++) MMC_FPRINTF(stdout," ");
+        MMC_FPRINTF(stdout,"] %3d%%" S_RESET,(int)(percent*100));
 #ifdef MCX_CONTAINER
         mcx_matlab_flush();
 #else

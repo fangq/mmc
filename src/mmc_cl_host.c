@@ -52,7 +52,7 @@ extern cl_event kernelevent;
    master driver code to run MC simulations
 */
 
-void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
+void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressfun)(float, void *),void *handle){
 
      cl_uint i,j,iter;
      cl_float t,twindow0,twindow1;
@@ -109,6 +109,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
 
      MCXReporter reporter={0.f};
      platform=mcx_list_gpu(cfg,&workdev,devices,&gpu);
+     if(progressfun==NULL)
+         cfg->debuglevel=cfg->debuglevel & (~MCX_DEBUG_PROGRESS);
 
      if(workdev>MAX_DEVICE)
          workdev=MAX_DEVICE;
@@ -383,20 +385,19 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer){
            if((cfg->debuglevel & MCX_DEBUG_PROGRESS)){
 	     int p0 = 0, ndone=-1;
 
-	     mcx_progressbar(-0.f,cfg);
+	     progressfun(-0.f,handle);
 
 	     do{
                ndone = *progress;
 
 	       if (ndone > p0){
-		  mcx_progressbar((float)ndone/gpu[0].autothread*cfg->nphoton,cfg);
+		  progressfun((float)ndone/gpu[0].autothread,handle);
 		  p0 = ndone;
 	       }
                sleep_ms(100);
 	     }while (p0 < gpu[0].autothread);
-             mcx_progressbar(cfg->nphoton,cfg);
+             progressfun(cfg->nphoton,handle);
              MMC_FPRINTF(cfg->flog,"\n");
-
            }
            clEnqueueUnmapMemObject(mcxqueue[0], gprogress[0], progress, 0, NULL, NULL);
 

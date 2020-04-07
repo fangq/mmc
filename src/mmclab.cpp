@@ -104,6 +104,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
                                   "autoblock","autothread","maxgate"};
 #ifdef MATLAB_MEX_FILE
   waitbar    *hprop=NULL;
+  void (*progressfun)(float, void *)=mcx_progressbar;
+#else
+  void (*progressfun)(float, void *)=mcx_progressbar;
 #endif
 
   /**
@@ -233,13 +236,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
         dt=GetTimeMillis();
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... \n",dt-t0));
 
+#ifdef MATLAB_MEX_FILE
+        if(cfg.debuglevel & dlProgress && progressfun==waitbar_update_c && usewaitbar)
+            hprop = waitbar_create (0, NULL);
+#endif
+    
     /** \subsection ssimu Parallel photon transport simulation */
 
         try{
             if(cfg.gpuid>MAX_DEVICE)
-                mmc_run_mp(&cfg,&mesh,&tracer);
+                mmc_run_mp(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
 	    else
-                mmc_run_cl(&cfg,&mesh,&tracer);
+                mmc_run_cl(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
         }catch(const char *err){
     	    mexPrintf("Error from thread (%d): %s\n",threadid,err);
     	    errorflag++;
@@ -254,11 +262,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	/** \subsection sreport Post simulation */
 
 #ifdef MATLAB_MEX_FILE
-	if((cfg.debuglevel & dlProgress)){
+	if(cfg.debuglevel & dlProgress){
 	    if(usewaitbar)
                  waitbar_update (1.0, hprop, NULL);
 	    else
-		 mcx_progressbar(cfg.nphoton,&cfg);
+		 mcx_progressbar(1.f,&cfg);
 	}
 #endif
 	dt=GetTimeMillis()-dt;
@@ -266,8 +274,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** Clear up simulation data structures by calling the destructors */
 
 #ifdef MATLAB_MEX_FILE
-        if((cfg.debuglevel & dlProgress))
-	   if(usewaitbar)
+        if(cfg.debuglevel & dlProgress && usewaitbar)
              waitbar_destroy (hprop) ;
 #endif
 	tracer_clear(&tracer);

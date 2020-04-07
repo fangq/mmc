@@ -283,7 +283,7 @@ int  mcx_remap(char *opt);
 int  mcx_lookupindex(char *key, const char *index);
 int  mcx_keylookup(char *key, const char *table[]);
 int  mcx_parsedebugopt(char *debugopt);
-void mcx_progressbar(unsigned int n, mcconfig *cfg);
+void mcx_progressbar(float percent, void *cfg);
 int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);

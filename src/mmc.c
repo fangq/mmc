@@ -62,9 +62,9 @@ int main(int argc, char**argv){
 	   multiple threads are executed to simulate all photons.
          */
 	if(cfg.gpuid>MAX_DEVICE)
-            mmc_run_mp(&cfg,&mesh,&tracer);
+            mmc_run_mp(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
 	else
-            mmc_run_cl(&cfg,&mesh,&tracer);
+            mmc_run_cl(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
 
 	/** 
            Once all photon simulations are complete, we clean up all allocated memory

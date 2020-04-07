@@ -92,7 +92,7 @@ typedef struct POST_ALIGN(32) GPU_reporter{
   float  raytet;
 } MCXReporter  POST_ALIGN(32);
 
-void mmc_run_cl(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
+void mmc_run_cl(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, void (*progressfun)(float, void *),void *handle);
 
 #ifdef  __cplusplus
 }

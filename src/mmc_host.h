@@ -43,7 +43,7 @@ int mmc_init_from_json(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, char *jc
 int mmc_reset(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 int mmc_cleanup(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
 int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
-int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer);
+int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, void (*progressfun)(float, void *),void *handle);
 
 #ifdef  __cplusplus
 }

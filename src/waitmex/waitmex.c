@@ -79,10 +79,16 @@ void waitbar_update
 )
 {
     int error ;
+    static double oldperc=-1.0;
+
     if (h == NULL) return ;                 /* nothing to do */    
+    if(fraction == oldperc) return;
+
     (* mxGetPr (h->fraction)) = fraction ;  /* update the fraction */
     h->inputs [0] = h->fraction ;           /* define the inputs x and h */
     h->inputs [1] = h->handle ;
+
+    oldperc=fraction;
 
     if (message == NULL)
     {
@@ -101,6 +107,10 @@ void waitbar_update
     {
         mexErrMsgTxt ("unable to update waitbar") ;
     }
+}
+
+void waitbar_update_c(float frac, void *handle){
+    waitbar_update((double)frac,(waitbar*)handle, NULL);
 }
 
 /* -------------------------------------------------------------------------- */
