@@ -662,6 +662,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }else{
         printf("WARNING: redundant field '%s'\n",name);
     }
+    if(jsonshapes)
+         delete [] jsonshapes;
 }
 
 /** 

@@ -82,8 +82,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      
      cl_float  *field,*dref=NULL;
 
-     cl_uint   *Pseed;
-     float  *Pdet;
+     cl_uint   *Pseed=NULL;
+     float  *Pdet=NULL;
      char opt[MAX_PATH_LENGTH]={'\0'};
      cl_uint detreclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+1;
      cl_uint hostdetreclen=detreclen+1;
@@ -544,27 +544,27 @@ is more than what your have specified (%d), please use the -H option to specify 
              cfg->energytot,(cfg->energytot-cfg->energyesc)/cfg->energytot*100.f);
      fflush(cfg->flog);
 
-     clReleaseMemObject(gnode);
-     clReleaseMemObject(gelem);
-     clReleaseMemObject(gtype);
-     clReleaseMemObject(gfacenb);
-     clReleaseMemObject(gsrcelem);
-     clReleaseMemObject(gnormal);
-     clReleaseMemObject(gproperty);
-     clReleaseMemObject(gparam);
-     if(cfg->detpos) clReleaseMemObject(gdetpos);
+     OCL_ASSERT(clReleaseMemObject(gnode));
+     OCL_ASSERT(clReleaseMemObject(gelem));
+     OCL_ASSERT(clReleaseMemObject(gtype));
+     OCL_ASSERT(clReleaseMemObject(gfacenb));
+     if(gsrcelem) OCL_ASSERT(clReleaseMemObject(gsrcelem));
+     OCL_ASSERT(clReleaseMemObject(gnormal));
+     OCL_ASSERT(clReleaseMemObject(gproperty));
+     OCL_ASSERT(clReleaseMemObject(gparam));
+     if(cfg->detpos) OCL_ASSERT(clReleaseMemObject(gdetpos));
 
      for(i=0;i<workdev;i++){
-         clReleaseMemObject(gseed[i]);
-         clReleaseMemObject(gdetphoton[i]);
-         clReleaseMemObject(gweight[i]);
-	 clReleaseMemObject(gdref[i]);
-         clReleaseMemObject(genergy[i]);
-         clReleaseMemObject(gprogress[i]);
-         clReleaseMemObject(gdetected[i]);
-         if(gsrcpattern[i]) clReleaseMemObject(gsrcpattern[i]);
-         clReleaseMemObject(greporter[i]);
-         clReleaseKernel(mcxkernel[i]);
+         OCL_ASSERT(clReleaseMemObject(gseed[i]));
+         OCL_ASSERT(clReleaseMemObject(gdetphoton[i]));
+         OCL_ASSERT(clReleaseMemObject(gweight[i]));
+	 OCL_ASSERT(clReleaseMemObject(gdref[i]));
+         OCL_ASSERT(clReleaseMemObject(genergy[i]));
+         OCL_ASSERT(clReleaseMemObject(gprogress[i]));
+         OCL_ASSERT(clReleaseMemObject(gdetected[i]));
+         if(gsrcpattern[i]) OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
+         OCL_ASSERT(clReleaseMemObject(greporter[i]));
+         OCL_ASSERT(clReleaseKernel(mcxkernel[i]));
      }
      free(gseed);
      free(gdetphoton);
@@ -573,6 +573,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      free(genergy);
      free(gprogress);
      free(gdetected);
+     free(greporter);
      free(gsrcpattern);
      free(mcxkernel);
 
@@ -581,14 +582,15 @@ is more than what your have specified (%d), please use the -H option to specify 
      if(gpu)
         free(gpu);
 
-     for(devid=0;devid<workdev;devid++)
-        clReleaseCommandQueue(mcxqueue[devid]);
-
+     for(devid=0;devid<workdev;devid++){
+        OCL_ASSERT((clFinish(mcxqueue[devid])));
+        OCL_ASSERT(clReleaseCommandQueue(mcxqueue[devid]));
+     }
      free(mcxqueue);
-     clReleaseProgram(mcxprogram);
-     clReleaseContext(mcxcontext);
+     OCL_ASSERT(clReleaseProgram(mcxprogram));
+     OCL_ASSERT(clReleaseContext(mcxcontext));
 #ifndef USE_OS_TIMER
-     clReleaseEvent(kernelevent);
+     OCL_ASSERT(clReleaseEvent(kernelevent));
 #endif
      free(field);
      if(Pdet)free(Pdet);
