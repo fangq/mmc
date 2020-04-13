@@ -34,7 +34,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define __device__ static inline
+#ifndef inlinefun
+#define inlinefun static inline
+#endif
 
 typedef unsigned long long RandType;
 typedef unsigned int uint;
@@ -47,21 +49,21 @@ typedef unsigned long long ulong;
 #define RAND_BUF_LEN       2        //register arrays
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 
-__device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx);
+inlinefun void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx);
 
-__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]);
+inlinefun void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]);
 // generate [0,1] random number for the next scattering length
-__device__ float rand_next_scatlen(RandType t[RAND_BUF_LEN]);
+inlinefun float rand_next_scatlen(RandType t[RAND_BUF_LEN]);
 // generate [0,1] random number for the next arimuthal angle
-__device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]);
+inlinefun float rand_next_aangle(RandType t[RAND_BUF_LEN]);
 // generate random number for the next zenith angle
-__device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]);
-__device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]);
-__device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]);
+inlinefun float rand_next_zangle(RandType t[RAND_BUF_LEN]);
+inlinefun float rand_next_reflect(RandType t[RAND_BUF_LEN]);
+inlinefun float rand_do_roulette(RandType t[RAND_BUF_LEN]);
 
 #ifdef MMC_USE_SSE_MATH
-__device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co);
-__device__ float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]);
+inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co);
+inlinefun float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]);
 #endif
 
 #endif

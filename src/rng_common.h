@@ -34,23 +34,23 @@
 #define EPS        1e-6f
 
 //! generate [0,1] random number for the next scattering length
-__device__ float rand_next_scatlen(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_next_scatlen(RandType t[RAND_BUF_LEN]){
     return -logf(rand_uniform01(t)+EPS);
 }
 //! generate [0,1] random number for the next arimuthal angle
-__device__ float rand_next_aangle(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_next_aangle(RandType t[RAND_BUF_LEN]){
     return rand_uniform01(t);
 }
 //! generate random number for the next zenith angle
-__device__ float rand_next_zangle(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_next_zangle(RandType t[RAND_BUF_LEN]){
     return rand_uniform01(t);
 }
 //! generate random number for reflection test
-__device__ float rand_next_reflect(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_next_reflect(RandType t[RAND_BUF_LEN]){
     return rand_uniform01(t);
 }
 //! generate random number for the next zenith angle
-__device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_do_roulette(RandType t[RAND_BUF_LEN]){
     return rand_uniform01(t);
 }
 #ifdef MMC_USE_SSE_MATH      //! when SSE Math functions are used
@@ -58,7 +58,7 @@ __device__ float rand_do_roulette(RandType t[RAND_BUF_LEN]){
 #define MATH_BLOCK 8
 
 //! generate [0,1] random number for the sin/cos of arimuthal angles
-__device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co){
+inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, float *co){
     static __thread V4SF sine[MATH_BLOCK], cosine[MATH_BLOCK];
     static __thread int pos=(MATH_BLOCK<<2);
     if(pos>=(MATH_BLOCK<<2)){
@@ -76,7 +76,7 @@ __device__ void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN],float *si, floa
 }
 
 //! generate [0,1] random number for the next scattering length
-__device__ float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]){
     static __thread V4SF logval[MATH_BLOCK];
     static __thread int pos=(MATH_BLOCK<<2);
     float res;

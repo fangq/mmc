@@ -108,7 +108,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 		     cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, ((1 << cfg->nbuffer)-1)};
 
      MCXReporter reporter={0.f};
-     platform=mcx_list_gpu(cfg,&workdev,devices,&gpu);
+     platform=mcx_list_cl_gpu(cfg,&workdev,devices,&gpu);
      if(progressfun==NULL)
          cfg->debuglevel=cfg->debuglevel & (~MCX_DEBUG_PROGRESS);
 

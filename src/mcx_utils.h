@@ -31,7 +31,7 @@
 #define _MMC_UTILITIES_H
 
 #include <stdio.h>
-#include "vector_types.h"
+#include <vector_types.h>
 #include "cjson/cJSON.h"
 
 #ifdef _OPENMP                      ///< use multi-threading for running simulation on multiple GPUs
@@ -184,8 +184,8 @@ typedef struct MMC_config{
 	float tend;                    /**<end time in second*/
 	float3 steps;                  /**<voxel sizes along x/y/z in mm*/
 	uint3 dim;                     /**<dim.x is the initial element number in MMC, dim.y is faceid*/
-	uint3 crop0;                   /**<sub-volume for cache*/
-	uint3 crop1;                   /**<the other end of the caching box*/
+	uint4 crop0;                   /**<sub-volume for cache*/
+	uint4 crop1;                   /**<the other end of the caching box*/
 	int medianum;                  /**<total types of media*/
 	int srcnum;		       /**<total number of sources, could be larger than 1 only with pattern illumination*/
 	int detnum;                    /**<total detector numbers*/
@@ -258,6 +258,7 @@ typedef struct MMC_config{
 	float normalizer;            /**<normalization factor*/
 	unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
 	unsigned int gpuid;
+	int backend;
 } mcconfig;
 
 #ifdef	__cplusplus

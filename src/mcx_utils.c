@@ -81,7 +81,7 @@
 const char shortopt[]={'h','E','f','n','A','t','T','s','a','g','b','D','G',
                  'd','r','S','e','U','R','l','L','I','-','u','C','M',
                  'i','V','O','-','F','q','x','P','k','v','m','-','-',
-		 'J','o','H','-','W','X','-','\0'};
+		 'J','o','H','-','W','X','-','-','\0'};
 		 
 /**
  * Long command line options
@@ -98,7 +98,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon","--autopilot",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
                  "--debugphoton","--compileropt","--optlevel","--maxdetphoton",
-		 "--buffer","--workload","--saveref","--gridsize",""};
+		 "--buffer","--workload","--saveref","--gridsize","--backend",""};
 
 extern char pathsep;
 
@@ -158,6 +158,12 @@ const char *srctypeid[]={"pencil","isotropic","cone","gaussian","planar",
 char flagset[256]={'\0'};
 
 /**
+ * Flag to decide which platform to run mmc
+ */
+
+const char *computebackend[]={"cpu","opencl","cuda",""};
+
+/**
  * @brief Initializing the simulation configuration with default values
  *
  * Constructor of the simulation configuration, initializing all field to default values
@@ -188,6 +194,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
+     cfg->backend=0;
 #ifdef USE_OPENCL
      cfg->method=4;
 #else
@@ -1478,6 +1485,11 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                     i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
                                 }else if(strcmp(argv[i]+2,"debugphoton")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
+                                }else if(strcmp(argv[i]+2,"backend")==0){
+                                     if(i>=argc)
+                                        MMC_ERROR(-1,"incomplete input");
+                                     if((cfg->backend=mcx_keylookup(argv[++i], computebackend))<0)
+                                        MMC_ERROR(-2,"the specified compute backend is not recognized");
                                 }else if(strcmp(argv[i]+2,"buffer")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->nbuffer),"int");
                                 }else if(strcmp(argv[i]+2,"gridsize")==0){

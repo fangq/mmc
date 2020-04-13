@@ -38,7 +38,7 @@
 #include <smmintrin.h>
 #endif
 
-#ifndef USE_OPENCL
+#if !defined(USE_OPENCL) && !defined(__NVCC__)
 
 #ifdef MMC_LOGISTIC
   #include "logistic_rand.c"
@@ -50,10 +50,10 @@
   #include "posix_randr.c"
 #endif
 
+#elif defined(__NVCC__)
+  #include "xorshift128p_rand.h"
 #else
-
   #include "xorshift128p_rand.c"
-
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)

@@ -33,6 +33,10 @@
     #include "mmc_cl_host.h"
 #endif
 
+#ifdef USE_CUDA
+    #include "mmc_cu_host.h"
+#endif
+
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the 
 necessary data structures. This include the command line options (cfg),
@@ -61,10 +65,17 @@ int main(int argc, char**argv){
            The core simulation loop is executed in the mmc_run_mp() function where
 	   multiple threads are executed to simulate all photons.
          */
-	if(cfg.gpuid>MAX_DEVICE)
+	if(cfg.backend==0 || cfg.gpuid>MAX_DEVICE)
             mmc_run_mp(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+#ifdef USE_CUDA
+	else if(cfg.backend==2){
+            mmc_run_cu(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+	}
+#endif
+#ifdef USE_OPENCL
 	else
             mmc_run_cl(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+#endif
 
 	/** 
            Once all photon simulations are complete, we clean up all allocated memory

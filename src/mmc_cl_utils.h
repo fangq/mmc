@@ -39,7 +39,7 @@ extern "C" {
 #define CL_DEVICE_GFXIP_MAJOR_AMD                       0x404A
 #define CL_DEVICE_GFXIP_MINOR_AMD                       0x404B
 
-cl_platform_id mcx_list_gpu(mcconfig *cfg,unsigned int *activedev,cl_device_id *activedevlist,GPUInfo **info);
+cl_platform_id mcx_list_cl_gpu(mcconfig *cfg,unsigned int *activedev,cl_device_id *activedevlist,GPUInfo **info);
 void ocl_assess(int cuerr,const char *file,const int linenum);
 
 #ifdef  __cplusplus

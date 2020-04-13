@@ -129,7 +129,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             mcx_initcfg(&cfg);
             cfg.isgpuinfo=3;
 	    try{
-              mcx_list_gpu(&cfg,&workdev,NULL,&gpuinfo);
+              mcx_list_cl_gpu(&cfg,&workdev,NULL,&gpuinfo);
             }catch(...){
 	      mexErrMsgTxt("OpenCL is not supported or not fully installed on your system");
 	    }

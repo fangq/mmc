@@ -13,14 +13,24 @@
 **          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
-#ifdef __CUDA_ARCH__
+#ifdef __NVCC__
   #define __constant const
   #define __private 
   #define __local 
   #define __global
   #define __kernel __global__
-  #define get_global_id 
 
+  inline __device__ float3 cross(float3 a, float3 b){
+	return make_float3(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x);
+  }
+  inline __device__ __host__ int get_global_id(int idx){
+      return (idx==0)? blockIdx.x * blockDim.x + threadIdx.x 
+         : ( (idx==1)? blockIdx.y * blockDim.y + threadIdx.y  
+	             : blockIdx.z * blockDim.z + threadIdx.z);
+  }
+  inline __device__ __host__ int get_local_id(int idx){
+      return (idx==0)? threadIdx.x : ( (idx==1)? threadIdx.y :threadIdx.z );
+  }
   inline __device__ __host__ float3 operator *(float3 a, float3 b){
       return make_float3(a.x*b.x, a.y*b.y, a.z*b.z);
   }
@@ -61,7 +71,14 @@
       b.y *= inv;
       b.z *= inv;
   }
-
+  inline __device__ __host__ void operator *=(float3 & b, float3 f){
+      b.x *= f.x;
+      b.y *= f.y;
+      b.z *= f.z;
+  }
+  inline __device__ __host__ float4 operator -(float4 a){
+      return make_float4(-a.x, -a.y, -a.z, -a.w);
+  }
   inline __device__ __host__ float4 operator *(float4 a, float4 b){
       return make_float4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w);
   }
@@ -78,7 +95,7 @@
       b.w *= f;
   }
   inline __device__ __host__ float4 operator +(float4 a, float4 b){
-      return make_float4(a.x+b.x, a.y+b.y, a.z+b.w, a.w+b.w);
+      return make_float4(a.x+b.x, a.y+b.y, a.z+b.z, a.w+b.w);
   }
   inline __device__ __host__ void operator +=(float4 & b, float4 a){
       b.x += a.x;
@@ -112,6 +129,9 @@
   inline __device__ __host__ float4 operator /(float4 a, float4 b){
       return make_float4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w);
   }
+  inline __device__ float4 operator |(float4 a, float4 b){
+      return make_float4(__fdividef(a.x,b.x), __fdividef(a.y,b.y), __fdividef(a.z,b.z), __fdividef(a.w,b.w));
+  }
 
   inline __device__ __host__ float dot(float3 a, float3 b){
       return a.x * b.x + a.y * b.y + a.z * b.z;
@@ -129,31 +149,35 @@
   inline __device__ __host__ float3 clamp(float3 v, float3 a, float3 b){
       return make_float3(clamp(v.x, a.x, b.x), clamp(v.y, a.y, b.y), clamp(v.z, a.z, b.z));
   }
-
+  inline __device__ __host__ float4 dropbelow0(float4 a) {
+      return make_float4((a.x > 0.f)?a.x:0.f, (a.y > 0.f)?a.y:0.f, (a.z > 0.f)?a.z:0.f, (a.w > 0.f)?a.w:0.f);
+  }
+  inline __device__ __host__ float4 ispositive(float4 a) {
+      return make_float4((a.x > 0.f)?1.f:0.f, (a.y > 0.f)?1.f:0.f, (a.z > 0.f)?1.f:0.f, (a.w > 0.f)?1.f:0.f);
+  }
+  inline __device__ __host__ float4 convert_float4_rte(float4 v) {
+      return make_float4(roundf(v.x), roundf(v.y), roundf(v.z), roundf(v.w));
+  }
   #define FL4(f) make_float4(f,f,f,f)
   #define FL3(f) make_float3(f,f,f)
   #define FLT_EPSILON   1.19209290E-07F
   #define atomicadd(a,b)  atomicAdd(a,b)
-  #define atomic_add(a,b) atomicAdd(a,b)
-  #define sincos(a,b)     sincosf(a,b)
+  #define atomic_inc(x)   atomicAdd(x,1)
+
+#ifdef MCX_USE_NATIVE
+  #define MCX_MATHFUN(fun)              fun
+#else
+  #define MCX_MATHFUN(fun)              fun
+#endif
+  #define MCX_SINCOS(theta,osin,ocos)   sincosf((theta),&(osin),&(ocos))
 
 #else
   #define FL4(f) (f)
   #define FL3(f) (f)
-#endif
+  #define __constant__  __constant
+  #define __device__
 
-#ifdef MCX_SAVE_DETECTORS
-  #pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
-#endif
-
-#ifdef USE_HALF
-  #pragma OPENCL EXTENSION cl_khr_fp16 : enable
-  #define FLOAT4VEC half4
-  #define TOFLOAT4  convert_half4
-#else
-  #define FLOAT4VEC float4
-  #define TOFLOAT4
-#endif
+  #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 #ifdef MCX_USE_NATIVE
   #define MCX_MATHFUN(fun)              native_##fun
@@ -163,27 +187,48 @@
   #define MCX_SINCOS(theta,osin,ocos)   (ocos)=sincos((theta),&(osin))
 #endif
 
-#ifdef MCX_GPU_DEBUG
-  #define MMC_FPRINTF(x)        printf x             // enable debugging in CPU mode
+#ifdef MCX_SAVE_DETECTORS
+  #pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+#endif
+
+#endif
+
+#ifdef USE_HALF
+#ifndef NVCC
+  #pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#endif
+  #define FLOAT4VEC half4
+  #define TOFLOAT4  convert_half4
 #else
-  #define MMC_FPRINTF(x)        {}
+  #define FLOAT4VEC float4
+  #define TOFLOAT4
+#endif
+
+
+#ifdef MCX_DEBUG
+  #define GPUDEBUG(x)        printf x             // enable debugging in CPU mode
+#else
+  #define GPUDEBUG(x)        {}
 #endif
 
 #define R_PI               0.318309886183791f
 
 #define ONE_PI             3.1415926535897932f     //pi
-#define TWO_PI             6.28318530717959f       //2*pi
 
 #define C0                 299792458000.f          //speed of light in mm/s
 #define R_C0               3.335640951981520e-12f  //1/C0 in s/mm
 
-#define EPS                FLT_EPSILON             //round-off limit
-#define VERY_BIG           (1.f/FLT_EPSILON)       //a big number
 #define JUST_ABOVE_ONE     1.0001f                 //test for boundary
 #define SAME_VOXEL         -9999.f                 //scatter within a voxel
 #define NO_LAUNCH          9999                    //when fail to launch, for debug
-#define MAX_PROP           2000                     /*maximum property number*/
-#define ID_UNDEFINED       0xFFFFFFFFU              /**< flag indicating the index is outside of the volume */
+
+#ifndef __NVCC__
+  #define ID_UNDEFINED       0xFFFFFFFFU              /**< flag indicating the index is outside of the volume */
+  #define TWO_PI             6.28318530717959f       //2*pi
+  #define EPS                FLT_EPSILON             //round-off limit
+  #define VERY_BIG           (1.f/FLT_EPSILON)       //a big number
+  #define MAX_PROP           2000                     /*maximum property number*/
+#endif
 
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
@@ -249,9 +294,9 @@ typedef struct MMC_Parameter {
   int    nn, ne, nf;
   float3 nmin;
   float  nout;
-  uint   roulettesize;
+  float  roulettesize;
   int    srcnum;
-  int4   crop0;
+  uint4   crop0;
   int    srcelemlen;
   float4 bary0;
   int    e0;
@@ -266,21 +311,25 @@ typedef struct MMC_Reporter{
   float  raytet;
 } MCXReporter  __attribute__ ((aligned (32)));
 
-typedef struct MMC_medium{
+typedef struct MCX_medium{
         float mua;                     /**<absorption coeff in 1/mm unit*/
         float mus;                     /**<scattering coeff in 1/mm unit*/
         float g;                       /**<anisotropy*/
         float n;                       /**<refractive index*/
-} medium __attribute__ ((aligned (32)));
+} Medium __attribute__ ((aligned (32)));
 
-__constant int faceorder[]={1,3,2,0,-1};
-__constant int ifaceorder[]={3,0,2,1};
+__constant__ MCXParam gcfg[1];
+__constant__ int faceorder[]={1,3,2,0,-1};
+__constant__ int ifaceorder[]={3,0,2,1};
 //__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 //__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-__constant int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
-__constant int facemap[]={2,0,1,3};
-__constant int ifacemap[]={1,2,0,3};
+#if defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D)	
+__constant__ int out[4][3]={{0,3,1},{3,2,1},{0,2,3},{0,1,2}};
+__constant__ int facemap[]={2,0,1,3};
+__constant__ int ifacemap[]={1,2,0,3};
+#endif
 
+#ifndef __NVCC__
 enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEnter=32,
                   dlTracingExit=64,dlEdge=128,dlAccum=256,dlTime=512,dlReflect=1024,
                   dlProgress=2048,dlExit=4096};
@@ -294,17 +343,16 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
-
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+typedef ulong  RandType;
+#endif
 
 #define RAND_BUF_LEN       2        //register arrays
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 #define LOG_MT_MAX         22.1807097779182f
 #define IEEE754_DOUBLE_BIAS     0x3FF0000000000000ul /* Added to exponent.  */
 
-typedef ulong  RandType;
 
-static float xorshift128p_nextf (__private RandType t[RAND_BUF_LEN]){
+__device__ static float xorshift128p_nextf (__private RandType t[RAND_BUF_LEN]){
    union {
         ulong  i;
 	float f[2];
@@ -320,26 +368,27 @@ static float xorshift128p_nextf (__private RandType t[RAND_BUF_LEN]){
 
    return s1.f[0] - 1.0f;
 }
-
-static void copystate(__local float *v1, __private float *v2, int len){
+#ifdef MCX_SAVE_DETECTORS
+__device__ static void copystate(__local float *v1, __private float *v2, int len){
     for(int i=0;i<len;i++)
         v1[i]=v2[i];
 }
+#endif
 
-static float rand_uniform01(__private RandType t[RAND_BUF_LEN]){
+__device__ static float rand_uniform01(__private RandType t[RAND_BUF_LEN]){
     return xorshift128p_nextf(t);
 }
 
-static void xorshift128p_seed (__global uint *seed,RandType t[RAND_BUF_LEN]){
+__device__ static void xorshift128p_seed (__global uint *seed,RandType t[RAND_BUF_LEN]){
     t[0] = (ulong)seed[0] << 32 | seed[1] ;
     t[1] = (ulong)seed[2] << 32 | seed[3];
 }
 
-static void gpu_rng_init(__private RandType t[RAND_BUF_LEN], __global uint *n_seed, int idx){
+__device__ static void gpu_rng_init(__private RandType t[RAND_BUF_LEN], __global uint *n_seed, int idx){
     xorshift128p_seed((n_seed+idx*RAND_SEED_WORD_LEN),t);
 }
 
-float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]){
+__device__ float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]){
     return -MCX_MATHFUN(log)(rand_uniform01(t)+EPS);
 }
 
@@ -350,13 +399,13 @@ float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]){
 
 #ifdef USE_ATOMIC
 
-#ifndef __CUDA_ARCH__
+#ifndef __NVCC__
 
 // OpenCL float atomicadd hack:
 // http://suhorukov.blogspot.co.uk/2011/12/opencl-11-atomic-operations-on-floating.html
 // https://devtalk.nvidia.com/default/topic/458062/atomicadd-float-float-atomicmul-float-float-/
 
-inline float atomicadd(volatile __global float* address, const float value){
+__device__ inline float atomicadd(volatile __global float* address, const float value){
     float old = value;
     while ((old = atomic_xchg(address, atomic_xchg(address, 0.0f)+old))!=0.0f);
     return old;
@@ -384,14 +433,14 @@ inline double atomicadd(__global double *val, const double delta){
 
 #endif
 
-void clearpath(__local float *p, int len){
+__device__ void clearpath(__local float *p, int len){
       uint i;
       for(i=0;i<len;i++)
       	   p[i]=0.f;
 }
 
 #ifdef MCX_SAVE_DETECTORS
-uint finddetector(float3 *p0,__constant float4 *gdetpos,__constant MCXParam *gcfg){
+__device__ uint finddetector(float3 *p0,__constant float4 *gdetpos,__constant MCXParam *gcfg){
       uint i;
       for(i=0;i<gcfg->detnum;i++){
       	if((gdetpos[i].x-p0[0].x)*(gdetpos[i].x-p0[0].x)+
@@ -403,7 +452,7 @@ uint finddetector(float3 *p0,__constant float4 *gdetpos,__constant MCXParam *gcf
       return 0;
 }
 
-void savedetphoton(__global float *n_det,__global uint *detectedphoton,
+__device__ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
                    __local float *ppath,float3 *p0,float3 *v,__constant float4 *gdetpos,
 		   int extdetid, __constant MCXParam *gcfg){
       uint detid=(extdetid<0)? finddetector(p0,gdetpos,gcfg) : extdetid;
@@ -446,8 +495,8 @@ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
  * \param[out] visit: statistics counters of this thread
  */
 
-float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int *elem,__global float *weight,
-    int type, __constant int *facenb, __constant float4 *normal, __constant medium *med){
+__device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int *elem,__global float *weight,
+    int type, __constant int *facenb, __constant float4 *normal, __constant Medium *med){
 
 	float Lmin;
 	float ww,totalloss=0.f;
@@ -467,14 +516,22 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	r->faceid=-1;
 	r->isend=0;
 
-	S = FL4(r->vec.x)*normal[eid]+FL4(r->vec.y)*normal[eid+1]+FL4(r->vec.z)*normal[eid+2];
-	T = normal[eid+3] - (FL4(r->p0.x)*normal[eid]+FL4(r->p0.y)*normal[eid+1]+FL4(r->p0.z)*normal[eid+2]);
+	S = (FL4(r->vec.x)*normal[eid])+(FL4(r->vec.y)*normal[eid+1])+(FL4(r->vec.z)*normal[eid+2]);
+	T = normal[eid+3] - ((FL4(r->p0.x)*normal[eid])+(FL4(r->p0.y)*normal[eid+1])+(FL4(r->p0.z)*normal[eid+2]));
+#ifndef __NVCC__
         T = -convert_float4_rte(isgreater(T,FL4(0.f))*2)*FL4(0.5f)*T;
 	T = T/S;
+#else
+	T = T|S;
+#endif
 
+
+#ifndef __NVCC__
         S = -convert_float4_rte(isgreater(S,FL4(0.f))*2)*FL4(0.5f);
-        T =  S * T + (FL4(1.f)-S) * FL4(1e10f);
-
+        T =  (S * T) + ((FL4(1.f)-S) * FL4(1e10f));
+#else
+	T = make_float4(S.x>0.f?T.x:1e10f,S.y>0.f?T.y:1e10f,S.z>0.f?T.z:1e10f,S.w>0.f?T.w:1e10f);
+#endif
 	eid=r->eid-1;
 
 	Lmin=fmin(fmin(fmin(T.x,T.y),T.z),T.w);
@@ -482,7 +539,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 	r->faceid=faceorder[faceidx];
 
 	if(r->faceid>=0 && Lmin>=0.f){
-	    medium prop;
+	    Medium prop;
 
 	    prop=med[type];
             currweight.f=r->weight;
@@ -588,7 +645,7 @@ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__constant int
 
 #ifdef MCX_DO_REFLECTION
 
-float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,__private RandType *ran, __constant int *type, __constant float4 *normal, __constant medium *med){
+__device__ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int faceid,__private RandType *ran, __constant int *type, __constant float4 *normal, __constant Medium *med){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f,0.f,0.f};
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -622,19 +679,19 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
 	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
               *c0+=(FL3(-2.f*Icos))*pnorm;
-              //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal));
+              //if(gcfg->debuglevel&dlReflect) GPUDEBUG(("R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal));
 	      *eid=*oldeid; /*stay with the current element*/
 	  }else if(gcfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
               *c0+=(FL3(-Icos))*pnorm;
 	      *c0=(FL3(tmp2))*pnorm+FL3(n1/n2)*(*c0);
-              //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal));
+              //if(gcfg->debuglevel&dlReflect) GPUDEBUG(("Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal));
 	  }
        }else{ /*total internal reflection*/
           *c0+=(FL3(-2.f*Icos))*pnorm;
 	  *eid=*oldeid;
-          //if(gcfg->debuglevel&dlReflect) MMC_FPRINTF(("V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f));
+          //if(gcfg->debuglevel&dlReflect) GPUDEBUG(("V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f));
        }
        tmp0=MCX_MATHFUN(rsqrt)(dot(*c0,*c0));
        (*c0)*=FL3(tmp0);
@@ -655,7 +712,7 @@ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,int *eid,int 
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-float mc_next_scatter(float g, float3 *dir,__private RandType *ran, __constant MCXParam *gcfg, float *pmom){
+__device__ float mc_next_scatter(float g, float3 *dir,__private RandType *ran, __constant MCXParam *gcfg, float *pmom){
 
     float nextslen;
     float sphi,cphi,tmp0,theta,stheta,ctheta,tmp1;
@@ -715,7 +772,7 @@ float mc_next_scatter(float g, float3 *dir,__private RandType *ran, __constant M
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-void fixphoton(float3 *p,__global float3 *nodes, __constant int *ee){
+__device__ void fixphoton(float3 *p,__global float3 *nodes, __constant int *ee){
         float3 c0={0.f,0.f,0.f};
 	int i;
         /*calculate element centroid*/
@@ -737,7 +794,7 @@ void fixphoton(float3 *p,__global float3 *nodes, __constant int *ee){
  * \param[in,out] ran: the random number generator states
  */
 
-void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__constant int *elem,__constant int *srcelem, __private RandType *ran){
+__device__ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__constant int *elem,__constant int *srcelem, __private RandType *ran){
         int canfocus=1;
         float3 origin=r->p0;
 
@@ -893,7 +950,7 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
 	float bary[4]={0.f};
 	for(is=0;is<gcfg->srcelemlen;is++){
 		int include = 1;
-		constant int *elems=elem+(srcelem[is]-1)*gcfg->elemlen;
+		__constant int *elems=elem+(srcelem[is]-1)*gcfg->elemlen;
 		for(i=0;i<4;i++){
 			ea=elems[out[i][0]]-1;
 			eb=elems[out[i][1]]-1;
@@ -938,8 +995,8 @@ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 *node,__con
  * \param[out] visit: statistics counters of this thread
  */
 
-void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,__global float *dref,
-    __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant medium *med,
+__device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__constant int *elem, __global float *weight,__global float *dref,
+    __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, __constant Medium *med,
     __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __constant float4 *gdetpos, __private RandType *ran, int *raytet){
 
 	int oldeid,fixcount=0;
@@ -989,7 +1046,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    /*when a photon enters the domain from the background*/
 		    if(type[oldeid-1]==0 && type[r.eid-1]){
                         //if(gcfg->debuglevel&dlExit)
-			    MMC_FPRINTF(("e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+			    GPUDEBUG(("e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    	r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
                         if(!gcfg->voidtime)
                             r.photontimer=0.f;
@@ -997,7 +1054,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    /*when a photon exits the domain into the background*/
 		    if(type[oldeid-1] && type[r.eid-1]==0){
                         //if(gcfg->debuglevel&dlExit)
-		            MMC_FPRINTF(("x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+		            GPUDEBUG(("x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			        r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
 			if(!gcfg->isextdet){
                             r.eid=0;
@@ -1006,7 +1063,7 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		    }
 //		    if(r.eid==0 && med[type[oldeid-1]].n == gcfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED) // && (gcfg->debuglevel&dlMove))
-	    		MMC_FPRINTF(("P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen));
+	    		GPUDEBUG(("P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen));
 
 	    	    r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, med);
 		    (*raytet)++;
@@ -1033,10 +1090,10 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    //if(r.eid==0 && (gcfg->debuglevel&dlMove))
-        		 MMC_FPRINTF(("B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
+        		 GPUDEBUG(("B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    if(r.eid!=ID_UNDEFINED){
                        //if(gcfg->debuglevel&dlExit)
-        		 MMC_FPRINTF(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
+        		 GPUDEBUG(("E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
 #ifdef MCX_SAVE_DETECTORS
                        if(gcfg->issavedet && gcfg->issaveexit){                                     /*when issaveexit is set to 1*/
@@ -1051,9 +1108,9 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 		       }
 #endif
 		    }else if(r.faceid==-2 && (gcfg->debuglevel&dlMove)){
-                         MMC_FPRINTF(("T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
+                         GPUDEBUG(("T %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 	    	    }else if(r.eid && r.faceid!=-2  && gcfg->debuglevel&dlEdge){
-        		 MMC_FPRINTF(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
+        		 GPUDEBUG(("X %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 		    }
 #ifdef MCX_SAVE_DETECTORS
 		    if(r.eid<0){
@@ -1068,12 +1125,12 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	    	    break;  /*photon exits boundary*/
 	    }
 	    //if(gcfg->debuglevel&dlMove)
-	        MMC_FPRINTF(("M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
+	        GPUDEBUG(("M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen));
 	    if(gcfg->minenergy>0.f && r.weight < gcfg->minenergy && (gcfg->tend-gcfg->tstart)*gcfg->Rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*gcfg->roulettesize<=1.f){
 			r.weight*=gcfg->roulettesize;
                         //if(gcfg->debuglevel&dlWeight)
-			    MMC_FPRINTF(("Russian Roulette bumps r.weight to %f\n",r.weight));
+			    GPUDEBUG(("Russian Roulette bumps r.weight to %f\n",r.weight));
 		}else
 			break;
 	    }
@@ -1089,9 +1146,12 @@ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,_
 	*energyesc+=r.weight;
 }
 
-__kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCXParam *gcfg,__local float *sharedmem,
+__kernel void mmc_main_loop(const int nphoton, const int ophoton,
+#ifndef __NVCC__
+    __constant MCXParam *gcfg, __local float *sharedmem,
+#endif
     __global float3 *node,__constant int *elem,  __global float *weight, __global float *dref, __constant int *type, __constant int *facenb,  __constant int *srcelem, __constant float4 *normal, 
-    __constant medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
+    __constant Medium *med,  __constant float4 *gdetpos,__global float *n_det, __global uint *detectedphoton, 
     __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter){
  
  	RandType t[RAND_BUF_LEN];
@@ -1099,6 +1159,9 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCX
 	gpu_rng_init(t,n_seed,idx);
         float  energyesc=0.f, energytot=0.f;
 	int raytet=0;
+#ifdef __NVCC__
+        extern __shared__ float sharedmem[];
+#endif
 
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){

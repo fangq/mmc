@@ -20,6 +20,7 @@ MMCSRC :=$(MMCDIR)/src
 
 CXX        := g++
 AR         := $(CC)
+CUDACC     :=nvcc
 BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
@@ -36,6 +37,8 @@ EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
+CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math
+CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
 
 ECHO	   := echo
 MKDIR      := mkdir
@@ -75,7 +78,26 @@ else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
     OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
+    CUDA_STATIC=--cudart static
 endif
+
+ifeq ($(BACKEND),ocelot)
+  LINKOPT=-L/usr/local/lib `OcelotConfig -l` -ltinfo
+  CUCCOPT=-D__STRICT_ANSI__ -g #--maxrregcount 32
+else ifeq ($(BACKEND),cudastatic)
+  ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+      CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+  else
+      CUDART=-lcudadevrt -lcudart_static -ldl -lrt -static-libgcc -static-libstdc++
+  endif
+  LINKOPT=-L/usr/local/cuda/lib -lm $(CUDART)
+  CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
+else
+  LINKOPT=-L/usr/local/cuda/lib -lm $(CUDART)
+  CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
+endif
+
+CUGENCODE?=-arch=sm_30
 
 INCLUDEDIR+=$(INCLUDEDIRS)
 EXTRALIB+=$(LIBOPENCL)
@@ -148,6 +170,9 @@ oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
 oct octomp:     USERARFLAGS=-o $(BINDIR)/mmc
 
+debug:     sse
+debug:     CUCCOPT+=-DMCX_DEBUG
+
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 ifeq ($(TARGETSUFFIX),.so)
@@ -164,7 +189,7 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-all release sse ssemath prof omp mex oct mexomp octomp pnacl web: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
@@ -177,6 +202,11 @@ makedocdir:
 	@if test ! -d $(DOCDIR); then $(MKDIR) $(DOCDIR); fi
 
 .SUFFIXES : $(OBJSUFFIX) .cpp
+
+
+##  Compile .cu files ##
+$(OBJDIR)/%$(OBJSUFFIX): %.cu
+	$(CUDACC) -c $(CUCCOPT) -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
