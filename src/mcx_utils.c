@@ -194,14 +194,14 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
-     cfg->backend=0;
-#ifdef USE_OPENCL
-     cfg->method=4;
+     cfg->backend=1;
+#if defined(USE_OPENCL) || defined(USE_CUDA)
+     cfg->method=rtBLBadouelGrid;
 #else
   #ifndef MMC_USE_SSE
-     cfg->method=0;
+     cfg->method=rtPlucker;
   #else
-     cfg->method=1;
+     cfg->method=rtHavel;
   #endif
 #endif
      cfg->prop=NULL;
@@ -1633,6 +1633,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
  -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable\n\
+ --backend [opencl,cpu,cuda]   select compute backend (OpenCL is the default)\n\
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto\n\
       or\n\
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\

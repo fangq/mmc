@@ -535,7 +535,8 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
       mmc_main_loop<<<mcgrid, mcblock, sharedMemSize>>>(
           threadphoton, oddphotons, gnode, (int *)gelem, gweight, gdref,
           gtype, (int *)gfacenb, gsrcelem, gnormal, gproperty, gdetpos,
-          gdetphoton, gdetected, gseed, (int *)gprogress, genergy, greporter);
+          gdetphoton, gdetected, gseed, (int *)gprogress, genergy, greporter,
+	  gsrcpattern);
 
       #pragma omp master
       {

@@ -74,9 +74,9 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      cl_uint  totalcucore;
      cl_uint  devid=0;
-     cl_mem gnode,gelem,gtype,gfacenb,gsrcelem,gnormal,gproperty,gparam,gdetpos; /*read-only buffers*/
+     cl_mem gnode,gelem,gtype,gfacenb,gsrcelem,gnormal,gproperty,gparam,gdetpos,gsrcpattern; /*read-only buffers*/
      cl_mem *gweight,*gdref,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
-     cl_mem *gprogress=NULL,*gdetected, *gsrcpattern;  /*read-write buffers*/
+     cl_mem *gprogress=NULL,*gdetected;  /*read-write buffers*/
 
      cl_uint meshlen=((cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)<<cfg->nbuffer; // use 4 copies to reduce racing
      
@@ -133,7 +133,6 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      genergy=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gprogress=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gdetected=(cl_mem *)malloc(workdev*sizeof(cl_mem));
-     gsrcpattern=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      greporter=(cl_mem *)malloc(workdev*sizeof(cl_mem));
 
      /* The block is to move the declaration of prop closer to its use */
@@ -225,6 +224,13 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      progress = (cl_uint *)clEnqueueMapBuffer(mcxqueue[0], gprogress[0], CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(cl_uint), 0, NULL, NULL, NULL);
      *progress=0;
 
+     if(cfg->srctype==MCX_SRC_PATTERN)
+         OCL_ASSERT(((gsrcpattern=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*(int)(cfg->srcparam1.w*cfg->srcparam2.w),cfg->srcpattern,&status),status)));
+     else if(cfg->srctype==MCX_SRC_PATTERN3D)
+         OCL_ASSERT(((gsrcpattern=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*(int)(cfg->srcparam1.x*cfg->srcparam1.y*cfg->srcparam1.z),cfg->srcpattern,&status),status)));
+     else
+         gsrcpattern=NULL;
+
      for(i=0;i<workdev;i++){
        Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_WORD_LEN);
        energy=(cl_float*)calloc(sizeof(cl_float),gpu[i].autothread<<1);
@@ -237,12 +243,6 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
        OCL_ASSERT(((greporter[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(MCXReporter),&reporter,&status),status)));
-       if(cfg->srctype==MCX_SRC_PATTERN)
-           OCL_ASSERT(((gsrcpattern[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*(int)(cfg->srcparam1.w*cfg->srcparam2.w),cfg->srcpattern,&status),status)));
-       else if(cfg->srctype==MCX_SRC_PATTERN3D)
-           OCL_ASSERT(((gsrcpattern[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*(int)(cfg->srcparam1.x*cfg->srcparam1.y*cfg->srcparam1.z),cfg->srcpattern,&status),status)));
-       else
-           gsrcpattern[i]=NULL;
        free(Pseed);
        free(energy);
      }
@@ -341,7 +341,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (void*)(gprogress))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],18, sizeof(cl_mem), (void*)(genergy+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],19, sizeof(cl_mem), (void*)(greporter+i))));
-	// OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)(gsrcpattern+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],20, sizeof(cl_mem), (void*)(gsrcpattern))));
      }
      MMC_FPRINTF(cfg->flog,"set kernel arguments complete : %d ms %d\n",GetTimeMillis()-tic, param.method);fflush(cfg->flog);
 
@@ -553,6 +553,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      OCL_ASSERT(clReleaseMemObject(gproperty));
      OCL_ASSERT(clReleaseMemObject(gparam));
      if(cfg->detpos) OCL_ASSERT(clReleaseMemObject(gdetpos));
+     if(cfg->srcpattern) OCL_ASSERT(clReleaseMemObject(gsrcpattern));
 
      for(i=0;i<workdev;i++){
          OCL_ASSERT(clReleaseMemObject(gseed[i]));
@@ -562,7 +563,6 @@ is more than what your have specified (%d), please use the -H option to specify 
          OCL_ASSERT(clReleaseMemObject(genergy[i]));
          OCL_ASSERT(clReleaseMemObject(gprogress[i]));
          OCL_ASSERT(clReleaseMemObject(gdetected[i]));
-         if(gsrcpattern[i]) OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
          OCL_ASSERT(clReleaseMemObject(greporter[i]));
          OCL_ASSERT(clReleaseKernel(mcxkernel[i]));
      }
@@ -574,7 +574,6 @@ is more than what your have specified (%d), please use the -H option to specify 
      free(gprogress);
      free(gdetected);
      free(greporter);
-     free(gsrcpattern);
      free(mcxkernel);
 
      free(waittoread);
