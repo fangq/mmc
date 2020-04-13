@@ -126,12 +126,15 @@
       b.z *= inv;
       b.w *= inv;
   }
+#ifdef __USE_FAST_MATH__ 
+  inline __device__ float4 operator /(float4 a, float4 b){
+      return make_float4(__fdividef(a.x,b.x), __fdividef(a.y,b.y), __fdividef(a.z,b.z), __fdividef(a.w,b.w));
+  }
+#else
   inline __device__ __host__ float4 operator /(float4 a, float4 b){
       return make_float4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w);
   }
-  inline __device__ float4 operator |(float4 a, float4 b){
-      return make_float4(__fdividef(a.x,b.x), __fdividef(a.y,b.y), __fdividef(a.z,b.z), __fdividef(a.w,b.w));
-  }
+#endif
 
   inline __device__ __host__ float dot(float3 a, float3 b){
       return a.x * b.x + a.y * b.y + a.z * b.z;
@@ -520,11 +523,8 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__c
 	T = normal[eid+3] - ((FL4(r->p0.x)*normal[eid])+(FL4(r->p0.y)*normal[eid+1])+(FL4(r->p0.z)*normal[eid+2]));
 #ifndef __NVCC__
         T = -convert_float4_rte(isgreater(T,FL4(0.f))*2)*FL4(0.5f)*T;
-	T = T/S;
-#else
-	T = T|S;
 #endif
-
+	T = T/S;
 
 #ifndef __NVCC__
         S = -convert_float4_rte(isgreater(S,FL4(0.f))*2)*FL4(0.5f);
@@ -594,13 +594,24 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__c
 		   eid=(eid<<1);
 		   S.w=r->Lmove/eid;                     // segment length
 	           T.w=MCX_MATHFUN(exp)(-prop.mua*S.w);  // segment loss
+#ifndef __NVCC__
 		   T.xyz =  r->vec * FL3(S.w);      // delta vector
 		   S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * FL3(0.5f)); /*starting point*/
+#else
+		   T =  make_float4(r->vec.x*S.w,r->vec.y*S.w,r->vec.z*S.w,T.w);      // delta vector
+		   S =  make_float4((r->p0.x-gcfg->nmin.x)+T.x*0.5f,(r->p0.y-gcfg->nmin.y)+T.y*0.5f,(r->p0.z-gcfg->nmin.z)+T.z*0.5f,S.w); /*starting point*/
+#endif
 		   totalloss=(totalloss==0.f)? 0.f : (1.f-T.w)/totalloss;    // fraction of total loss per segment
 		   S.w=ww;                               // S.w is now the current weight
                    for(faceidx=0; faceidx< eid; faceidx++){
+#ifndef __NVCC__
 		       int3 idx= convert_int3_rtn(S.xyz * FL3(gcfg->dstep));
 		       idx = idx & (idx>=(int3)(0));
+#else
+		       int3 idx= make_int3((S.x>0.f)?__float2int_rd(S.x*gcfg->dstep):0,
+		                           (S.y>0.f)?__float2int_rd(S.y*gcfg->dstep):0,
+					   (S.z>0.f)?__float2int_rd(S.z*gcfg->dstep):0);
+#endif
 		       uint newidx=(idx.z*gcfg->crop0.y+idx.y*gcfg->crop0.x+idx.x)+tshift;
 		       r->oldidx=(r->oldidx==ID_UNDEFINED)? newidx: r->oldidx;
 		       if(newidx!=r->oldidx){
@@ -615,8 +626,12 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__c
                            r->oldweight=S.w*totalloss;
 		       }else
                            r->oldweight+=S.w*totalloss;
+#ifndef __NVCC__
 		       S.w*=T.w;
 		       S.xyz += T.xyz;
+#else
+		       S = make_float4(S.x+T.x,S.y+T.y,S.z+T.z,S.w*T.w);
+#endif
                    }
   #endif
 #endif
