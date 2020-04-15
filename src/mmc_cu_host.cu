@@ -38,6 +38,7 @@
 #ifdef _OPENMP
   #include <omp.h>
 #endif
+#include "mcx_const.h"
 
 #include "mmc_core.cu"
 
@@ -192,7 +193,7 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
 
   float3 *gnode;
   int4 *gelem, *gfacenb;
-  float4 *gnormal, *gdetpos;
+  float4 *gnormal;
   int *gtype, *gsrcelem;
   uint *gseed, *gdetected;
   volatile int *progress, *gprogress;
@@ -201,8 +202,6 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
   float *gdetphoton;
   float *genergy;
   float *gsrcpattern;
-
-  Medium *gproperty;
 
   MCXReporter *greporter;
   uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)
@@ -388,22 +387,20 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
   CUDA_ASSERT(cudaMemcpy(gnormal, tracer->n, sizeof(float4) * (mesh->ne) * 4,
                          cudaMemcpyHostToDevice));
 
+  // gparam
+  CUDA_ASSERT(cudaMemcpyToSymbol(gcfg, &param, sizeof(MCXParam), 0,cudaMemcpyHostToDevice));
+  CUDA_ASSERT(cudaMemcpyToSymbol(gmed, mesh->med,
+                         (mesh->prop + 1 + cfg->isextdet) * sizeof(Medium),0,
+                         cudaMemcpyHostToDevice));
+
   if (cfg->detpos && cfg->detnum) {
-    CUDA_ASSERT(cudaMalloc((void **)&gdetpos, sizeof(float4) * (cfg->detnum)));
-    CUDA_ASSERT(cudaMemcpy(gdetpos, cfg->detpos, sizeof(float4) * (cfg->detnum),
-                           cudaMemcpyHostToDevice));
-  } else {
-    gdetpos = NULL;
+    if((mesh->prop + 1 + cfg->isextdet)+cfg->detnum >= MAX_PROP)
+        mcx_error(-5, "Total tissue type and detector count must be less than 2000", __FILE__, __LINE__);
+    CUDA_ASSERT(cudaMemcpyToSymbol(gmed, cfg->detpos, 
+                         sizeof(float4) * (cfg->detnum), (mesh->prop + 1 + cfg->isextdet) * sizeof(Medium), 
+			 cudaMemcpyHostToDevice));
   }
 
-  CUDA_ASSERT(cudaMalloc((void **)&gproperty,
-                         (mesh->prop + 1 + cfg->isextdet) * sizeof(Medium)));
-  CUDA_ASSERT(cudaMemcpy(gproperty, mesh->med,
-                         (mesh->prop + 1 + cfg->isextdet) * sizeof(Medium),
-                         cudaMemcpyHostToDevice));
-  // gparam
-  CUDA_ASSERT(cudaMemcpyToSymbol(gcfg, &param, sizeof(MCXParam), 0,
-                                 cudaMemcpyHostToDevice));
   // gprogress
   CUDA_ASSERT(
       cudaHostAlloc((void **)&progress, sizeof(int), cudaHostAllocMapped));
@@ -534,7 +531,7 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
 
       mmc_main_loop<<<mcgrid, mcblock, sharedMemSize>>>(
           threadphoton, oddphotons, gnode, (int *)gelem, gweight, gdref,
-          gtype, (int *)gfacenb, gsrcelem, gnormal, gproperty, gdetpos,
+          gtype, (int *)gfacenb, gsrcelem, gnormal,
           gdetphoton, gdetected, gseed, (int *)gprogress, genergy, greporter,
 	  gsrcpattern);
 
@@ -744,10 +741,6 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
   CUDA_ASSERT(cudaFree(gfacenb));
   CUDA_ASSERT(cudaFree(gsrcelem));
   CUDA_ASSERT(cudaFree(gnormal));
-  CUDA_ASSERT(cudaFree(gproperty));
-  if (cfg->detpos)
-    CUDA_ASSERT(cudaFree(gdetpos));
-
   CUDA_ASSERT(cudaFree(gseed));
   CUDA_ASSERT(cudaFree(gdetphoton));
   CUDA_ASSERT(cudaFree(gweight));

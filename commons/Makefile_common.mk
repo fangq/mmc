@@ -37,7 +37,7 @@ EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
-CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math
+CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v
 CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
 
 ECHO	   := echo
