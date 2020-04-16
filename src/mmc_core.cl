@@ -462,7 +462,7 @@ __device__ uint finddetector(float3 *p0,__constant float4 *gmed,__constant MCXPa
 __device__ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
                    __local float *ppath,float3 *p0,float3 *v,__constant Medium *gmed,
 		   int extdetid, __constant MCXParam *gcfg){
-      uint detid=(extdetid<0)? finddetector(p0,(float4*)gmed,gcfg) : extdetid;
+      uint detid=(extdetid<0)? finddetector(p0,(__constant float4*)gmed,gcfg) : extdetid;
       if(detid){
 	 uint baseaddr=atomic_inc(detectedphoton);
 	 if(baseaddr<gcfg->maxdetphoton){
@@ -684,9 +684,9 @@ __device__ float reflectray(__constant MCXParam *gcfg,float3 *c0, int *oldeid,in
 
 	faceid=ifaceorder[faceid];
 	/*calculate the normal direction of the intersecting triangle*/
-	pnorm.x=((float*)&(normal[offs]))[faceid];
-	pnorm.y=((float*)&(normal[offs]))[faceid+4];
-	pnorm.z=((float*)&(normal[offs]))[faceid+8];
+	pnorm.x=((__global float*)&(normal[offs]))[faceid];
+	pnorm.y=((__global float*)&(normal[offs]))[faceid+4];
+	pnorm.z=((__global float*)&(normal[offs]))[faceid+8];
 
 	/*pn pointing outward*/
 
