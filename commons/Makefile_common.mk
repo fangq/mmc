@@ -189,7 +189,9 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug: $(SUBDIRS) $(BINDIR)/$(BINARY)
+cuda: sse
+
+all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug cuda: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
