@@ -65,16 +65,17 @@ int main(int argc, char**argv){
            The core simulation loop is executed in the mmc_run_mp() function where
 	   multiple threads are executed to simulate all photons.
          */
-	if(cfg.backend==0 || cfg.gpuid>MAX_DEVICE)
+	if(cfg.compute==cbSSE || cfg.gpuid>MAX_DEVICE)
             mmc_run_mp(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
 #ifdef USE_CUDA
-	else if(cfg.backend==2){
+	else if(cfg.compute==cbCUDA){
             mmc_run_cu(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
 	}
 #endif
 #ifdef USE_OPENCL
-	else
+	else{
             mmc_run_cl(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+	}
 #endif
 
 	/** 

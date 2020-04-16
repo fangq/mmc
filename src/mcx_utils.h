@@ -80,6 +80,7 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};
 enum TMCMethod {mmMCX, mmMCML};
+enum TComputeBackend {cbSSE, cbOpenCL, cbCUDA};
 
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
@@ -255,7 +256,7 @@ typedef struct MMC_config{
 	float normalizer;            /**<normalization factor*/
 	unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
 	unsigned int gpuid;
-	int backend;
+	int compute;
 } mcconfig;
 
 #ifdef	__cplusplus

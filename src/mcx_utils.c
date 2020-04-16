@@ -81,7 +81,7 @@
 const char shortopt[]={'h','E','f','n','A','t','T','s','a','g','b','D','G',
                  'd','r','S','e','U','R','l','L','I','-','u','C','M',
                  'i','V','O','-','F','q','x','P','k','v','m','-','-',
-		 'J','o','H','-','W','X','-','-','\0'};
+		 'J','o','H','-','W','X','-','c','\0'};
 		 
 /**
  * Long command line options
@@ -98,7 +98,7 @@ const char *fullopt[]={"--help","--seed","--input","--photon","--autopilot",
                  "--momentum","--outputformat","--saveseed","--saveexit",
                  "--replaydet","--voidtime","--version","--mc","--atomic",
                  "--debugphoton","--compileropt","--optlevel","--maxdetphoton",
-		 "--buffer","--workload","--saveref","--gridsize","--backend",""};
+		 "--buffer","--workload","--saveref","--gridsize","--compute",""};
 
 extern char pathsep;
 
@@ -161,7 +161,7 @@ char flagset[256]={'\0'};
  * Flag to decide which platform to run mmc
  */
 
-const char *computebackend[]={"cpu","opencl","cuda",""};
+const char *computebackend[]={"sse","opencl","cuda",""};
 
 /**
  * @brief Initializing the simulation configuration with default values
@@ -194,7 +194,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->issave2pt=1;
      cfg->isgpuinfo=0;
      cfg->basisorder=1;
-     cfg->backend=1;
+     cfg->compute=cbOpenCL;
 #if defined(USE_OPENCL) || defined(USE_CUDA)
      cfg->method=rtBLBadouelGrid;
 #else
@@ -1461,6 +1461,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
                      case 'A':
                                 i=mcx_readarg(argc,argv,i,&(cfg->autopilot),"int");
                                 break;
+                     case 'c':
+				if(i+1<argc && isalpha((int)argv[i+1][0]) )
+					cfg->compute=mcx_keylookup(argv[++i], computebackend);
+				else
+	                                i=mcx_readarg(argc,argv,i,&(cfg->compute),"int");
+                                break;
                      case 'G':
                                 if(mcx_isbinstr(argv[i+1])){
                                     i=mcx_readarg(argc,argv,i,cfg->deviceid,"string");
@@ -1485,11 +1491,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 		                     i=mcx_readarg(argc,argv,i,cfg->rootpath,"string");
                                 }else if(strcmp(argv[i]+2,"debugphoton")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->debugphoton),"int");
-                                }else if(strcmp(argv[i]+2,"backend")==0){
-                                     if(i>=argc)
-                                        MMC_ERROR(-1,"incomplete input");
-                                     if((cfg->backend=mcx_keylookup(argv[++i], computebackend))<0)
-                                        MMC_ERROR(-2,"the specified compute backend is not recognized");
                                 }else if(strcmp(argv[i]+2,"buffer")==0){
 		                     i=mcx_readarg(argc,argv,i,&(cfg->nbuffer),"int");
                                 }else if(strcmp(argv[i]+2,"gridsize")==0){
@@ -1633,7 +1634,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
  -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable\n\
- --backend [opencl,cpu,cuda]   select compute backend (OpenCL is the default)\n\
+ -c [opencl,sse,cuda](--compute) select compute backend (default to opencl)\n\
+                               can also use 0: sse, 1: opencl, 2: cuda\n\
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto\n\
       or\n\
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\
