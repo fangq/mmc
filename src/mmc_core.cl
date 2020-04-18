@@ -523,8 +523,8 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__g
 	r->faceid=-1;
 	r->isend=0;
 
-	S = (FL4(r->vec.x)*normal[eid])+(FL4(r->vec.y)*normal[eid+1])+(FL4(r->vec.z)*normal[eid+2]);
-	T = normal[eid+3] - ((FL4(r->p0.x)*normal[eid])+(FL4(r->p0.y)*normal[eid+1])+(FL4(r->p0.z)*normal[eid+2]));
+	S = ((r->vec.x)*normal[eid])+((r->vec.y)*normal[eid+1])+((r->vec.z)*normal[eid+2]);
+	T = normal[eid+3] - (((r->p0.x)*normal[eid])+((r->p0.y)*normal[eid+1])+((r->p0.z)*normal[eid+2]));
 #ifndef __NVCC__
         T = -convert_float4_rte(isgreater(T,FL4(0.f))*2)*FL4(0.5f)*T;
 #endif
