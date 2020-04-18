@@ -552,7 +552,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      OCL_ASSERT(clReleaseMemObject(gnormal));
      OCL_ASSERT(clReleaseMemObject(gproperty));
      OCL_ASSERT(clReleaseMemObject(gparam));
-     if(cfg->detpos) OCL_ASSERT(clReleaseMemObject(gdetpos));
+     if(gdetpos)  OCL_ASSERT(clReleaseMemObject(gdetpos));
 
      for(i=0;i<workdev;i++){
          OCL_ASSERT(clReleaseMemObject(gseed[i]));
