@@ -546,13 +546,13 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
             ndone = *progress;
 
             if (ndone > p0) {
-              progressfun((float)ndone / gpu[0].autothread * cfg->nphoton,
+              progressfun((float)ndone / gpu[0].autothread,
                               handle);
               p0 = ndone;
             }
             sleep_ms(100);
           } while (p0 < (int)gpu[0].autothread);
-          progressfun(cfg->nphoton, handle);
+          progressfun(1.f, handle);
           MMC_FPRINTF(cfg->flog, "\n");
         }
       }
