@@ -259,7 +259,8 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
                     cfg->isextdet,
                     (int)meshlen,
                     cfg->nbuffer,
-                    (uint)((1 << cfg->nbuffer) - 1)
+                    (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+		    (uint)(MIN((MAX_PROP-(mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne)<<2)) >>2)  /*max count of elem normal data in const mem*/
 		    };
 
   MCXReporter reporter = {0.f};
@@ -397,9 +398,12 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
     if((mesh->prop + 1 + cfg->isextdet)+cfg->detnum >= MAX_PROP)
         mcx_error(-5, "Total tissue type and detector count must be less than 2000", __FILE__, __LINE__);
     CUDA_ASSERT(cudaMemcpyToSymbol(gmed, cfg->detpos, 
-                         sizeof(float4) * (cfg->detnum), (mesh->prop + 1 + cfg->isextdet) * sizeof(Medium), 
+                         sizeof(float4)*cfg->detnum, (mesh->prop + 1 + cfg->isextdet) * sizeof(Medium), 
 			 cudaMemcpyHostToDevice));
   }
+  CUDA_ASSERT(cudaMemcpyToSymbol(gmed, tracer->n,
+                         (param.normbuf<<2)*(sizeof(float4)), sizeof(float4)*param.maxpropdet,
+			 cudaMemcpyHostToDevice));
 
   // gprogress
   CUDA_ASSERT(
@@ -620,8 +624,7 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
                     GetTimeMillis() - tic);
         fflush(cfg->flog);
 
-        for (i = 0; i < fieldlen;
-             i++) // accumulate field, can be done in the GPU
+        for (i = 0; i < fieldlen; i++) // accumulate field, can be done in the GPU
           field[(i >> cfg->nbuffer)] += rawfield[i]; //+rawfield[i+fieldlen];
 
         free(rawfield);

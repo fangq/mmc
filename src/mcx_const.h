@@ -4,6 +4,8 @@
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
 
+#define MAX_PROP           4000
+
 #define MCX_DEBUG_REC_LEN  6  /**<  number of floating points per position saved when -D M is used for trajectory */
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */

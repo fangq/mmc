@@ -207,7 +207,6 @@
   #define TOFLOAT4
 #endif
 
-
 #ifdef MCX_DEBUG
   #define GPUDEBUG(x)        printf x             // enable debugging in CPU mode
 #else
@@ -232,7 +231,7 @@
   #define VERY_BIG           (1.f/FLT_EPSILON)       //a big number
 #endif
 
-#define MAX_PROP           2000                     /*maximum property number*/
+#define MAX_PROP           4000                     /*maximum property number*/
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
 #define MAX_ACCUM          1000.f
@@ -306,7 +305,8 @@ typedef struct MMC_Parameter {
   int    isextdet;
   int    framelen;
   uint   nbuffer;
-  uint   buffermask;
+  uint   maxpropdet;
+  uint   normbuf;
   //int    issaveseed;
 } MCXParam __attribute__ ((aligned (16)));
 
@@ -509,6 +509,7 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__g
 	float ww,totalloss=0.f;
 	int tshift,faceidx=-1,eid;
 	float4 T,S;
+	
 	union {
 	    float f;
 	    uint  i;
@@ -523,8 +524,14 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__g
 	r->faceid=-1;
 	r->isend=0;
 
-	S = ((r->vec.x)*normal[eid])+((r->vec.y)*normal[eid+1])+((r->vec.z)*normal[eid+2]);
-	T = normal[eid+3] - (((r->p0.x)*normal[eid])+((r->p0.y)*normal[eid+1])+((r->p0.z)*normal[eid+2]));
+        if(r->eid<=gcfg->normbuf){
+	    eid+=gcfg->maxpropdet;
+	    S = ((r->vec.x)*((__constant float4*)gmed)[eid])+((r->vec.y)*((__constant float4*)gmed)[eid+1])+((r->vec.z)*((__constant float4*)gmed)[eid+2]);
+	    T = ((__constant float4*)gmed)[eid+3] - (((r->p0.x)*((__constant float4*)gmed)[eid])+((r->p0.y)*((__constant float4*)gmed)[eid+1])+((r->p0.z)*((__constant float4*)gmed)[eid+2]));
+	}else{
+	    S = ((r->vec.x)*normal[eid])+((r->vec.y)*normal[eid+1])+((r->vec.z)*normal[eid+2]);
+	    T = normal[eid+3] - (((r->p0.x)*normal[eid])+((r->p0.y)*normal[eid+1])+((r->p0.z)*normal[eid+2]));
+	}
 #ifndef __NVCC__
         T = -convert_float4_rte(isgreater(T,FL4(0.f))*2)*FL4(0.5f)*T;
 #endif

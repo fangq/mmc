@@ -106,7 +106,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 		     mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x,mesh->nmin.y,mesh->nmin.z}}, cfg->nout,
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
 		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, 
-		     cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, ((1 << cfg->nbuffer)-1)};
+		     cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+		     (MIN((MAX_PROP-param.maxpropdet), ((mesh->ne)<<2)) >>2)  /*max count of elem normal data in const mem*/};
 
      MCXReporter reporter={0.f};
      platform=mcx_list_cl_gpu(cfg,&workdev,devices,&gpu);
@@ -211,11 +212,13 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
          gsrcelem=NULL;
      OCL_ASSERT(((gnormal=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float4)*(mesh->ne)*4,tracer->n,&status),status)));
 
-     propdet=(float4 *)malloc((mesh->prop+1+cfg->isextdet)*sizeof(medium)+cfg->detnum*sizeof(float4));
+     propdet=(float4 *)malloc(MAX_PROP*sizeof(float4));
      memcpy(propdet,mesh->med,(mesh->prop+1+cfg->isextdet)*sizeof(medium));
+
      if(cfg->detpos && cfg->detnum)
          memcpy(propdet+(mesh->prop+1+cfg->isextdet),cfg->detpos,cfg->detnum*sizeof(float4));
-     OCL_ASSERT(((gproperty=clCreateBuffer(mcxcontext,RO_MEM, (mesh->prop+1+cfg->isextdet)*sizeof(medium)+cfg->detnum*sizeof(float4),propdet,&status),status)));
+     memcpy(propdet+param.maxpropdet,tracer->n,(param.normbuf<<2)*sizeof(float4));
+     OCL_ASSERT(((gproperty=clCreateBuffer(mcxcontext,RO_MEM, MAX_PROP*sizeof(float4),propdet,&status),status)));
      free(propdet);
 
      OCL_ASSERT(((gparam=clCreateBuffer(mcxcontext,RO_MEM, sizeof(MCXParam),&param,&status),status)));
