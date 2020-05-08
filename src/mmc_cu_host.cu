@@ -638,23 +638,21 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
                     memcpy(field,field+fieldlen,sizeof(cl_float)*fieldlen);
                     }
          */
-        if (cfg->isnormalized) {
-          energy = (float *)calloc(sizeof(float), gpu[gpuid].autothread << 1);
+	energy = (float *)calloc(sizeof(float), gpu[gpuid].autothread << 1);
 
-          CUDA_ASSERT(cudaMemcpy(energy, genergy,
-                                 sizeof(float) * (gpu[gpuid].autothread << 1),
-                                 cudaMemcpyDeviceToHost));
-          #pragma omp critical
-          {
-            for (i = 0; i < gpu[gpuid].autothread; i++) {
-              cfg->energyesc += energy[(i << 1)];
-              cfg->energytot += energy[(i << 1) + 1];
-              // eabsorp+=Plen[i].z;  // the accumulative absorpted energy near
-              // the source
-            }
-          }
-          free(energy);
-        }
+	CUDA_ASSERT(cudaMemcpy(energy, genergy,
+	                       sizeof(float) * (gpu[gpuid].autothread << 1),
+			       cudaMemcpyDeviceToHost));
+	#pragma omp critical
+	{
+	  for (i = 0; i < gpu[gpuid].autothread; i++) {
+	    cfg->energyesc += energy[(i << 1)];
+	    cfg->energytot += energy[(i << 1) + 1];
+	    // eabsorp+=Plen[i].z;  // the accumulative absorpted energy near
+	    // the source
+	  }
+	}
+	free(energy);
       }
       if (cfg->respin > 1 && RAND_SEED_WORD_LEN > 1) {
         Pseed = (uint *)malloc(sizeof(uint) * gpu[gpuid].autothread *
