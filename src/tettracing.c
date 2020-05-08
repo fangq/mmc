@@ -1054,6 +1054,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    r->oldweight=ww;
                         }else
 			    r->oldweight+=ww;
+			if(r->faceid==-2 || !r->isend){
+			    if(cfg->isatomic)
+#pragma omp atomic
+			        tracer->mesh->weight[newidx]+=r->oldweight;
+                            else
+			        tracer->mesh->weight[newidx]+=r->oldweight;
+			    r->oldweight=0.f;
+			}
                      }else{
 			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
@@ -1077,11 +1085,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				unsigned int newidx=idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift;
 				r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 				if(newidx!=r->oldidx){
-				    tracer->mesh->weight[r->oldidx]+=r->oldweight;
+				    if(cfg->isatomic)
+#pragma omp atomic
+				        tracer->mesh->weight[r->oldidx]+=r->oldweight;
+				    else
+				        tracer->mesh->weight[r->oldidx]+=r->oldweight;
 				    r->oldidx=newidx;
 				    r->oldweight=w0*totalloss;
 				}else
 				    r->oldweight+=w0*totalloss;
+				if(r->faceid==-2 || !r->isend){
+				    if(cfg->isatomic)
+#pragma omp atomic
+				        tracer->mesh->weight[newidx]+=r->oldweight;
+				    else
+				        tracer->mesh->weight[newidx]+=r->oldweight;
+				    r->oldweight=0.f;
+				}
 				w0*=segloss;
 			        S = _mm_add_ps(S, T);
                             }
