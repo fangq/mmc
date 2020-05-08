@@ -294,6 +294,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
          sprintf(opt+strlen(opt)," -DMCX_DO_REFLECTION");
      if(cfg->method==rtBLBadouelGrid)
          sprintf(opt+strlen(opt)," -DUSE_DMMC");
+     if(cfg->method==rtBLBadouel)
+         sprintf(opt+strlen(opt)," -DUSE_BLBADOUEL");
 
      MMC_FPRINTF(cfg->flog,"Building kernel with option: %s\n",opt);
      status=clBuildProgram(mcxprogram, 0, NULL, opt, NULL, NULL);

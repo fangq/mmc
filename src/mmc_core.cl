@@ -584,7 +584,7 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__g
 	           if(gcfg->outputtype!=otEnergy && gcfg->outputtype!=otWP)
                       ww/=prop.mua;
 	       }
-  #ifndef USE_DMMC
+  #ifdef USE_BLBADOUEL  
     #ifdef __NVCC__
        if(gcfg->method==rtBLBadouel){
     #endif
@@ -618,7 +618,8 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__g
     #ifdef __NVCC__
        }
     #endif
-  #else
+  #endif
+  #ifdef USE_DMMC
     #ifdef __NVCC__
        if(gcfg->method==rtBLBadouelGrid){
     #endif
