@@ -294,6 +294,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
          sprintf(opt+strlen(opt)," -DMCX_DO_REFLECTION");
      if(cfg->method==rtBLBadouelGrid)
          sprintf(opt+strlen(opt)," -DUSE_DMMC");
+     if(cfg->method==rtBLBadouel)
+         sprintf(opt+strlen(opt)," -DUSE_BLBADOUEL");
 
      MMC_FPRINTF(cfg->flog,"Building kernel with option: %s\n",opt);
      status=clBuildProgram(mcxprogram, 0, NULL, opt, NULL, NULL);
@@ -476,17 +478,16 @@ is more than what your have specified (%d), please use the -H option to specify 
                 	memcpy(field,field+fieldlen,sizeof(cl_float)*fieldlen);
         	}
 */
-        	if(cfg->isnormalized){
-                    energy=(cl_float*)calloc(sizeof(cl_float),gpu[devid].autothread<<1);
-                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],genergy[devid],CL_TRUE,0,sizeof(cl_float)*(gpu[devid].autothread<<1),
-	                                     energy, 0, NULL, NULL)));
-                    for(i=0;i<gpu[devid].autothread;i++){
-                	cfg->energyesc+=energy[(i<<1)];
-       	       		cfg->energytot+=energy[(i<<1)+1];
-                	//eabsorp+=Plen[i].z;  // the accumulative absorpted energy near the source
-                    }
-		    free(energy);
-        	}
+
+                energy=(cl_float*)calloc(sizeof(cl_float),gpu[devid].autothread<<1);
+		OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],genergy[devid],CL_TRUE,0,sizeof(cl_float)*(gpu[devid].autothread<<1),
+	                                        energy, 0, NULL, NULL)));
+                for(i=0;i<gpu[devid].autothread;i++){
+		    cfg->energyesc+=energy[(i<<1)];
+		    cfg->energytot+=energy[(i<<1)+1];
+		    //eabsorp+=Plen[i].z;  // the accumulative absorpted energy near the source
+		}
+		free(energy);
              }
 	     if(cfg->respin>1 && RAND_SEED_WORD_LEN>1){
                Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[devid].autothread*RAND_SEED_WORD_LEN);
