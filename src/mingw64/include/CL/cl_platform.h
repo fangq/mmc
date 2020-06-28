@@ -26,7 +26,7 @@
  * MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
  **********************************************************************************/
 
-/* $Rev             $ on $Date                                               $ */
+/* $Rev      $ on $Date                         $ */
 
 #ifndef __CL_PLATFORM_H
 #define __CL_PLATFORM_H
