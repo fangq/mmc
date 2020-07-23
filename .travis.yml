@@ -1,0 +1,32 @@
+language: cpp
+
+sudo: enabled
+
+compiler:
+  - gcc
+
+matrix:
+  include:
+    - os: linux
+      name: Ubuntu 16.04
+      dist: xenial
+    - os: linux
+      name: Ubuntu 18.04
+      dist: bionic
+    - os: osx
+      name: Mac OS
+      name: OSX
+
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get install ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev; fi
+
+addons:
+  apt:
+    packages:
+    - ocl-icd-libopencl1
+    - opencl-headers
+    - ocl-icd-opencl-dev
+    update: true
+
+script:
+    - make -C src
