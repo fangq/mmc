@@ -14,11 +14,12 @@ matrix:
       name: Ubuntu 18.04
       dist: bionic
     - os: osx
-      name: Mac OS
       name: OSX
+      env:
+      - CPP=/usr/local/opt/llvm/bin/clang
 
 before_install:
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get install ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get install ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev; else brew install llvm libomp; fi
 
 addons:
   apt:
@@ -27,6 +28,10 @@ addons:
     - opencl-headers
     - ocl-icd-opencl-dev
     update: true
+  homebrew:
+    packages:
+    - llvm
+    - libomp
 
 script:
     - make -C src
