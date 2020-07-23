@@ -18,6 +18,7 @@ matrix:
       env:
       - CC=gcc-9
       - CXX=g++-9
+      - AR=g++-9
 
 before_install:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get install ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev; fi
@@ -31,6 +32,4 @@ addons:
     update: true
 
 script:
-    - which gcc-9
-    - ls -lt /usr/local/bin/gcc*
     - make -C src
