@@ -35,6 +35,6 @@ script:
     - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
          make -C src;
       else
-         find /usr -name libgomp.a ;
+         find /usr/local/Cellar/gcc -name libgomp.a -exec sudo ln -sf '{}' /usr/local/lib/ \; ;
          make -C src AR=g++-9 CC=gcc-9 CXX=g++-9;
       fi
