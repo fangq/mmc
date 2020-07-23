@@ -32,4 +32,8 @@ addons:
     update: true
 
 script:
-    - make -C src
+    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+         make -C src
+      else
+         make -C src AR=g++-10 CC=gcc-10 CXX=g++-10
+      fi
