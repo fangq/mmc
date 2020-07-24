@@ -35,6 +35,7 @@ addons:
 
 script:
     - which make
+    - ls -lt /c/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin
     - if [ "$TRAVIS_OS_NAME" = "linux" ] || [ "$TRAVIS_OS_NAME" = "windows" ] ; then
          make -C src;
       else
