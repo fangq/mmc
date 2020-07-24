@@ -34,10 +34,10 @@ addons:
     update: true
 
 script:
-    - which make
-    - ls -lt /c/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin
-    - if [ "$TRAVIS_OS_NAME" = "linux" ] || [ "$TRAVIS_OS_NAME" = "windows" ] ; then
-         make -C src;
+    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+         make -C src;   
+      elif [ "$TRAVIS_OS_NAME" = "windows" ] ; then
+         mingw32-make -C src;
       else
          find /usr/local/Cellar/gcc -name libgomp.a -exec sudo ln -sf '{}' /usr/local/lib/ \; ;
          make -C src AR=g++-9 CC=gcc-9 CXX=g++-9;
