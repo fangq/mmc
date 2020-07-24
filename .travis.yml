@@ -34,6 +34,7 @@ addons:
     update: true
 
 script:
+    - which make
     - if [ "$TRAVIS_OS_NAME" = "linux" ] || [ "$TRAVIS_OS_NAME" = "windows" ] ; then
          make -C src;
       else
