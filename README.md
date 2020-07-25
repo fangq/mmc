@@ -67,9 +67,9 @@ Please file bug reports to <https://github.com/fangq/mmc/issues>
 
 Reference:
 
-**[Fang2019]** Qianqian Fang and Shijie Yan, “GPU-accelerated mesh-based 
-Monte Carlo photon transport simulations,” J. of Biomedical Optics, in 
-press, 2019. Preprint URL: <https://www.biorxiv.org/content/10.1101/815977v1>
+>**[Fang2019]** Qianqian Fang and Shijie Yan, “GPU-accelerated mesh-based 
+Monte Carlo photon transport simulations,” J. of Biomedical Optics, 24(11), 
+115002 (2019) URL: <http://dx.doi.org/10.1117/1.JBO.24.11.115002>
 
 
 Introduction
@@ -104,8 +104,8 @@ The most relevant publication describing this work is the GPU-accelerated MMC
 paper:
 
 > Qianqian Fang and Shijie Yan, “GPU-accelerated mesh-based Monte Carlo photon 
-transport simulations,” J. of Biomedical Optics, in press, 2019. Preprint 
-URL: <https://www.biorxiv.org/content/10.1101/815977v1>
+transport simulations,” J. of Biomedical Optics, 24(11), 115002 (2019)
+URL: <http://dx.doi.org/10.1117/1.JBO.24.11.115002>
 
 Please keep in mind that MMC is only a partial implementation of the general 
 Mesh-based Monte Carlo Method (MMCM). The limitations and issues you observed 
@@ -134,8 +134,8 @@ and their key differences compared to another mesh-based MC simulator, TIM-OS,
 are discussed in
 
 > Qianqian Fang, “Comment on 'A study on tetrahedron-based inhomogeneous 
-Monte-Carlo optical simulation',” Biomed. Opt. Express, vol. 2(5) 1258-1264, 
-2011. URL: <https://www.osapublishing.org/boe/abstract.cfm?uri=boe-2-5-1258>
+Monte-Carlo optical simulation',” Biomed. Opt. Express, vol. 2(5) 1258-1264, (2011)
+URL: <https://www.osapublishing.org/boe/abstract.cfm?uri=boe-2-5-1258>
 
 In addition, the generalized MMC algorithm for wide-field sources and detectors 
 are described in the following paper, and was made possible with the 
