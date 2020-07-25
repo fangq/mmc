@@ -91,7 +91,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   int        ifield, jstruct;
   int        ncfg, nfields;
   dimtype     fielddim[5];
-#ifdef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
   int        usewaitbar=1;
 #endif
   int        errorflag=0;
@@ -102,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   const char       *gpuinfotag[]={"name","id","devcount","major","minor","globalmem",
                                   "constmem","sharedmem","regcount","clock","sm","core",
                                   "autoblock","autothread","maxgate"};
-#ifdef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
   waitbar    *hprop=NULL;
   void (*progressfun)(float, void *)=mcx_progressbar;
 #else
@@ -186,7 +186,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if(nlhs>=3)
       plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
 
-#ifdef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
   if(mexEvalString("mmclab_waitbar_handle=figure('visible','off');")) // waitbar is not supported with nojvm after matlab R2013a
       usewaitbar=0;
   else
@@ -236,7 +236,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
         dt=GetTimeMillis();
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... \n",dt-t0));
 
-#ifdef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
         if(cfg.debuglevel & dlProgress && progressfun==waitbar_update_c && usewaitbar)
             hprop = waitbar_create (0, NULL);
 #endif
@@ -261,7 +261,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
 	/** \subsection sreport Post simulation */
 
-#ifdef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
 	if(cfg.debuglevel & dlProgress){
 	    if(usewaitbar)
                  waitbar_update (1.0, hprop, NULL);
@@ -273,7 +273,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 
     /** Clear up simulation data structures by calling the destructors */
 
-#ifdef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
         if(cfg.debuglevel & dlProgress && usewaitbar)
              waitbar_destroy (hprop) ;
 #endif
@@ -794,7 +794,7 @@ void mmclab_usage(){
  */
 
 extern "C" void mcx_matlab_flush(){
-#ifndef MATLAB_MEX_FILE
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
 	mexEvalString("fflush(stdout);");
 #else
 	mexEvalString("pause(.0001);");
