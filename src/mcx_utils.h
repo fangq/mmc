@@ -86,11 +86,16 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
-enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
+enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofJNifti, ofBJNifti};
 enum TOutputDomain {odMesh, odGrid};
 enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU};
 enum TMCXParent  {mpStandalone, mpMATLAB};
 enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
+
+enum TBJData {JDB_mixed, JDB_nulltype, JDB_noop,JDB_true,JDB_false,
+     JDB_char,JDB_string,JDB_hp,JDB_int8,JDB_uint8,JDB_int16,JDB_int32,
+     JDB_int64,JDB_single,JDB_double,JDB_array,JDB_object,JDB_numtypes,
+     JDB_uint16=10,JDB_uint32,JDB_uint64};
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -257,6 +262,12 @@ typedef struct MMC_config{
 	unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
 	unsigned int gpuid;
 	int compute;
+        char isdumpjson;             /**<1 to save json */
+	int  zipid;                  /**<data zip method "zlib","gzip","base64","lzip","lzma","lz4","lz4hc"*/
+        unsigned int savedetflag;    /**<a flag to control the output fields of detected photon data*/
+	uint mediabyte;
+        char *shapedata;    /**<a pointer points to a string defining the JSON-formatted shape data*/
+	char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
 } mcconfig;
 
 #ifdef	__cplusplus
@@ -274,7 +285,7 @@ void mcx_clearcfg(mcconfig *cfg);
 void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
 void mcx_usage(char *exename,mcconfig *cfg);
-void mcx_loadvolume(char *filename,mcconfig *cfg);
+void mcx_loadvolume(char *filename,mcconfig *cfg,int isbuf);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
@@ -289,6 +300,14 @@ int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
 void mcx_printheader(mcconfig *cfg);
 void mcx_cleargpuinfo(GPUInfo **gpuinfo);
+void mcx_convertcol2row(unsigned int **vol, uint3 *dim);
+void mcx_convertcol2row4d(unsigned int **vol, uint4 *dim);
+void mcx_savejdata(char *filename, mcconfig *cfg);
+int  mcx_jdataencode(void *vol,  int ndim, uint *dims, char *type, int byte, int zipid, void *obj, int isubj, mcconfig *cfg);
+int  mcx_jdatadecode(void **vol, int *ndim, uint *dims, int maxdim, char **type, cJSON *obj, mcconfig *cfg);
+void mcx_savejnii(OutputType *vol, int ndim, uint *dims, float *voxelsize, char* name, int isfloat, mcconfig *cfg);
+void mcx_savebnii(OutputType *vol, int ndim, uint *dims, float *voxelsize, char* name, int isfloat, mcconfig *cfg);
+void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP

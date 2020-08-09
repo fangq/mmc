@@ -94,5 +94,6 @@ typedef struct MMC_uint2{
 
 
 typedef unsigned int uint;
+typedef unsigned char uchar;
 
 #endif

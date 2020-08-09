@@ -26,9 +26,12 @@ BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
 CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
-INCLUDEDIR := $(MMCDIR)/src
+INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
 MAKE       := make
+
+ZMATLIB    :=libzmat.a
+USERARFLAGS?=$(ZMATLIB) -lz
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL  ?=-lOpenCL
@@ -176,7 +179,7 @@ mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 oct:            BINARY=mmc.mex
 oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
-oct octomp:     USERARFLAGS=-o $(BINDIR)/mmc
+oct octomp:     USERARFLAGS+=-o $(BINDIR)/mmc
 
 debug:     sse
 debug:     CUCCOPT+=-DMCX_DEBUG
@@ -206,6 +209,7 @@ $(SUBDIRS):
 
 makedirs:
 	@if test ! -d $(OBJDIR); then $(MKDIR) $(OBJDIR); fi
+	@if test ! -d $(OBJDIR)/ubj; then $(MKDIR) $(OBJDIR)/ubj; fi
 	@if test ! -d $(BINDIR); then $(MKDIR) $(BINDIR); fi
 
 makedocdir:
@@ -237,9 +241,13 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
 
 ##  Link  ##
-$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(OBJS)
+$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
+
+
+$(ZMATLIB):
+	-$(MAKE) -C zmat lib AR=ar CPPOPT="$(DLLFLAG)" CCOPT="$(DLLFLAG)" USERLINKOPT=
 
 ##  Documentation  ##
 doc: makedocdir
@@ -247,6 +255,7 @@ doc: makedocdir
 
 ## Clean
 clean:
+	-$(MAKE) -C zmat clean
 	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
