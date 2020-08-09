@@ -1,0 +1,48 @@
+language: cpp
+
+sudo: enabled
+
+compiler:
+  - gcc
+
+matrix:
+  include:
+    - os: linux
+      name: Ubuntu 16.04
+      dist: xenial
+    - os: linux
+      name: Ubuntu 18.04
+      dist: bionic
+    - os: windows
+      name: Windows
+    - os: osx
+      name: OSX
+      env:
+      - CC=gcc-9
+      - CXX=g++-9
+      - AR=g++-9
+
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get install ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev; fi
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then choco install opencl-intel-cpu-runtime; fi
+
+addons:
+  apt:
+    packages:
+    - ocl-icd-libopencl1
+    - opencl-headers
+    - ocl-icd-opencl-dev
+    - liboctave-dev
+    update: true
+
+script:
+    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+         make -C src oct;
+         make -C src clean;
+         make -C src;
+      elif [ "$TRAVIS_OS_NAME" = "windows" ] ; then
+         mingw32-make -C src;
+      else
+         find /usr/local/Cellar/gcc -name libgomp.a -exec sudo ln -sf '{}' /usr/local/lib/ \; ;
+         make -C src AR=g++-9 CC=gcc-9 CXX=g++-9;
+      fi

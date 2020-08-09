@@ -26,7 +26,7 @@
  * MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
  ******************************************************************************/
 
-/* $Rev      $ on $Date              $ */
+/* $Rev      $ on $Date                         $ */
 
 #ifndef __OPENCL_H
 #define __OPENCL_H

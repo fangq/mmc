@@ -1,31 +1,23 @@
-===============================================================================
-=                       Mesh-based Monte Carlo (MMC)                          =
-=            Supporting both OpenCL and Multi-threading with SSE4             =
-===============================================================================
+---------------------------------------------------------------------
+=                  Mesh-based Monte Carlo (MMC)                     =
+        Supporting both OpenCL and Multi-threading with SSE4
+---------------------------------------------------------------------
 
-Author:  Qianqian Fang <q.fang at neu.edu>
-License: GNU General Public License version 3 (GPL v3), see License.txt
-Version: 1.9 (v2019.10, Moon Cake - alpha)
-URL:     http://mcx.space/mmc
 
--------------------------------------------------------------------------------
-
-Table of Content:
-
-O.   What's New
-I.   Introduction
-II.  Downloading and Compiling MMC
-III. Running Simulations
-IV.  Plotting the Results
-V.   Known Issues and TODOs
-VI   Getting Involved
-VII. Acknowledgement
-VIII.Reference
-
+*Author:  Qianqian Fang <q.fang at neu.edu>
+*License: GNU General Public License version 3 (GPL v3), see License.txt
+*Version: 1.9 (v2019.10, Moon Cake - alpha)
+*URL:     http://mcx.space/mmc
 
 ---------------------------------------------------------------------
 
-O.    What's New
+Table of Content:
+
+<toc>
+
+---------------------------------------------------------------------
+
+== # What's New ==
 
 MMC v2019.10 (1.9) is a major update to MMC. For the first time, MMC adds
 GPU support via the newly implemented OpenCL version. The released package
@@ -64,7 +56,7 @@ Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
 
 ------------------------------------------------------------------------------- 
 
-I.  Introduction
+== # Introduction ==
 
 Mesh-based Monte Carlo (MMC) is a 3D Monte Carlo (MC) simulation software 
 for photon transport in complex turbid media. MMC combines the strengths
@@ -96,9 +88,9 @@ eXtreme, or MCX [2]).
 The most relevant publication describing this work is the GPU-accelerated
 MMC paper:
 
-  Qianqian Fang and Shijie Yan, "GPU-accelerated mesh-based Monte Carlo 
-  photon transport simulations," J. of Biomedical Optics, in press, 2019.
-  Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
+Qianqian Fang and Shijie Yan, "GPU-accelerated mesh-based Monte Carlo 
+photon transport simulations," J. of Biomedical Optics, in press, 2019.
+Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
 
 Please keep in mind that MMC is only a partial implementation of the 
 general Mesh-based Monte Carlo Method (MMCM). The limitations and issues
@@ -109,9 +101,9 @@ sure you have correctly understood the details of the implementation.
 
 The details of MMCM can be found in the following paper:
 
-  Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
-  in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
-  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-1-1-165
+Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
+in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
+URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-1-1-165
 
 While the original MMC paper was based on the Plücker coordinates, a number
 of more efficient SIMD-based ray-tracers, namely, Havel SSE4 ray-tracer, 
@@ -119,43 +111,43 @@ Badouel SSE ray-tracer and branchless-Badouel SSE ray-tracer (fastest) have
 been added since 2011. These methods can be selected by the -M flag. The 
 details of these methods can be found in the below paper
 
-  Qianqian Fang and David R. Kaeli, 
-  "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"
-  Biomed. Opt. Express 3(12), 3223-3230 (2012)
-  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223
+Qianqian Fang and David R. Kaeli, 
+"Accelerating mesh-based Monte Carlo method on modern CPU architectures,"
+Biomed. Opt. Express 3(12), 3223-3230 (2012)
+URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223
   
 and their key differences compared to another mesh-based MC simulator, 
 TIM-OS, are discussed in 
 
-  Qianqian Fang, "Comment on 'A study on tetrahedron-based inhomogeneous 
-  Monte-Carlo optical simulation'," Biomed. Opt. Express, vol. 2(5) 1258-1264, 2011.
-  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-2-5-1258
+Qianqian Fang, "Comment on 'A study on tetrahedron-based inhomogeneous 
+Monte-Carlo optical simulation'," Biomed. Opt. Express, vol. 2(5) 1258-1264, 2011.
+URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-2-5-1258
 
 In addition, the generalized MMC algorithm for wide-field sources and detectors are
 described in the following paper, and was made possible with the collaboration
 with Ruoyang Yao and Prof. Xavier Intes from RPI
 
-  Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for
-  wide-field illumination and detection via mesh retessellation,"
-  Biomed. Optics Express, 7(1), 171-184 (2016)
-  URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171
+Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for
+wide-field illumination and detection via mesh retessellation,"
+Biomed. Optics Express, 7(1), 171-184 (2016)
+URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171
 
 In addition, we have been developing a fast approach to build the
 Jacobian matrix for solving inverse problems. The technique is called
 "photon replay", and is described in details in the below paper:
 
-  Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians for 
-  diffuse optical tomography using perturbation Monte Carlo-based 
-  photon 'replay'," Biomed. Optics Express, in press, (2018)
+Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians for 
+diffuse optical tomography using perturbation Monte Carlo-based 
+photon 'replay'," Biomed. Optics Express, in press, (2018)
 
 In 2019, we published an improved MMC algorithm, named "dual-grid MMC", 
 or DMMC, in the below JBO Letter. This method allows to use separate mesh
 for ray-tracing and fluence storage, and can be 2 to 3 fold faster
 than the original MMC without loss of accuracy. 
 
-  Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based 
-  Monte Carlo algorithm for efficient photon1transport simulations in 
-  complex 3-D media," J. of Biomedical Optics, 24(2), 020503 (2019).
+Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based 
+Monte Carlo algorithm for efficient photon1transport simulations in 
+complex 3-D media," J. of Biomedical Optics, 24(2), 020503 (2019).
 
 The authors of the papers are greatly appreciated if you can cite 
 the above papers as references if you use MMC and related software
@@ -163,7 +155,7 @@ in your publication.
 
 -------------------------------------------------------------------------------
 
-II. Download and Compile MMC
+== # Download and Compile MMC ==
 
 The latest release of MMC can be downloaded from the following URL:
 
@@ -207,12 +199,13 @@ this will create a fully optimized OpenCL based mmc executable,
 located under the mmc/src/bin/ folder.
 
 Other compilation options include
-
+<pre>
   make ssemath  # this uses SSE4 for both vector operations and math functions
   make omp      # this compiles a multi-threaded binary using OpenMP
   make release  # create a single-threaded optimized binary
   make prof     # this makes a binary to produce profiling info for gprof
   make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
+</pre>
 
 if you want to generate a portable binary that does not require external 
 library files, you may use (only works for Linux and Windows with gcc)
@@ -267,10 +260,10 @@ gcc.
 
 -------------------------------------------------------------------------------
 
-III. Running Simulations
+== # Running Simulations ==
 
 
-3.1 Preparation
+=== Preparation ===
 
 Before you create/run your own MMC simulations, we suggest you
 first understanding all the examples under the mmc/example 
@@ -293,7 +286,7 @@ the "elem" array and make sure all elements are oriented in the
 same direction. Otherwise, MMC will give incorrect results.
 
 
-3.2 Command line options
+=== Command line options ===
 
 The full command line options of MMC include the following:
 <pre>
@@ -403,36 +396,39 @@ where possible parameters include (the first item in [] is the default value)
 </pre>
 
 
-3.3 Input files
+=== Input files ===
 
 The simplest example can be found under the "example/onecube" 
 folder. Please run "createmesh.m" first from Matlab/Octave to 
 create all the mesh files, which include
-
-  elem_onecube.dat    -- tetrahedral element file
-  facenb_onecube.dat  -- element neighbors of each face
-  node_onecube.dat    -- node coordinates
-  prop_onecube.dat    -- optical properties of each element type
-  velem_onecube.dat   -- volume of each element
+<pre>
+elem_onecube.dat    -- tetrahedral element file
+facenb_onecube.dat  -- element neighbors of each face
+node_onecube.dat    -- node coordinates
+prop_onecube.dat    -- optical properties of each element type
+velem_onecube.dat   -- volume of each element
+</pre>
 
 The input file of the example is named "onecube.inp", where we
 specify most of the simulation parameters. The input file follows
 a similar format as in MCX, which looks like the following
 
- 100                  # total photon number (can be overwriten by -n)
- 17182818             # RNG seed, negative to regenerate
- 2. 8. 0.             # source position (mm)
- 0. 0. 1.             # initial incident vector
- 0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
- onecube              # mesh id: name stub to all mesh files
- 3                    # index of element (starting from 1) which encloses the source
- 3       1.0          # detector number and radius (mm)
- 2.0     6.0    0.0   # detector 1 position (mm)
- 2.0     4.0    0.0   # ...
- 2.0     2.0    0.0
- pencil               # optional: source type
- 0 0 0 0              # optional: source parameter set 1
- 0 0 0 0              # optional: source parameter set 2
+<pre>
+100                  # total photon number (can be overwriten by -n)
+17182818             # RNG seed, negative to regenerate
+2. 8. 0.             # source position (mm)
+0. 0. 1.             # initial incident vector
+0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
+onecube              # mesh id: name stub to all mesh files
+3                    # index of element (starting from 1) which encloses the source
+3       1.0          # detector number and radius (mm)
+2.0     6.0    0.0   # detector 1 position (mm)
+2.0     4.0    0.0   # ...
+2.0     2.0    0.0
+pencil               # optional: source type
+0 0 0 0              # optional: source parameter set 1
+0 0 0 0              # optional: source parameter set 2
+</pre>
 
 The mesh files are linked through the "mesh id" (a name stub) with a 
 format of {node|elem|facenb|velem}_meshid.dat. All mesh files must 
@@ -464,7 +460,7 @@ can find "createmesh" scripts and post-processing script to make
 plots from the simulation results.
 
 
-3.4 JSON-formatted input files
+=== JSON-formatted input files ===
 
 Starting from version 0.9, MMC accepts a JSON-formatted input file in
 addition to the conventional tMCimg-like input format. JSON 
@@ -475,8 +471,8 @@ and easy-to-interface with other applications (like MATLAB).
 
 A sample JSON input file can be found under the examples/onecube
 folder. The same file, onecube.json, is also shown below:
-
- {
+<pre>
+{
     "Domain": {
 	"MeshID": "onecube",
 	"InitElem": 3
@@ -514,7 +510,8 @@ folder. The same file, onecube.json, is also shown below:
             }
 	]
     }
- }
+}
+</pre>
 
 A JSON input file requires 4 root objects, namely "Domain", "Session", "Forward" 
 and "Optode". Each object is a data structure providing information
@@ -535,12 +532,13 @@ MMC accepts an alternative form of JSON input, but using it is not
 recommended. In the alternative format, you can use 
  "rootobj_name.field_name": value 
 to represent any parameter directly in the root level. For example
-
- {
+<pre>
+{
     "Domain.MeshID": "onecube",
     "Session.ID": "onecube",
     ...
- }
+}
+</pre>
 
 You can even mix the alternative format with the standard format. 
 If any input parameter has values in both formats in a single input 
@@ -562,10 +560,10 @@ If your JSON input file is invalid, MMC will quit and point out
 where it expects you to double check.
 
 
-3.5 Photon debugging information using -D flag
+=== Photon debugging information using -D flag ===
 
 the output format for -D M (photon moving) is below:
-
+<pre>
 ? px py pz eid id scat
 
 ? is a single letter representing the state of the current position:
@@ -603,10 +601,11 @@ E  px py pz vx vy vz w eid
 
 vx vy vz: the unitary propagation vector when the photon exits
 w: the current photon weight
+</pre>
 
 -------------------------------------------------------------------------------
 
-IV. Plotting the Results
+=== Plotting the Results ===
 
 As described above, MMC produces a fluence-rate output file as
 "session-id".dat. By default, this file contains the normalized,
@@ -654,7 +653,7 @@ readings without rerunning the simulation (for absorption changes only).
 
 -------------------------------------------------------------------------------
 
-V. Known issues and TODOs
+== # Known issues and TODOs ==
 
 * MMC only supports linear tetrahedral elements at this point. Quadratic \
  elements will be added later
@@ -664,7 +663,7 @@ V. Known issues and TODOs
 
 -------------------------------------------------------------------------------
 
-VI.   Getting Involved
+== # Getting Involved ==
 
 MMC is an open-source software. It is released under the terms of GNU 
 General Public License version 3 (GPLv3). That means not only everyone 
@@ -698,121 +697,123 @@ found from this link:
 
 -------------------------------------------------------------------------------
 
-VII.  Acknowledgement
+== # Acknowledgement ==
 
 MMC uses the following open-source libraries:
 
 === SSE Math library by Julien Pommier ===
 
-  Copyright (C) 2007  Julien Pommier
+Copyright (C) 2007  Julien Pommier
 
-  This software is provided 'as-is', without any express or implied
-  warranty.  In no event will the authors be held liable for any damages
-  arising from the use of this software.
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-  Permission is granted to anyone to use this software for any purpose,
-  including commercial applications, and to alter it and redistribute it
-  freely, subject to the following restrictions:
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
 
-  1. The origin of this software must not be misrepresented; you must not
-     claim that you wrote the original software. If you use this software
-     in a product, an acknowledgment in the product documentation would be
-     appreciated but is not required.
-  2. Altered source versions must be plainly marked as such, and must not be
-     misrepresented as being the original software.
-  3. This notice may not be removed or altered from any source distribution.
+1. The origin of this software must not be misrepresented; you must not
+claim that you wrote the original software. If you use this software
+in a product, an acknowledgment in the product documentation would be
+appreciated but is not required.
 
-  (this is the zlib license)
+2. Altered source versions must be plainly marked as such, and must not be
+misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
+
+(this is the zlib license)
 
 === cJSON library by Dave Gamble ===
 
-  Copyright (c) 2009 Dave Gamble
+Copyright (c) 2009 Dave Gamble
 
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 === SFMT library by Mutsuo Saito, Makoto Matsumoto and Hiroshima University  ===
 
-  Copyright (c) 2006,2007 Mutsuo Saito, Makoto Matsumoto and Hiroshima
-  University. All rights reserved.
+Copyright (c) 2006,2007 Mutsuo Saito, Makoto Matsumoto and Hiroshima
+University. All rights reserved.
 
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are
-  met:
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
 
-      * Redistributions of source code must retain the above copyright
-	notice, this list of conditions and the following disclaimer.
-      * Redistributions in binary form must reproduce the above
-	copyright notice, this list of conditions and the following
-	disclaimer in the documentation and/or other materials provided
-	with the distribution.
-      * Neither the name of the Hiroshima University nor the names of
-	its contributors may be used to endorse or promote products
-	derived from this software without specific prior written
-	permission.
+* Redistributions of source code must retain the above copyright \
+ notice, this list of conditions and the following disclaimer. 
+* Redistributions in binary form must reproduce the above \
+ copyright notice, this list of conditions and the following \
+ disclaimer in the documentation and/or other materials provided \
+ with the distribution.
+* Neither the name of the Hiroshima University nor the names of \
+ its contributors may be used to endorse or promote products \
+ derived from this software without specific prior written \
+ permission.
 
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 === drand48_r port for libgw32c by Free Software Foundation ===
 
-   Copyright (C) 1995, 1997, 2001 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
-   Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
+Copyright (C) 1995, 1997, 2001 Free Software Foundation, Inc.
+This file is part of the GNU C Library.
+Contributed by Ulrich Drepper <drepper@gnu.ai.mit.edu>, August 1995.
 
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
+The GNU C Library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
 
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
+The GNU C Library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
 
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA.
+You should have received a copy of the GNU Lesser General Public
+License along with the GNU C Library; if not, write to the Free
+Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307 USA.
 
 === git-rcs-keywords by Martin Turon (turon) at Github ===
 
-   MMC includes a pair of git filters (.git_filters/rcs-keywords.clean
-   and .git_filters/rcs-keywords.smudge) to automatically update SVN
-   keywords in mcx_utils.c. The two simple filter scripts were licensed
-   under the BSD license according to this link:
+MMC includes a pair of git filters (.git_filters/rcs-keywords.clean
+and .git_filters/rcs-keywords.smudge) to automatically update SVN
+keywords in mcx_utils.c. The two simple filter scripts were licensed
+under the BSD license according to this link:
 
-   https://github.com/turon/git-rcs-keywords/issues/4
+https://github.com/turon/git-rcs-keywords/issues/4
 
-   Both filter files were significantly modified by Qianqian Fang.
+Both filter files were significantly modified by Qianqian Fang.
  
 -------------------------------------------------------------------------------
 
-VIII.  Reference
+== # Reference ===
 
 [1] http://iso2mesh.sf.net  -- an image-based surface/volumetric mesh generator
 [2] http://mcx.sf.net       -- Monte Carlo eXtreme: a GPU-accelerated MC code

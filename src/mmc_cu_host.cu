@@ -752,6 +752,7 @@ void mmc_run_simulation(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,GPUInfo 
     CUDA_ASSERT(cudaFree(gsrcpattern));
   CUDA_ASSERT(cudaFree(greporter));
 
+  #pragma omp master
   if (gpu)
     free(gpu);
 
