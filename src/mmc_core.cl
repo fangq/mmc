@@ -1108,7 +1108,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton, __constant MCX
 	energy[idx<<1]=energyesc;
 	energy[1+(idx<<1)]=energytot;
 
-        if(gcfg->debuglevel & MCX_DEBUG_PROGRESS)
+        if(gcfg->debuglevel & MCX_DEBUG_PROGRESS && progress)
             atomic_inc(progress);
 	atomicadd(&(reporter->raytet),raytet);
 }

@@ -74,7 +74,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      cl_uint  totalcucore;
      cl_uint  devid=0;
-     cl_mem gnode,gelem,gtype,gfacenb,gsrcelem,gnormal,gproperty,gparam,gdetpos; /*read-only buffers*/
+     cl_mem *gnode=NULL,*gelem=NULL,*gtype=NULL,*gfacenb=NULL,*gsrcelem=NULL,*gnormal=NULL,*gproperty=NULL,*gparam=NULL,*gdetpos=NULL; /*read-only buffers*/
      cl_mem *gweight,*gdref,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
      cl_mem *gprogress=NULL,*gdetected, *gsrcpattern;  /*read-write buffers*/
 
@@ -121,7 +121,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      /* Use NULL for backward compatibility */
      cl_context_properties* cprops=(platform==NULL)?NULL:cps;
-     OCL_ASSERT(((mcxcontext=clCreateContextFromType(cprops,CL_DEVICE_TYPE_ALL,NULL,NULL,&status),status)));
+     OCL_ASSERT(((mcxcontext=clCreateContext(cprops,workdev,devices,NULL,NULL,&status),status)));
 
      mcxqueue= (cl_command_queue*)malloc(workdev*sizeof(cl_command_queue));
      waittoread=(cl_event *)malloc(workdev*sizeof(cl_event));
@@ -131,10 +131,21 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      gdref=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gdetphoton=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      genergy=(cl_mem *)malloc(workdev*sizeof(cl_mem));
-     gprogress=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gdetected=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gsrcpattern=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      greporter=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+
+     gnode=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gelem=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gtype=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gfacenb=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gsrcelem=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gnormal=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gproperty=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gparam=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gdetpos=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+
+     gprogress=(cl_mem *)malloc(workdev*sizeof(cl_mem));
 
      /* The block is to move the declaration of prop closer to its use */
      cl_command_queue_properties prop = CL_QUEUE_PROFILING_ENABLE;
@@ -201,22 +212,6 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      else
         srand(time(0));
 
-     OCL_ASSERT(((gnode=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float3)*(mesh->nn),mesh->node,&status),status)));
-     OCL_ASSERT(((gelem=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int4)*(mesh->ne),mesh->elem,&status),status)));
-     OCL_ASSERT(((gtype=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->ne),mesh->type,&status),status)));
-     OCL_ASSERT(((gfacenb=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int4)*(mesh->ne),mesh->facenb,&status),status)));
-     if(mesh->srcelemlen>0)
-         OCL_ASSERT(((gsrcelem=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->srcelemlen),mesh->srcelem,&status),status)));
-     else
-         gsrcelem=NULL;
-     OCL_ASSERT(((gnormal=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float4)*(mesh->ne)*4,tracer->n,&status),status)));
-     if(cfg->detpos && cfg->detnum)
-           OCL_ASSERT(((gdetpos=clCreateBuffer(mcxcontext,RO_MEM, cfg->detnum*sizeof(float4),cfg->detpos,&status),status)));
-     else
-         gdetpos=NULL;
-
-     OCL_ASSERT(((gproperty=clCreateBuffer(mcxcontext,RO_MEM, (mesh->prop+1+cfg->isextdet)*sizeof(medium),mesh->med,&status),status)));
-     OCL_ASSERT(((gparam=clCreateBuffer(mcxcontext,RO_MEM, sizeof(MCXParam),&param,&status),status)));
      cl_mem (*clCreateBufferNV)(cl_context,cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*) = (cl_mem (*)(cl_context,cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*)) clGetExtensionFunctionAddressForPlatform(platform, "clCreateBufferNV");
      if (clCreateBufferNV == NULL)
          OCL_ASSERT(((gprogress[0]=clCreateBuffer(mcxcontext,RW_PTR, sizeof(cl_uint),NULL,&status),status)));
@@ -226,6 +221,23 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      *progress=0;
 
      for(i=0;i<workdev;i++){
+       OCL_ASSERT(((gnode[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float3)*(mesh->nn),mesh->node,&status),status)));
+       OCL_ASSERT(((gelem[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int4)*(mesh->ne),mesh->elem,&status),status)));
+       OCL_ASSERT(((gtype[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->ne),mesh->type,&status),status)));
+       OCL_ASSERT(((gfacenb[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int4)*(mesh->ne),mesh->facenb,&status),status)));
+       if(mesh->srcelemlen>0)
+           OCL_ASSERT(((gsrcelem[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(int)*(mesh->srcelemlen),mesh->srcelem,&status),status)));
+       else
+           gsrcelem[i]=NULL;
+       OCL_ASSERT(((gnormal[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float4)*(mesh->ne)*4,tracer->n,&status),status)));
+       if(cfg->detpos && cfg->detnum)
+             OCL_ASSERT(((gdetpos[i]=clCreateBuffer(mcxcontext,RO_MEM, cfg->detnum*sizeof(float4),cfg->detpos,&status),status)));
+       else
+           gdetpos[i]=NULL;
+
+       OCL_ASSERT(((gproperty[i]=clCreateBuffer(mcxcontext,RO_MEM, (mesh->prop+1+cfg->isextdet)*sizeof(medium),mesh->med,&status),status)));
+       OCL_ASSERT(((gparam[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(MCXParam),&param,&status),status)));
+
        Pseed=(cl_uint*)malloc(sizeof(cl_uint)*gpu[i].autothread*RAND_SEED_WORD_LEN);
        energy=(cl_float*)calloc(sizeof(cl_float),gpu[i].autothread<<1);
        for (j=0; j<gpu[i].autothread*RAND_SEED_WORD_LEN;j++)
@@ -291,12 +303,12 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      size_t len;
      // get the details on the error, and store it in buffer
-     clGetProgramBuildInfo(mcxprogram,devices[devid],CL_PROGRAM_BUILD_LOG,0,NULL,&len);
+     clGetProgramBuildInfo(mcxprogram,devices[0],CL_PROGRAM_BUILD_LOG,0,NULL,&len);
      if(len>0){
          char *msg;
 	 int i;
          msg=(char *)calloc(len,1);
-         clGetProgramBuildInfo(mcxprogram,devices[devid],CL_PROGRAM_BUILD_LOG,len,msg,NULL);
+         clGetProgramBuildInfo(mcxprogram,devices[0],CL_PROGRAM_BUILD_LOG,len,msg,NULL);
          for(i=0;i<(int)len;i++)
              if(msg[i]<='z' && msg[i]>='A'){
                  MMC_FPRINTF(cfg->flog,"Kernel build log:\n%s\n", msg);
@@ -323,22 +335,22 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 	 OCL_ASSERT(((mcxkernel[i] = clCreateKernel(mcxprogram, "mmc_main_loop", &status),status)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 0, sizeof(cl_uint),(void*)&threadphoton)));
          OCL_ASSERT((clSetKernelArg(mcxkernel[i], 1, sizeof(cl_uint),(void*)&oddphotons)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 2, sizeof(cl_mem), (void*)&gparam)));
+	 //OCL_ASSERT((clSetKernelArg(mcxkernel[i], 2, sizeof(cl_mem), (void*)(gparam+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, cfg->issavedet? sizeof(cl_float)*((int)gpu[i].autoblock)*detreclen : sizeof(int), NULL)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)&gnode)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)&gelem)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)(gnode+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)(gelem+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 6, sizeof(cl_mem), (void*)(gweight+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 7, sizeof(cl_mem), (void*)(gdref+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)&gtype)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 9, sizeof(cl_mem), (void*)&gfacenb)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],10, sizeof(cl_mem), (void*)&gsrcelem)));	 
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],11, sizeof(cl_mem), (void*)&gnormal)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],12, sizeof(cl_mem), (void*)&gproperty)));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],13, sizeof(cl_mem), (void*)&gdetpos)));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)(gtype+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i], 9, sizeof(cl_mem), (void*)(gfacenb+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],10, sizeof(cl_mem), (void*)(gsrcelem+i))));	 
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],11, sizeof(cl_mem), (void*)(gnormal+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],12, sizeof(cl_mem), (void*)(gproperty+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],13, sizeof(cl_mem), (void*)(gdetpos+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],14, sizeof(cl_mem), (void*)(gdetphoton+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],15, sizeof(cl_mem), (void*)(gdetected+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],16, sizeof(cl_mem), (void*)(gseed+i))));
-	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (void*)(gprogress))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (i==0)?((void*)(gprogress)):NULL)));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],18, sizeof(cl_mem), (void*)(genergy+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],19, sizeof(cl_mem), (void*)(greporter+i))));
 	// OCL_ASSERT((clSetKernelArg(mcxkernel[i], 8, sizeof(cl_mem), (void*)(gsrcpattern+i))));
@@ -372,13 +384,14 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 	   param.tend=twindow1;
 
            for(devid=0;devid<workdev;devid++){
-               OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gparam,CL_TRUE,0,sizeof(MCXParam),&param, 0, NULL, NULL)));
-               OCL_ASSERT((clSetKernelArg(mcxkernel[devid],2, sizeof(cl_mem), (void*)&gparam)));
+               OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid],gparam[devid],CL_TRUE,0,sizeof(MCXParam),&param, 0, NULL, NULL)));
+               OCL_ASSERT((clSetKernelArg(mcxkernel[devid],2, sizeof(cl_mem), (void*)(gparam+devid))));
+
                // launch mcxkernel
 #ifndef USE_OS_TIMER
                OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid],mcxkernel[devid],1,NULL,&gpu[devid].autothread,&gpu[devid].autoblock, 0, NULL, &kernelevent)));
 #else
-               OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid],mcxkernel[devid],1,NULL,&gpu[devid].autothread,&gpu[devid].autoblock, 0, NULL, NULL)));
+               OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid],mcxkernel[devid],1,NULL,&gpu[devid].autothread,&gpu[devid].autoblock, 0, NULL, &waittoread[devid])));
 #endif
                OCL_ASSERT((clFlush(mcxqueue[devid])));
            }
@@ -544,26 +557,27 @@ is more than what your have specified (%d), please use the -H option to specify 
              cfg->energytot,(cfg->energytot-cfg->energyesc)/cfg->energytot*100.f);
      fflush(cfg->flog);
 
-     OCL_ASSERT(clReleaseMemObject(gnode));
-     OCL_ASSERT(clReleaseMemObject(gelem));
-     OCL_ASSERT(clReleaseMemObject(gtype));
-     OCL_ASSERT(clReleaseMemObject(gfacenb));
-     if(gsrcelem) OCL_ASSERT(clReleaseMemObject(gsrcelem));
-     OCL_ASSERT(clReleaseMemObject(gnormal));
-     OCL_ASSERT(clReleaseMemObject(gproperty));
-     OCL_ASSERT(clReleaseMemObject(gparam));
-     if(gdetpos)  OCL_ASSERT(clReleaseMemObject(gdetpos));
-
+     OCL_ASSERT(clReleaseMemObject(gprogress[0]));
      for(i=0;i<workdev;i++){
          OCL_ASSERT(clReleaseMemObject(gseed[i]));
          OCL_ASSERT(clReleaseMemObject(gdetphoton[i]));
          OCL_ASSERT(clReleaseMemObject(gweight[i]));
 	 OCL_ASSERT(clReleaseMemObject(gdref[i]));
          OCL_ASSERT(clReleaseMemObject(genergy[i]));
-         OCL_ASSERT(clReleaseMemObject(gprogress[i]));
          OCL_ASSERT(clReleaseMemObject(gdetected[i]));
          if(gsrcpattern[i]) OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
          OCL_ASSERT(clReleaseMemObject(greporter[i]));
+
+         OCL_ASSERT(clReleaseMemObject(gnode[i]));
+         OCL_ASSERT(clReleaseMemObject(gelem[i]));
+         OCL_ASSERT(clReleaseMemObject(gtype[i]));
+         OCL_ASSERT(clReleaseMemObject(gfacenb[i]));
+         if(gsrcelem[i]) OCL_ASSERT(clReleaseMemObject(gsrcelem[i]));
+         OCL_ASSERT(clReleaseMemObject(gnormal[i]));
+         OCL_ASSERT(clReleaseMemObject(gproperty[i]));
+         OCL_ASSERT(clReleaseMemObject(gparam[i]));
+         if(gdetpos[i])  OCL_ASSERT(clReleaseMemObject(gdetpos[i]));
+
          OCL_ASSERT(clReleaseKernel(mcxkernel[i]));
      }
      free(gseed);
@@ -574,6 +588,17 @@ is more than what your have specified (%d), please use the -H option to specify 
      free(gprogress);
      free(gdetected);
      free(greporter);
+
+     free(gnode);
+     free(gelem);
+     free(gtype);
+     free(gfacenb);
+     free(gsrcelem);
+     free(gnormal);
+     free(gproperty);
+     free(gparam);
+     free(gdetpos);
+
      free(gsrcpattern);
      free(mcxkernel);
 
