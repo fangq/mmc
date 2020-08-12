@@ -30,6 +30,9 @@
 #include "mcx_const.h"
 #include "tictoc.h"
 
+#define IPARAM_TO_MACRO(macro,a,b) sprintf(macro+strlen(macro)," -Dgcfg%s=%u ",    #b,(a.b))
+#define FPARAM_TO_MACRO(macro,a,b) sprintf(macro+strlen(macro)," -Dgcfg%s=%.10ef ",#b,(a.b))
+
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the 
 necessary data structures. This include the command line options (cfg),
@@ -284,13 +287,15 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      if(cfg->optlevel>=1)
          sprintf(opt,"%s ","-cl-mad-enable -DMCX_USE_NATIVE");
+     if(cfg->optlevel>=2)
+         sprintf(opt+strlen(opt),"%s ","-DUSE_MACRO_CONST");
      if(cfg->optlevel>=3)
          sprintf(opt+strlen(opt),"%s ","-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
      
      if((uint)cfg->srctype<sizeof(sourceflag)/sizeof(sourceflag[0]))
          sprintf(opt+strlen(opt),"%s ",sourceflag[(uint)cfg->srctype]);
 
-     sprintf(opt+strlen(opt),"%s",cfg->compileropt);
+     sprintf(opt+strlen(opt),"%s ",cfg->compileropt);
      if(cfg->isatomic)
          sprintf(opt+strlen(opt)," -DUSE_ATOMIC");
      if(cfg->issave2pt==0)
@@ -305,6 +310,37 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
          sprintf(opt+strlen(opt)," -DUSE_DMMC");
      if(cfg->method==rtBLBadouel)
          sprintf(opt+strlen(opt)," -DUSE_BLBADOUEL");
+
+     if(strstr(opt,"USE_MACRO_CONST")){
+	IPARAM_TO_MACRO(opt,param,debuglevel);
+	FPARAM_TO_MACRO(opt,param,dstep);
+	IPARAM_TO_MACRO(opt,param,e0);
+	IPARAM_TO_MACRO(opt,param,elemlen);
+	FPARAM_TO_MACRO(opt,param,focus);
+	IPARAM_TO_MACRO(opt,param,framelen);
+	IPARAM_TO_MACRO(opt,param,isextdet);
+	IPARAM_TO_MACRO(opt,param,ismomentum);
+	IPARAM_TO_MACRO(opt,param,isreflect);
+	IPARAM_TO_MACRO(opt,param,issavedet);
+	IPARAM_TO_MACRO(opt,param,issaveexit);
+	IPARAM_TO_MACRO(opt,param,issaveref);
+	IPARAM_TO_MACRO(opt,param,isspecular);
+	IPARAM_TO_MACRO(opt,param,maxdetphoton);
+	IPARAM_TO_MACRO(opt,param,maxmedia);
+	IPARAM_TO_MACRO(opt,param,maxgate);
+	IPARAM_TO_MACRO(opt,param,maxpropdet);
+	IPARAM_TO_MACRO(opt,param,method);
+	FPARAM_TO_MACRO(opt,param,minenergy);
+	IPARAM_TO_MACRO(opt,param,normbuf);
+	FPARAM_TO_MACRO(opt,param,nout);
+	IPARAM_TO_MACRO(opt,param,outputtype);
+	IPARAM_TO_MACRO(opt,param,reclen);
+	IPARAM_TO_MACRO(opt,param,roulettesize);
+	FPARAM_TO_MACRO(opt,param,Rtstep);
+	IPARAM_TO_MACRO(opt,param,srcelemlen);
+	IPARAM_TO_MACRO(opt,param,srctype);
+	IPARAM_TO_MACRO(opt,param,voidtime);
+     }
 
      MMC_FPRINTF(cfg->flog,"Building kernel with option: %s\n",opt);
      status=clBuildProgram(mcxprogram, 0, NULL, opt, NULL, NULL);
