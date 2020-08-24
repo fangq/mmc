@@ -2,7 +2,7 @@ function varargout=mmclab(varargin)
 %
 %#############################################################################%
 %         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
-%          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
+%          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          %
 %                            http://mcx.space/#mmc                            %
 %                                                                             %
 % Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
@@ -10,7 +10,7 @@ function varargout=mmclab(varargin)
 %                                                                             %
 %               Research funded by NIH/NIGMS grant R01-GM114365               %
 %#############################################################################%
-%$Rev::      $2019.4$Date::                       $ by $Author::             $%
+%$Rev::      $v2020 $Date::                       $ by $Author::             $%
 %#############################################################################%
 %
 % Format:

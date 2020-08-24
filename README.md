@@ -4,7 +4,7 @@ Mesh-based Monte Carlo (MMC) - SSE4 and OpenCL
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
 -   License: GNU General Public License version 3 (GPL v3), see License.txt
--   Version: 1.9 (v2020, Moon Cake - alpha)
+-   Version: 1.9 (v2020, Moon Cake - beta)
 -   URL: <http://mcx.space/mmc>
 
 [![Build Status](https://travis-ci.com/fangq/mmc.svg?branch=master)](https://travis-ci.com/fangq/mmc)
@@ -41,8 +41,7 @@ simultaneously supports CPU-only multi-threading with SSE4 (standard MMC) and
 OpenCL-based MMC on a wide variety of CPU/GPU devices across vendors. Using 
 up-to-date GPU hardware, the MMC simulation speed was increased by 100x to 400x 
 compared to single-threaded SSE4-based MMC simulation. The detailed description 
-of the GPU accelerated MMC can be found in the below in-press paper 
-[Fang2019] and its preprint online.
+of the GPU accelerated MMC can be found in the below paper [Fang2019].
 
 One can choose between the SSE4 and OpenCL based simulation modes using the `-G` 
 or `cfg.gpuid` input options. A device ID of -1 enables SSE4 CPU based MMC, and a 
@@ -55,7 +54,9 @@ Github commit history: <https://github.com/fangq/mmc/commits/master>
 To highlight a few most important updates:
 
 -   Supported GPU using OpenCL in both binary and mmclab
+-   Supported using multiple NVIDIA GPUs
 -   GPU MMC (or MMCL) had been rigirously validated across a range of benchmarks
+-   Supported photon sharing for multiple patterns
 -   Charactrized the speed improvement of MMCL simulations over standard MMC
 -   Created `mmc` and `octave-mmclab` official Fedora packages and disseminate via Fedora repositories
 -   Implemented xorshift128+ RNG unit and used as default for both CPU/GPU MMC
@@ -65,12 +66,30 @@ B2D:d-sphshells, B3:colin27, B4:skin-vessel) for comparisons
 
 Please file bug reports to <https://github.com/fangq/mmc/issues>
 
+Moreover, over the past year, we have also published a high-quality brain
+3D mesh generation pipeline and rigirously compared mmc with voxel based
+MCX, and showed improvement in modeling accuracy. The detail of the mesh
+generation software (Brain2mesh: http://mcx.space/brian2mesh) and the 
+benchmarks can be found in the below [Brain2Mesh2020] paper.
+
+Lastly, we also implemented the photon sharing algorithm to simultaneously 
+simulate multiple pattern sources. This paper is detailed in the recently
+published OL paper, see [Yan2020].
+
+
 Reference:
 
 >**[Fang2019]** Qianqian Fang and Shijie Yan, “GPU-accelerated mesh-based 
 Monte Carlo photon transport simulations,” J. of Biomedical Optics, 24(11), 
 115002 (2019) URL: <http://dx.doi.org/10.1117/1.JBO.24.11.115002>
 
+>**[Brain2Mesh2020]** Anh Phong Tran† , Shijie Yan† , Qianqian Fang*, (2020) "Improving 
+model-based fNIRS analysis using mesh-based anatomical and light-transport models," 
+Neurophotonics, 7(1), 015008, URL: https://doi.org/10.1117/1.NPh.7.1.015008
+
+>**[Yan2020]** Yan S, Yao R, Intes X, and Fang Q*, "Accelerating Monte Carlo modeling 
+of structured-light-based diffuse optical imaging via 'photon sharing'," Opt. Lett. 45, 2842-2845 (2020)
+URL: https://www.biorxiv.org/content/10.1101/2020.02.16.951590v2
 
 Introduction
 ---------------
@@ -189,16 +208,13 @@ and for Fedora/Redhat based GNU/Linux systems, you can type
 
       su -c 'yum install gcc'
 
-To compile the binary with multi-threaded computing via OpenMP, your gcc 
-version should be at least 4.0. To compile the binary supporting SSE4 
-instructions, gcc version should be at least 4.3.4. For windows users, you 
-should install Cygwin64 [3]. During the installation, please select 
-`mingw64-x86_64-gcc` and make packages. You should also install LibGW32C library 
-[4] and copy the missing header files from `GnuWin32\include\glibc` to 
-`C:\cygwin64\usr\include` when you compile the code (these files typically 
-include `ieee754.h`, `features.h`, `endian.h`, `bits/`, `gnu/`, `sys/cdefs.h`, `sys/ioctl.h` 
-and `sys/ttydefaults.h`). For Mac OS X users, you need to install the mp-gcc4.x 
-series from MacPorts or Homebrew and use the instructions below to compile the 
+To compile the binary with multi-threaded computing via OpenMP, 
+your gcc version should be at least 4.0. To compile the binary 
+supporting SSE4 instructions, gcc version should be at least 
+4.3.4. For windows users, you should install Cygwin64 [3] or MSYS2. During the 
+installation, please select mingw64-x86_64-gcc and make packages.
+For Mac OS X users, you need to install the mp-gcc4.x or newer gcc from 
+MacPorts or Homebrew and use the instructions below to compile the 
 MMC source code.
 
 To compile the program, you should first navigate into the mmc/src folder, and 
@@ -298,15 +314,15 @@ The full command line options of MMC include the following:
 ```
 ###############################################################################
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
-#          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #
+#          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          #
 #                            http://mcx.space/#mmc                            #
 #                                                                             #
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
-#            Department of Bioengineering, Northeastern University            #
+#   Department of Bioengineering, Northeastern University, Boston, MA, USA    #
 #                                                                             #
 #                Research funded by NIH/NIGMS grant R01-GM114365              #
 ###############################################################################
-$Rev::57e5d6$2019.10$Date::Qianqian Fang          $ by $Author::Qianqian Fang $
+$Rev::646b41$ v2020 $Date::2020-08-15 22:22:09 -07$ by $Author::Qianqian Fang $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...
@@ -337,6 +353,8 @@ where possible parameters include (the first item in [] is the default value)
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
+
+== GPU options ==
  -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto
       or
@@ -396,9 +414,10 @@ where possible parameters include (the first item in [] is the default value)
 
 == Additional options ==
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save
+ --gridsize     [1|float]      if -M G is used, this sets the grid size in mm
 
 == Example ==
-       mmc -n 1000000 -f input.json -s test -b 0 -D TP
+       mmc -n 1000000 -f input.json -s test -b 0 -D TP -G -1
 ```
 
 ### Input files

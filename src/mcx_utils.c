@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -1558,7 +1558,7 @@ void mcx_savedetphoton(float *ppath, void *seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig *cfg){
-    MMC_ERROR(MMC_INFO,"MMC $Rev::      $2019.4");
+    MMC_ERROR(MMC_INFO,"MMC $Rev::      $v2020");
 }
 
 /**
@@ -1571,15 +1571,15 @@ void mcx_printheader(mcconfig *cfg){
     MMC_FPRINTF(cfg->flog,S_YELLOW"\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
-#          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          #\n\
+#          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          #\n\
 #                            http://mcx.space/#mmc                            #\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
-#            Department of Bioengineering, Northeastern University            #\n\
+#   Department of Bioengineering, Northeastern University, Boston, MA, USA    #\n\
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $2019.10$Date::                       $ by $Author::              $\n\
+$Rev::      $ v2020 $Date::                       $ by $Author::              $\n\
 ###############################################################################\n"S_RESET);
 }
 
@@ -1620,6 +1620,8 @@ where possible parameters include (the first item in [] is the default value)\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
+\n"S_BOLD S_CYAN"\
+== GPU options ==\n"S_RESET"\
  -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable\n\
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto\n\
       or\n\
@@ -1682,7 +1684,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  --gridsize     [1|float]      if -M G is used, this sets the grid size in mm\n\
 \n"S_BOLD S_CYAN"\
 == Example ==\n"S_RESET"\
-       %s -n 1000000 -f input.json -s test -b 0 -D TP\n",exename,
+       %s -n 1000000 -f input.json -s test -b 0 -D TP -G -1\n",exename,
 #ifdef USE_OPENCL
  'G',
 #else
