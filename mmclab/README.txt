@@ -2,7 +2,7 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.9, v2019.10
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.9, v2020
 *URL: http://mcx.space/wiki/?Learn#mmc
 
 <toc>
@@ -52,18 +52,18 @@ formats and examples. The input cfg structure has very similar field names as
 the verbose command line options in MMC.
 
 <pre>
- %#############################################################################%
- %         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
- %          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
- %                            http://mcx.space/#mmc                            %
- %                                                                             %
- % Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
- %            Department of Bioengineering, Northeastern University            %
- %                                                                             %
- %               Research funded by NIH/NIGMS grant R01-GM114365               %
- %#############################################################################%
- %$Rev::57e5d6$2019.4$Date::Qianqian Fang          $ by $Author::Qianqian Fang$%
- %#############################################################################%
+ #############################################################################%
+          MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
+           Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
+                             http://mcx.space/#mmc                            %
+                                                                              %
+  Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
+             Department of Bioengineering, Northeastern University            %
+                                                                              %
+                Research funded by NIH/NIGMS grant R01-GM114365               %
+ #############################################################################%
+ $Rev::c38804$2019.4$Date::Qianqian Fang          $ by $Author::Qianqian Fang$%
+ #############################################################################%
  
   Format:
      [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
@@ -406,6 +406,11 @@ Screenshot for using MMCLAB in GNU Octave:
 [Fang2019] Qianqian Fang* and Shijie Yan, "GPU-accelerated mesh-based \
  Monte Carlo photon transport simulations," J. of Biomedical Optics, in press, 2019. \
  Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
+
+
+[Brain2Mesh2020] Anh Phong Tran† , Shijie Yan† , Qianqian Fang*, (2020) "Improving \
+ model-based fNIRS analysis using mesh-based anatomical and light-transport models," \ 
+ Neurophotonics, 7(1), 015008, URL: https://doi.org/10.1117/1.NPh.7.1.015008
 
 [Fang2010] Fang Q, "Mesh-based Monte Carlo method using fast ray-tracing \
    in Plucker coordinates," Biomed. Opt. Express 1(1), 165-175 (2010) 

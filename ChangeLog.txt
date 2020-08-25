@@ -1,7 +1,54 @@
 Change Log
 
-== MMC 1.9 (v2019.10, Moon Cake - alpha), Qianqian Fang <q.fang at neu.edu> ==
+== MMC 1.9 (v2020, Moon Cake - beta), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2020-08-09*[874c5bf] support multiple NVIDIA GPUs, patch from fangq/mcxcl@c1e3ebb
+ 2020-07-25 [41d4aef] Update README.md
+ 2020-07-24 [f9dd4dd] add markdown version of README, add travis badge
+ 2020-07-24 [3cbccd1] fix oct for travis linux
+ 2020-07-24 [b532d76] use MSYS for travis windows
+ 2020-07-22*[214fc47] add travis ci script
+ 2020-06-28 [a3c98c5] use the new gitfilter format
+ 2020-04-18 [867b2b9] test gpu pointer to avoid error
+ 2020-04-11 [46e1fbe] wrapping opencl api with return value tests, fix a few small memory leaks
+ 2020-04-08 [cb30b31] fix beam focusing issue reported by Luka Rogelj
+ 2020-04-06 [123dc0d] remove mingw64 compilation warnings
+ 2020-04-06 [e65c3a3] define function pointer to update progressbar
+ 2020-04-06 [f3c3b56] fix error when cfg.gpuid is a string
+ 2020-04-05 [e9e04a7] update function name in help info
+ 2020-04-05 [1abe23d] make creating octave mex file work again
+ 2020-04-04 [c6c5d55] prevent ioctl linking with mingw64 gcc compiler
+ 2020-04-03 [c986ab7] use more portable output handle
+ 2020-04-03 [66b8f4f] flush octave compilation command
+ 2020-04-03 [5d3df36] replace %I64u by %zu
+ 2020-04-03 [c20ed88] compile on windows
+ 2020-04-03 [50fbcc7] remove all matlab mex compilation warnings on windows, add installation instruction
+ 2020-04-02 [c8884a4] remove all warnings raised by gcc 8 and 9.3
+ 2020-04-02 [d7becea] add mingw64 mexopts xml file for matlab r2014 or newer
+ 2020-04-02 [085420c] need to select both c and c++ compiler
+ 2020-04-02 [9e8918d] add CL header for better portability
+ 2020-04-02 [8f90d58] add missing header files from mingw64 compiler on windows
+ 2020-04-02 [72f6ded] test buildmmc script on linux
+ 2020-04-02*[387e3ba] add matlab script to build mmclab mex file
+ 2020-03-31 [c01b6ae] test on msys2 gcc compiler
+ 2020-03-30 [92b19e3] switch windows building environment to msys2
+ 2020-03-29 [48e397f] make byte alignment compatible with MS VS
+ 2020-03-25 [a2948be] force updating elemprop if elem contains more than 4 columns
+ 2020-03-25 [18fb6fc] prevent mmclab from crashing if the source is not enclosed
+ 2020-03-25 [d6de33e] use cfg.steps to specify voxel size in DMMC mode, instead of unitinmm
+ 2020-03-25 [7e04588] allow users to set cfg.maxdetphoton in mmclab
+ 2020-03-03*[99312c3] fix wrong ray-tracer problem when compile with omp, finish fedora packaging
+ 2020-02-26 [d4608f4] fix gpuid=-1 does not work bug in mmclab
+ 2020-02-25 [acef8db] update onecube filtering command, fix #51
+ 2020-02-20 [36c4f5f] remove mexsse and octsse, add mexomp and octomp targets
+ 2020-02-20 [8527d82] allow make omp to work again, but currently results are not correct, do not use
+ 2020-02-05 [dbea367] fix all warnings for gcc 7
+ 2020-02-05 [a5ac4a9] update cjson to the latest git version
+ 2019-11-19 [75a4844] use detp.prop and detp.unitinmm if present, similar to mcx #83
+ 2019-11-19 [a89457a] fix time/weight scaling, see mcx bug #83
+ 2019-11-05 [a10b743] revert the previous change, use a more robust condition to find ppath
+ 2019-11-05 [3c3ab43] remove the unneeded condition when converting ppath in loadmch.m, fix mcx bug #82
+ 2019-10-29 [4d7d94f] partially update documentation
  2019-10-29 [a9c4732] rename mmcl executable to mmc
  2019-10-29*[0c3f19f] Merge branch 'mmcl' to 'master', now mmcl is official!
  2019-10-27 [206bedf] fix skinvessel example
