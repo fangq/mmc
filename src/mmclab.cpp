@@ -308,6 +308,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	  }
 	  free(cfg.exportdetected);
 	  cfg.exportdetected=NULL;
+          
+	  if(nlhs>=3 && cfg.issaveseed && cfg.exportseed){
+               fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=cfg.detectedcount; fielddim[2]=0; fielddim[3]=0; 
+               mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
+               memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0)), cfg.exportseed);
+	  }
+	  free(cfg.exportseed);
+	  cfg.exportseed=NULL;
 	}
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);

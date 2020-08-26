@@ -253,6 +253,7 @@ typedef struct MMC_config{
 	int optlevel;
         unsigned int maxdetphoton; /*anticipated maximum detected photons*/
 	double *exportfield;     /*memory buffer when returning the flux to external programs such as matlab*/
+	unsigned char *exportseed;     /*memory buffer when returning the RNG seed to matlab*/
 	float *exportdetected;  /*memory buffer when returning the partial length info to external programs such as matlab*/
 	double energytot, energyabs, energyesc;
 	unsigned int detectedcount; /**<total number of detected photons*/

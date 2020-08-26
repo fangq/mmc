@@ -74,16 +74,17 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      cl_uint  totalcucore;
      cl_uint  devid=0;
      cl_mem *gnode=NULL,*gelem=NULL,*gtype=NULL,*gfacenb=NULL,*gsrcelem=NULL,*gnormal=NULL;
-     cl_mem *gproperty=NULL,*gparam=NULL,*gsrcpattern=NULL;    /*read-only buffers*/
+     cl_mem *gproperty=NULL,*gparam=NULL,*gsrcpattern=NULL,*greplayweight=NULL,*greplaytime=NULL, *greplayseed=NULL;    /*read-only buffers*/
      cl_mem *gweight,*gdref,*gdetphoton,*gseed,*genergy,*greporter;          /*read-write buffers*/
-     cl_mem *gprogress=NULL,*gdetected=NULL;  /*read-write buffers*/
+     cl_mem *gprogress=NULL,*gdetected=NULL,*gphotonseed=NULL;  /*write-only buffers*/
 
      cl_uint meshlen=((cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)<<cfg->nbuffer; // use 4 copies to reduce racing
      
      cl_float  *field,*dref=NULL;
 
      cl_uint   *Pseed=NULL;
-     float  *Pdet=NULL;
+     float     *Pdet=NULL;
+     RandType  *Pphotonseed=NULL;
      char opt[MAX_PATH_LENGTH]={'\0'};
      cl_uint detreclen=(2+((cfg->ismomentum)>0))*mesh->prop+(cfg->issaveexit>0)*6+1;
      cl_uint hostdetreclen=detreclen+1;
@@ -107,7 +108,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 		     cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x,cfg->crop0.y,cfg->crop0.z}}, 
 		     mesh->srcelemlen, {{cfg->bary0.x,cfg->bary0.y,cfg->bary0.z,cfg->bary0.w}}, 
 		     cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
-		     (MIN((MAX_PROP-param.maxpropdet), ((mesh->ne)<<2)) >>2)  /*max count of elem normal data in const mem*/};
+		     (MIN((MAX_PROP-param.maxpropdet), ((mesh->ne)<<2)) >>2),  /*max count of elem normal data in const mem*/
+		     cfg->issaveseed, cfg->seed};
 
      MCXReporter reporter={0.f};
      platform=mcx_list_cl_gpu(cfg,&workdev,devices,&gpu);
@@ -134,6 +136,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      gdetphoton=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      genergy=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gdetected=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     gphotonseed=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      greporter=(cl_mem *)malloc(workdev*sizeof(cl_mem));
 
      gnode=(cl_mem *)malloc(workdev*sizeof(cl_mem));
@@ -147,6 +150,9 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      gprogress=(cl_mem *)malloc(workdev*sizeof(cl_mem));
      gsrcpattern=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     greplayweight=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     greplaytime=(cl_mem *)malloc(workdev*sizeof(cl_mem));
+     greplayseed=(cl_mem *)malloc(workdev*sizeof(cl_mem));
 
      /* The block is to move the declaration of prop closer to its use */
      cl_command_queue_properties prop = CL_QUEUE_PROFILING_ENABLE;
@@ -205,6 +211,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      field=(cl_float *)calloc(sizeof(cl_float)*meshlen,cfg->maxgate);
      dref=(cl_float *)calloc(sizeof(cl_float)*mesh->nf,cfg->maxgate);
      Pdet=(float*)calloc(cfg->maxdetphoton*sizeof(float),hostdetreclen);
+     Pphotonseed=(RandType *)calloc(cfg->maxdetphoton,(sizeof(RandType)*RAND_BUF_LEN));
 
      fieldlen=meshlen*cfg->maxgate;
 
@@ -253,6 +260,7 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
        OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*fieldlen,field,&status),status)));
        OCL_ASSERT(((gdref[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*nflen,dref,&status),status)));
        OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*hostdetreclen,Pdet,&status),status)));
+       OCL_ASSERT(((gphotonseed[i]=clCreateBuffer(mcxcontext,RW_MEM, cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN),Pphotonseed,&status),status)));
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
        OCL_ASSERT(((greporter[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(MCXReporter),&reporter,&status),status)));
@@ -263,6 +271,15 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
            OCL_ASSERT(((gsrcpattern[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*(int)(cfg->srcparam1.x*cfg->srcparam1.y*cfg->srcparam1.z),cfg->srcpattern,&status),status)));
        else
            gsrcpattern[i]=NULL;
+       if(cfg->seed==SEED_FROM_FILE){
+           OCL_ASSERT(((greplayweight[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*cfg->nphoton,cfg->replayweight,&status),status)));
+           OCL_ASSERT(((greplaytime[i]=clCreateBuffer(mcxcontext,RO_MEM, sizeof(float)*cfg->nphoton,cfg->replaytime,&status),status)));
+	   OCL_ASSERT(((greplayseed[i]=clCreateBuffer(mcxcontext,RO_MEM, (sizeof(RandType)*RAND_BUF_LEN)*cfg->nphoton,cfg->photonseed,&status),status)));
+       }else{
+           greplayweight[i]=NULL;
+	   greplaytime[i]=NULL;
+	   greplayseed[i]=NULL;
+       }
        free(Pseed);
        free(energy);
      }
@@ -287,11 +304,11 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 
      if(cfg->optlevel>=1)
          sprintf(opt,"%s ","-cl-mad-enable -DMCX_USE_NATIVE");
-     if(cfg->optlevel>=2)
-         sprintf(opt+strlen(opt),"%s ","-DUSE_MACRO_CONST");
      if(cfg->optlevel>=3)
          sprintf(opt+strlen(opt),"%s ","-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
-     
+     if(cfg->optlevel>=4)
+         sprintf(opt+strlen(opt),"%s ","-DUSE_MACRO_CONST");
+
      if((uint)cfg->srctype<sizeof(sourceflag)/sizeof(sourceflag[0]))
          sprintf(opt+strlen(opt),"%s ",sourceflag[(uint)cfg->srctype]);
 
@@ -397,6 +414,10 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],17, sizeof(cl_mem), (void*)(genergy+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],18, sizeof(cl_mem), (void*)(greporter+i))));
 	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],19, sizeof(cl_mem), (void*)(gsrcpattern+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],20, sizeof(cl_mem), (void*)(greplayweight+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],21, sizeof(cl_mem), (void*)(greplaytime+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],22, sizeof(cl_mem), (void*)(greplayseed+i))));
+	 OCL_ASSERT((clSetKernelArg(mcxkernel[i],23, sizeof(cl_mem), (void*)(gphotonseed+i))));
      }
      MMC_FPRINTF(cfg->flog,"set kernel arguments complete : %d ms %d\n",GetTimeMillis()-tic, param.method);fflush(cfg->flog);
 
@@ -404,6 +425,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
          cfg->exportfield=mesh->weight;
      if(cfg->exportdetected==NULL)
          cfg->exportdetected=(float*)malloc(hostdetreclen*cfg->maxdetphoton*sizeof(float));
+     if(cfg->issaveseed && cfg->exportseed==NULL)
+         cfg->exportseed=(unsigned char*)malloc(cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN));
 
      cfg->energytot=0.f;
      cfg->energyesc=0.f;
@@ -476,8 +499,10 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
              if(cfg->issavedet){
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetected[devid],CL_FALSE,0,sizeof(uint),
                                             &detected, 0, NULL, NULL)));
-                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*cfg->maxdetphoton*hostdetreclen,
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*MIN(detected,cfg->maxdetphoton)*hostdetreclen,
 	                                        Pdet, 0, NULL, NULL)));
+		OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gphotonseed[devid],CL_TRUE,0,MIN(detected,cfg->maxdetphoton)*(sizeof(RandType)*RAND_BUF_LEN),
+	                                        Pphotonseed, 0, NULL, NULL)));
 		if(detected>cfg->maxdetphoton){
 			MMC_FPRINTF(cfg->flog,"WARNING: the detected photon (%d) \
 is more than what your have specified (%d), please use the -H option to specify a greater number\t"
@@ -490,6 +515,10 @@ is more than what your have specified (%d), please use the -H option to specify 
 		if(cfg->exportdetected){
                         cfg->exportdetected=(float*)realloc(cfg->exportdetected,(cfg->detectedcount+detected)*hostdetreclen*sizeof(float));
 	                memcpy(cfg->exportdetected+cfg->detectedcount*(hostdetreclen),Pdet,detected*(hostdetreclen)*sizeof(float));
+			if(cfg->issaveseed){
+                            cfg->exportseed=(unsigned char *)realloc(cfg->exportseed,(cfg->detectedcount+detected)*(sizeof(RandType)*RAND_BUF_LEN));
+	                    memcpy(cfg->exportseed+cfg->detectedcount*sizeof(RandType)*RAND_BUF_LEN,Pphotonseed,detected*(sizeof(RandType)*RAND_BUF_LEN));
+			}
                         cfg->detectedcount+=detected;
 		}
 	     }
@@ -586,7 +615,7 @@ is more than what your have specified (%d), please use the -H option to specify 
          cfg->his.unitinmm=cfg->unitinmm;
          cfg->his.savedphoton=cfg->detectedcount;
          cfg->his.detected=cfg->detectedcount;
-         mesh_savedetphoton(cfg->exportdetected,NULL,cfg->detectedcount,(sizeof(RandType)*RAND_BUF_LEN),cfg);
+         mesh_savedetphoton(cfg->exportdetected,(void*)(cfg->exportseed),cfg->detectedcount,(sizeof(RandType)*RAND_BUF_LEN),cfg);
      }
      if(cfg->issaveref){
 	MMC_FPRINTF(cfg->flog,"saving surface diffuse reflectance ...");
@@ -607,6 +636,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 	 OCL_ASSERT(clReleaseMemObject(gdref[i]));
          OCL_ASSERT(clReleaseMemObject(genergy[i]));
          OCL_ASSERT(clReleaseMemObject(gdetected[i]));
+	 OCL_ASSERT(clReleaseMemObject(gphotonseed[i]));
          OCL_ASSERT(clReleaseMemObject(greporter[i]));
 
          OCL_ASSERT(clReleaseMemObject(gnode[i]));
@@ -617,7 +647,10 @@ is more than what your have specified (%d), please use the -H option to specify 
          OCL_ASSERT(clReleaseMemObject(gnormal[i]));
          OCL_ASSERT(clReleaseMemObject(gproperty[i]));
          OCL_ASSERT(clReleaseMemObject(gparam[i]));
-	 if(gsrcpattern[i]) OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
+	 if(gsrcpattern[i])   OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
+	 if(greplayweight[i]) OCL_ASSERT(clReleaseMemObject(greplayweight[i]));
+	 if(greplayseed[i]) OCL_ASSERT(clReleaseMemObject(greplayseed[i]));
+	 if(greplaytime[i])   OCL_ASSERT(clReleaseMemObject(greplaytime[i]));
 
          OCL_ASSERT(clReleaseKernel(mcxkernel[i]));
      }
@@ -628,6 +661,7 @@ is more than what your have specified (%d), please use the -H option to specify 
      free(genergy);
      free(gprogress);
      free(gdetected);
+     free(gphotonseed);
      free(greporter);
 
      free(gnode);
@@ -640,6 +674,9 @@ is more than what your have specified (%d), please use the -H option to specify 
      free(gparam);
 
      free(gsrcpattern);
+     free(greplayweight);
+     free(greplayseed);
+     free(greplaytime);
      free(mcxkernel);
 
      free(waittoread);
@@ -659,5 +696,6 @@ is more than what your have specified (%d), please use the -H option to specify 
 #endif
      free(field);
      if(Pdet)free(Pdet);
+     if(Pphotonseed)free(Pphotonseed);
      free(dref);
 }

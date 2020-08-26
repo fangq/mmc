@@ -86,7 +86,8 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig{
   cl_uint   nbuffer;
   cl_uint   maxpropdet;
   cl_uint   normbuf;
-  //cl_int    issaveseed;
+  cl_int    issaveseed;
+  cl_uint   seed;
 } MCXParam POST_ALIGN(32);
 
 typedef struct POST_ALIGN(32) GPU_reporter{

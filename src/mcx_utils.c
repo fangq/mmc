@@ -303,6 +303,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->maxdetphoton=1000000; 
      cfg->exportfield=NULL;
      cfg->exportdetected=NULL;
+     cfg->exportseed=NULL;
      cfg->detectedcount=0;
      cfg->energytot=0.f;
      cfg->energyabs=0.f;
@@ -347,6 +348,8 @@ void mcx_clearcfg(mcconfig *cfg){
         free(cfg->replayweight);
      if(cfg->replaytime)
         free(cfg->replaytime);
+     if(cfg->exportseed)
+        free(cfg->exportseed);
      if(cfg->exportdetected)
         free(cfg->exportdetected);
      if(cfg->flog && cfg->flog!=stdout && cfg->flog!=stderr)

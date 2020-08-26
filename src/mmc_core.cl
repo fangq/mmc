@@ -243,6 +243,7 @@
 #define MCX_DEBUG_PROGRESS  2048
 
 #define MMC_UNDEFINED      (3.40282347e+38F)
+#define SEED_FROM_FILE      -999                         /**< special flag indicating to load seeds from history file */
 
 #define MIN(a,b)           ((a)<(b)?(a):(b))
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
@@ -264,8 +265,8 @@ typedef struct MMC_Ray{
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 	//int nexteid;                  /**< the index to the neighboring tet to be moved into */
 	//float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
-	//float slen0;                  /**< initial unitless scattering length = length*mus */
-	//unsigned int photonid;        /**< index of the current photon */
+	float slen0;                  /**< initial unitless scattering length = length*mus */
+	unsigned int photonid;        /**< index of the current photon */
 } ray __attribute__ ((aligned (16)));
 
 
@@ -307,7 +308,8 @@ typedef struct MMC_Parameter {
   uint   nbuffer;
   uint   maxpropdet;
   uint   normbuf;
-  //int    issaveseed;
+  int    issaveseed;
+  uint   seed;
 } MCXParam __attribute__ ((aligned (16)));
 
 typedef struct MMC_Reporter{
@@ -362,6 +364,7 @@ enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
 enum TOutputDomain {odMesh, odGrid};
 typedef ulong  RandType;
 #endif
+
 
 #define RAND_BUF_LEN       2        //register arrays
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
@@ -450,13 +453,13 @@ inline double atomicadd(__global double *val, const double delta){
 
 #endif
 
+#ifdef MCX_SAVE_DETECTORS
 __device__ void clearpath(__local float *p, int len){
       uint i;
       for(i=0;i<len;i++)
       	   p[i]=0.f;
 }
 
-#ifdef MCX_SAVE_DETECTORS
 __device__ uint finddetector(float3 *p0,__constant float4 *gmed,__constant MCXParam *gcfg){
       uint i;
       for(i=GPU_PARAM(gcfg,maxmedia)+1+GPU_PARAM(gcfg,isextdet);i<GPU_PARAM(gcfg,maxmedia)+1+GPU_PARAM(gcfg,isextdet)+GPU_PARAM(gcfg,detnum);i++){
@@ -471,12 +474,17 @@ __device__ uint finddetector(float3 *p0,__constant float4 *gmed,__constant MCXPa
 
 __device__ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
                    __local float *ppath,float3 *p0,float3 *v,__constant Medium *gmed,
-		   int extdetid, __constant MCXParam *gcfg){
+		   int extdetid, __constant MCXParam *gcfg, __global RandType *photonseed, __local RandType *initseed){
       uint detid=(extdetid<0)? finddetector(p0,(__constant float4*)gmed,gcfg) : extdetid;
       if(detid){
 	 uint baseaddr=atomic_inc(detectedphoton);
 	 if(baseaddr<GPU_PARAM(gcfg,maxdetphoton)){
 	    uint i;
+	    if(GPU_PARAM(gcfg,issaveseed)){
+                for(i=0;i<RAND_BUF_LEN;i++)
+		    photonseed[baseaddr*RAND_BUF_LEN+i]=initseed[i];
+	    }
+
 	    baseaddr*=(GPU_PARAM(gcfg,reclen)+1);
 	    n_det[baseaddr++]=detid;
 	    for(i=0;i<(GPU_PARAM(gcfg,maxmedia)<<1);i++)
@@ -513,7 +521,7 @@ __device__ void savedetphoton(__global float *n_det,__global uint *detectedphoto
  */
 
 __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__global int *elem,__global float *weight,
-    int type, __global int *facenb, __global float4 *normal, __constant Medium *gmed){
+    int type, __global int *facenb, __global float4 *normal, __constant Medium *gmed, __global float *replayweight,__global float *replaytime){
 
 	float Lmin;
 	float ww,totalloss=0.f;
@@ -579,14 +587,27 @@ __device__ float branchless_badouel_raytet(ray *r, __constant MCXParam *gcfg,__g
             r->weight*=totalloss;
 
 	    totalloss=1.f-totalloss;    /*remaining fraction*/
+            if(GPU_PARAM(gcfg,seed)==SEED_FROM_FILE){
+	        if(GPU_PARAM(gcfg,outputtype)==otWL || GPU_PARAM(gcfg,outputtype)==otJacobian){
+		    currweight.f=r->Lmove;
+		    currweight.f*=replayweight[r->photonid];
+		    currweight.f+=r->weight;
+		}else if(GPU_PARAM(gcfg,outputtype)==otWP){
+		    if(r->slen0<EPS)
+		        currweight.f=1;
+		    else
+		        currweight.f=r->Lmove*prop.mus/r->slen0;
+		    currweight.f*=replayweight[r->photonid];
+		    currweight.f+=r->weight;
+		}
+            }
 	    r->slen-=r->Lmove*prop.mus;
 	    ww=currweight.f-r->weight;
             r->photontimer+=r->Lmove*(prop.n*R_C0);
-/*
+
 	    if(GPU_PARAM(gcfg,outputtype)==otWL || GPU_PARAM(gcfg,outputtype)==otWP)
 		    tshift=MIN( ((int)(replaytime[r->photonid]*GPU_PARAM(gcfg,Rtstep))), GPU_PARAM(gcfg,maxgate)-1 )*GPU_PARAM(gcfg,framelen);
 	    else
-*/
                     tshift=MIN( ((int)((r->photontimer-gcfg->tstart)*GPU_PARAM(gcfg,Rtstep))), GPU_PARAM(gcfg,maxgate)-1 )*GPU_PARAM(gcfg,framelen);
             {
 #ifndef MCX_SKIP_VOLUME
@@ -1144,13 +1165,24 @@ __device__ void launchphoton(__constant MCXParam *gcfg, ray *r, __global float3 
 
 __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXParam *gcfg,__global float3 *node,__global int *elem, __global float *weight,__global float *dref,
     __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, __constant Medium *gmed,
-    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __private RandType *ran, int *raytet, __global float *srcpattern){
+    __global float *n_det, __global uint *detectedphoton, float *energytot, float *energyesc, __private RandType *ran, int *raytet, __global float *srcpattern,
+    __global float *replayweight,__global float *replaytime,__global RandType *photonseed){
 
 	int oldeid,fixcount=0;
 	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},GPU_PARAM(gcfg,e0),0,0,1.f,0.f,0.f,0.f,ID_UNDEFINED,0.f};
+#ifdef __NVCC__
+        __shared__ RandType initseed[RAND_BUF_LEN];
+#else
+        __local    RandType initseed[RAND_BUF_LEN];
+#endif
 
-	//r.photonid=id;
+	r.photonid=id;
 
+#ifdef MCX_SAVE_DETECTORS
+	if(GPU_PARAM(gcfg,issaveseed))
+	    for(oldeid=0;oldeid<RAND_BUF_LEN;oldeid++)
+	        initseed[oldeid]=ran[oldeid];
+#endif
 	/*initialize the photon parameters*/
         launchphoton(gcfg, &r, node, elem, srcelem, ran,srcpattern);
 	*energytot+=r.weight;
@@ -1162,7 +1194,7 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 
 	while(1){  /*propagate a photon until exit*/
-	    r.slen=branchless_badouel_raytet(&r, gcfg, elem, weight, type[r.eid-1], facenb, normal, gmed);
+	    r.slen=branchless_badouel_raytet(&r, gcfg, elem, weight, type[r.eid-1], facenb, normal, gmed, replayweight, replaytime);
 	    (*raytet)++;
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
@@ -1212,7 +1244,7 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 	    	    if(r.pout.x!=MMC_UNDEFINED) // && (GPU_PARAM(gcfg,debuglevel)&dlMove))
 	    		GPUDEBUG(("P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen));
 
-	    	    r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, gmed);
+	    	    r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, gmed, replayweight, replaytime);
 		    (*raytet)++;
 #ifdef MCX_SAVE_DETECTORS
 		    if(GPU_PARAM(gcfg,issavedet) && r.Lmove>0.f && type[r.eid-1]>0)
@@ -1222,7 +1254,7 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 		    fixcount=0;
 		    while(r.pout.x==MMC_UNDEFINED && fixcount++<MAX_TRIAL){
 		       fixphoton(&r.p0,node,(__global int *)(elem+(r.eid-1)*GPU_PARAM(gcfg,elemlen)));
-                       r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, gmed);
+                       r.slen=branchless_badouel_raytet(&r,gcfg, elem, weight, type[r.eid-1], facenb, normal, gmed, replayweight, replaytime);
 		       (*raytet)++;
 #ifdef MCX_SAVE_DETECTORS
 		       if(GPU_PARAM(gcfg,issavedet) && r.Lmove>0.f && type[r.eid-1]>0)
@@ -1263,9 +1295,9 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 if(GPU_PARAM(gcfg,issavedet)){
 		    if(r.eid<0){
                        if(GPU_PARAM(gcfg,isextdet) && type[oldeid-1]==GPU_PARAM(gcfg,maxmedia)+1){
-                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,oldeid,gcfg);
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,oldeid,gcfg,photonseed,initseed);
                        }else{
-                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,-1,gcfg);
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,-1,gcfg,photonseed,initseed);
 		       }
                        clearpath(ppath,GPU_PARAM(gcfg,reclen));
 		    }
@@ -1284,7 +1316,8 @@ if(GPU_PARAM(gcfg,issavedet)){
 			break;
 	    }
             float mom=0.f;
-	    r.slen=mc_next_scatter(gmed[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
+	    r.slen0=mc_next_scatter(gmed[type[r.eid-1]].g,&r.vec,ran,gcfg,&mom);
+	    r.slen=r.slen0;
 #ifdef MCX_SAVE_DETECTORS
 if(GPU_PARAM(gcfg,issavedet)){
             if(GPU_PARAM(gcfg,ismomentum) && type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
@@ -1303,21 +1336,28 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
 #endif
     __global float3 *node,__global int *elem,  __global float *weight, __global float *dref, __global int *type, __global int *facenb,  __global int *srcelem, __global float4 *normal, 
     __global float *n_det, __global uint *detectedphoton, 
-    __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter, __global float *srcpattern){
+    __global uint *n_seed, __global int *progress, __global float *energy, __global MCXReporter *reporter, __global float *srcpattern,
+    __global float *replayweight,__global float *replaytime,__global RandType *replayseed,__global RandType *photonseed){
  
  	RandType t[RAND_BUF_LEN];
 	int idx=get_global_id(0);
-	gpu_rng_init(t,n_seed,idx);
         float  energyesc=0.f, energytot=0.f;
 	int raytet=0;
+
 #ifdef __NVCC__
         extern __shared__ float sharedmem[];
 #endif
+        if(GPU_PARAM(gcfg,seed)!=SEED_FROM_FILE)
+	    gpu_rng_init(t,n_seed,idx);
 
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
+            if(GPU_PARAM(gcfg,seed)!=SEED_FROM_FILE)
+	        for(int j=0;j<RAND_BUF_LEN;j++)
+	            t[j]=photonseed[(idx*nphoton+MIN(idx,ophoton)+i)*RAND_BUF_LEN + j];
 	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+get_local_id(0)*GPU_PARAM(gcfg,reclen),gcfg,node,elem,
-	        weight,dref,type,facenb,srcelem, normal,gmed,n_det,detectedphoton,&energytot,&energyesc,t,&raytet,srcpattern);
+	        weight,dref,type,facenb,srcelem, normal,gmed,n_det,detectedphoton,&energytot,&energyesc,t,&raytet,
+		srcpattern,replayweight,replaytime,photonseed);
 	}
 	energy[idx<<1]=energyesc;
 	energy[1+(idx<<1)]=energytot;
