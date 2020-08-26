@@ -312,7 +312,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	  if(nlhs>=3 && cfg.issaveseed && cfg.exportseed){
                fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=cfg.detectedcount; fielddim[2]=0; fielddim[3]=0; 
                mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
-               memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0)), cfg.exportseed);
+               memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0)), cfg.exportseed, fielddim[0]*fielddim[1]);
 	  }
 	  free(cfg.exportseed);
 	  cfg.exportseed=NULL;
@@ -826,9 +826,9 @@ void mmclab_usage(){
  */
 
 extern "C" void mcx_matlab_flush(){
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-	mexEvalString("fflush(stdout);");
-#else
+#if defined(MATLAB_MEX_FILE)
 	mexEvalString("pause(.0001);");
+#else
+	mexEvalString("fflush(stdout);");
 #endif
 }

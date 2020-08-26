@@ -499,9 +499,9 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
              if(cfg->issavedet){
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetected[devid],CL_FALSE,0,sizeof(uint),
                                             &detected, 0, NULL, NULL)));
-                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*MIN(detected,cfg->maxdetphoton)*hostdetreclen,
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*cfg->maxdetphoton*hostdetreclen,
 	                                        Pdet, 0, NULL, NULL)));
-		OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gphotonseed[devid],CL_TRUE,0,MIN(detected,cfg->maxdetphoton)*(sizeof(RandType)*RAND_BUF_LEN),
+		OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gphotonseed[devid],CL_TRUE,0,cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN),
 	                                        Pphotonseed, 0, NULL, NULL)));
 		if(detected>cfg->maxdetphoton){
 			MMC_FPRINTF(cfg->flog,"WARNING: the detected photon (%d) \
