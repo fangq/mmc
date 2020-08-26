@@ -1352,7 +1352,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
 
 	/*launch photons*/
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
-            if(GPU_PARAM(gcfg,seed)!=SEED_FROM_FILE)
+            if(GPU_PARAM(gcfg,seed)==SEED_FROM_FILE)
 	        for(int j=0;j<RAND_BUF_LEN;j++)
 	            t[j]=photonseed[(idx*nphoton+MIN(idx,ophoton)+i)*RAND_BUF_LEN + j];
 	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+get_local_id(0)*GPU_PARAM(gcfg,reclen),gcfg,node,elem,
