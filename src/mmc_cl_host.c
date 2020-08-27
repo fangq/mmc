@@ -321,6 +321,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
          sprintf(opt+strlen(opt)," -DMCX_SAVE_DETECTORS");
      if(cfg->issaveref)
          sprintf(opt+strlen(opt)," -DMCX_SAVE_DREF");
+     if(cfg->issaveseed)
+         sprintf(opt+strlen(opt)," -DMCX_SAVE_SEED");
      if(cfg->isreflect)
          sprintf(opt+strlen(opt)," -DMCX_DO_REFLECTION");
      if(cfg->method==rtBLBadouelGrid)
@@ -649,7 +651,7 @@ is more than what your have specified (%d), please use the -H option to specify 
          OCL_ASSERT(clReleaseMemObject(gparam[i]));
 	 if(gsrcpattern[i])   OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
 	 if(greplayweight[i]) OCL_ASSERT(clReleaseMemObject(greplayweight[i]));
-	 if(greplayseed[i]) OCL_ASSERT(clReleaseMemObject(greplayseed[i]));
+	 if(greplayseed[i])   OCL_ASSERT(clReleaseMemObject(greplayseed[i]));
 	 if(greplaytime[i])   OCL_ASSERT(clReleaseMemObject(greplaytime[i]));
 
          OCL_ASSERT(clReleaseKernel(mcxkernel[i]));

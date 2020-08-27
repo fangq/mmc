@@ -44,16 +44,18 @@ newcfg=mmclab(cfg,'prep');  % preprocessing of the mesh to get the missing field
 
 newcfg.replaydet=1;     % replay photons detected by det#1
 newcfg.seed=seeds.data(:,detp.data(1,:)==newcfg.replaydet);
+detp.ppath=detp.ppath(detp.data(1,:)==newcfg.replaydet,:);
+detp.w0=detp.w0(detp.data(1,:)==newcfg.replaydet,:);
 detp.data=detp.data(:,detp.data(1,:)==newcfg.replaydet);
 % calculate the detected photon weight using the partial path output and prop
-newcfg.replayweight=mmcdetweight(detp.data,newcfg.prop,detp.data(end,:));
-newcfg.replaytime=mmcdettime(detp.data,newcfg.prop);
+newcfg.replayweight=mmcdetweight(detp,newcfg.prop);
+newcfg.replaytime=mmcdettime(detp,newcfg.prop);
 newcfg.isnormalized=0;
 newcfg.outputtype='wl';    % replay and get wl
 
 % now replay the detected photons
 
-[cube2,detp2,~,~]=mmclab(newcfg);
+[cube2,detp2]=mmclab(newcfg);
 
 % the two detected photon arrays should be the same. however, because
 % the program uses multi-threading, the orders may be different

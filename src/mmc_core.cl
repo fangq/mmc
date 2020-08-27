@@ -466,7 +466,7 @@ __device__ uint finddetector(float3 *p0,__constant float4 *gmed,__constant MCXPa
       	if((gmed[i].x-p0[0].x)*(gmed[i].x-p0[0].x)+
 	   (gmed[i].y-p0[0].y)*(gmed[i].y-p0[0].y)+
 	   (gmed[i].z-p0[0].z)*(gmed[i].z-p0[0].z) < gmed[i].w){
-	        return i+1;
+	        return i-GPU_PARAM(gcfg,maxmedia)-GPU_PARAM(gcfg,isextdet);
 	   }
       }
       return 0;
@@ -474,17 +474,16 @@ __device__ uint finddetector(float3 *p0,__constant float4 *gmed,__constant MCXPa
 
 __device__ void savedetphoton(__global float *n_det,__global uint *detectedphoton,
                    __local float *ppath,float3 *p0,float3 *v,__constant Medium *gmed,
-		   int extdetid, __constant MCXParam *gcfg, __global RandType *photonseed, __local RandType *initseed){
+		   int extdetid, __constant MCXParam *gcfg, __global RandType *photonseed, RandType *initseed){
       uint detid=(extdetid<0)? finddetector(p0,(__constant float4*)gmed,gcfg) : extdetid;
       if(detid){
 	 uint baseaddr=atomic_inc(detectedphoton);
 	 if(baseaddr<GPU_PARAM(gcfg,maxdetphoton)){
 	    uint i;
-	    if(GPU_PARAM(gcfg,issaveseed)){
-                for(i=0;i<RAND_BUF_LEN;i++)
-		    photonseed[baseaddr*RAND_BUF_LEN+i]=initseed[i];
-	    }
-
+#ifdef MCX_SAVE_SEED
+            for(i=0;i<RAND_BUF_LEN;i++)
+	        photonseed[baseaddr*RAND_BUF_LEN+i]=initseed[i];
+#endif
 	    baseaddr*=(GPU_PARAM(gcfg,reclen)+1);
 	    n_det[baseaddr++]=detid;
 	    for(i=0;i<(GPU_PARAM(gcfg,maxmedia)<<1);i++)
@@ -1170,19 +1169,17 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 
 	int oldeid,fixcount=0;
 	ray r={gcfg->srcpos,gcfg->srcdir,{MMC_UNDEFINED,0.f,0.f},GPU_PARAM(gcfg,e0),0,0,1.f,0.f,0.f,0.f,ID_UNDEFINED,0.f};
-#ifdef __NVCC__
-        __shared__ RandType initseed[RAND_BUF_LEN];
-#else
-        __local    RandType initseed[RAND_BUF_LEN];
+#ifdef MCX_SAVE_SEED
+        RandType initseed[RAND_BUF_LEN];
 #endif
 
 	r.photonid=id;
 
-#ifdef MCX_SAVE_DETECTORS
-	if(GPU_PARAM(gcfg,issaveseed))
+#ifdef MCX_SAVE_SEED
 	    for(oldeid=0;oldeid<RAND_BUF_LEN;oldeid++)
 	        initseed[oldeid]=ran[oldeid];
 #endif
+
 	/*initialize the photon parameters*/
         launchphoton(gcfg, &r, node, elem, srcelem, ran,srcpattern);
 	*energytot+=r.weight;
@@ -1294,11 +1291,17 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 #ifdef MCX_SAVE_DETECTORS
 if(GPU_PARAM(gcfg,issavedet)){
 		    if(r.eid<0){
-                       if(GPU_PARAM(gcfg,isextdet) && type[oldeid-1]==GPU_PARAM(gcfg,maxmedia)+1){
+#ifdef MCX_SAVE_SEED
+                       if(GPU_PARAM(gcfg,isextdet) && type[oldeid-1]==GPU_PARAM(gcfg,maxmedia)+1)
                           savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,oldeid,gcfg,photonseed,initseed);
-                       }else{
+                       else
                           savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,-1,gcfg,photonseed,initseed);
-		       }
+#else
+                       if(GPU_PARAM(gcfg,isextdet) && type[oldeid-1]==GPU_PARAM(gcfg,maxmedia)+1)
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,oldeid,gcfg,photonseed,NULL);
+                       else
+                          savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,-1,gcfg,photonseed,NULL);
+#endif
                        clearpath(ppath,GPU_PARAM(gcfg,reclen));
 		    }
 }
@@ -1354,7 +1357,8 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
 	for(int i=0;i<nphoton+(idx<ophoton);i++){
             if(GPU_PARAM(gcfg,seed)==SEED_FROM_FILE)
 	        for(int j=0;j<RAND_BUF_LEN;j++)
-	            t[j]=photonseed[(idx*nphoton+MIN(idx,ophoton)+i)*RAND_BUF_LEN + j];
+	            t[j]=replayseed[(idx*nphoton+MIN(idx,ophoton)+i)*RAND_BUF_LEN + j];
+
 	    onephoton(idx*nphoton+MIN(idx,ophoton)+i,sharedmem+get_local_id(0)*GPU_PARAM(gcfg,reclen),gcfg,node,elem,
 	        weight,dref,type,facenb,srcelem, normal,gmed,n_det,detectedphoton,&energytot,&energyesc,t,&raytet,
 		srcpattern,replayweight,replaytime,photonseed);
