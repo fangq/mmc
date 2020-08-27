@@ -211,7 +211,8 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
      field=(cl_float *)calloc(sizeof(cl_float)*meshlen,cfg->maxgate);
      dref=(cl_float *)calloc(sizeof(cl_float)*mesh->nf,cfg->maxgate);
      Pdet=(float*)calloc(cfg->maxdetphoton*sizeof(float),hostdetreclen);
-     Pphotonseed=(RandType *)calloc(cfg->maxdetphoton,(sizeof(RandType)*RAND_BUF_LEN));
+     if(cfg->issaveseed)
+         Pphotonseed=(RandType *)calloc(cfg->maxdetphoton,(sizeof(RandType)*RAND_BUF_LEN));
 
      fieldlen=meshlen*cfg->maxgate;
 
@@ -260,7 +261,10 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
        OCL_ASSERT(((gweight[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*fieldlen,field,&status),status)));
        OCL_ASSERT(((gdref[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*nflen,dref,&status),status)));
        OCL_ASSERT(((gdetphoton[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*cfg->maxdetphoton*hostdetreclen,Pdet,&status),status)));
-       OCL_ASSERT(((gphotonseed[i]=clCreateBuffer(mcxcontext,RW_MEM, cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN),Pphotonseed,&status),status)));
+       if(cfg->issaveseed)
+           OCL_ASSERT(((gphotonseed[i]=clCreateBuffer(mcxcontext,RW_MEM, cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN),Pphotonseed,&status),status)));
+       else
+           gphotonseed[i]=NULL;
        OCL_ASSERT(((genergy[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(float)*(gpu[i].autothread<<1),energy,&status),status)));
        OCL_ASSERT(((gdetected[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(cl_uint),&detected,&status),status)));
        OCL_ASSERT(((greporter[i]=clCreateBuffer(mcxcontext,RW_MEM, sizeof(MCXReporter),&reporter,&status),status)));
@@ -503,8 +507,10 @@ void mmc_run_cl(mcconfig *cfg,tetmesh *mesh, raytracer *tracer, void (*progressf
                                             &detected, 0, NULL, NULL)));
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gdetphoton[devid],CL_TRUE,0,sizeof(float)*cfg->maxdetphoton*hostdetreclen,
 	                                        Pdet, 0, NULL, NULL)));
-		OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gphotonseed[devid],CL_TRUE,0,cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN),
+	        if (cfg->issaveseed) {
+		    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid],gphotonseed[devid],CL_TRUE,0,cfg->maxdetphoton*(sizeof(RandType)*RAND_BUF_LEN),
 	                                        Pphotonseed, 0, NULL, NULL)));
+		}
 		if(detected>cfg->maxdetphoton){
 			MMC_FPRINTF(cfg->flog,"WARNING: the detected photon (%d) \
 is more than what your have specified (%d), please use the -H option to specify a greater number\t"
@@ -638,7 +644,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 	 OCL_ASSERT(clReleaseMemObject(gdref[i]));
          OCL_ASSERT(clReleaseMemObject(genergy[i]));
          OCL_ASSERT(clReleaseMemObject(gdetected[i]));
-	 OCL_ASSERT(clReleaseMemObject(gphotonseed[i]));
+	 if(gphotonseed[i]) OCL_ASSERT(clReleaseMemObject(gphotonseed[i]));
          OCL_ASSERT(clReleaseMemObject(greporter[i]));
 
          OCL_ASSERT(clReleaseMemObject(gnode[i]));

@@ -297,7 +297,7 @@ typedef struct MMC_Parameter {
   int    nn, ne, nf;
   float3 nmin;
   float  nout;
-  uint   roulettesize;
+  float  roulettesize;
   int    srcnum;
   uint4   crop0;
   int    srcelemlen;
@@ -309,7 +309,7 @@ typedef struct MMC_Parameter {
   uint   maxpropdet;
   uint   normbuf;
   int    issaveseed;
-  uint   seed;
+  int    seed;
 } MCXParam __attribute__ ((aligned (16)));
 
 typedef struct MMC_Reporter{
