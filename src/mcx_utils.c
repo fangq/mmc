@@ -1964,6 +1964,9 @@ void mcx_validatecfg(mcconfig *cfg){
 
      if(cfg->seed<0 && cfg->seed!=SEED_FROM_FILE)
         cfg->seed=time(NULL);
+     if(cfg->compute!=cbSSE && (cfg->method!=rtBLBadouelGrid && cfg->method!=rtBLBadouel)){
+        cfg->method=rtBLBadouel;
+     }
      if(cfg->method==rtBLBadouelGrid){
 	cfg->basisorder=0;
      }

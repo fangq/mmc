@@ -27,6 +27,7 @@ cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.prop=[0 0 1 1;0.005 1.0 0.01 1.0];
 cfg.debuglevel='TP';
+cfg.method='elem';
 cfg.isreflect=0;
 cfg.detpos=[30. 20. 0. 1.
    30. 40. 0. 1.
