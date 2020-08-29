@@ -486,11 +486,12 @@ void mcx_savebnii(OutputType *vol, int ndim, uint *dims, float *voxelsize, char*
      char fname[MAX_FULL_PATH]={'\0'};
      int affine[]={0,0,1,0,0,0};
      size_t datalen=sizeof(int), outputlen=0;
+     int i;
 
      ubjw_context_t *root=NULL;
      uchar *jsonstr=NULL;
 
-     for(int i=0;i<ndim;i++)
+     for(i=0;i<ndim;i++)
          datalen*=dims[i];
      jsonstr=malloc(datalen<<1);
      root=ubjw_open_memory(jsonstr,jsonstr+(datalen<<1));
@@ -770,7 +771,7 @@ void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig 
 	char fhistory[MAX_FULL_PATH], filetag;
         cJSON *root=NULL, *obj=NULL, *hdr=NULL, *dat=NULL, *sub=NULL;
         char *jsonstr=NULL;
-	int col=0;
+	int col=0,i,j,id;
 
         root=cJSON_CreateObject();
 
@@ -791,7 +792,7 @@ void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig 
 	cJSON_AddNumberToObject(hdr, "SrcNum", cfg->his.srcnum);
 	cJSON_AddNumberToObject(hdr, "SaveDetFlag", cfg->his.savedetflag);
 	cJSON_AddItemToObject(hdr, "Media", sub = cJSON_CreateArray());
-	for(int i=0;i<cfg->medianum;i++){
+	for(i=0;i<cfg->medianum;i++){
 	     cJSON_AddItemToArray(sub,dat=cJSON_CreateObject());
 	     cJSON_AddNumberToObject(dat, "mua", cfg->prop[i].mua/cfg->unitinmm);
 	     cJSON_AddNumberToObject(dat, "mus", cfg->prop[i].mus/cfg->unitinmm);
@@ -804,11 +805,11 @@ void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig 
 	    char *dtype[]={"uint32","single","single"};
 	    char *dname[]={"photonid","p","w0"};
 	    cJSON_AddItemToObject(obj, "Trajectory", dat = cJSON_CreateObject());
-	    for(int id=0;id<sizeof(colnum);id++){
+	    for(id=0;id<sizeof(colnum);id++){
 		uint dims[2]={count,colnum[id]};
 		float *buf=(float *)calloc(dims[0]*dims[1],sizeof(float));
-		for(int i=0;i<dims[0];i++)
-		    for(int j=0;j<dims[1];j++)
+		for(i=0;i<dims[0];i++)
+		    for(j=0;j<dims[1];j++)
 			buf[i*dims[1]+j]=ppath[i*cfg->his.colcount+col+j];
 		cJSON_AddItemToObject(dat, dname[id], sub = cJSON_CreateObject());
 		if(mcx_jdataencode(buf,2,dims,dtype[id], 4, cfg->zipid, sub, 0, cfg))
@@ -822,7 +823,7 @@ void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig 
 	    char *dname[]={"detid","nscat","ppath","mom","p","v","w0"};
 
 	    cJSON_AddItemToObject(obj, "PhotonData", dat = cJSON_CreateObject());
-	    for(int id=0;id<sizeof(colnum);id++){
+	    for(id=0;id<sizeof(colnum);id++){
 	      if((cfg->savedetflag >> id) & 0x1){
 		uint dims[2]={count,colnum[id]};
 		void *val=NULL;
@@ -830,14 +831,14 @@ void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig 
 		uint  *ibuf=NULL;
 		if(!strcmp(dtype[id],"uint32")){
 		    ibuf=(uint *)calloc(dims[0]*dims[1],sizeof(uint));
-		    for(int i=0;i<dims[0];i++)
-			for(int j=0;j<dims[1];j++)
+		    for(i=0;i<dims[0];i++)
+			for(j=0;j<dims[1];j++)
 			    ibuf[i*dims[1]+j]=ppath[i*cfg->his.colcount+col+j];
 		    val=(void*)ibuf;
 		}else{
 		    fbuf=(float *)calloc(dims[0]*dims[1],sizeof(float));
-		    for(int i=0;i<dims[0];i++)
-			for(int j=0;j<dims[1];j++)
+		    for(i=0;i<dims[0];i++)
+			for(j=0;j<dims[1];j++)
 			    fbuf[i*dims[1]+j]=ppath[i*cfg->his.colcount+col+j];
 		    val=(void*)fbuf;
 		}
@@ -1415,6 +1416,7 @@ void mcx_saveconfig(FILE *out, mcconfig *cfg){
 void mcx_savejdata(char *filename, mcconfig *cfg){
      cJSON *root=NULL, *obj=NULL, *sub=NULL, *tmp=NULL;
      char *jsonstr=NULL;
+     int i;
      root=cJSON_CreateObject();
      
      /* the "Session" section */
@@ -1464,7 +1466,7 @@ void mcx_savejdata(char *filename, mcconfig *cfg){
      cJSON_AddItemToObject(root, "Domain", obj = cJSON_CreateObject());
      cJSON_AddNumberToObject(obj, "LengthUnit", cfg->unitinmm);
      cJSON_AddItemToObject(obj, "Media", sub = cJSON_CreateArray());
-     for(int i=0;i<cfg->medianum;i++){
+     for(i=0;i<cfg->medianum;i++){
 	 cJSON_AddItemToArray(sub,tmp=cJSON_CreateObject());
 	 cJSON_AddNumberToObject(tmp, "mua", cfg->prop[i].mua/cfg->unitinmm);
 	 cJSON_AddNumberToObject(tmp, "mus", cfg->prop[i].mus/cfg->unitinmm);
@@ -1487,7 +1489,7 @@ void mcx_savejdata(char *filename, mcconfig *cfg){
      cJSON_AddNumberToObject(sub, "SrcNum", cfg->srcnum);
 
      cJSON_AddItemToObject(obj, "Detector", sub = cJSON_CreateArray());
-     for(int i=0;i<cfg->detnum;i++){
+     for(i=0;i<cfg->detnum;i++){
 	 cJSON_AddItemToArray(sub, tmp = cJSON_CreateObject());
 	 cJSON_AddItemToObject(tmp, "Pos", cJSON_CreateFloatArray(&(cfg->detpos[i].x),3));
          cJSON_AddNumberToObject(tmp, "R", cfg->detpos[i].w);
@@ -1602,7 +1604,7 @@ void  mcx_convertcol2row4d(unsigned int **vol, uint4 *dim){
  */
 
 int  mcx_jdatadecode(void **vol, int *ndim, uint *dims, int maxdim, char **type, cJSON *obj, mcconfig *cfg){
-     int ret=0;
+     int ret=0,i;
      cJSON * ztype=NULL;
      cJSON * vsize=cJSON_GetObjectItem(obj,"_ArraySize_");
      cJSON * vtype=cJSON_GetObjectItem(obj,"_ArrayType_");
@@ -1625,7 +1627,7 @@ int  mcx_jdatadecode(void **vol, int *ndim, uint *dims, int maxdim, char **type,
          if(vsize){
 	     cJSON *tmp=vsize->child;
              *ndim=cJSON_GetArraySize(vsize);
-	     for(int i=0;i<MIN(maxdim,*ndim);i++){
+	     for(i=0;i<MIN(maxdim,*ndim);i++){
 		 dims[i]=tmp->valueint;
 		 tmp=tmp->next;
 	     }
@@ -1672,9 +1674,9 @@ int  mcx_jdataencode(void *vol, int ndim, uint *dims, char *type, int byte, int 
      uint datalen=1;
      size_t compressedbytes, totalbytes;
      uchar *compressed=NULL, *buf=NULL;
-     int ret=0, status=0;
+     int ret=0, status=0,i;
 
-     for(int i=0;i<ndim;i++)
+     for(i=0;i<ndim;i++)
          datalen*=dims[i];
      totalbytes=datalen*byte;
 
@@ -2226,7 +2228,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 					 jsoninput=(char *)benchjson[idx];
 			             }else{
 				         MMC_FPRINTF(cfg->flog,"Built-in benchmarks:\n");
-				         for(int i=0;i<sizeof(benchname)/sizeof(char*)-1;i++)
+				         for(i=0;i<sizeof(benchname)/sizeof(char*)-1;i++)
 					     MMC_FPRINTF(cfg->flog,"\t%s\n",benchname[i]);
 				         exit(0);
 				     }
