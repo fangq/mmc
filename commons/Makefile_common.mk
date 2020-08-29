@@ -28,7 +28,7 @@ OBJDIR 	   := $(BUILT)
 CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
 INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
-MAKE       := make
+MAKE       ?= make
 
 ZMATLIB    :=libzmat.a
 USERARFLAGS?=$(ZMATLIB) -lz
