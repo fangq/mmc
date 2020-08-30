@@ -2086,7 +2086,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
  				if (cfg->issaveref) cfg->issaveref=1;
  				break;
 		     case 'Z':
-			        if(i+1<argc && isalpha(argv[i+1][0]) ){
+			        if(i+1<argc && isalpha((int)(argv[i+1][0])) ){
 				    cfg->zipid=mcx_keylookup(argv[++i],zipformat);
 			        }else
 				    i=mcx_readarg(argc,argv,i,&(cfg->zipid),"int");
@@ -2213,14 +2213,14 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg){
 				     if(i+1>=argc){
 				         cfg->isdumpjson=1;
 					 i++;
-				     }else if(i+1<argc && (isalpha(argv[i+1][0]) || argv[i+1][0]=='-')){
+				     }else if(i+1<argc && (isalpha((int)(argv[i+1][0])) || argv[i+1][0]=='-')){
 				         cfg->isdumpjson=1;
 				         memcpy(cfg->jsonfile,argv[i+1],MIN(strlen(argv[i+1]),MAX_PATH_LENGTH));
 					 i++;
 			             }else
 				         i=mcx_readarg(argc,argv,i,&(cfg->isdumpjson),"int");
                                 }else if(strcmp(argv[i]+2,"bench")==0){
-                                     if(i+1<argc && isalpha(argv[i+1][0]) ){
+                                     if(i+1<argc && isalpha((int)(argv[i+1][0])) ){
 				         int idx=mcx_keylookup(argv[++i],benchname);
 					 if(idx==-1)
 					     MMC_ERROR(-1,"Unsupported bechmark.");
