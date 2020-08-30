@@ -147,7 +147,7 @@ $(OUTPUT_DIR)/$(BINARY): $(OBJS)
 	$(CUDACC) -c $(CUCCOPT) -o $@  $<
 
 clean:
-	-rm -f $(OBJS) $(OUTPUT_DIR)/$(BINARY)$(EXESUFFIX)
+	-rm -f $(OBJS) $(OUTPUT_DIR)/$(BINARY)$(EXESUFFIX) $(OUTPUT_DIR)/libzmat.*
 
 .PHONY: all mex oct lib
 
