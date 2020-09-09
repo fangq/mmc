@@ -4,6 +4,8 @@
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
 
+#define MAX_PROP           4000
+
 #define MCX_DEBUG_REC_LEN  6  /**<  number of floating points per position saved when -D M is used for trajectory */
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */
@@ -22,5 +24,29 @@
 #define MCX_SRC_SLIT       13 /**<  a collimated line source */
 #define MCX_SRC_PENCILARRAY 14 /**<  a rectangular array of pencil beams */
 #define MCX_SRC_PATTERN3D  15  /**<  a 3D pattern source, starting from srcpos, srcparam1.{x,y,z} define the x/y/z dimensions */
+
+#define SAVE_DETID(a)         ((a)    & 0x1)   /**<  mask to save detector ID*/
+#define SAVE_NSCAT(a)         ((a)>>1 & 0x1)   /**<  output partial scattering counts */
+#define SAVE_PPATH(a)         ((a)>>2 & 0x1)   /**<  output partial path */
+#define SAVE_MOM(a)           ((a)>>3 & 0x1)   /**<  output momentum transfer */
+#define SAVE_PEXIT(a)         ((a)>>4 & 0x1)   /**<  save exit positions */
+#define SAVE_VEXIT(a)         ((a)>>5 & 0x1)   /**<  save exit vector/directions */
+#define SAVE_W0(a)            ((a)>>6 & 0x1)   /**<  save initial weight */
+
+#define SET_SAVE_DETID(a)     ((a) | 0x1   )   /**<  mask to save detector ID*/
+#define SET_SAVE_NSCAT(a)     ((a) | 0x1<<1)   /**<  output partial scattering counts */
+#define SET_SAVE_PPATH(a)     ((a) | 0x1<<2)   /**<  output partial path */
+#define SET_SAVE_MOM(a)       ((a) | 0x1<<3)   /**<  output momentum transfer */
+#define SET_SAVE_PEXIT(a)     ((a) | 0x1<<4)   /**<  save exit positions */
+#define SET_SAVE_VEXIT(a)     ((a) | 0x1<<5)   /**<  save exit vector/directions */
+#define SET_SAVE_W0(a)        ((a) | 0x1<<6)   /**<  save initial weight */
+
+#define UNSET_SAVE_DETID(a)     ((a) & ~(0x1)   )   /**<  mask to save detector ID*/
+#define UNSET_SAVE_NSCAT(a)     ((a) & ~(0x1<<1))   /**<  output partial scattering counts */
+#define UNSET_SAVE_PPATH(a)     ((a) & ~(0x1<<2))   /**<  output partial path */
+#define UNSET_SAVE_MOM(a)       ((a) & ~(0x1<<3))   /**<  output momentum transfer */
+#define UNSET_SAVE_PEXIT(a)     ((a) & ~(0x1<<4))   /**<  save exit positions */
+#define UNSET_SAVE_VEXIT(a)     ((a) & ~(0x1<<5))   /**<  save exit vector/directions */
+#define UNSET_SAVE_W0(a)        ((a) & ~(0x1<<6))   /**<  save initial weight */
 
 #endif

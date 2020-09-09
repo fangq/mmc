@@ -20,14 +20,18 @@ MMCSRC :=$(MMCDIR)/src
 
 CXX        := g++
 AR         := $(CC)
+CUDACC     :=nvcc
 BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
 CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
-INCLUDEDIR := $(MMCDIR)/src
+INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
-MAKE       := make
+MAKE       ?= make
+
+ZMATLIB    :=libzmat.a
+USERARFLAGS?=$(ZMATLIB) -lz
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL  ?=-lOpenCL
@@ -36,6 +40,8 @@ EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
+CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v
+CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
 
 ECHO	   := echo
 MKDIR      := mkdir
@@ -83,7 +89,26 @@ else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
     OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
+    CUDA_STATIC=--cudart static
 endif
+
+ifeq ($(BACKEND),ocelot)
+  LINKOPT=-L/usr/local/lib `OcelotConfig -l` -ltinfo
+  CUCCOPT=-D__STRICT_ANSI__ -g #--maxrregcount 32
+else ifeq ($(BACKEND),cudastatic)
+  ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+      CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+  else
+      CUDART=-lcudadevrt -lcudart_static -ldl -lrt -static-libgcc -static-libstdc++
+  endif
+  LINKOPT=-L/usr/local/cuda/lib -lm $(CUDART)
+  CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
+else
+  LINKOPT=-L/usr/local/cuda/lib -lm $(CUDART)
+  CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
+endif
+
+CUGENCODE?=-arch=sm_30
 
 INCLUDEDIR+=$(INCLUDEDIRS)
 EXTRALIB+=$(LIBOPENCL)
@@ -154,7 +179,10 @@ mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 oct:            BINARY=mmc.mex
 oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
 oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
-oct octomp:     USERARFLAGS=-o $(BINDIR)/mmc
+oct octomp:     USERARFLAGS+=-o $(BINDIR)/mmc
+
+debug:     sse
+debug:     CUCCOPT+=-DMCX_DEBUG
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 
@@ -172,19 +200,27 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-all release sse ssemath prof omp mex oct mexomp octomp pnacl web: $(SUBDIRS) $(BINDIR)/$(BINARY)
+cuda: sse
+
+all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug cuda: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
 
 makedirs:
 	@if test ! -d $(OBJDIR); then $(MKDIR) $(OBJDIR); fi
+	@if test ! -d $(OBJDIR)/ubj; then $(MKDIR) $(OBJDIR)/ubj; fi
 	@if test ! -d $(BINDIR); then $(MKDIR) $(BINDIR); fi
 
 makedocdir:
 	@if test ! -d $(DOCDIR); then $(MKDIR) $(DOCDIR); fi
 
 .SUFFIXES : $(OBJSUFFIX) .cpp
+
+
+##  Compile .cu files ##
+$(OBJDIR)/%$(OBJSUFFIX): %.cu
+	$(CUDACC) -c $(CUCCOPT) -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
@@ -205,9 +241,13 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
 
 ##  Link  ##
-$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(OBJS)
+$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
+
+
+$(ZMATLIB):
+	-$(MAKE) -C zmat lib AR=ar CPPOPT="$(DLLFLAG)" CCOPT="$(DLLFLAG)" USERLINKOPT=
 
 ##  Documentation  ##
 doc: makedocdir
@@ -215,6 +255,7 @@ doc: makedocdir
 
 ## Clean
 clean:
+	-$(MAKE) -C zmat clean
 	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done

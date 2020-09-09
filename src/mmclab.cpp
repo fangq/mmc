@@ -129,7 +129,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
             mcx_initcfg(&cfg);
             cfg.isgpuinfo=3;
 	    try{
-              mcx_list_gpu(&cfg,&workdev,NULL,&gpuinfo);
+              mcx_list_cl_gpu(&cfg,&workdev,NULL,&gpuinfo);
             }catch(...){
 	      mexErrMsgTxt("OpenCL is not supported or not fully installed on your system");
 	    }
@@ -244,10 +244,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** \subsection ssimu Parallel photon transport simulation */
 
         try{
-            if(cfg.gpuid>MAX_DEVICE)
-                mmc_run_mp(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
-	    else
-                mmc_run_cl(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
+	    if(cfg.compute==cbSSE || cfg.gpuid>MAX_DEVICE)
+		mmc_run_mp(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
+#ifdef USE_CUDA
+	    else if(cfg.compute==cbCUDA){
+		mmc_run_cu(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
+	    }
+#endif
+#ifdef USE_OPENCL
+	    else{
+		mmc_run_cl(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
+	    }
+#endif
         }catch(const char *err){
     	    mexPrintf("Error from thread (%d): %s\n",threadid,err);
     	    errorflag++;
@@ -300,6 +308,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	  }
 	  free(cfg.exportdetected);
 	  cfg.exportdetected=NULL;
+          
+	  if(nlhs>=3 && cfg.issaveseed && cfg.exportseed){
+               fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=cfg.detectedcount; fielddim[2]=0; fielddim[3]=0; 
+               mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
+               memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0)), cfg.exportseed, fielddim[0]*fielddim[1]);
+	  }
+	  free(cfg.exportseed);
+	  cfg.exportseed=NULL;
 	}
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
@@ -582,6 +598,22 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         if(cfg->outputtype==-1)
              mexErrMsgTxt("the specified output type is not supported");
 	printf("mmc.outputtype='%s';\n",outputstr);
+    }else if(strcmp(name,"compute")==0){
+        int len=mxGetNumberOfElements(item);
+        const char *computebackend[]={"sse","opencl","cuda",""};
+        char computestr[MAX_SESSION_LENGTH]={'\0'};
+
+        if(!mxIsChar(item) || len==0)
+             mexErrMsgTxt("the 'compute' field must be a non-empty string");
+	if(len>MAX_SESSION_LENGTH)
+	     mexErrMsgTxt("the 'compute' field is too long");
+        int status = mxGetString(item, computestr, MAX_SESSION_LENGTH);
+        if (status != 0)
+             mexWarnMsgTxt("not enough space. string is truncated.");
+        cfg->compute=mcx_keylookup(computestr,computebackend);
+        if(cfg->compute==-1)
+             mexErrMsgTxt("the specified compute is not supported");
+	printf("mmc.compute='%s';\n",computestr);
     }else if(strcmp(name,"shapes")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
@@ -794,9 +826,9 @@ void mmclab_usage(){
  */
 
 extern "C" void mcx_matlab_flush(){
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-	mexEvalString("fflush(stdout);");
-#else
+#if defined(MATLAB_MEX_FILE)
 	mexEvalString("pause(.0001);");
+#else
+	mexEvalString("fflush(stdout);");
 #endif
 }

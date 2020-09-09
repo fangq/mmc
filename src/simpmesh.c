@@ -893,7 +893,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
         else
                 sprintf(fweight,"%s%s.dat",cfg->session,(isref? "_dref": ""));
 
-        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
+        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofBJNifti){
 	        uint3 dim0=cfg->dim;
 	        if(cfg->method!=rtBLBadouelGrid){
 		    cfg->dim.x=cfg->srcnum;
@@ -963,7 +963,8 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
             cfg->detectedcount=count;
             cfg->exportdetected=(float*)malloc(cfg->his.colcount*cfg->detectedcount*sizeof(float));
         }
-        memcpy(cfg->exportdetected,ppath,count*cfg->his.colcount*sizeof(float));
+        if(cfg->exportdetected!=ppath)
+	    memcpy(cfg->exportdetected,ppath,count*cfg->his.colcount*sizeof(float));
 	
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);

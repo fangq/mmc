@@ -386,9 +386,9 @@ end
 
 if(useopencl==1)
     if(isfield(cfg,'gpuid') && ~ischar(cfg.gpuid) && cfg.gpuid<-1)
-	cfg.gpuid=1;
+	    cfg.gpuid=1;
     end
-    [varargout{1:nargout}]=mmc(cfg);
+    [varargout{1:mmcout}]=mmc(cfg);
 elseif(length(varargin)<2)
     [varargout{1:mmcout}]=mmc(cfg);
 elseif(strcmp(type,'omp'))
@@ -423,9 +423,9 @@ if(mmcout>=2)
             end
             newdetp.w0=detp(end,:)';  % last column is the initial packet weight
             newdetp.prop=cfg(i).prop;
-	    if(isfield(cfg(i),'unitinmm'))
-		newdetp.unitinmm=cfg(i).unitinmm;
-	    end
+            if(isfield(cfg(i),'unitinmm'))
+                newdetp.unitinmm=cfg(i).unitinmm;
+            end
             newdetp.data=detp;      % enable this line for compatibility
             newdetpstruct(i)=newdetp;
         else

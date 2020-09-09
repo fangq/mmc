@@ -118,7 +118,7 @@ int mcx_nv_corecount(int v1, int v2){
  * @param[out] info: the GPU information structure
  */
 
-cl_platform_id mcx_list_gpu(mcconfig *cfg,unsigned int *activedev,cl_device_id *activedevlist,GPUInfo **info){
+cl_platform_id mcx_list_cl_gpu(mcconfig *cfg,unsigned int *activedev,cl_device_id *activedevlist,GPUInfo **info){
 
     uint i,j,k,cuid=0,devnum;
     cl_uint numPlatforms;
