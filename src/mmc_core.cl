@@ -1184,8 +1184,10 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
         launchphoton(gcfg, &r, node, elem, srcelem, ran,srcpattern);
 	*energytot+=r.weight;
 #ifdef MCX_SAVE_DETECTORS
-	if(GPU_PARAM(gcfg,issavedet))
+	if(GPU_PARAM(gcfg,issavedet)){
+	    clearpath(ppath,GPU_PARAM(gcfg,reclen));    /*clear shared memory for saving history of a new photon*/
 	    ppath[GPU_PARAM(gcfg,reclen)-1] = r.weight; /*last record in partialpath is the initial photon weight*/
+	}
 #endif
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
 	/*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
@@ -1302,7 +1304,6 @@ if(GPU_PARAM(gcfg,issavedet)){
                        else
                           savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,-1,gcfg,photonseed,NULL);
 #endif
-                       clearpath(ppath,GPU_PARAM(gcfg,reclen));
 		    }
 }
 #endif
