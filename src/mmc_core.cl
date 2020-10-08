@@ -1292,7 +1292,7 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 		    }
 #ifdef MCX_SAVE_DETECTORS
 if(GPU_PARAM(gcfg,issavedet)){
-		    if(r.eid<0){
+		    if(r.eid<=0){
 #ifdef MCX_SAVE_SEED
                        if(GPU_PARAM(gcfg,isextdet) && type[oldeid-1]==GPU_PARAM(gcfg,maxmedia)+1)
                           savedetphoton(n_det,detectedphoton,ppath,&(r.p0),&(r.vec),gmed,oldeid,gcfg,photonseed,initseed);
