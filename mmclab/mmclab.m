@@ -125,7 +125,6 @@ function varargout=mmclab(varargin)
 %                      source, see cfg.srctype='pattern' for details
 %                      Example <demo_photon_sharing.m>
 %      cfg.replaydet:  only works when cfg.outputtype is 'jacobian', 'wl', 'nscat', or 'wp' and cfg.seed is an array
-%                      -1 replay all detectors and save in separate volumes (output has 5 dimensions)
 %                       0 replay all detectors and sum all Jacobians into one volume
 %                       a positive number: the index of the detector to replay and obtain Jacobians
 %      cfg.voidtime:   for wide-field sources, [1]-start timer at launch, 0-when entering
@@ -182,8 +181,6 @@ function varargout=mmclab(varargin)
 %            or [size(cfg.elem,1), total-time-gates] if cfg.basisorder=0. 
 %            The content of the array is the normalized fluence-rate (or others 
 %            depending on cfg.outputtype) at each mesh node and time-gate.
-%            In the "replay" mode, if cfg.replaydet is set to -1 and multiple 
-%            detectors exist, fluence.data will add a 5th dimension for the detector number.
 %
 %            If cfg.issaveref is set to 1, fluence(i).dref is not empty, and stores
 %            the surface diffuse reflectance (normalized by default). The surface mesh
