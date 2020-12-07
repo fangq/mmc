@@ -1,6 +1,6 @@
 The author of MMC is Qianqian Fang. Qianqian is currently an 
-Assistant Professor in the Department of Bioengineering at
-Northeastern University.
+Associate Professor in the Department of Bioengineering at
+Northeastern University, USA.
 
 Address: Qianqian Fang
          Department of Bioengineering

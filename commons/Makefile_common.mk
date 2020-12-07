@@ -20,19 +20,28 @@ MMCSRC :=$(MMCDIR)/src
 
 CXX        := g++
 AR         := $(CC)
+CUDACC     :=nvcc
 BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
-CCFLAGS    += -c -Wall -g -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
-INCLUDEDIR := $(MMCDIR)/src
-EXTRALIB   += -lm
+CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
+INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
-MAKE       := make
+MAKE       ?= make
+
+ZMATLIB    :=libzmat.a
+USERARFLAGS?=$(ZMATLIB) -lz
+
+LIBOPENCLDIR ?= /usr/local/cuda/lib64
+LIBOPENCL  ?=-lOpenCL
+EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
+CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v
+CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
 
 ECHO	   := echo
 MKDIR      := mkdir
@@ -44,22 +53,65 @@ endif
 
 MEXLINKOPT +=$(OPENMPLIB)
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='-L$$TMW_ROOT$$MATLABROOT/sys/os/$$ARCH $$LDFLAGS $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
-MKOCT      :=mkoctfile
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXLIBS='$$CXXLIBS $(LIBOPENCL)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='-L$$TMW_ROOT$$MATLABROOT/sys/os/$$ARCH $$LDFLAGS $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
+MKOCT      :=mkoctfile -v
 
 DLLFLAG=-fPIC
 
 PLATFORM = $(shell uname -s)
-ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
+ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
+    MW_MINGW64_LOC=/c/msys64/usr/
     MKMEX      :=cmd //c mex.bat
-    MKMEXOPT    =COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH)
-    DLLFLAG     =
-endif
-ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
+    INCLUDEDIRS+=-I"./mingw64/include"
+    LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
+    MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    EXTRALIB   +=-static
+    CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
+    DLLFLAG    =
+else ifeq ($(findstring MSYS,$(PLATFORM)), MSYS)
+    MKMEX      :=cmd //c mex.bat
+    INCLUDEDIRS+=-I"./mingw64/include"
+    LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
+    MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    EXTRALIB   +=-static
+    CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
+    DLLFLAG    =
+else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
-    MKMEXOPT    =-f mexopts_cygwin64_gcc.bat COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LINKFLAGS='$$LINKFLAGS $(OPENMPLIB) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
+    LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
+    INCLUDEDIRS+=-I"./mingw64/include"
+    EXTRALIB   +=-static
+    CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG     =
+else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
+    LIBOPENCL=-framework OpenCL
+    LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
+    OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
+    CUDA_STATIC=--cudart static
 endif
+
+ifeq ($(BACKEND),ocelot)
+  LINKOPT=-L/usr/local/lib `OcelotConfig -l` -ltinfo
+  CUCCOPT=-D__STRICT_ANSI__ -g #--maxrregcount 32
+else ifeq ($(BACKEND),cudastatic)
+  ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+      CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+  else
+      CUDART=-lcudadevrt -lcudart_static -ldl -lrt -static-libgcc -static-libstdc++
+  endif
+  LINKOPT=-L/usr/local/cuda/lib -lm $(CUDART)
+  CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
+else
+  LINKOPT=-L/usr/local/cuda/lib -lm $(CUDART)
+  CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
+endif
+
+CUGENCODE?=-arch=sm_30
+
+INCLUDEDIR+=$(INCLUDEDIRS)
+EXTRALIB+=$(LIBOPENCL)
 
 NACL_SDK_ROOT ?= ../../../nacl
 OSNAME := $(shell echo $(PLATFORM) | tr A-Z a-z)
@@ -84,17 +136,19 @@ ARFLAGS    :=
 
 OBJSUFFIX  := .o
 BINSUFFIX  := 
+CLHEADER=.clh
 
 OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
 OBJS       := $(subst $(OBJDIR)/$(MMCSRC)/,$(MMCSRC)/,$(OBJS))
 OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
+CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
 
 release:   CCFLAGS+= -O3
-sse ssemath mex oct mexsse octsse: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
-sse ssemath omp mex oct mexsse octsse:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+sse ssemath mex oct: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
+sse ssemath omp mex oct mexomp octomp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
-ssemath mexsse octsse:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
-mex mexsse:        ARFLAGS+=$(MKMEXOPT)
+ssemath:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
+mex mexomp:        ARFLAGS+=$(MKMEXOPT)
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
 
@@ -114,20 +168,21 @@ web: BINDIR:=webmmc
 web: AR=emcc
 web: EXTRALIB=-s SIMD=1 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
-mex oct mexsse octsse:   EXTRALIB=
-mex oct mexsse octsse:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
-mex oct mexsse octsse:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
-mex oct mexsse octsse:   BINDIR=../mmclab
-mex mexsse:     AR=$(MKMEX)
-mex mexsse:     AROUTPUT=-output
-mex mexsse:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
-mexsse:         BINARY=mmc_sse
+mex oct mexomp octomp:   EXTRALIB=
+mex oct mexomp octomp:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp:   BINDIR=../mmclab
+mex mexomp:     AR=$(MKMEX)
+mex mexomp:     AROUTPUT=-output
+mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 
 oct:            BINARY=mmc.mex
-octsse:         BINARY=mmc_sse.mex
-oct octsse:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
-oct octsse:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(LFLAGS)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
-oct octsse:     USERARFLAGS=-o $(BINDIR)/mmc
+oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
+oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
+oct octomp:     USERARFLAGS+=-o $(BINDIR)/mmc
+
+debug:     sse
+debug:     CUCCOPT+=-DMCX_DEBUG
 
 TARGETSUFFIX:=$(suffix $(BINARY))
 
@@ -145,19 +200,27 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-all release sse ssemath prof omp mex oct mexsse octsse pnacl web: $(SUBDIRS) $(BINDIR)/$(BINARY)
+cuda: sse
+
+all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug cuda: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
 
 makedirs:
 	@if test ! -d $(OBJDIR); then $(MKDIR) $(OBJDIR); fi
+	@if test ! -d $(OBJDIR)/ubj; then $(MKDIR) $(OBJDIR)/ubj; fi
 	@if test ! -d $(BINDIR); then $(MKDIR) $(BINDIR); fi
 
 makedocdir:
 	@if test ! -d $(DOCDIR); then $(MKDIR) $(DOCDIR); fi
 
 .SUFFIXES : $(OBJSUFFIX) .cpp
+
+
+##  Compile .cu files ##
+$(OBJDIR)/%$(OBJSUFFIX): %.cu
+	$(CUDACC) -c $(CUCCOPT) -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
@@ -174,10 +237,17 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 	@$(ECHO) Building $@
 	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
+%$(CLHEADER): %.cl
+	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
+
 ##  Link  ##
-$(BINDIR)/$(BINARY): makedirs $(OBJS)
+$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
+
+
+$(ZMATLIB):
+	-$(MAKE) -C zmat lib AR=ar CPPOPT="$(DLLFLAG)" CCOPT="$(DLLFLAG)" USERLINKOPT=
 
 ##  Documentation  ##
 doc: makedocdir
@@ -185,6 +255,7 @@ doc: makedocdir
 
 ## Clean
 clean:
+	-$(MAKE) -C zmat clean
 	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done

@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -978,7 +978,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    T = _mm_add_ps(T, S);
 	    _mm_store_ps(&(r->pout.x),T);
 
-	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
+	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>cfg->maxgate-1){ /*exit time window*/
 	       r->faceid=-2;
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
@@ -1054,10 +1054,18 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    r->oldweight=ww;
                         }else
 			    r->oldweight+=ww;
+			if(r->faceid==-2 || !r->isend){
+			    if(cfg->isatomic)
+#pragma omp atomic
+			        tracer->mesh->weight[newidx]+=r->oldweight;
+                            else
+			        tracer->mesh->weight[newidx]+=r->oldweight;
+			    r->oldweight=0.f;
+			}
                      }else{
 			    float dstep, segloss, w0;
 			    int4 idx __attribute__ ((aligned(16)));
-			    int i, seg=(int)(r->Lmove/cfg->unitinmm)+1;
+			    int i, seg=(int)(r->Lmove/cfg->steps.x)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
 #ifdef __INTEL_COMPILER
@@ -1068,7 +1076,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
 			    O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
 			    S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
-			    dstep=1.f/cfg->unitinmm;
+			    dstep=1.f/cfg->steps.x;
 			    totalloss=(totalloss==0.f)? 0.f : (1.f-segloss)/totalloss;
 			    w0=ww;
                             for(i=0; i< seg; i++){
@@ -1077,11 +1085,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				unsigned int newidx=idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift;
 				r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 				if(newidx!=r->oldidx){
-				    tracer->mesh->weight[r->oldidx]+=r->oldweight;
+				    if(cfg->isatomic)
+#pragma omp atomic
+				        tracer->mesh->weight[r->oldidx]+=r->oldweight;
+				    else
+				        tracer->mesh->weight[r->oldidx]+=r->oldweight;
 				    r->oldidx=newidx;
 				    r->oldweight=w0*totalloss;
 				}else
 				    r->oldweight+=w0*totalloss;
+				if(r->faceid==-2 || !r->isend){
+				    if(cfg->isatomic)
+#pragma omp atomic
+				        tracer->mesh->weight[newidx]+=r->oldweight;
+				    else
+				        tracer->mesh->weight[newidx]+=r->oldweight;
+				    r->oldweight=0.f;
+				}
 				w0*=segloss;
 			        S = _mm_add_ps(S, T);
                             }
@@ -1254,7 +1274,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 //		    if(r.eid!=ID_UNDEFINED && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
-	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
+	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %zu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1275,7 +1295,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid!=ID_UNDEFINED && (cfg->debuglevel&dlMove))
-        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 		    if(r.eid!=ID_UNDEFINED){
                        if(cfg->debuglevel&dlExit)
         		 MMC_FPRINTF(cfg->flog,"E %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
@@ -1289,11 +1309,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		            mesh->dref[((-r.eid)-1) + tshift]+=r.weight;
 		       }
 		    }else if(r.faceid==-2 && (cfg->debuglevel&dlMove)){
-                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+                         MMC_FPRINTF(cfg->flog,"T %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    	    }else if(r.eid && r.faceid!=-2  && cfg->debuglevel&dlEdge)
-        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+        		 MMC_FPRINTF(cfg->flog,"X %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 
-		    if(cfg->issavedet && r.eid<0){
+		    if(cfg->issavedet && r.eid<=0){
 		       int i;
                        if(cfg->detnum==0 && cfg->isextdet && mesh->type[oldeid-1]==mesh->prop+1){
                           exitdet=oldeid;
@@ -1309,7 +1329,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
-	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %lu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %zu %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f){
 			r.weight*=cfg->roulettesize;
@@ -1647,8 +1667,8 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		  MMC_FPRINTF(cfg->flog,"source position [%e %e %e] \n",r->p0.x,r->p0.y,r->p0.z);
 		  MMC_FPRINTF(cfg->flog,"bary centric volume [%e %e %e %e] \n",bary[0],bary[1],bary[2],bary[3]);
 		}
-}
 		MESH_ERROR("initial element does not enclose the source!");
+}
 	}
 }
 

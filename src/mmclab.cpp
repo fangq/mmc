@@ -2,12 +2,12 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pl¡§1cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -38,6 +38,8 @@
 
 #include "mex.h"
 #include "simpmesh.h"
+#include "mmc_host.h"
+#include "mmc_cl_host.h"
 #include "tictoc.h"
 #include "tettracing.h"
 #include "waitmex/waitmex.c"
@@ -59,6 +61,9 @@
 //! Macro to read one 4-element vector member of cfg
 #define GET_VEC4_FIELD(u,v) else if(strcmp(name,#v)==0) {double *val=mxGetPr(item);u->v.x=val[0];u->v.y=val[1];u->v.z=val[2];u->v.w=val[3];\
                                  printf("mmc.%s=[%g %g %g %g];\n",#v,(float)(u->v.x),(float)(u->v.y),(float)(u->v.z),(float)(u->v.w));}
+/**<  Macro to output GPU parameters as field */
+#define SET_GPU_INFO(output,id,v)  mxSetField(output,id,#v,mxCreateDoubleScalar(gpuinfo[i].v));
+
 #define ABS(a)    ((a)<0?-(a):(a))                        //! Macro to calculate the absolute value
 #define MAX(a,b)  ((a)>(b)?(a):(b))                       //! Macro to calculate the max of two floating points
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
@@ -79,22 +84,29 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   mcconfig cfg;
   tetmesh mesh;
   raytracer tracer={NULL,0,NULL,NULL,NULL};
-  visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
-  RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
-  RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
   unsigned int threadid=0,t0,dt;
-  float* detmap;
+  GPUInfo *gpuinfo=NULL;
 
   mxArray    *tmp;
   int        ifield, jstruct;
-  int        ncfg, nfields, pidx;
+  int        ncfg, nfields;
   dimtype     fielddim[5];
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
   int        usewaitbar=1;
+#endif
   int        errorflag=0;
+  cl_uint    workdev;
+
   const char       *outputtag[]={"data"};
   const char       *datastruct[]={"data","dref"};
-#ifdef MATLAB_MEX_FILE
-  waitbar    *hprop;
+  const char       *gpuinfotag[]={"name","id","devcount","major","minor","globalmem",
+                                  "constmem","sharedmem","regcount","clock","sm","core",
+                                  "autoblock","autothread","maxgate"};
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
+  waitbar    *hprop=NULL;
+  void (*progressfun)(float, void *)=mcx_progressbar;
+#else
+  void (*progressfun)(float, void *)=mcx_progressbar;
 #endif
 
   /**
@@ -103,6 +115,52 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if (nrhs==0){
      mmclab_usage();
      return;
+  }
+
+  /**
+   * If a single string is passed, and if this string is 'gpuinfo', this function 
+   * returns the list of GPUs on this host and return.
+   */
+  if(nrhs==1 && mxIsChar(prhs[0])){
+        char shortcmd[MAX_SESSION_LENGTH];
+        mxGetString(prhs[0], shortcmd, MAX_SESSION_LENGTH);
+        shortcmd[MAX_SESSION_LENGTH-1]='\0';
+        if(strcmp(shortcmd,"gpuinfo")==0){
+            mcx_initcfg(&cfg);
+            cfg.isgpuinfo=3;
+	    try{
+              mcx_list_cl_gpu(&cfg,&workdev,NULL,&gpuinfo);
+            }catch(...){
+	      mexErrMsgTxt("OpenCL is not supported or not fully installed on your system");
+	    }
+            if(!workdev){
+                mexErrMsgTxt("no active GPU device found");
+            }
+            if(workdev>MAX_DEVICE)
+                workdev=MAX_DEVICE;
+
+            plhs[0] = mxCreateStructMatrix(gpuinfo[0].devcount,1,15,gpuinfotag);
+            for(cl_uint i=0;i<workdev;i++){
+		mxSetField(plhs[0],i,"name",mxCreateString(gpuinfo[i].name));
+		SET_GPU_INFO(plhs[0],i,id);
+		SET_GPU_INFO(plhs[0],i,devcount);
+		SET_GPU_INFO(plhs[0],i,major);
+		SET_GPU_INFO(plhs[0],i,minor);
+		SET_GPU_INFO(plhs[0],i,globalmem);
+		SET_GPU_INFO(plhs[0],i,constmem);
+		SET_GPU_INFO(plhs[0],i,sharedmem);
+		SET_GPU_INFO(plhs[0],i,regcount);
+		SET_GPU_INFO(plhs[0],i,clock);
+		SET_GPU_INFO(plhs[0],i,sm);
+		SET_GPU_INFO(plhs[0],i,core);
+		SET_GPU_INFO(plhs[0],i,autoblock);
+		SET_GPU_INFO(plhs[0],i,autothread);
+		SET_GPU_INFO(plhs[0],i,maxgate);
+            }
+            mcx_cleargpuinfo(&gpuinfo);
+            mcx_clearcfg(&cfg);
+	}
+	return;
   }
 
   /**
@@ -128,10 +186,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
   if(nlhs>=3)
       plhs[2] = mxCreateStructMatrix(ncfg,1,1,outputtag);
 
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
   if(mexEvalString("mmclab_waitbar_handle=figure('visible','off');")) // waitbar is not supported with nojvm after matlab R2013a
       usewaitbar=0;
   else
       mexEvalString("close(mmclab_waitbar_handle);");
+#endif
 
   /**
    * Loop over each element of the struct if it is an array, each element is a simulation
@@ -141,8 +201,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     /** Enclose all simulation calls inside a try/catch construct for exception handling */
     try{
         printf("Running simulations for configuration #%d ...\n", jstruct+1);
-        unsigned int ncomplete=0;
-        float raytri=0.f,raytri0=0.f;;
 
         /** Initialize cfg with default values first */
 	t0=StartTimer();
@@ -173,177 +231,92 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 	/** Validate all input fields, and warn incompatible inputs */
 	mmc_validate_config(&cfg,&mesh);
 
-        visitor_init(&cfg, &master);
-	tracer_init(&tracer,&mesh,cfg.method);
-	tracer_prep(&tracer,&cfg);
+	if(cfg.isgpuinfo==0) mmc_prep(&cfg,&mesh,&tracer);
 
         dt=GetTimeMillis();
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... ",dt-t0));
+	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\nsimulating ... \n",dt-t0));
 
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
+        if(cfg.debuglevel & dlProgress && progressfun==waitbar_update_c && usewaitbar)
+            hprop = waitbar_create (0, NULL);
+#endif
+    
     /** \subsection ssimu Parallel photon transport simulation */
 
-    /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
-#pragma omp parallel private(ran0,ran1,threadid,pidx) shared(errorflag)
-{
-	visitor visit={0.f,0.f,1.f/cfg.tstep,DET_PHOTON_BUF,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
-	visit.reclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
-        visitor_init(&cfg, &visit);
-	if(cfg.issavedet){
-            if(cfg.issaveseed)
-                visit.photonseed=calloc(visit.detcount,(sizeof(RandType)*RAND_BUF_LEN));
-	    visit.partialpath=(float*)calloc(visit.detcount*visit.reclen,sizeof(float));
-        }
-    #ifdef _OPENMP
-	threadid=omp_get_thread_num();	
-    #endif
-	rng_init(ran0,ran1,(unsigned int *)&(cfg.seed),threadid);
-    #ifdef MATLAB_MEX_FILE
-        if((cfg.debuglevel & dlProgress) && threadid==0)
-	  if(usewaitbar)
-             hprop = waitbar_create (0, NULL);
-    #endif
-
-	/*launch photons*/
-	#pragma omp for reduction(+:raytri,raytri0)
-	for(size_t i=0;i<cfg.nphoton;i++){
-            #pragma omp flush (errorflag)
-	    if(errorflag){
-		i=cfg.nphoton;
-		continue;
+        try{
+	    if(cfg.compute==cbSSE || cfg.gpuid>MAX_DEVICE)
+		mmc_run_mp(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
+#ifdef USE_CUDA
+	    else if(cfg.compute==cbCUDA){
+		mmc_run_cu(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
 	    }
-            try{
-		visit.raytet=0.f;
-                visit.raytet0=0.f;
-                if(cfg.seed==SEED_FROM_FILE)
-                   onephoton(i,&tracer,&mesh,&cfg,((RandType *)cfg.photonseed)+i*RAND_BUF_LEN,ran1,&visit);
-                else
-                   onephoton(i,&tracer,&mesh,&cfg,ran0,ran1,&visit);
-		raytri+=visit.raytet;
-                raytri0+=visit.raytet0;
-		#pragma omp atomic
-		   ncomplete++;
-
-		if((cfg.debuglevel & dlProgress) && threadid==0 && cfg.nphoton>0){
-#ifdef MATLAB_MEX_FILE
-                    int prog=ncomplete*100/cfg.nphoton;
-                    static int oldprog=-1;
-                    char percent[8]="";
-                    sprintf(percent,"%d%%",prog);
-                    if(prog!=oldprog){
-		       if(usewaitbar)
-                        waitbar_update (((double)ncomplete)/cfg.nphoton, hprop, percent);
-		       else
-		        mcx_progressbar(ncomplete,&cfg);
-                    }
-		    oldprog=prog;
-#else
-                    mcx_progressbar(ncomplete,&cfg);
 #endif
-                }
-	    }catch(const char *err){
-        	mexPrintf("Error from thread (%d): %s\n",threadid,err);
-		errorflag++;
-	    }catch(const std::exception &err){
-        	mexPrintf("C++ Error from thread (%d): %s\n",threadid,err.what());
-		errorflag++;
-	    }catch(...){
-        	mexPrintf("Unknown Exception from thread (%d)",threadid);
-		errorflag++;
+#ifdef USE_OPENCL
+	    else{
+		mmc_run_cl(&cfg,&mesh,&tracer,progressfun,(void*)hprop);
 	    }
-	}
-
-        for(pidx=0;pidx<cfg.srcnum;pidx++){
-            #pragma omp atomic
-                master.launchweight[pidx] += visit.launchweight[pidx];
-            #pragma omp atomic
-                master.absorbweight[pidx] += visit.absorbweight[pidx];
+#endif
+        }catch(const char *err){
+    	    mexPrintf("Error from thread (%d): %s\n",threadid,err);
+    	    errorflag++;
+        }catch(const std::exception &err){
+    	    mexPrintf("C++ Error from thread (%d): %s\n",threadid,err.what());
+    	    errorflag++;
+        }catch(...){
+    	    mexPrintf("Unknown Exception from thread (%d)",threadid);
+    	    errorflag++;
         }
-
-        /** If no error is detected, generat all output data */
-	if(cfg.issavedet && errorflag==0){
-	    #pragma omp atomic
-		master.detcount+=visit.bufpos;
-            #pragma omp barrier
-            if(master.detcount>0){
-	      if(threadid==0){
-		if(nlhs>=2){
-		    if(cfg.issaveexit==2){
-			fielddim[0]=cfg.detparam1.w; fielddim[1]=cfg.detparam2.w; fielddim[2]=cfg.maxgate; fielddim[3]=0;
-			mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(3,fielddim,mxSINGLE_CLASS,mxREAL));
-			detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
-			master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
-		    }
-		    else{
-	            	fielddim[0]=visit.reclen; fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0;
-    		    	mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
-		    	master.partialpath = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
-		    }
-                    if(nlhs>=3 && cfg.issaveseed){
-                        fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=master.detcount; fielddim[2]=0; fielddim[3]=0; 
-                        mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
-                        master.photonseed = (unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0));
-		    }
-		}else{
-	            master.partialpath=(float*)calloc(master.detcount*visit.reclen,sizeof(float));
-                    if(cfg.issaveseed)
-                        master.photonseed=calloc(master.detcount,(sizeof(RandType)*RAND_BUF_LEN));
-                }
-	      }
-              #pragma omp barrier
-              #pragma omp critical
-              {
-		memcpy(master.partialpath+master.bufpos*visit.reclen,
-		       visit.partialpath,visit.bufpos*visit.reclen*sizeof(float));
-                if(nlhs>=3 && cfg.issaveseed)
-                    memcpy((unsigned char*)master.photonseed+master.bufpos*(sizeof(RandType)*RAND_BUF_LEN),
-                            visit.photonseed,visit.bufpos*(sizeof(RandType)*RAND_BUF_LEN));
-		master.bufpos+=visit.bufpos;
-              }
-            }
-            #pragma omp barrier
-	    visitor_clear(&visit);
-	    if(visit.partialpath)
-	        free(visit.partialpath);
-            if(cfg.issaveseed && visit.photonseed)
-	        free(visit.photonseed);
-	}
-}
 
 	/** \subsection sreport Post simulation */
 
-#ifdef MATLAB_MEX_FILE
-	if((cfg.debuglevel & dlProgress)){
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
+	if(cfg.debuglevel & dlProgress){
 	    if(usewaitbar)
                  waitbar_update (1.0, hprop, NULL);
 	    else
-		 mcx_progressbar(cfg.nphoton,&cfg);
+		 mcx_progressbar(1.f,&cfg);
 	}
 #endif
 	dt=GetTimeMillis()-dt;
-	MMCDEBUG(&cfg,dlProgress,(cfg.flog,"\n"));
-	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",dt));
-        MMCDEBUG(&cfg,dlTime,(cfg.flog,"speed ...\t%.2f photon/ms,%.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n",(double)cfg.nphoton/dt,raytri,raytri0,raytri/dt));
 
     /** Clear up simulation data structures by calling the destructors */
 
-#ifdef MATLAB_MEX_FILE
-        if((cfg.debuglevel & dlProgress))
-	   if(usewaitbar)
+#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
+        if(cfg.debuglevel & dlProgress && usewaitbar)
              waitbar_destroy (hprop) ;
 #endif
 	tracer_clear(&tracer);
-	if(cfg.isnormalized){
-            double cur_normalizer, sum_normalizer=0;
-            for(pidx=0;pidx<cfg.srcnum;pidx++){
-                cur_normalizer=mesh_normalize(&mesh,&cfg,master.absorbweight[pidx],master.launchweight[pidx],pidx);
-                sum_normalizer+=cur_normalizer;
-	        printf("source %d\ttotal simulated energy: %.0f\tabsorbed: %5.5f%%\tnormalizor=%g\n",
-		    pidx+1,master.launchweight[pidx],100.f*master.absorbweight[pidx]/master.launchweight[pidx],cur_normalizer);
-            }
-            cfg.his.normalizer=sum_normalizer/cfg.srcnum;
-	}
 	MMCDEBUG(&cfg,dlTime,(cfg.flog,"\tdone\t%d\n",GetTimeMillis()-t0));
 
+	/** if the 2nd output presents, output the detected photon partialpath data */
+	if(nlhs>=2){
+	  if(cfg.issaveexit!=2){
+            int hostdetreclen=(2+((cfg.ismomentum)>0))*mesh.prop+(cfg.issaveexit>0)*6+2;
+            fielddim[0]=hostdetreclen; fielddim[1]=cfg.detectedcount; 
+            fielddim[2]=0; fielddim[3]=0;
+            if(cfg.detectedcount>0){
+                    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(2,fielddim,mxSINGLE_CLASS,mxREAL));
+                    memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0)),cfg.exportdetected,
+                         fielddim[0]*fielddim[1]*sizeof(float));
+            }
+	  }else{
+            fielddim[0]=cfg.detparam1.w; fielddim[1]=cfg.detparam2.w; fielddim[2]=cfg.maxgate; fielddim[3]=0;
+	    mxSetFieldByNumber(plhs[1],jstruct,0, mxCreateNumericArray(3,fielddim,mxSINGLE_CLASS,mxREAL));
+	    float *detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1],jstruct,0));
+	    memset(detmap,cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
+	    mesh_getdetimage(detmap,cfg.exportdetected,cfg.detectedcount,&cfg,&mesh);
+	  }
+	  free(cfg.exportdetected);
+	  cfg.exportdetected=NULL;
+          
+	  if(nlhs>=3 && cfg.issaveseed && cfg.exportseed){
+               fielddim[0]=(sizeof(RandType)*RAND_BUF_LEN); fielddim[1]=cfg.detectedcount; fielddim[2]=0; fielddim[3]=0; 
+               mxSetFieldByNumber(plhs[2],jstruct,0, mxCreateNumericArray(2,fielddim,mxUINT8_CLASS,mxREAL));
+               memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2],jstruct,0)), cfg.exportseed, fielddim[0]*fielddim[1]);
+	  }
+	  free(cfg.exportseed);
+	  cfg.exportseed=NULL;
+	}
 	if(nlhs>=1){
 	    int datalen=(cfg.method==rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
             fielddim[0]=cfg.srcnum;
@@ -361,26 +334,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		    mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(4,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
 		}
 	    }else{
-		    if(cfg.srcnum>1){
-		      mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
-		    }else{
-		      mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
-		    }
+		if(cfg.srcnum>1){
+		  mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(3,fielddim,mxDOUBLE_CLASS,mxREAL));
+		}else{
+		  mxSetFieldByNumber(plhs[0],jstruct,0, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
+		}
 	    }
 	    double *output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,0));
 	    memcpy(output,mesh.weight,cfg.srcnum*datalen*cfg.maxgate*sizeof(double));
 	    
             if(cfg.issaveref){        /** save diffuse reflectance */
 		fielddim[1]=mesh.nf;
+		fielddim[2]=cfg.maxgate;
 	        mxSetFieldByNumber(plhs[0],jstruct,1, mxCreateNumericArray(2,&fielddim[1],mxDOUBLE_CLASS,mxREAL));
                 memcpy((double*)mxGetPr(mxGetFieldByNumber(plhs[0],jstruct,1)),mesh.dref,fielddim[1]*fielddim[2]*sizeof(double));
 	    }
-	}
-	if(nlhs>=2 && cfg.issaveexit==2){
-	    float *detimage=(float*)calloc(cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate,sizeof(float));
-	    mesh_getdetimage(detimage,master.partialpath,master.bufpos,&cfg,&mesh);
-	    memcpy(detmap,detimage,cfg.detparam1.w*cfg.detparam2.w*cfg.maxgate*sizeof(float));
-	    free(detimage);	detimage = NULL;
 	}
         if(errorflag)
             mexErrMsgTxt("MMCLAB Terminated due to exception!");
@@ -393,7 +361,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     }
 
     /** \subsection sclean End the simulation */   
-    visitor_clear(&master);
     mesh_clear(&mesh);
     mcx_clearcfg(&cfg);
   }
@@ -425,6 +392,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 
     cfg->flog=stderr;
     GET_1ST_FIELD(cfg,nphoton)
+    GET_ONE_FIELD(cfg,nblocksize)
+    GET_ONE_FIELD(cfg,nthread)
     GET_ONE_FIELD(cfg,tstart)
     GET_ONE_FIELD(cfg,tstep)
     GET_ONE_FIELD(cfg,tend)
@@ -433,6 +402,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,ismomentum)
     GET_ONE_FIELD(cfg,issaveexit)
     GET_ONE_FIELD(cfg,issaveseed)
+    GET_ONE_FIELD(cfg,optlevel)
     GET_ONE_FIELD(cfg,isatomic)
     GET_ONE_FIELD(cfg,basisorder)
     GET_ONE_FIELD(cfg,outputformat)
@@ -447,6 +417,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     GET_ONE_FIELD(cfg,unitinmm)
     GET_ONE_FIELD(cfg,voidtime)
     GET_ONE_FIELD(cfg,mcmethod)
+    GET_ONE_FIELD(cfg,maxdetphoton)
     GET_VEC3_FIELD(cfg,srcpos)
     GET_VEC34_FIELD(cfg,srcdir)
     GET_VEC3_FIELD(cfg,steps)
@@ -503,7 +474,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	mesh->elemlen=arraydim[1];
 	if(mesh->facenb) free(mesh->facenb);
         mesh->facenb=(int *)malloc(sizeof(int)*arraydim[1]*mesh->ne);
-        for(j=0;j<arraydim[1];j++)
+        for(dimtype j=0;j<arraydim[1];j++)
           for(i=0;i<mesh->ne;i++)
              mesh->facenb[i*arraydim[1]+j]=val[j*mesh->ne+i];
         printf("mmc.facenb=[%d,%d];\n",mesh->ne,mesh->elemlen);
@@ -543,8 +514,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(j=0;j<4;j++)
           for(i=0;i<=mesh->prop;i++)
              ((float *)(&mesh->med[i]))[j]=val[j*(mesh->prop+1)+i];
-	/*for(i=0;i<=mesh->prop;i++)
-             mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
 	cfg->his.maxmedia=mesh->prop;
         printf("mmc.prop=%d;\n",mesh->prop);
     }else if(strcmp(name,"debuglevel")==0){
@@ -596,7 +565,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         cfg->srcpattern=(float*)malloc(arraydim[0]*arraydim[1]*cfg->srcnum*sizeof(float));
         for(k=0;k<arraydim[0]*arraydim[1]*cfg->srcnum;k++)
              cfg->srcpattern[k]=val[k];
-        printf("mmc.srcpattern=[%d %d %d];\n",arraydim[0],arraydim[1],cfg->srcnum);
+        printf("mmc.srcpattern=[%d %d %d];\n",(int)arraydim[0],(int)arraydim[1],cfg->srcnum);
     }else if(strcmp(name,"method")==0){
         int len=mxGetNumberOfElements(item);
         const char *methods[]={"plucker","havel","badouel","elem","grid",""};
@@ -629,6 +598,22 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         if(cfg->outputtype==-1)
              mexErrMsgTxt("the specified output type is not supported");
 	printf("mmc.outputtype='%s';\n",outputstr);
+    }else if(strcmp(name,"compute")==0){
+        int len=mxGetNumberOfElements(item);
+        const char *computebackend[]={"sse","opencl","cuda",""};
+        char computestr[MAX_SESSION_LENGTH]={'\0'};
+
+        if(!mxIsChar(item) || len==0)
+             mexErrMsgTxt("the 'compute' field must be a non-empty string");
+	if(len>MAX_SESSION_LENGTH)
+	     mexErrMsgTxt("the 'compute' field is too long");
+        int status = mxGetString(item, computestr, MAX_SESSION_LENGTH);
+        if (status != 0)
+             mexWarnMsgTxt("not enough space. string is truncated.");
+        cfg->compute=mcx_keylookup(computestr,computebackend);
+        if(cfg->compute==-1)
+             mexErrMsgTxt("the specified compute is not supported");
+	printf("mmc.compute='%s';\n",computestr);
     }else if(strcmp(name,"shapes")==0){
         int len=mxGetNumberOfElements(item);
         if(!mxIsChar(item) || len==0)
@@ -652,7 +637,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
             memcpy(cfg->photonseed,mxGetData(item),arraydim[0]*arraydim[1]);
             cfg->seed=SEED_FROM_FILE;
             cfg->nphoton=arraydim[1];
-            printf("mmc.nphoton=%d;\n",cfg->nphoton);
+            printf("mmc.nphoton=%zu;\n",cfg->nphoton);
 	}
     }else if(strcmp(name,"replayweight")==0){
         arraydim=mxGetDimensions(item);
@@ -670,11 +655,47 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
 	cfg->replaytime=(float *)malloc(cfg->his.detected*sizeof(float));
         memcpy(cfg->replaytime,mxGetData(item),cfg->his.detected*sizeof(float));
         printf("mmc.replaytime=%d;\n",cfg->his.detected);
+    }else if(strcmp(name,"gpuid")==0){
+        int len=mxGetNumberOfElements(item);
+
+        if(mxIsChar(item)){
+	   if(len==0)
+             mexErrMsgTxt("the 'gpuid' field must be an integer or non-empty string");
+	   if(len>MAX_DEVICE)
+		mexErrMsgTxt("the 'gpuid' field is too long");
+           int status = mxGetString(item, cfg->deviceid, MAX_DEVICE);
+           if (status != 0)
+        	mexWarnMsgTxt("not enough space. string is truncated.");
+
+           printf("mmc.gpuid='%s';\n",cfg->deviceid);
+	}else{
+           double *val=mxGetPr(item);
+	   cfg->gpuid=val[0];
+           memset(cfg->deviceid,0,MAX_DEVICE);
+           if(cfg->gpuid>0 && cfg->gpuid<MAX_DEVICE){
+                memset(cfg->deviceid,'0',cfg->gpuid-1);
+           	cfg->deviceid[cfg->gpuid-1]='1';
+           }
+           printf("mmc.gpuid=%d;\n",cfg->gpuid);
+	}
+        for(int i=0;i<MAX_DEVICE;i++)
+           if(cfg->deviceid[i]=='0')
+              cfg->deviceid[i]='\0';
+    }else if(strcmp(name,"workload")==0){
+        double *val=mxGetPr(item);
+	arraydim=mxGetDimensions(item);
+	if(arraydim[0]*arraydim[1]>MAX_DEVICE)
+	     mexErrMsgTxt("the workload list can not be longer than 256");
+	for(dimtype i=0;i<arraydim[0]*arraydim[1];i++)
+	     cfg->workload[i]=val[i];
+        printf("mmc.workload=<<%zu>>;\n",(size_t)arraydim[0]*arraydim[1]);
     }else if(strcmp(name,"isreoriented")==0){
         /*internal flag, don't need to do anything*/
     }else{
         printf("WARNING: redundant field '%s'\n",name);
     }
+    if(jsonshapes)
+         delete [] jsonshapes;
 }
 
 /** 
@@ -733,12 +754,16 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
         mexErrMsgTxt("multiple source simulation is currently not supported under replay mode");
 
      if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
-        for(i=1;i<mesh->prop;i++){
+        for(i=1;i<=mesh->prop;i++){
 		mesh->med[i].mus*=cfg->unitinmm;
 		mesh->med[i].mua*=cfg->unitinmm;
         }
      }
      cfg->his.unitinmm=cfg->unitinmm;
+
+     if(cfg->steps.x!=cfg->steps.y || cfg->steps.y!=cfg->steps.z)
+        MEXERROR("MMC dual-grid algorithm currently does not support anisotropic voxels");
+
      if(mesh->node==NULL || mesh->elem==NULL || mesh->prop==0){
 	 MEXERROR("You must define 'mesh' and 'prop' fields.");
      }
@@ -801,9 +826,9 @@ void mmclab_usage(){
  */
 
 extern "C" void mcx_matlab_flush(){
-#ifndef MATLAB_MEX_FILE
-	mexEvalString("fflush(stdout);");
-#else
+#if defined(MATLAB_MEX_FILE)
 	mexEvalString("pause(.0001);");
+#else
+	mexEvalString("fflush(stdout);");
 #endif
 }

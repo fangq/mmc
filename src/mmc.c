@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -29,6 +29,14 @@
 
 #include "mmc_host.h"
 
+#ifdef USE_OPENCL
+    #include "mmc_cl_host.h"
+#endif
+
+#ifdef USE_CUDA
+    #include "mmc_cu_host.h"
+#endif
+
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the 
 necessary data structures. This include the command line options (cfg),
@@ -51,14 +59,25 @@ int main(int argc, char**argv){
            In the second step, we pre-compute all needed mesh and ray-tracing data
 	   and get ready for launching photon simulations.
         */
-        mmc_prep(&cfg,&mesh,&tracer);
+        if(cfg.isgpuinfo==0) mmc_prep(&cfg,&mesh,&tracer);
 	
 	/** 
            The core simulation loop is executed in the mmc_run_mp() function where
 	   multiple threads are executed to simulate all photons.
          */
-        mmc_run_mp(&cfg,&mesh,&tracer);
-	
+	if(cfg.compute==cbSSE || cfg.gpuid>MAX_DEVICE)
+            mmc_run_mp(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+#ifdef USE_CUDA
+	else if(cfg.compute==cbCUDA){
+            mmc_run_cu(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+	}
+#endif
+#ifdef USE_OPENCL
+	else{
+            mmc_run_cl(&cfg,&mesh,&tracer,mcx_progressbar,&cfg);
+	}
+#endif
+
 	/** 
            Once all photon simulations are complete, we clean up all allocated memory
 	   and finish the execution.

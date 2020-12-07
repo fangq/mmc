@@ -1,9 +1,9 @@
 ===============================================================================
 =         MMCLAB - Mesh-based Monte Carlo (MMC)  for MATLAB/GNU Octave        =
-=                     Multi-threaded Edition with SSE4                        =
+=                OpenCL and Multi-threaded Edition with SSE4                  =
 ===============================================================================
 
-Copyright (C) 2010-2018  Qianqian Fang <q.fang at neu.edu>
+Copyright (C) 2010-2020  Qianqian Fang <q.fang at neu.edu>
 
 -------------------------------------------------------------------------------
 

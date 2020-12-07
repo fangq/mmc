@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -55,7 +55,7 @@ tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 int mmc_init_from_cmd(mcconfig *cfg, tetmesh *mesh, raytracer *tracer,int argc, char**argv){
         mcx_initcfg(cfg);
         mcx_parsecmd(argc,argv,cfg);
-	mesh_init_from_cfg(mesh,cfg);
+	if(cfg->isgpuinfo==0) mesh_init_from_cfg(mesh,cfg);
         return 0;
 }
 
@@ -133,7 +133,7 @@ int mmc_prep(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
  * \param[out] tracer: the ray-tracer data structure
  */
 
-int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
+int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, void (*progressfun)(float, void *),void *handle){
 	RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
         unsigned int i,j;
@@ -142,6 +142,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	visitor master={0.f,0.f,0.f,0,0,0,NULL,NULL,NULL,NULL,NULL,NULL};
 	visitor_init(cfg, &master);
 
+        if(progressfun==NULL)
+            cfg->debuglevel=cfg->debuglevel & (~dlProgress);
 
 	t0=StartTimer();
 
@@ -151,7 +153,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	cfg->issaveseed=0;
 #endif
         dt=GetTimeMillis();
-        MMCDEBUG(cfg,dlTime,(cfg->flog,"seed=%u\nsimulating ... ",cfg->seed));
+        MMCDEBUG(cfg,dlTime,(cfg->flog,"seed=%u\nsimulating ... \n",cfg->seed));
         if(cfg->debugphoton>=0){
             debuglevel=cfg->debuglevel;
             cfg->debuglevel &= 0xFFFFEA00;
@@ -206,6 +208,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 
 	rng_init(ran0,ran1,seeds,threadid);
 
+	if((cfg->debuglevel & dlProgress) && threadid==0)
+		progressfun(-0.f,handle);
+
 	/*launch photons*/
         #pragma omp for reduction(+:raytri,raytri0)
 	for(id=0;id<cfg->nphoton;id++){
@@ -228,9 +233,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 		   ncomplete++;
 
 		if((cfg->debuglevel & dlProgress) && threadid==0)
-			mcx_progressbar(ncomplete,cfg);
-		if(cfg->issave2pt && cfg->checkpt[0])
-			mesh_saveweightat(mesh,cfg,id+1);
+			progressfun((float)ncomplete/cfg->nphoton,handle);
 	}
 
 	for(j=0;j<cfg->srcnum;j++){
@@ -272,7 +275,7 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
         /** \subsection sreport Post simulation */
 
 	if((cfg->debuglevel & dlProgress))
-		mcx_progressbar(cfg->nphoton,cfg);
+		progressfun(1.f,handle);
 
 	dt=GetTimeMillis()-dt;
 	MMCDEBUG(cfg,dlProgress,(cfg->flog,"\n"));
@@ -286,8 +289,8 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	    for(j=0;j<cfg->srcnum;j++){
 	    	cur_normalizer = mesh_normalize(mesh,cfg,master.absorbweight[j],master.launchweight[j],j);
           	sum_normalizer += cur_normalizer;
-          	fprintf(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
-		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer);
+          	MMCDEBUG(cfg,dlTime,(cfg->flog,"source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
+		j+1,master.launchweight[j],100.f*master.absorbweight[j]/master.launchweight[j],cur_normalizer));
   	    }
   	    cfg->his.normalizer=sum_normalizer/cfg->srcnum;	// average normalizer value for all simulated sources
 	}
@@ -301,9 +304,9 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer){
 	}
 	if(cfg->issavedet){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving detected photons ..."));
-		if(cfg->issaveexit!=2)
+		if(cfg->issaveexit)
 			mesh_savedetphoton(master.partialpath,master.photonseed,master.bufpos,(sizeof(RandType)*RAND_BUF_LEN),cfg);
-		else{
+		if(cfg->issaveexit==2){
 			float *detimage=(float*)calloc(cfg->detparam1.w*cfg->detparam2.w*cfg->maxgate,sizeof(float));
 			mesh_getdetimage(detimage,master.partialpath,master.bufpos,cfg,mesh);
 			mesh_savedetimage(detimage,cfg);	free(detimage);

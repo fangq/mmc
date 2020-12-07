@@ -75,6 +75,7 @@ cfg.tstep=1e-10;
 cfg.debuglevel='TP';
 cfg.isreflect=1;
 cfg.detpos=[30 30 0 2]; % detector position
+cfg.method='elem';
 
 %% mmc simulation
 

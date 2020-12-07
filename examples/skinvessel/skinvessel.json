@@ -1,0 +1,28 @@
+{
+	"Session": {
+		"ID": "skinvessel",
+		"DoMismatch": 0,
+		"OutputType": "flux",
+		"DebugFlag": "TP",
+		"RayTracer": "g",
+		"RNGSeed": 1648335518,
+		"Photons": 10000000
+	},
+	"Mesh": {
+		"MeshID": "skinvessel",
+		"InitElem": 466437
+	},
+	"Forward": {
+		"T0": 0,
+		"T1": 5e-08,
+		"Dt": 5e-08
+	},
+	"Optode": {
+		"Source": {
+			"Pos": [0.5,0.5,-0.005],
+			"Dir": [0,0,1],
+			"Param1": [0.3,0,0,0],
+			"Type": "disk"
+		}
+	}
+}

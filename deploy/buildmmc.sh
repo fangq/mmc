@@ -28,17 +28,17 @@ then
 fi
 DATE=`date +'%Y%m%d'`
 BUILDROOT=~/space/autobuild/$BUILD/mmc
-OS=`uname -s`
+OSID=`uname -s`
 MACHINE=`uname -m`
 
-if [ "$OS" == "Linux" ]
+if [ "$OSID" == "Linux" ]
 then
     OS=linux
     source ~/.bashrc
-elif [ "$OS" == "Darwin" ]; then
+elif [ "$OSID" == "Darwin" ]; then
     OS=osx
     source ~/.bash_profile
-elif [[ "$OS" == CYGWIN* ]] || [[ "$OS" == MINGW* ]] || [[ "$OS" == MSYS* ]]; then
+elif [[ "$OSID" == CYGWIN* ]] || [[ "$OSID" == MINGW* ]] || [[ "$OSID" == MSYS* ]]; then
     OS=win
 fi
 
@@ -65,6 +65,10 @@ cat <<EOF >> mmc/.git/config
 EOF
 
 cd mmc
+if [ ! -z "$2" ]
+then
+	git checkout $2
+fi
 rm -rf *
 git checkout *
 rm -rf .git
@@ -80,12 +84,27 @@ cd mmc/src
 
 rm -rf ../mmclab/AUTO_BUILD_*
 make clean
-make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" &> ../mmclab/AUTO_BUILD_${DATE}.log
+if [ "$OS" == "win" ]
+then
+    if [[ "$OSID" == CYGWIN* ]]; then
+        PATH=/cygdrive/c/ProgramData/MATLAB/SupportPackages/R2017b/3P.instrset/mingw_w64.instrset/bin/:$PATH  make mex CC=gcc &> ../mmclab/AUTO_BUILD_${DATE}.log
+    else
+        PATH=/c/ProgramData/MATLAB/SupportPackages/R2017b/3P.instrset/mingw_w64.instrset/bin/:$PATH  make mex CC=gcc &> ../mmclab/AUTO_BUILD_${DATE}.log
+    fi
+else
+    make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" &> ../mmclab/AUTO_BUILD_${DATE}.log
+fi
 
 make clean
 if [ "$OS" == "osx" ]
 then
 	make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" >>  ../mmclab/AUTO_BUILD_${DATE}.log 2>&1
+elif [ "$OS" == "win" ]; then
+    if [[ "$OSID" == CYGWIN* ]]; then
+        PATH=/cygdrive/c/Octave/Octave-4.2.1/bin:$PATH make oct CC=gcc LIBOPENCL='C:\Windows\System32\OpenCL.dll' MEXLINKOPT='-LC:\Octave\Octave-4.2.1\lib64 -LC:\Octave\Octave-4.2.1\lib\octave\4.2.1' &> ../mmclab/AUTO_BUILD_${DATE}.log
+    else
+        PATH=/c/Octave/Octave-4.2.1/bin:$PATH make oct CC=gcc LIBOPENCL='C:\Windows\System32\OpenCL.dll' MEXLINKOPT='-LC:\Octave\Octave-4.2.1\lib64 -LC:\Octave\Octave-4.2.1\lib\octave\4.2.1' &> ../mmclab/AUTO_BUILD_${DATE}.log
+    fi
 else
 	make oct  >>  ../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 fi
@@ -102,7 +121,7 @@ then
 	rm -rf ../mmclab/AUTO_BUILD_${DATE}.log
 fi
 
-cp $BUILDROOT/dlls/*.dll ../mmclab
+#cp $BUILDROOT/dlls/*.dll ../mmclab
 cd ..
 zip -FSr $BUILDROOT/mmclab-${TAG}.zip mmclab
 cd src
@@ -113,8 +132,10 @@ make clean
 if [ "$OS" == "osx" ]
 then
 	make &> $BUILDROOT/mmc_buildlog_${DATE}.log
+elif [ "$OS" == "win" ]; then
+        make USERARFLAGS="-lwinmm -static-libgcc -static"
 else
-	make EXTRALIB="-static -lm" &> $BUILDROOT/mmc_buildlog_${DATE}.log
+	make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -lOpenCL -lm" &> $BUILDROOT/mmc_buildlog_${DATE}.log
 fi
 
 if [ -f "bin/mmc" ]
@@ -130,6 +151,7 @@ fi
 cd ../
 rm -rf .git mmclab webmmc commons
 mv src/bin .
+cp $BUILDROOT/dlls/*.dll bin
 rm -rf src .git_filters .gitattributes
 mkdir -p src/bin
 cd src/bin
@@ -148,7 +170,12 @@ then
 	rm -rf mmc/AUTO_BUILD_${DATE}.log
 fi
 
-zip -FSr mmc-${TAG}.zip mmc
+if [ "$OS" == "win" ]
+then
+   zip -FSr mmc-${TAG}.zip mmc
+else
+   zip -FSry mmc-${TAG}.zip mmc
+fi
 
 #mv mmc-${TAG}.zip $BUILDROOT
 

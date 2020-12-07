@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -39,7 +39,7 @@
 typedef unsigned int RandType;
 typedef unsigned int uint;
 
-#define MCX_RNG_NAME       "SFMT19937 RNG"
+#define MCX_RNG_NAME       "xorshift128+ RNG"
 
 #define RAND_BUF_LEN       1248    //buffer length
 #define RAND_SEED_WORD_LEN      2       //

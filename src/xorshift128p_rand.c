@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -33,13 +33,15 @@
 #include <math.h>
 #include <stdio.h>
 #include "xorshift128p_rand.h"
+#include "fastmath.h"
 
 #ifdef MMC_USE_SSE_MATH
 #include "sse_math/sse_math.h"
 #include <smmintrin.h>
 #endif
 
-#define LOG_RNG_MAX             22.1807097779182f
+#define LOG_RNG_MAX         22.1807097779182f
+#define IEEE754_DOUBLE_BIAS     0x3FF0000000000000ul /* Added to exponent.  */
 
 static float xorshift128p_nextf (RandType t[RAND_BUF_LEN]){
    union {
@@ -64,13 +66,13 @@ static void xorshift128p_seed (uint *seed,RandType t[RAND_BUF_LEN]){
 }
 
 // transform into [0,1] random number
-__device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
+inlinefun float rand_uniform01(RandType t[RAND_BUF_LEN]){
     return xorshift128p_nextf(t);
 }
-__device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
+inlinefun void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
     xorshift128p_seed(n_seed+idx*RAND_SEED_WORD_LEN,t);
 }
-__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]){
+inlinefun void rand_need_more(RandType t[RAND_BUF_LEN],RandType tbuf[RAND_BUF_LEN]){
 }
 
 #include "rng_common.h"

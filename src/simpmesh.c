@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include "simpmesh.h"
 #include <string.h>
+#include "highordermesh.h"
 
 #ifdef WIN32
          char pathsep='\\';  /**< path separator on Windows */
@@ -85,6 +86,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->elemlen=4;
 	mesh->node=NULL;
 	mesh->elem=NULL;
+	mesh->elem2=NULL;
 	mesh->srcelemlen=0;
 	mesh->srcelem=NULL;
 	mesh->detelemlen=0;
@@ -117,6 +119,8 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_init(mesh);
         mesh_loadnode(mesh,cfg);
         mesh_loadelem(mesh,cfg);
+	if(cfg->basisorder==2)
+	  mesh_10nodetet(mesh,cfg);
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
@@ -150,7 +154,7 @@ void mesh_error(const char *msg,const char *file,const int linenum){
  * @param[in] cfg: the simulation configuration structure
  */
 
-void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
+void mesh_filenames(const char format[64],char *foutput,mcconfig *cfg){
 	char filename[MAX_PATH_LENGTH];
 	sprintf(filename,format,cfg->meshtag);
 
@@ -169,8 +173,8 @@ void mesh_filenames(const char *format,char *foutput,mcconfig *cfg){
 
 void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i,datalen;
-	char fnode[MAX_PATH_LENGTH];
+	int tmp,len,i;
+	char fnode[MAX_FULL_PATH];
 	mesh_filenames("node_%s.dat",fnode,cfg);
 	if((fp=fopen(fnode,"rt"))==NULL){
 		MESH_ERROR("can not open node file");
@@ -187,8 +191,6 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
         if(cfg->method==rtBLBadouelGrid)
 	        mesh_createdualmesh(mesh,cfg);
-	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate*cfg->srcnum);
 }
 
 void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
@@ -215,9 +217,9 @@ void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
 	mesh->nmax.y+=EPS;
 	mesh->nmax.z+=EPS;
 
-	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->unitinmm)+1;
-	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->unitinmm)+1;
-	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->unitinmm)+1;
+	cfg->dim.x=(int)((mesh->nmax.x-mesh->nmin.x)/cfg->steps.x)+1;
+	cfg->dim.y=(int)((mesh->nmax.y-mesh->nmin.y)/cfg->steps.y)+1;
+	cfg->dim.z=(int)((mesh->nmax.z-mesh->nmin.z)/cfg->steps.z)+1;
 
 	cfg->crop0.x=cfg->dim.x;
         cfg->crop0.y=cfg->dim.y*cfg->dim.x;
@@ -234,7 +236,7 @@ void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg){
 void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i;
-	char fmed[MAX_PATH_LENGTH];
+	char fmed[MAX_FULL_PATH];
 	mesh_filenames("prop_%s.dat",fmed,cfg);
 	if((fp=fopen(fmed,"rt"))==NULL){
 		MESH_ERROR("can not open media property file");
@@ -269,7 +271,7 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 	fclose(fp);
 
         if(cfg->method!=rtBLBadouelGrid && cfg->unitinmm!=1.f){
-           for(i=1;i<mesh->prop;i++){
+           for(i=1;i<=mesh->prop;i++){
                    mesh->med[i].mus*=cfg->unitinmm;
                    mesh->med[i].mua*=cfg->unitinmm;
            }
@@ -286,9 +288,9 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
-	int tmp,len,i,j;
+	int tmp,len,i,j,datalen;
 	int *pe;
-	char felem[MAX_PATH_LENGTH];
+	char felem[MAX_FULL_PATH];
 
 	mesh_filenames("elem_%s.dat",felem,cfg);
 	if((fp=fopen(felem,"rt"))==NULL){
@@ -303,9 +305,9 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 
 	mesh->elem=(int *)malloc(sizeof(int)*mesh->elemlen*mesh->ne);
 	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
-	if(!cfg->basisorder)
-	  if(cfg->method==rtBLBadouel)
-	    mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate*cfg->srcnum);
+	
+	datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+	mesh->weight=(double *)calloc(sizeof(double)*datalen,cfg->maxgate*cfg->srcnum);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i*mesh->elemlen;
@@ -374,7 +376,7 @@ void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg){
 void mesh_loadelemvol(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j,*ee;
-	char fvelem[MAX_PATH_LENGTH];
+	char fvelem[MAX_FULL_PATH];
 	mesh_filenames("velem_%s.dat",fvelem,cfg);
 	if((fp=fopen(fvelem,"rt"))==NULL){
 		MESH_ERROR("can not open element volume file");
@@ -409,7 +411,7 @@ void mesh_loadfaceneighbor(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int len,i,j;
 	int *pe;
-	char ffacenb[MAX_PATH_LENGTH];
+	char ffacenb[MAX_FULL_PATH];
 	mesh_filenames("facenb_%s.dat",ffacenb,cfg);
 
 	if((fp=fopen(ffacenb,"rt"))==NULL){
@@ -517,6 +519,10 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->elem){
 		free(mesh->elem);
 		mesh->elem=NULL;
+	}
+	if(mesh->elem2){
+		free(mesh->elem2);
+		mesh->elem2=NULL;
 	}
 	if(mesh->facenb){
 		free(mesh->facenb);
@@ -724,7 +730,7 @@ void tracer_build(raytracer *tracer){
 				Rn2*=Rn2;
 				vec_mult(vecN+1,Rn2,vecN+1);
                                 vec_mult(vecN+2,Rn2,vecN+2);
-#ifdef MMC_USE_SSE
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
 				vecN->w    = vec_dot(vecN,  &nodes[ea]);
 				(vecN+1)->w=-vec_dot(vecN+1,&nodes[ea]);
                                 (vecN+2)->w=-vec_dot(vecN+2,&nodes[ea]);
@@ -751,11 +757,10 @@ void tracer_build(raytracer *tracer){
 
 				Rn2=1.f/sqrt(vec_dot(&vN,&vN));
 				vec_mult(&vN,Rn2,&vN);
-
 				vecN[j]=vN.x;
 				vecN[j+4]=vN.y;
 				vecN[j+8]=vN.z;
-#ifdef MMC_USE_SSE
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
 				vecN[j+12]    = vec_dot(&vN, &nodes[ea]);
 #endif
 			}
@@ -867,36 +872,6 @@ float mc_next_scatter(float g, float3 *dir,RandType *ran, RandType *ran0, mcconf
 }
 
 /**
- * @brief Save a snapshot of the simulation output
- *
- * save snapshot of the simulation output during a lengthy simulation
- * the snapshots are specified by a set of "check-points", i.e. the index 
- * of the photons that being completed.
- *
- * @param[in] mesh: the mesh object
- * @param[in] cfg: the simulation configuration
- * @param[in] id: the index of the current photon
- */
-
-void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
-	char sess[MAX_SESSION_LENGTH];
-	int i,found=0;
-	for(i=0;i<MAX_CHECKPOINT;i++){
-           if(cfg->checkpt[i]==0)  return;
-	   if(id==cfg->checkpt[i]) {
-		found=1;
-		break;
-	   }
-	}
-        if(!found) return;
-	memcpy(sess,cfg->session,MAX_SESSION_LENGTH);
-	sprintf(cfg->session,"%s_%d",sess,id);
-	mesh_saveweight(mesh,cfg,0);
-	memcpy(cfg->session,sess,MAX_SESSION_LENGTH);
-}
-
-
-/**
  * @brief Save the fluence output to a file
  *
  * @param[in] mesh: the mesh object
@@ -906,7 +881,7 @@ void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id){
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 	FILE *fp;
 	int i,j, datalen=(cfg->method==rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-	char fweight[MAX_PATH_LENGTH];
+	char fweight[MAX_FULL_PATH];
 	double *data=mesh->weight;
 
 	if(isref){
@@ -918,8 +893,15 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
         else
                 sprintf(fweight,"%s%s.dat",cfg->session,(isref? "_dref": ""));
 
-        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofTX3){
-		mcx_savedata(data,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
+        if(cfg->outputformat>=ofBin && cfg->outputformat<=ofBJNifti){
+	        uint3 dim0=cfg->dim;
+	        if(cfg->method!=rtBLBadouelGrid){
+		    cfg->dim.x=cfg->srcnum;
+		    cfg->dim.y=cfg->maxgate;
+		    cfg->dim.z=datalen;
+		}
+		mcx_savedata(mesh->weight,datalen*cfg->maxgate*cfg->srcnum,cfg,isref);
+		cfg->dim=dim0;
 		return;
 	}
 	if((fp=fopen(fweight,"wt"))==NULL){
@@ -955,7 +937,7 @@ void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref){
 
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg){
 	FILE *fp;
-	char fhistory[MAX_PATH_LENGTH];
+	char fhistory[MAX_FULL_PATH];
         if(cfg->rootpath[0])
                 sprintf(fhistory,"%s%c%s.mch",cfg->rootpath,pathsep,cfg->session);
         else
@@ -976,7 +958,14 @@ void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcco
 	   cfg->his.seedbyte=seedbyte;
         }
         cfg->his.colcount=(2+(cfg->ismomentum>0))*cfg->his.maxmedia+(cfg->issaveexit>0)*6+2; /*column count=maxmedia+3*/
-
+	
+	if(count>0 && cfg->exportdetected==NULL){
+            cfg->detectedcount=count;
+            cfg->exportdetected=(float*)malloc(cfg->his.colcount*cfg->detectedcount*sizeof(float));
+        }
+        if(cfg->exportdetected!=ppath)
+	    memcpy(cfg->exportdetected,ppath,count*cfg->his.colcount*sizeof(float));
+	
 	fwrite(&(cfg->his),sizeof(history),1,fp);
 	fwrite(ppath,sizeof(float),count*cfg->his.colcount,fp);
 	if(cfg->issaveseed && seeds!=NULL)
@@ -1045,7 +1034,7 @@ void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tet
 void mesh_savedetimage(float *detmap, mcconfig *cfg){
 	
 	FILE *fp;
-	char fhistory[MAX_PATH_LENGTH];
+	char fhistory[MAX_FULL_PATH];
         if(cfg->rootpath[0])
                 sprintf(fhistory,"%s%c%s.img",cfg->rootpath,pathsep,cfg->session);
         else

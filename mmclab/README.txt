@@ -2,7 +2,7 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.4.8, v2019.3
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.9, v2020
 *URL: http://mcx.space/wiki/?Learn#mmc
 
 <toc>
@@ -52,31 +52,37 @@ formats and examples. The input cfg structure has very similar field names as
 the verbose command line options in MMC.
 
 <pre>
- %#############################################################################%
- %         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
- %          Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
- %                            http://mcx.space/#mmc                            %
- %                                                                             %
- % Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
- %            Department of Bioengineering, Northeastern University            %
- %                                                                             %
- %               Research funded by NIH/NIGMS grant R01-GM114365               %
- %#############################################################################%
- %$Rev::8270b9$2019.4$Date::2019-04-24 14:18:58 -04$ by $Author::Qianqian Fang$%
- %#############################################################################%
+ #############################################################################%
+          MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
+           Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
+                             http://mcx.space/#mmc                            %
+                                                                              %
+  Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
+             Department of Bioengineering, Northeastern University            %
+                                                                              %
+                Research funded by NIH/NIGMS grant R01-GM114365               %
+ #############################################################################%
+ $Rev::c38804$2019.4$Date::Qianqian Fang          $ by $Author::Qianqian Fang$%
+ #############################################################################%
  
   Format:
-     [fluence,detphoton,ncfg,seeds]=mmclab(cfg,type);
+     [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
            or
      fluence=mmclab(cfg);
      newcfg=mmclab(cfg,'prep');
-     [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
+     [fluence,detphoton,ncfg,seeds]=mmclab(cfg, options);
  
   Input:
      cfg: a struct, or struct array. Each element in cfg defines 
           a set of parameters for a simulation. 
  
-          It may contain the following fields:
+     option: (optional), options is a string, specifying additional options
+          option='preview': this plots the domain configuration using mcxpreview(cfg)
+          option='opencl':  force using OpenCL (set cfg.gpuid=1 if not set)
+                            instead of SSE on CPUs/GPUs that support OpenCL
+ 
+ 
+     cfg may contain the following fields:
  
  == Required ==
       *cfg.nphoton:     the total number of photons to be simulated (integer)
@@ -105,6 +111,8 @@ the verbose command line options in MMC.
                         if set to a uint8 array, the binary data in each column is used 
                         to seed a photon (i.e. the "replay" mode), default value: 1648335518
        cfg.isreflect:   [1]-consider refractive index mismatch, 0-matched index
+                        2 - total absorption on exterior surface
+                        3 - prefect reflection (mirror) on exterior surface
        cfg.isnormalized:[1]-normalize the output fluence to unitary source, 0-no reflection
        cfg.isspecular:  [1]-calculate specular reflection if source is outside
        cfg.ismomentum:  [0]-save momentum transfer for each detected photon
@@ -395,6 +403,15 @@ Screenshot for using MMCLAB in GNU Octave:
 
 == # Reference ==
 
- [Fang2010] Fang Q, "Mesh-based Monte Carlo method using fast ray-tracing
+[Fang2019] Qianqian Fang* and Shijie Yan, "GPU-accelerated mesh-based \
+ Monte Carlo photon transport simulations," J. of Biomedical Optics, in press, 2019. \
+ Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
+
+
+[Brain2Mesh2020] Anh Phong Tran† , Shijie Yan† , Qianqian Fang*, (2020) "Improving \
+ model-based fNIRS analysis using mesh-based anatomical and light-transport models," \ 
+ Neurophotonics, 7(1), 015008, URL: https://doi.org/10.1117/1.NPh.7.1.015008
+
+[Fang2010] Fang Q, "Mesh-based Monte Carlo method using fast ray-tracing \
    in Plucker coordinates," Biomed. Opt. Express 1(1), 165-175 (2010) 
 

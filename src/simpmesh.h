@@ -2,12 +2,12 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
 **          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
-**          in Plücker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
+**          in Pl¨¹cker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
 **  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
 **          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
@@ -38,6 +38,8 @@
 #include <smmintrin.h>
 #endif
 
+#if !defined(USE_OPENCL) && !defined(__NVCC__)
+
 #ifdef MMC_LOGISTIC
   #include "logistic_rand.c"
 #elif defined MMC_SFMT    
@@ -46,6 +48,12 @@
   #include "xorshift128p_rand.c"
 #else
   #include "posix_randr.c"
+#endif
+
+#elif defined(__NVCC__)
+  #include "xorshift128p_rand.h"
+#else
+  #include "xorshift128p_rand.c"
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
@@ -81,6 +89,7 @@ typedef struct MMC_mesh{
 	int elemlen;           /**< number of nodes per element */
 	float3 *node;          /**< node coordinates */
 	int  *elem;            /**< element indices */
+	int  *elem2;            /**< element indices */
 	int  *srcelem;	       /**< candidate list of elements containing the source*/
 	int  srcelemlen;       /**< length of the elements that may contain the source*/
 	int  *detelem;	       /**< candidate list of elements containing a widefield detector*/
@@ -131,7 +140,6 @@ float mesh_normalize(tetmesh *mesh, mcconfig *cfg, float Eabsorb, float Etotal, 
 void mesh_build(tetmesh *mesh);
 void mesh_error(const char *msg, const char *file,const int linenum);
 void mesh_filenames(const char *format,char *foutput,mcconfig *cfg);
-void mesh_saveweightat(tetmesh *mesh,mcconfig *cfg,int id);
 void mesh_saveweight(tetmesh *mesh,mcconfig *cfg,int isref);
 void mesh_savedetphoton(float *ppath, void *seeds, int count, int seedbyte, mcconfig *cfg);
 void mesh_getdetimage(float *detmap, float *ppath, int count, mcconfig *cfg, tetmesh *mesh);

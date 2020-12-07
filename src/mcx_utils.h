@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2018
+**  \copyright Qianqian Fang, 2010-2020
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -38,16 +38,16 @@
     #include <omp.h>
 #endif
 
-#define MAX_PROP            256                          /**< max optical property count */
-#define MAX_DETECTORS       256                          /**< max number of detectors */
+#define MAX_FULL_PATH       2048                         /**< max characters in a full file name string */
 #define MAX_PATH_LENGTH     1024                         /**< max characters in a full file name string */
-#define MAX_SESSION_LENGTH  256                          /**< max session name length */
+#define MAX_SESSION_LENGTH  64                           /**< max session name length */
 #define MAX_CHECKPOINT      16                           /**< max number of photon save points */
 #define DET_PHOTON_BUF      100000                       /**< initialize number of detected photons */
 #define SEED_FROM_FILE      -999                         /**< special flag indicating to load seeds from history file */
 #define MIN(a,b)            ((a)<(b)?(a):(b))            /**< macro to get the min values of two numbers */
 #define MMC_ERROR(id,msg)   mcx_error(id,msg,__FILE__,__LINE__)
 #define MMC_INFO            -99999
+#define MAX_DEVICE          256
 
 #ifndef MCX_CONTAINER
   #define S_RED     "\x1b[31m"
@@ -80,14 +80,22 @@ enum TDebugLevel {dlMove=1,dlTracing=2,dlBary=4,dlWeight=8,dlDist=16,dlTracingEn
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};
 enum TMCMethod {mmMCX, mmMCML};
+enum TComputeBackend {cbSSE, cbOpenCL, cbCUDA};
 
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX, 
                stFourier2D, stZGaussian, stLine, stSlit};
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
-enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofUBJSON};
+enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofJNifti, ofBJNifti};
 enum TOutputDomain {odMesh, odGrid};
+enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU};
+enum TMCXParent  {mpStandalone, mpMATLAB};
 enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
+
+enum TBJData {JDB_mixed, JDB_nulltype, JDB_noop,JDB_true,JDB_false,
+     JDB_char,JDB_string,JDB_hp,JDB_int8,JDB_uint8,JDB_int16,JDB_int32,
+     JDB_int64,JDB_single,JDB_double,JDB_array,JDB_object,JDB_numtypes,
+     JDB_uint16=10,JDB_uint32,JDB_uint64};
 
 /***************************************************************************//**
 \struct MMC_medium mcx_utils.h
@@ -130,11 +138,28 @@ typedef struct MMC_history{
 	float unitinmm;                /**< what is the voxel size of the simulation */
 	unsigned int  seedbyte;        /**< how many bytes per RNG seed */
         float normalizer;              /**< what is the normalization factor */
+	unsigned int  srcnum;	       /**< number of sources in the simulation*/
 	int respin;                    /**< if positive, repeat count so total photon=totalphoton*respin; if negative, total number is processed in respin subset */
-	unsigned int  srcnum;          /**< number of sources for simultaneous pattern sources */
-	unsigned int  savedetflag;     /**< number of sources for simultaneous pattern sources */
+	unsigned int  savedetflag;     /**<  */
 	int reserved[2];               /**< reserved fields for future extension */
 } history;
+
+
+typedef struct MCXGPUInfo {
+        char name[MAX_SESSION_LENGTH];
+        int id;
+	int devcount;
+        int platformid;
+        int major, minor;
+        size_t globalmem, constmem, sharedmem;
+        int regcount;
+        int clock;
+        int sm, core;
+        size_t autoblock, autothread;
+        int maxgate;
+        int maxmpthread;  /**< maximum thread number per multi-processor */
+        enum TDeviceVendor vendor;
+} GPUInfo;
 
 /***************************************************************************//**
 \struct MMC_config mcx_utils.h
@@ -162,8 +187,8 @@ typedef struct MMC_config{
 	float tend;                    /**<end time in second*/
 	float3 steps;                  /**<voxel sizes along x/y/z in mm*/
 	uint3 dim;                     /**<dim.x is the initial element number in MMC, dim.y is faceid*/
-	uint3 crop0;                   /**<sub-volume for cache*/
-	uint3 crop1;                   /**<the other end of the caching box*/
+	uint4 crop0;                   /**<sub-volume for cache*/
+	uint4 crop1;                   /**<the other end of the caching box*/
 	int medianum;                  /**<total types of media*/
 	int srcnum;		       /**<total number of sources, could be larger than 1 only with pattern illumination*/
 	int detnum;                    /**<total detector numbers*/
@@ -184,7 +209,7 @@ typedef struct MMC_config{
 				           0 for wide-field detection pattern*/
 	unsigned char *vol;            /**<pointer to the volume*/
 	char session[MAX_SESSION_LENGTH];/**<session id, a string*/
-        char meshtag[MAX_PATH_LENGTH];   /**<a string to tag all input mesh files*/
+        char meshtag[MAX_SESSION_LENGTH];/**<a string to tag all input mesh files*/
 	char isrowmajor;               /**<1 for C-styled array in vol, 0 for matlab-styled array*/
 	char isreflect;                /**<1 for reflecting photons at boundary,0 for exiting*/
         char isref3;                   /**<1 considering maximum 3 ref. interfaces; 0 max 2 ref*/
@@ -219,6 +244,31 @@ typedef struct MMC_config{
 	float *replayweight;           /**< pointer to the detected photon weight array */
 	float *replaytime;             /**< pointer to the detected photon time-of-fly array */
         char seedfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
+        char deviceid[MAX_DEVICE];
+        float workload[MAX_DEVICE];
+	char compileropt[MAX_PATH_LENGTH];
+        char kernelfile[MAX_SESSION_LENGTH];
+	char *clsource;
+	int parentid;
+	int optlevel;
+        unsigned int maxdetphoton; /*anticipated maximum detected photons*/
+	double *exportfield;     /*memory buffer when returning the flux to external programs such as matlab*/
+	unsigned char *exportseed;     /*memory buffer when returning the RNG seed to matlab*/
+	float *exportdetected;  /*memory buffer when returning the partial length info to external programs such as matlab*/
+	double energytot, energyabs, energyesc;
+	unsigned int detectedcount; /**<total number of detected photons*/
+	unsigned int runtime;
+        char autopilot;     /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
+	float normalizer;            /**<normalization factor*/
+	unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
+	unsigned int gpuid;
+	int compute;
+        char isdumpjson;             /**<1 to save json */
+	int  zipid;                  /**<data zip method "zlib","gzip","base64","lzip","lzma","lz4","lz4hc"*/
+        unsigned int savedetflag;    /**<a flag to control the output fields of detected photon data*/
+	uint mediabyte;
+        char *shapedata;    /**<a pointer points to a string defining the JSON-formatted shape data*/
+	char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
 } mcconfig;
 
 #ifdef	__cplusplus
@@ -236,7 +286,7 @@ void mcx_clearcfg(mcconfig *cfg);
 void mcx_validatecfg(mcconfig *cfg);
 void mcx_parsecmd(int argc, char* argv[], mcconfig *cfg);
 void mcx_usage(char *exename,mcconfig *cfg);
-void mcx_loadvolume(char *filename,mcconfig *cfg);
+void mcx_loadvolume(char *filename,mcconfig *cfg,int isbuf);
 void mcx_normalize(float field[], float scale, int fieldlen);
 int  mcx_readarg(int argc, char *argv[], int id, void *output,const char *type);
 void mcx_printlog(mcconfig *cfg, char *str);
@@ -244,12 +294,21 @@ int  mcx_remap(char *opt);
 int  mcx_lookupindex(char *key, const char *index);
 int  mcx_keylookup(char *key, const char *table[]);
 int  mcx_parsedebugopt(char *debugopt);
-void mcx_progressbar(unsigned int n, mcconfig *cfg);
+void mcx_progressbar(float percent, void *cfg);
 int  mcx_loadjson(cJSON *root, mcconfig *cfg);
 void mcx_version(mcconfig *cfg);
 int  mcx_loadfromjson(char *jbuf,mcconfig *cfg);
 void mcx_prep(mcconfig *cfg);
 void mcx_printheader(mcconfig *cfg);
+void mcx_cleargpuinfo(GPUInfo **gpuinfo);
+void mcx_convertcol2row(unsigned int **vol, uint3 *dim);
+void mcx_convertcol2row4d(unsigned int **vol, uint4 *dim);
+void mcx_savejdata(char *filename, mcconfig *cfg);
+int  mcx_jdataencode(void *vol,  int ndim, uint *dims, char *type, int byte, int zipid, void *obj, int isubj, mcconfig *cfg);
+int  mcx_jdatadecode(void **vol, int *ndim, uint *dims, int maxdim, char **type, cJSON *obj, mcconfig *cfg);
+void mcx_savejnii(OutputType *vol, int ndim, uint *dims, float *voxelsize, char* name, int isfloat, mcconfig *cfg);
+void mcx_savebnii(OutputType *vol, int ndim, uint *dims, float *voxelsize, char* name, int isfloat, mcconfig *cfg);
+void mcx_savejdet(float *ppath, void *seeds, uint count, int doappend, mcconfig *cfg);
 
 #ifdef MCX_CONTAINER
  #ifdef _OPENMP

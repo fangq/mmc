@@ -18,6 +18,7 @@ typedef struct waitbar_struct
 
 waitbar *waitbar_create (double, char *) ;
 void waitbar_update (double, waitbar *, char *) ;
+void waitbar_update_c (float, void *) ;
 void waitbar_destroy (waitbar *) ;
 mxArray *waitbar_return (waitbar *) ;
 #endif

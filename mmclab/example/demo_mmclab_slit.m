@@ -8,7 +8,7 @@
 
 % prepare simulation input
 
-cfg.nphoton=1e6;
+cfg.nphoton=1e7;
 [cfg.node face cfg.elem]=meshabox([0 0 0],[60 60 30],6);
 cfg.elemprop=ones(size(cfg.elem,1),1);
 cfg.srcpos=[20 30 -10];
@@ -19,6 +19,7 @@ cfg.tend=5e-9;
 cfg.tstep=5e-9;
 cfg.debuglevel='TP';
 cfg.unitinmm=1;
+cfg.method='elem';
 cfg.srctype='slit';
 cfg.srcparam1=[30 0 0 0];
 cfg.srcparam2=[0 0 0 0];
