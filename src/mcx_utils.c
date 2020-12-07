@@ -206,6 +206,7 @@ void mcx_initcfg(mcconfig *cfg){
      cfg->seed=0x623F9A9E;
      cfg->isrowmajor=0;      /* not needed */
      cfg->maxgate=1;
+     cfg->implicit=0;
      cfg->isreflect=1;
      cfg->isref3=1;
      cfg->isnormalized=1;
