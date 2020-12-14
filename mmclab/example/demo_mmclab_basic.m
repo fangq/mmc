@@ -10,6 +10,7 @@
 
 clear cfg
 cfg.nphoton=1e6;
+% cfg.implicit = 1;
 [cfg.node, face, cfg.elem]=meshabox([0 0 0],[60 60 30],6);
 cfg.elemprop=ones(size(cfg.elem,1),1);
 cfg.srcpos=[30 30 0];
