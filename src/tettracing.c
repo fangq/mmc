@@ -43,6 +43,12 @@ __m128 int_coef;                            /**<  a global variable used for SSE
 #define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
 
 /** 
+ * \mapping from edge index to node index
+ */
+
+const int e2n[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+
+/** 
  * \brief Tetrahedron face edge indices
  *
  * fc[4] points to the 4 facets of a tetrahedron, with each
@@ -884,6 +890,289 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 }
 #endif  /* #if !defined(__EMSCRIPTEN__) */
 
+
+/**
+ * Commpute the distance between P0 and the labeled edge
+ * and the distance between P1 and the labeled edge.
+ * P0 is the entry point and P1 is the exit point
+ */
+void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, int* hitstatus){
+        float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
+	float norm, normr, st, DIS0, DIS1;
+	int en0, en1;
+
+	en0 = ee[e2n[r->vesselid[index]][0]]-1;
+	en1 = ee[e2n[r->vesselid[index]][1]]-1;
+	E0 = tracer->mesh->node[en0];
+	E1 = tracer->mesh->node[en1];
+
+	vec_diff(&E0,&E1,&u);
+	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
+	normr = 1.0f/norm;
+	vec_mult(&u,normr,&u);	// normal vector of the edge
+	r->u = u;
+	r->E = E0;
+
+	PP = r->p0;				// P0
+	vec_diff(&E0,&PP,&OP);
+	st = vec_dot(&OP,&u);
+	vec_mult(&u,st,&Pt);
+	vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
+	DIS0 = vec_dot(&PP0,&PP0);
+
+	vec_mult(&r->vec,r->Lmove,&PP);
+	vec_add(&r->p0,&PP,&PP);		// P1
+	vec_diff(&E0,&PP,&OP);
+	st = vec_dot(&OP,&u);
+	vec_mult(&u,st,&Pt);
+	vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
+	DIS1 = vec_dot(&PP1,&PP1);
+
+	distdata[0] = DIS0;
+	distdata[1] = DIS1;
+        projdata[0] = PP0;
+	projdata[1] = PP1;
+	
+	float rt, rt2;
+	rt = r->vesselr[index];
+	rt2 = rt*rt;
+	if(DIS0>rt2+EPS2 && DIS1<rt2-EPS2){
+	  // hit, out->in
+	  *hitstatus = 0;
+	}else if(DIS0<rt2-EPS2 && DIS1>rt2+EPS2){
+	  // hit, in->out
+	  *hitstatus = 1;
+	}else if(DIS1>rt2+EPS2){
+	  // out
+	  *hitstatus = 2;
+	}else if(DIS1<rt2-EPS2){
+	  // in
+	  *hitstatus = 3;
+	} else {
+	  // inside error margin
+	  *hitstatus = 4;
+	}
+}
+
+/**
+ * Compute the next step length for edge-based iMMC
+ */
+float ray_cylinder_intersect(ray *r, int index, int *propnum, float* distdata, float3* projdata, int hitstatus){
+	float3 PP0, PP1;
+	float pt0[2], pt1[2], theta, ph0[2], ph1[2], Lratio;
+	float DIS0, DIS1;
+
+        PP0 = projdata[0];
+	PP1 = projdata[1];
+	DIS0 = distdata[0];
+	DIS1 = distdata[1];
+	
+	// update Lmove and reflection
+	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
+	rt = r->vesselr[index];
+	rt2 = rt*rt;
+	// accurate intersection computation
+	if(hitstatus == 0 || hitstatus == 1) 	// hit vessel out->in or in->out
+	{
+		r->isvessel = 1;
+
+		DIS0 = sqrtf(DIS0);
+		DIS1 = sqrtf(DIS1);
+
+		theta = vec_dot(&PP0,&PP1);
+
+		theta = theta/(DIS0*DIS1+EPS);
+		pt0[0] = DIS0;
+		pt0[1] = 0;
+		pt1[0] = DIS1*theta;
+		pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+
+		dx = pt1[0]-pt0[0];
+		dy = pt1[1]-pt0[1];
+		dr2 = dx*dx+dy*dy;
+		drr2 = 1.0f/dr2;
+		Dt = pt0[0]*pt1[1];
+		delta = sqrtf(rt2*dr2-Dt*Dt);	// must be >0
+		sgn = (dy>=0) ? 1.0f : -1.0f;
+		xa = Dt*dy*drr2;
+		xb = sgn*dx*delta*drr2;
+		ya = -Dt*dx*drr2;
+		yb = fabs(dy)*delta*drr2;
+		ph0[0] = xa+xb;
+		ph0[1] = ya+yb;
+		ph1[0] = xa-xb;
+		ph1[1] = ya-yb;
+		Dp = dist2d2(pt0,pt1);
+		if(DIS0>rt && DIS1<rt){		// out->in
+			r->inout = 1;
+			*propnum = 0;
+			Lratio = dist2d2(pt0,ph1);
+			if(Dp>Lratio){
+				Lratio = sqrtf(Lratio/Dp);
+			}else{
+				Lratio = dist2d2(pt0,ph0);
+				Lratio = sqrtf(Lratio/Dp);
+			}
+		}else{	// DIS0<rt && DIS1>rt, in->out
+			r->inout = 0;
+			*propnum = 1;
+			Lratio = dist2d2(pt1,ph1);
+			if(Dp>Lratio){
+				Lratio = 1-sqrtf(Lratio/Dp);
+			}else{
+				Lratio = dist2d2(pt1,ph0);
+				Lratio = 1-sqrtf(Lratio/Dp);
+			}
+		}
+		r->Lmove = r->Lmove*Lratio;
+		return 1;
+	}
+	else if(hitstatus == 2){  // outside
+		r->inout = 0;
+		r->isvessel = 0;
+		*propnum = 0;
+	}else if(hitstatus == 3){  // inside
+		r->inout = 1;
+		r->isvessel = 0;
+		*propnum = 1;
+	}else{
+		r->isvessel = 0;
+		*propnum = 0;
+	}
+
+	return 0;
+}
+
+/**
+ * Commpute the distance between P0 and the labeled node
+ * and the distance between P1 and the labeled node.
+ * P0 is the entry point and P1 is the exit point
+ */
+void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out) {
+        float npdist0,npdist1,nr2;
+	float3 PP, cc;
+	nr2 = nr*nr;
+	cc = tracer->mesh->node[ee[index]-1];
+	*cc_out = cc;
+	
+	npdist0=dist2(&r->p0,&cc);		// P0
+	vec_mult(&r->vec,r->Lmove,&PP);
+	vec_add(&r->p0,&PP,&PP);
+	npdist1=dist2(&PP,&cc);			// P1
+
+	if(npdist0>nr2+EPS2 && npdist1<nr2-EPS2) {
+	  // hit, out->in
+	  *hitstatus = 0;
+	}else if(npdist0<nr2-EPS2 && npdist1>nr2+EPS2) {
+	  // hit, in->out
+	  *hitstatus = 1;
+	}else if(npdist1>nr2+EPS2){
+	  // out
+	  *hitstatus = 2;
+	}else if(npdist1<nr2-EPS2){
+	  // in
+	  *hitstatus = 3;
+	}else{
+	  // inside error margin
+	  *hitstatus = 4;
+	}
+}
+
+/**
+ * Compute the next step length for node-based iMMC
+ */
+float ray_sphere_intersect(ray *r, int index, int *propnum, float3 cc, float nr, int hitstatus) {
+        float nr2,temp1,temp2,d1,d2;
+	float3 oo,ll,oc;
+
+	nr2 = nr*nr;
+	r->E = cc;
+	if(hitstatus == 0 || hitstatus == 1){
+		r->isvessel = 2;
+		oo = r->p0;
+		ll = r->vec;
+		vec_diff(&cc,&oo,&oc);
+		temp2 = oc.x*oc.x+oc.y*oc.y+oc.z*oc.z-nr2;
+		temp1 = vec_dot(&ll,&oc);
+		temp2 = sqrtf(fabs(temp1*temp1-temp2));
+		d1 = -temp1+temp2;
+		d2 = -temp1-temp2;
+		if(hitstatus == 0){ // out->in
+			r->inout = 1;
+			*propnum = 0;
+			r->Lmove = (d1<d2) ? d1 : d2;
+		}else{				// in->out
+			r->inout = 0;
+			*propnum = 1;
+			r->Lmove = (d1>d2) ? d1 : d2;
+		}
+		return 1;
+	}
+        else if(hitstatus == 2){  // outside
+		r->inout = 0;
+		r->isvessel = 0;
+		*propnum = 0;
+	}else if(hitstatus == 3){  // inside
+		r->inout = 1;
+		r->isvessel = 0;
+		*propnum = 1;
+	}else{
+		r->isvessel = 0;
+		*propnum = 0;
+	}
+	return 0;
+}
+
+/**
+ * Compute the next step length for the face-based iMMC
+ */
+float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid){
+	float3 pf0,pf1,pv,fnorm,ptemp;
+	float distf0,distf1,thick,lm=0;
+	int flocal;
+	// float3 tempp1, tempp2;
+
+	flocal = r->vesselid[index];
+	r->faceindex = flocal;
+	thick = r->vesselr[index];
+
+	pf0 = r->p0;		// P0: pf0
+	vec_mult(&r->vec,r->Lmove,&ptemp);
+	vec_add(&r->p0,&ptemp,&ptemp);		// P1: ptemp
+
+	pf1 = tracer->mesh->node[ee[nc[flocal][0]]-1];	// any point on face
+    	fnorm.x=(&(tracer->n[baseid].x))[flocal];		// normal vector of the face
+	fnorm.y=(&(tracer->n[baseid].x))[flocal+4];
+	fnorm.z=(&(tracer->n[baseid].x))[flocal+8];
+
+	vec_diff(&pf0,&pf1,&pv);
+	distf0 = vec_dot(&pv,&fnorm);
+
+	vec_diff(&ptemp,&pf1,&pv);
+	distf1 = vec_dot(&pv,&fnorm);
+
+	if(distf0>thick+EPS2 && distf1<thick-EPS2){	// hit: out->in
+		r->isvessel = 3;
+		r->inout = 1;
+		lm = 1-(thick-distf1)/(distf0-distf1);
+		r->Lmove = r->Lmove*lm;
+		return 1;
+	}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// hit: in->out
+		r->isvessel = 3;
+		r->inout = 0;
+		lm = (thick-distf0)/(distf1-distf0);
+		r->Lmove = r->Lmove*lm;
+		return 1;
+	}else if((distf0<=thick && distf1>=thick) || (distf0>thick && distf1>thick)){
+		r->inout = 0;
+	}else if((distf0>=thick && distf1<=thick) || (distf0<thick && distf1<thick)){
+		r->inout = 1;
+	}else{
+
+	}
+	return 0;
+}
+
 /** 
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
  * 
@@ -901,9 +1190,9 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
-	float3 bary={1e10f,0.f,0.f,0.f};
-	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
-	int tshift,faceidx=-1,baseid,eid;
+  float3 bary={1e10f,0.f,0.f,0.f},projdata0[2],projdata1[2];
+	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f,distdata0[2],distdata1[2];
+	int tshift,faceidx=-1,baseid,eid,hitstatus0=2,hitstatus1=2;
 	__m128 O,T,S;
 	__m128i P;
 
@@ -954,6 +1243,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0 && bary.x>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+	    int hit=0, curprop=-1;
 	    float mus;
 	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    rc=prop->n*R_C0;

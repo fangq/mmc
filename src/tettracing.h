@@ -64,6 +64,14 @@ typedef struct MMC_ray{
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 	unsigned int oldidx;
 	double oldweight;
+        int vesselid[4];	      /**< local edge id for vessels */
+	float vesselr[4];	      /**< vessel radius corresponding to vesselid */
+	int isvessel;		      /**< if 1, the photon hits the vessel; if 2, the photon hits the node vessel; if 0, does not hit vessel */
+	int inout;		      /**< if 1, inside vessel for the NEXT position; if 0, outside vessel */
+	float3 u;		      /**< vessel edge direction */
+	float3 E;		      /**< the starting node of vessel edge */
+	int faceindex;		      /**< local face index that the photon intersect with*/
+	int faceeid;		      /**< reference element id that is used for face-based implicit MMC*/
 } ray;
 
 /***************************************************************************//**
@@ -90,12 +98,19 @@ typedef struct MMC_visitor{
 #ifdef	__cplusplus
 extern "C" {
 #endif
+ void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, int* hitstatus);
+ float ray_cylinder_intersect(ray *r, int index, int *propnum, float* distdata, float3* projdata, int hitstatus);
+ void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out);
+  float ray_sphere_intersect(ray *r, int index, int *propnum, float3 cc, float nr, int hitstatus);
+float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid);
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
 void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
+void init_face_inout(ray *r, raytracer *tracer,tetmesh *mesh);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran);
+float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex,int *faceeid);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void visitor_init(mcconfig *cfg, visitor* visit);
