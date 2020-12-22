@@ -283,11 +283,40 @@ for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
         error('cfg.node or cfg.elem is missing');
     end
-    if(size(cfg(i).elem,2)>4)
-        cfg(i).elemprop=cfg(i).elem(:,5);
+    if(isfield(cfg(i),'implicit'))
+        if(cfg(i).implicit)
+            if(size(cfg(i).node,2)<4 || size(cfg(i).elem,2)<12)
+                error('cfg.node must contain 4 columns and cfg.elem must contain 12 columns');                
+            end
+            vesseln = cfg(i).node(:,4);
+            vessel = cfg(i).elem(:,5:8);
+            vesselr = cfg(i).elem(:,9:12);
+            cfg(i).node = cfg(i).node(:,1:3);
+            cfg(i).elem = cfg(i).elem(:,1:4);
+        end
+    else
+        if(size(cfg(i).elem,2)>4)
+            cfg(i).elemprop=cfg(i).elem(:,5);
+        end
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
-        cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+        if(isfield(cfg(i),'implicit') && cfg(i).implicit==1)
+            [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            vtemp = vessel;
+            rc = find(vessel<0);
+            vessel(rc) = 6;
+            vessel(idx,:) = reorient(vessel(idx,:)+1);
+            vessel(rc) = vtemp(rc);
+        elseif(isfield(cfg(i),'implicit') && cfg(i).implicit==2)
+            [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            vtemp = vessel;
+            rc = find(vessel<0);
+            vessel(rc) = 6;
+            vessel(idx,:) = reorient_face(vessel(idx,:)+1);
+            vessel(rc) = vtemp(rc);
+        else
+           cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4)); 
+        end
         cfg(i).isreoriented=1;
     end
     if(~isfield(cfg(i),'facenb') || isempty(cfg(i).facenb))
@@ -338,7 +367,23 @@ for i=1:len
             end
             [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
             cfg(i).elemprop=cfg(i).elem(:,5);
-            cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            if(isfield(cfg(i),'implicit') && cfg(i).implicit==1)
+                [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+                vtemp = vessel;
+                rc = find(vessel<0);
+                vessel(rc) = 6;
+                vessel(idx,:) = reorient(vessel(idx,:)+1);
+                vessel(rc) = vtemp(rc);
+            elseif(isfield(cfg(i),'implicit') && cfg(i).implicit==2)
+                [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+                vtemp = vessel;
+                rc = find(vessel<0);
+                vessel(rc) = 6;
+                vessel(idx,:) = reorient_face(vessel(idx,:)+1);
+                vessel(rc) = vtemp(rc);
+            else
+                cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            end
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;
@@ -363,6 +408,12 @@ for i=1:len
     end
     if(~isfield(cfg(i),'prop') || size(cfg(i).prop,1)<max(cfg(i).elemprop)+1 || min(cfg(i).elemprop<=0))
         error('cfg.prop field is missing or insufficient');
+    end
+    if(isfield(cfg(i),'implicit'))
+        if(cfg(i).implicit)
+            cfg(i).node = [cfg(i).node vesseln];
+            cfg(i).elem = [cfg(i).elem vessel vesselr];
+        end
     end
 end
 

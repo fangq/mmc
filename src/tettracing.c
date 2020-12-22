@@ -29,6 +29,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "tettracing.h"
 #include "fastmath.h"
 
@@ -1207,6 +1208,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
+	r->isvessel=0;
+	r->faceeid=-1;
 
 	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
 	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
@@ -1264,7 +1267,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
-
+	    
 	    // implicit MMC
             if(cfg->implicit==1){
 	        // edge-based iMMC  
@@ -1669,6 +1672,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	     	    r.vesselr[2] = vr[2];
 	     	    r.vesselr[3] = vr[3];
 	        }
+		// printf("photonid=%d, eid=%d, vesselid0=%d, vesselid1=%d, vesselr0=%f, vesselr1=%f\n", r.photonid,r.eid, r.vesselid[0], r.vesselid[1], r.vesselr[0], r.vesselr[1]);
 	    }
 	  
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
@@ -1701,10 +1705,19 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
 
+		    if(cfg->implicit>0){
 		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
 			if(! (!r.inout && r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
-			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
+			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inout);
 		    }
+		    }else{
+		      if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
+			if(! (r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
+			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inout);
+		      }
+		    }
+
+		    
 	    	    if(r.eid<=0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
@@ -1728,18 +1741,20 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %zu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-		    vid = (int *)(mesh->vessel+(r.eid-1)*4);
-	     	    r.vesselid[0] = vid[0];
-	     	    r.vesselid[1] = vid[1];
-	     	    vr = (float *)(mesh->radius+(r.eid-1)*4);
-	     	    r.vesselr[0] = vr[0];
-	     	    r.vesselr[1] = vr[1];
-	     	    if(cfg->implicit==2){
-		     	r.vesselid[2] = vid[2];
-		     	r.vesselid[3] = vid[3];
-		     	r.vesselr[2] = vr[2];
-		     	r.vesselr[3] = vr[3];
-	     	    }
+		    if(cfg->implicit>0){
+		        vid = (int *)(mesh->vessel+(r.eid-1)*4);
+	     	        r.vesselid[0] = vid[0];
+	     	        r.vesselid[1] = vid[1];
+	     	        vr = (float *)(mesh->radius+(r.eid-1)*4);
+	     	        r.vesselr[0] = vr[0];
+	     	        r.vesselr[1] = vr[1];
+	     	        if(cfg->implicit==2){
+		     	    r.vesselid[2] = vid[2];
+		     	    r.vesselid[3] = vid[3];
+		     	    r.vesselr[2] = vr[2];
+		     	    r.vesselr[3] = vr[3];
+	     	        }
+		    }
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1803,6 +1818,15 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		}else
 			break;
 	    }
+
+	    if(cfg->implicit>0 && cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex,&r.faceeid);
+	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
+	    	    continue;
+	    }
+	    else if(cfg->implicit>0 && r.isvessel)
+	    	continue;
+	    
             mom=0.f;
 	    r.slen0=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
 	    r.slen=r.slen0;
@@ -1956,7 +1980,7 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -1978,8 +2002,13 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-	n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
-	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]].n : cfg->nout;
+	if(cfg->implicit>0 && inout!=0){
+	    n1=tracer->mesh->med[cfg->his.maxmedia].n;
+            n2 = n1;
+	}else{
+	    n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
+	    n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]].n : cfg->nout;
+	}
 
 	tmp0=n1*n1;
 	tmp1=n2*n2;
