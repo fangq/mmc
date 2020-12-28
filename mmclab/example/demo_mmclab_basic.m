@@ -10,7 +10,7 @@
 
 clear cfg
 cfg.nphoton=1e6;
-% cfg.implicit = 1;
+% cfg.implicit = 0;
 [cfg.node, face, cfg.elem]=meshabox([0 0 0],[60 60 30],6);
 cfg.elemprop=ones(size(cfg.elem,1),1);
 cfg.srcpos=[30 30 0];
@@ -22,6 +22,7 @@ cfg.tstep=5e-9;
 cfg.debuglevel='TP';
 cfg.issaveref=1;  % in addition to volumetric fluence, also save surface diffuse reflectance
 cfg.method='elem';
+cfg.gpuid = -1;
 
 %% run the simulation
 
