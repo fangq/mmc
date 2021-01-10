@@ -723,6 +723,7 @@ void mmc_validate_config(mcconfig *cfg, tetmesh *mesh){
      if(cfg->tend<=cfg->tstart)
          MEXERROR("field 'tend' must be greater than field 'tstart'");
      cfg->maxgate=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
+     cfg->tend=cfg->tstart+cfg->tstep*cfg->maxgate;
 
      if(mesh->prop==0)
         MEXERROR("you must define the 'prop' field in the input structure");
