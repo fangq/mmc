@@ -312,8 +312,11 @@ int mmc_run_mp(mcconfig *cfg, tetmesh *mesh, raytracer *tracer, void (*progressf
 			mesh_savedetimage(detimage,cfg);	free(detimage);
 		}
 		free(master.partialpath);
-                if(cfg->issaveseed && master.photonseed)
+                if(cfg->issaveseed && master.photonseed){
+		    cfg->exportseed=(unsigned char *)malloc(cfg->detectedcount*sizeof(RandType)*RAND_BUF_LEN);
+		    memcpy(cfg->exportseed,master.photonseed,cfg->detectedcount*sizeof(RandType)*RAND_BUF_LEN);
 		    free(master.photonseed);
+		}
 	}
 	if(cfg->issaveref){
 		MMCDEBUG(cfg,dlTime,(cfg->flog,"saving surface diffuse reflectance ..."));
