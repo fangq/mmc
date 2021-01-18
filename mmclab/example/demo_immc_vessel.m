@@ -136,7 +136,7 @@ fprintf(fid,'%d\n',0);
 fclose(fid);
 end
 
-%% read generated .elem, .face and .node files
+%% function: read generated .elem, .face and .node files
 function [node_tet,elem_tet,face_tet]=readMesh(sessionid)
 % read the .elem, .face and .node files generated from tetgen
 % and write into elem_tet, face_tet and node_tet in MATLAB
