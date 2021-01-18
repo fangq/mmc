@@ -7,6 +7,7 @@
 % nbox:   nodes of bounding box
 % fbox:   faces of bounding box
 
+% addpath('/path/to/iso2mesh/toolbox/');
 addpath(genpath('/space/neza/2/users/yaoshen/NEU/Research/iso2mesh/'))
 addpath('../../matlab')
 

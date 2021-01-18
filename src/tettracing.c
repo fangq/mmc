@@ -1697,7 +1697,6 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	continue;
 	    
 	    /*move a photon until the end of the current scattering path*/
-	    /* UNTIL HERE, check the cfg->implicit */
 	    while(r.faceid>=0 && !r.isend && !r.isvessel){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
 

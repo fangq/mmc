@@ -52,7 +52,6 @@ addpath(genpath('/space/neza/2/users/yaoshen/NEU/Research/iso2mesh/'))
 % 2. you need to add the path to MMC matlab folder
 addpath('../../matlab')
 
-
 %% edge-based iMMC, benchmark B1
 % load immc
 
