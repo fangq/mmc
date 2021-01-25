@@ -1958,6 +1958,7 @@ void mcx_validatecfg(mcconfig *cfg){
      if(cfg->tend<=cfg->tstart)
          MMC_ERROR(-2,"field 'tend' must be greater than field 'tstart'");
      cfg->maxgate=(int)((cfg->tend-cfg->tstart)/cfg->tstep+0.5);
+     cfg->tend=cfg->tstart+cfg->tstep*cfg->maxgate;
 
      if(cfg->srctype==stPattern && cfg->srcpattern==NULL)
         MMC_ERROR(-2,"the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
