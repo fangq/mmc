@@ -90,6 +90,9 @@ typedef struct MMC_mesh{
 	float3 *node;          /**< node coordinates */
 	int  *elem;            /**< element indices */
 	int  *elem2;            /**< element indices */
+        int  *vessel;	       /**< local vessel indices */
+	float *radius;         /**< vessel radius */
+	float *nradius;	       /**< node radius */
 	int  *srcelem;	       /**< candidate list of elements containing the source*/
 	int  srcelemlen;       /**< length of the elements that may contain the source*/
 	int  *detelem;	       /**< candidate list of elements containing a widefield detector*/
@@ -249,6 +252,9 @@ static inline float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
 
+static inline float dist2d2(float *p0,float *p1){
+    return (p1[0]-p0[0])*(p1[0]-p0[0])+(p1[1]-p0[1])*(p1[1]-p0[1]);
+}
 
 static inline float mmc_rsqrtf(float a){
 #ifdef MMC_USE_SSE
