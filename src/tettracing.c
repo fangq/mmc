@@ -1309,7 +1309,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		  // then go for node-based iMMC
 		    // hitstatus0==2 && hitstatus1==2
 		    hit=0;
-		    int hitstatusn=2, ih_prev=-1;
+		    int hitstatusn=2, ih_prev=-1, hitstatusn_prev=-1;
 	            float nr,nr_prev=0;
 		    float3 cc,cc_prev;
 	            for(int ih=0;ih<4;ih++){	// check if hits any node vessel
@@ -1319,26 +1319,29 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 			compute_distances_to_node(r, tracer, ee, ih, nr, &hitstatusn, &cc);
 
-			if(hitstatusn == 0 || hitstatusn == 1 || hitstatusn == 3){
+			if(hitstatusn == 1 || hitstatusn == 3){
+			  // in or in->out, then no need to check other nodes
 			  hit = ray_sphere_intersect(r, ih, &curprop, cc, nr, hitstatusn);
 			  break;
-			}else if(hitstatusn == 0){
+			}else if(ih_prev==-1 || hitstatusn==0){
+			  // hitstatusn == 0 (out->in) or 2 (out)
+			  hitstatusn_prev=hitstatusn;
 			  ih_prev=ih;
 			  nr_prev=nr;
 			  cc_prev=cc;
 			  continue;
 			}
 
-			if(ih_prev!=-1 && ih==3){
-			  if(hitstatusn==2){
-			    hit = ray_sphere_intersect(r, ih_prev, &curprop, cc_prev, nr_prev, 0);
-			    break;
-			  }
+			if (ih==3) {
+			  // last node
+			  hit = ray_sphere_intersect(r, ih_prev, &curprop, cc_prev, nr_prev, hitstatusn_prev);
 			}
-
-			if(ih==3){
-			  hit = ray_sphere_intersect(r, ih, &curprop, cc, nr, hitstatusn);
-			}
+		    }
+		    if(ih_prev==-1) {
+		      // all nodes have a radius of zero
+		      r->inout = 0;
+		      r->isvessel = 0;
+		      curprop = 0;		      
 		    }
 		}
 	    }else if(cfg->implicit==2){
