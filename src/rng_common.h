@@ -32,6 +32,7 @@
 
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
+#define EPS2       0.1*EPS
 
 //! generate [0,1] random number for the next scattering length
 inlinefun float rand_next_scatlen(RandType t[RAND_BUF_LEN]){

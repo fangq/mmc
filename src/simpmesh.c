@@ -87,6 +87,9 @@ void mesh_init(tetmesh *mesh){
 	mesh->node=NULL;
 	mesh->elem=NULL;
 	mesh->elem2=NULL;
+	mesh->vessel=NULL;
+	mesh->radius=NULL;
+	mesh->nradius=NULL;
 	mesh->srcelemlen=0;
 	mesh->srcelem=NULL;
 	mesh->detelemlen=0;

@@ -225,6 +225,7 @@ typedef struct MMC_config{
 	char issaveref;                /**<1 to save diffuse reflectance on surface, 0 no save*/
 	char isatomic;                 /**<1 use atomic operations for weight accumulation, 0 do not use*/
 	char method;                   /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
+        int implicit;		       /**<1 for edge- or node-based implicit MMC, 2 for face-based implicit MMC*/
 	char basisorder;               /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
         char outputtype;               /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
         char outputformat;             /**<'ascii' output is text, 'bin': binary, 'json': regular json, 'ubjson': universal binary json*/

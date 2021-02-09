@@ -429,31 +429,78 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         double *val=mxGetPr(item);
 	cfg->e0=val[0];
         printf("mmc.e0=%d;\n",cfg->e0);
+    }else if(strcmp(name,"implicit")==0){
+        double *val=mxGetPr(item);
+	cfg->implicit=val[0];
+	printf("mmc.implicit=%d;\n",cfg->implicit);    
     }else if(strcmp(name,"node")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]!=3)
-            MEXERROR("the 'node' field must have 3 columns (x,y,z)");
-        double *val=mxGetPr(item);
-        mesh->nn=arraydim[0];
-	if(mesh->node) free(mesh->node);
-        mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
-        for(j=0;j<3;j++)
-          for(i=0;i<mesh->nn;i++)
-             ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
-        printf("mmc.nn=%d;\n",mesh->nn);
+        if(cfg->implicit>0){
+	    if(arraydim[0]<=0 || arraydim[1]!=4)
+                MEXERROR("the 'node' field must have 4 columns (x,y,z,r)");
+            double *val=mxGetPr(item);
+            mesh->nn=arraydim[0];
+	    if(mesh->node) free(mesh->node);
+            mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
+            for(j=0;j<3;j++)
+                for(i=0;i<mesh->nn;i++)
+            ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
+            printf("mmc.nn=%d;\n",mesh->nn);
+	    if(mesh->nradius) free(mesh->nradius);
+	    mesh->nradius=(float *)malloc(sizeof(float )*mesh->nn);
+	    for(i=0;i<mesh->nn;i++)
+	        mesh->nradius[i]=val[3*mesh->nn+i];
+	}else{
+	    if(arraydim[0]<=0 || arraydim[1] != 3)
+                MEXERROR("the 'node' field must have 3 columns (x,y,z)");
+            double *val=mxGetPr(item);
+            mesh->nn=arraydim[0];
+  	    if(mesh->node) free(mesh->node);
+            mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
+            for(j=0;j<3;j++)
+              for(i=0;i<mesh->nn;i++)
+                 ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
+            printf("mmc.nn=%d;\n",mesh->nn);
+	}
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]<4)
-            MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
-        double *val=mxGetPr(item);
-        mesh->ne=arraydim[0];
-	mesh->elemlen=arraydim[1];
-	if(mesh->elem) free(mesh->elem);
-        mesh->elem=(int *)calloc(sizeof(int)*arraydim[1],mesh->ne);
-        for(j=0;j<mesh->elemlen;j++)
-          for(i=0;i<mesh->ne;i++)
-             mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
-        printf("mmc.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
+        if(cfg->implicit>0){
+	    if(arraydim[0]<=0 || arraydim[1]<12)
+                MEXERROR("the 'elem' field must have 12 columns (e1,e2,e3,e4,label1,label2,label3,label4,r1,r2,r3,r4)");
+            double *val=mxGetPr(item);
+            mesh->ne=arraydim[0];
+	    // mesh->elemlen=arraydim[1];
+	    mesh->elemlen=4;
+	    if(mesh->elem) free(mesh->elem);
+            mesh->elem=(int *)calloc(sizeof(int)*mesh->elemlen,mesh->ne);
+            for(j=0;j<mesh->elemlen;j++)
+              for(i=0;i<mesh->ne;i++)
+                 mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
+	
+	    if(mesh->vessel) free(mesh->vessel);
+            mesh->vessel=(int *)calloc(sizeof(int)*4,mesh->ne);
+            for(j=4;j<8;j++)
+              for(i=0;i<mesh->ne;i++)
+                mesh->vessel[i*4+(j-4)]=val[j*mesh->ne+i];    
+	        
+            if(mesh->radius) free(mesh->radius);
+            mesh->radius=(float *)calloc(sizeof(float)*4,mesh->ne);
+            for(j=8;j<12;j++)
+              for(i=0;i<mesh->ne;i++)
+                mesh->radius[i*4+(j-8)]=val[j*mesh->ne+i];
+        }else{
+	  if(arraydim[0]<=0 || arraydim[1]<4)
+                MEXERROR("the 'elem' field must have at least 4 columns (e1,e2,e3,e4)");
+            double *val=mxGetPr(item);
+            mesh->ne=arraydim[0];
+	    mesh->elemlen=arraydim[1];
+	    if(mesh->elem) free(mesh->elem);
+            mesh->elem=(int *)calloc(sizeof(int)*arraydim[1],mesh->ne);
+            for(j=0;j<mesh->elemlen;j++)
+              for(i=0;i<mesh->ne;i++)
+                 mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
+            printf("mmc.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
+	}
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
