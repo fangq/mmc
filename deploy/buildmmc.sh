@@ -86,11 +86,7 @@ rm -rf ../mmclab/AUTO_BUILD_*
 make clean
 if [ "$OS" == "win" ]
 then
-    if [[ "$OSID" == CYGWIN* ]]; then
-        PATH=/cygdrive/c/ProgramData/MATLAB/SupportPackages/R2017b/3P.instrset/mingw_w64.instrset/bin/:$PATH  make mex CC=gcc &> ../mmclab/AUTO_BUILD_${DATE}.log
-    else
-        PATH=/c/ProgramData/MATLAB/SupportPackages/R2017b/3P.instrset/mingw_w64.instrset/bin/:$PATH  make mex CC=gcc &> ../mmclab/AUTO_BUILD_${DATE}.log
-    fi
+    make mex &> ../mmclab/AUTO_BUILD_${DATE}.log
 else
     make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" &> ../mmclab/AUTO_BUILD_${DATE}.log
 fi
@@ -100,11 +96,7 @@ if [ "$OS" == "osx" ]
 then
 	make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" >>  ../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 elif [ "$OS" == "win" ]; then
-    if [[ "$OSID" == CYGWIN* ]]; then
-        PATH=/cygdrive/c/Octave/Octave-4.2.1/bin:$PATH make oct CC=gcc LIBOPENCL='C:\Windows\System32\OpenCL.dll' MEXLINKOPT='-LC:\Octave\Octave-4.2.1\lib64 -LC:\Octave\Octave-4.2.1\lib\octave\4.2.1' &> ../mmclab/AUTO_BUILD_${DATE}.log
-    else
-        PATH=/c/Octave/Octave-4.2.1/bin:$PATH make oct CC=gcc LIBOPENCL='C:\Windows\System32\OpenCL.dll' MEXLINKOPT='-LC:\Octave\Octave-4.2.1\lib64 -LC:\Octave\Octave-4.2.1\lib\octave\4.2.1' &> ../mmclab/AUTO_BUILD_${DATE}.log
-    fi
+    make oct LIBOPENCL='/cygdrive/c/Windows/System32/OpenCL.dll' MEXLINKOPT='-L"C:\cygwin64\lib\octave\4.4.1"' >>  ../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 else
 	make oct  >>  ../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 fi
@@ -127,13 +119,13 @@ zip -FSr $BUILDROOT/mmclab-${TAG}.zip mmclab
 cd src
 [ ! -z "$SERVER" ] && scp $BUILDROOT/mmclab-${TAG}.zip $SERVER:$REMOTEPATH/${OS}64/
 
-
 make clean
+
 if [ "$OS" == "osx" ]
 then
 	make &> $BUILDROOT/mmc_buildlog_${DATE}.log
 elif [ "$OS" == "win" ]; then
-        make USERARFLAGS="-lwinmm -static-libgcc -static"
+        make USERARFLAGS="libzmat.a -lz" &> $BUILDROOT/mmc_buildlog_${DATE}.log
 else
 	make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -lOpenCL -lm" &> $BUILDROOT/mmc_buildlog_${DATE}.log
 fi
