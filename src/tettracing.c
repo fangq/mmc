@@ -1309,10 +1309,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		  // then go for node-based iMMC
 		    // hitstatus0==2 && hitstatus1==2
 		    hit=0;
-		    int hitstatusn=2, ih_prev=-1, hitstatusn_prev=-1;
+		    int hitstatusn=2, ih_prev=-1, hitstatusn_prev=-1, ih;
 	            float nr,nr_prev=0;
 		    float3 cc,cc_prev;
-	            for(int ih=0;ih<4;ih++){	// check if hits any node vessel
+	            for(ih=0;ih<4;ih++){	// check if hits any node vessel
 	                nr = tracer->mesh->nradius[ee[ih]-1];
 			if(!nr)
 		            continue;
@@ -1346,7 +1346,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		}
 	    }else if(cfg->implicit==2){
 	    	int noface=0, neweid, newbaseid;
-	    	int *newvid, *newee;
+	    	int *newvid, *newee, fid;
 	    	float *newvr;
 
 	    	neweid=r->vesselid[0];
@@ -1373,7 +1373,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
     		}
 
 
-	    	for(int fid=0;fid<4;fid++){
+	    	for(fid=0;fid<4;fid++){
 	    		if(r->vesselid[fid]==6)
 	    			continue;
 	    		if(!noface){
@@ -2271,11 +2271,12 @@ void init_face_inout(ray *r, raytracer *tracer, tetmesh *mesh){
     int baseid = eid<<2;
     int *vid, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
     float *vr;
+    int index;
 
     vid = (int *)(mesh->vessel+eid*4);
     vr = (float *)(mesh->radius+eid*4);
 
-    for(int index=0;index<4;index++){
+    for(index=0;index<4;index++){
         flocal = vid[index];
         thick = vr[index];
 

@@ -164,7 +164,7 @@ cl_platform_id mcx_list_cl_gpu(mcconfig *cfg,unsigned int *activedev,cl_device_i
                     totaldevice+=devnum;
 
                     for(k=0;k<devnum;k++){
-		          GPUInfo cuinfo={0};
+		          GPUInfo cuinfo={{0}};
                           cuinfo.platformid=i;
         		  cuinfo.id=cuid+1;
 			  cuinfo.devcount=devnum;
