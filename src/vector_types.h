@@ -33,7 +33,7 @@ typedef struct PRE_ALIGN(16) MMC_float4{
  if SSE is enabled, float3 is identical to float4
 */
 
-#if defined(MMC_USE_SSE)
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
  typedef struct MMC_float4 float3;
 #else
  typedef struct MMC_float3{
