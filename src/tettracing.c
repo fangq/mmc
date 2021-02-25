@@ -1471,21 +1471,45 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		        unsigned int newidx=eid+tshift;
 			r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 			if(newidx!=r->oldidx){
-                            if(cfg->isatomic)
+			    if(cfg->srctype!=stPattern){
+                                if(cfg->isatomic)
 #pragma omp atomic
-			        tracer->mesh->weight[r->oldidx]+=r->oldweight;
-                            else
-                                tracer->mesh->weight[r->oldidx]+=r->oldweight;
+			            tracer->mesh->weight[r->oldidx]+=r->oldweight;
+                                else
+                                    tracer->mesh->weight[r->oldidx]+=r->oldweight;
+			    }else{
+			        int psize=(int)cfg->srcparam1.w*(int)cfg->srcparam2.w; // total number of pixels in each pattern
+				int pidx; // pattern index
+				for(pidx=0;pidx<cfg->srcnum;pidx++) {
+				    if(cfg->isatomic)
+#pragma omp atomic
+				        tracer->mesh->weight[r->oldidx*cfg->srcnum+pidx]+=r->oldweight*cfg->srcpattern[pidx*psize+r->posidx];
+				    else
+				        tracer->mesh->weight[r->oldidx*cfg->srcnum+pidx]+=r->oldweight*cfg->srcpattern[pidx*psize+r->posidx];
+				}
+			    }
 			    r->oldidx=newidx;
 			    r->oldweight=ww;
                         }else
 			    r->oldweight+=ww;
 			if(r->faceid==-2 || !r->isend){
-			    if(cfg->isatomic)
+			    if(cfg->srctype!=stPattern){
+			        if(cfg->isatomic)
 #pragma omp atomic
-			        tracer->mesh->weight[newidx]+=r->oldweight;
-                            else
-			        tracer->mesh->weight[newidx]+=r->oldweight;
+			            tracer->mesh->weight[newidx]+=r->oldweight;
+                                else
+			            tracer->mesh->weight[newidx]+=r->oldweight;
+			    } else {
+			        int psize=(int)cfg->srcparam1.w*(int)cfg->srcparam2.w; // total number of pixels in each pattern
+				int pidx; // pattern index
+				for(pidx=0;pidx<cfg->srcnum;pidx++) {
+				    if(cfg->isatomic)
+#pragma omp atomic
+				        tracer->mesh->weight[newidx*cfg->srcnum+pidx]+=r->oldweight*cfg->srcpattern[pidx*psize+r->posidx];
+				    else
+				        tracer->mesh->weight[newidx*cfg->srcnum+pidx]+=r->oldweight*cfg->srcpattern[pidx*psize+r->posidx];
+				}
+			    }
 			    r->oldweight=0.f;
 			}
                      }else{
@@ -1535,13 +1559,27 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		  }else{
 			int i;
                         ww*=1.f/3.f;
-                        if(cfg->isatomic)
-			    for(i=0;i<3;i++)
+			if(cfg->srctype!=stPattern){
+                            if(cfg->isatomic)
+			        for(i=0;i<3;i++)
 #pragma omp atomic
-				tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
-                        else
-                            for(i=0;i<3;i++)
-                                tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+				    tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+                            else
+                                for(i=0;i<3;i++)
+                                    tracer->mesh->weight[ee[out[faceidx][i]]-1+tshift]+=ww;
+			}else{
+			    int psize=(int)cfg->srcparam1.w*(int)cfg->srcparam2.w; // total number of pixels in each pattern
+			    int pidx; // pattern index
+			    for(pidx=0;pidx<cfg->srcnum;pidx++){
+			        if(cfg->isatomic)
+				    for(i=0;i<3;i++)
+#pragma omp atomic
+				        tracer->mesh->weight[(ee[out[faceidx][i]]-1+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx];
+				else
+				    for(i=0;i<3;i++)
+				        tracer->mesh->weight[(ee[out[faceidx][i]]-1+tshift)*cfg->srcnum+pidx]+=ww*cfg->srcpattern[pidx*psize+r->posidx];
+			    }
+			}
 		  }
 		}
 	    }
