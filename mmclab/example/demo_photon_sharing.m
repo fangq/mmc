@@ -16,6 +16,8 @@ cfg.prop=[0 0 1 1;0.01 10 0.9 1.37];
 cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=1e-10;
+cfg.gpuid=-1;
+cfg.method='elem';
 cfg.debuglevel='TP';
 
 %% 5 patterns represented by a 3D matrix

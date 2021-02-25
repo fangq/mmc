@@ -415,6 +415,9 @@ for i=1:len
             cfg(i).elem = [cfg(i).elem vessel vesselr];
         end
     end
+    if(useopencl==1 && isfield(cfg(i),'gpuid') && ~ischar(cfg(i).gpuid) && cfg(i).gpuid<-1)
+        cfg(i).gpuid=1;
+    end
 end
 
 % must do a fflush, otherwise octave buffers the output until complete
@@ -435,9 +438,6 @@ if(nargout>=3)
 end
 
 if(useopencl==1)
-    if(isfield(cfg,'gpuid') && ~ischar(cfg.gpuid) && cfg.gpuid<-1)
-	    cfg.gpuid=1;
-    end
     [varargout{1:mmcout}]=mmc(cfg);
 elseif(length(varargin)<2)
     [varargout{1:mmcout}]=mmc(cfg);
