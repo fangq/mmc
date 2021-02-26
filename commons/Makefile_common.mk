@@ -177,7 +177,7 @@ mex mexomp:     AROUTPUT=-output
 mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 
 oct:            BINARY=mmc.mex
-oct octomp:     ARFLAGS+=--mex mmclab.cpp -I$(INCLUDEDIR)
+oct octomp:     ARFLAGS+=--mex -DMATLAB_MEX_FILE mmclab.cpp -I$(INCLUDEDIR)
 oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
 oct octomp:     USERARFLAGS+=-o $(BINDIR)/mmc
 
