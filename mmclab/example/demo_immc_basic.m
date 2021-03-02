@@ -61,21 +61,10 @@ EPS=0.001;
 nbox=[nbox; [1-EPS 0.5 0.5]; [EPS 0.5 0.5]];  % insert new nodes (node 9 and 10)
 fbox=[fbox; [9 9 10]];  % insert new edge coneected by node 9 and 10
 
-% (b) generate .poly file
-savesurfpoly(nbox,num2cell(fbox,2),[],[],[],[],mwpath('eimmc_mesh.poly'));
+% (b) generate mesh
+[node_eimmc,elem_eimmc]=s2m(nbox,num2cell(fbox,2),1,100,'tetgen1.5',[],[],'-YY');
 
-% (c) generate mesh files using tetgen
-tic
-[status, cmdout]=system([' "' mcpath('tetgen1.5',getexeext) '" -YY "' mwpath('eimmc_mesh.poly') '"']);
-if(status)
-    error('tetgen error: %s\n',cmdout);
-end
-toc
-
-% (d) read and plot vessel mesh
-[node_eimmc,elem_eimmc,face_eimmc]=readtetgen(mwpath('eimmc_mesh.1'));
-
-% (e) label the edge that has node 9 and 10 and add radii
+% (c) label the edge that has node 9 and 10 and add radii
 elem_eimmc=[elem_eimmc 6*ones(size(elem_eimmc))];
 elem_eimmc([10 11 13 16],5)=[5 4 4 3];  % local edge index
 elem_eimmc=[elem_eimmc zeros(size(elem_eimmc,1),4)];
@@ -113,21 +102,10 @@ flux_eimmc=mmclab(cfg);
 fbox=volface(ebox);
 nbox=[nbox; [0.5 0.5 0.5]];  % insert new nodes (node 9)
 
-% (b) generate .poly file
-savesurfpoly(nbox,num2cell(fbox,2),[],[],[],[],mwpath('nimmc_mesh.poly'));
+% (b) generate mesh
+[node_eimmc,elem_eimmc]=s2m(nbox,num2cell(fbox,2),1,100,'tetgen1.5',[],[],'-YY');
 
-% (c) generate mesh files using tetgen
-tic
-[status, cmdout]=system([' "' mcpath('tetgen1.5',getexeext) '" -YY "' mwpath('nimmc_mesh.poly') '"']);
-if(status)
-    error('tetgen error: %s\n',cmdout);
-end
-toc
-
-% (d) read and plot vessel mesh
-[node_nimmc,elem_nimmc,face_nimmc]=readtetgen(mwpath('nimmc_mesh.1'));
-
-% (e) label the edge that has node 9 and 10 and add radii
+% (c) label the edge that has node 9 and 10 and add radii
 elem_nimmc=[elem_nimmc 6*ones(size(elem_nimmc)) zeros(size(elem_nimmc))];
 node_nimmc=[node_nimmc zeros(size(node_nimmc,1),1)];
 node_nimmc(9,4)=0.1;  % add radius for inserted node
