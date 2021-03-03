@@ -35,3 +35,7 @@ $Download: https://doi.org/10.1117/1.NPh.7.1.015008
 # [Yan2020] Yan S, Yao R, Intes X, and Fang Q*, "Accelerating Monte Carlo modeling of structured-light-based diffuse optical imaging via 'photon sharing'," Opt. Lett. 45, 2842-2845 (2020)
 $Summary: Photon sharing for simultaneous simulations of multiple patterns
 $Download: https://www.biorxiv.org/content/10.1101/2020.02.16.951590v2
+
+# [Yuan2021] Yaoshen Yuan, Shijie Yan, and Qianqian Fang*, "Light transport modeling in highly complex tissues using the implicit mesh-based Monte Carlo algorithm," Biomed. Optics Express, 12(1), 147-161, (2021)
+$Summary:  Implicit MMC (iMMC)
+$Download: https://www.osapublishing.org/boe/fulltext.cfm?uri=boe-12-1-147

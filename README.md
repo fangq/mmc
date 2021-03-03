@@ -4,7 +4,7 @@ Mesh-based Monte Carlo (MMC) - SSE4 and OpenCL
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
 -   License: GNU General Public License version 3 (GPL v3), see License.txt
--   Version: 1.9 (v2020, Moon Cake - beta)
+-   Version: 1.9.5 (v2021.2, Moon Cake - RC1)
 -   URL: <http://mcx.space/mmc>
 
 [![Build Status](https://travis-ci.com/fangq/mmc.svg?branch=master)](https://travis-ci.com/fangq/mmc)
@@ -35,61 +35,36 @@ Table of Content:
 What's New
 -------------
 
-MMC v2020 (1.9) is a major update to MMC. For the first time, MMC adds GPU 
-support via the newly implemented OpenCL version. The released package 
-simultaneously supports CPU-only multi-threading with SSE4 (standard MMC) and 
-OpenCL-based MMC on a wide variety of CPU/GPU devices across vendors. Using 
-up-to-date GPU hardware, the MMC simulation speed was increased by 100x to 400x 
-compared to single-threaded SSE4-based MMC simulation. The detailed description 
-of the GPU accelerated MMC can be found in the below paper [Fang2019].
-
-One can choose between the SSE4 and OpenCL based simulation modes using the `-G` 
-or `cfg.gpuid` input options. A device ID of -1 enables SSE4 CPU based MMC, and a 
-number 1 or above chooses the supported OpenCL device (using `mmc -L` or 
-`mmclab('gpuinfo')` to list).
+MMC v2021.2 (1.9.5) includes a major feature upgrade - implicit MMC (iMMC) - to
+enable simulations of highly complex anatomical structures. The details of the
+iMMC algorithm, developed by Yaoshen Yuan, are described in his recent paper 
+[Yuan2021]. Briefly, iMMC permits one to associate cylindrical inclusions, 
+spherical inclusions, and thin-membrane with the edges, vertices and faces, 
+respectively, in a tetrahedral mesh. Currently, this feature is only supported
+on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`). 
 
 A detailed (long) list of updates can be found in the ChangeLog.txt or the 
 Github commit history: <https://github.com/fangq/mmc/commits/master>
 
 To highlight a few most important updates:
 
--   Supported GPU using OpenCL in both binary and mmclab
--   Supported using multiple NVIDIA GPUs
--   GPU MMC (or MMCL) had been rigirously validated across a range of benchmarks
--   Supported photon sharing for multiple patterns
--   Charactrized the speed improvement of MMCL simulations over standard MMC
--   Created `mmc` and `octave-mmclab` official Fedora packages and disseminate via Fedora repositories
--   Implemented xorshift128+ RNG unit and used as default for both CPU/GPU MMC
--   Fixed a list of bugs in both SSE4/OpenCL MMC
--   Created 6 standard benchmarks (B1:cube60, B1D:d-cube60, B2:sphshells, 
-B2D:d-sphshells, B3:colin27, B4:skin-vessel) for comparisons
+-   Support iMMC (edge-, node- and face-based implicit structures), CPU only (by Yaoshen Yuan)
+-   Added MMCLAB examples for iMMC, including a large dense vessel network (by Yaoshen Yuan)
+-   Added C++Builder (Community Edition) project file for compilation on Windows
+-   Added Windows GNU Octave mex file for MMCLAB
+-   Photon-sharing is now supported in the GPU code (by Shijie Yan)
+-   Several critical bug fixes (by Shijie Yan) 
 
 Please file bug reports to <https://github.com/fangq/mmc/issues>
-
-Moreover, over the past year, we have also published a high-quality brain
-3D mesh generation pipeline and rigirously compared mmc with voxel based
-MCX, and showed improvement in modeling accuracy. The detail of the mesh
-generation software (Brain2mesh: http://mcx.space/brian2mesh) and the 
-benchmarks can be found in the below [Brain2Mesh2020] paper.
-
-Lastly, we also implemented the photon sharing algorithm to simultaneously 
-simulate multiple pattern sources. This paper is detailed in the recently
-published OL paper, see [Yan2020].
 
 
 Reference:
 
->**[Fang2019]** Qianqian Fang and Shijie Yan, “GPU-accelerated mesh-based 
-Monte Carlo photon transport simulations,” J. of Biomedical Optics, 24(11), 
-115002 (2019) URL: <http://dx.doi.org/10.1117/1.JBO.24.11.115002>
+>**[Yuan2021]** Yaoshen Yuan, Shijie Yan, and Qianqian Fang*, 
+"Light transport modeling in highly complex tissues using the implicit 
+mesh-based Monte Carlo algorithm," Biomed. Optics Express, 12(1), 
+147-161, (2021), URL: https://www.osapublishing.org/boe/fulltext.cfm?uri=boe-12-1-147
 
->**[Brain2Mesh2020]** Anh Phong Tran† , Shijie Yan† , Qianqian Fang*, (2020) "Improving 
-model-based fNIRS analysis using mesh-based anatomical and light-transport models," 
-Neurophotonics, 7(1), 015008, URL: https://doi.org/10.1117/1.NPh.7.1.015008
-
->**[Yan2020]** Yan S, Yao R, Intes X, and Fang Q*, "Accelerating Monte Carlo modeling 
-of structured-light-based diffuse optical imaging via 'photon sharing'," Opt. Lett. 45, 2842-2845 (2020)
-URL: https://www.biorxiv.org/content/10.1101/2020.02.16.951590v2
 
 Introduction
 ---------------

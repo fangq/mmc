@@ -1,3 +1,4 @@
+function demo_immc_vessel
 % This example shows how to run e-iMMC on a vessel network
 
 %% load vessel data
@@ -7,8 +8,7 @@
 % nbox:   nodes of bounding box
 % fbox:   faces of bounding box
 
-addpath('/path/to/iso2mesh/toolbox/');
-addpath('../../matlab')
+%addpath('/path/to/iso2mesh/toolbox/');
 
 load vessel
 
@@ -23,18 +23,7 @@ fedge=[edge(:,1) edge];  %  convert edge to face for mesh generation
 face=[fbox; fedge];  %  add faces of bounding box into face
 
 % (b) generate .poly file
-generatePoly('vessel_mesh',node,face);
-
-% (c) generate mesh files using tetgen
-tic
-!/path/to/your/iso2mesh/bin/tetgen1.5.mexa64 -YY vessel_mesh.poly
-if ~isfile('vessel_mesh.1.node') || ~isfile('vessel_mesh.1.face') || ~isfile('vessel_mesh.1.ele')
-    error('Please identify your path to iso2mesh/bin/tetgen1.5.mexa64')
-end
-t=toc
-
-% (d) read and plot vessel mesh
-[nodeVessel, elemVessel, faceVessel]=readMesh('vessel_mesh');
+[nodeVessel, elemVessel]=s2m(node,num2cell(face,2),1,100,'tetgen1.5',[],[],'-YY');
 
 %% 2. Label local edges
 
@@ -80,94 +69,13 @@ cfg.outputtype='energy';
 
 tic
 flux=mmclab(cfg);
-runtime=toc
+toc
 
 figure,imagesc(log10(rot90(squeeze(flux.data(:,150,:)))))
 
 
 
 %% %%%%%%%%%%% functions %%%%%%%%%%%
-
-%% function: plot edges
-function plotEdges(edge,node)
-for i=1:size(edge,1)
-    plot3([node(edge(i,1),1),node(edge(i,2),1)],...
-        [node(edge(i,1),2),node(edge(i,2),2)],...
-        [node(edge(i,1),3),node(edge(i,2),3)],'r');
-    hold on
-end
-end
-
-%% function: compute element centroid
-function centroid = elemcentroid(node,elem)
-% compute the centroid of all elements
-centroid=zeros(size(elem,1),3);
-for i=1:size(elem,1)
-    n1=node(elem(i,1),:);
-    n2=node(elem(i,2),:);
-    n3=node(elem(i,3),:);
-    n4=node(elem(i,4),:);
-    n=[n1; n2; n3; n4];
-    centroid(i,:)=mean(n);
-end
-
-end
-
-%% function: generate .poly
-function generatePoly(sessionid,node,face)
-% generate the .poly file in current folder
-fid=fopen([sessionid,'.poly'],'wt');
-% === node ===
-[nn,nd]=size(node);
-fprintf(fid,'#node list\n');
-fprintf(fid,'%d %d %d %d\n',nn,nd,0,0);
-fprintf(fid,'%d %6.16f %6.16f %6.16f\n',[0:nn-1;node(:,1)';node(:,2)';node(:,3)']);
-
-% === face ===
-[ne,~]=size(face);
-face=face-1;
-fprintf(fid,'#face list\n');
-fprintf(fid,'%d %d\n',ne,1);
-for i=1:ne
-    fprintf(fid,'%d %d\n',1,0);
-    fprintf(fid,'%d %d %d %d\n',3,face(i,1),face(i,2),face(i,3));
-end
-
-% === hole ===
-fprintf(fid,'#hole list\n');
-fprintf(fid,'%d\n',0);
-
-fclose(fid);
-end
-
-%% function: read generated .elem, .face and .node files
-function [node_tet,elem_tet,face_tet]=readMesh(sessionid)
-% read the .elem, .face and .node files generated from tetgen
-% and write into elem_tet, face_tet and node_tet in MATLAB
-fileID=fopen([sessionid '.1.ele'],'r');
-formatSpec='%f';
-A=fscanf(fileID,formatSpec);
-A=[A(1:3); 0; 0; A(4:end)];
-elem_tet=reshape(A,[5 A(1)+1])';
-
-fileID=fopen([sessionid '.1.face'],'r');
-formatSpec='%f';
-A=fscanf(fileID,formatSpec);
-A=[A(1:2); 0; 0; 0; A(3:end)];
-face_tet=reshape(A,[5 A(1)+1])';
-
-fileID=fopen([sessionid '.1.node'],'r');
-formatSpec='%f';
-A=fscanf(fileID,formatSpec);
-node_tet=reshape(A,[4 A(1)+1])';
-
-elem_tet=elem_tet(2:end,2:end);
-elem_tet=elem_tet+1;
-face_tet=face_tet(2:end,2:end);
-face_tet=face_tet+1;
-node_tet=node_tet(2:end,2:end);
-
-end
 
 %% function: label local edges for all elements
 function [localEdgeIndex,edgeSet]=labelElements(edge,elem)
@@ -194,7 +102,6 @@ for i=1:size(elem,1)
 end
 fprintf('Finished index extraction.\n')
 
-end
 
 %% function: relabel the elements
 function [node,elemInserted,edgeIndexInserted]=relabelElement(elem,edgeIndex,indexForSplit,node,edgeSet)
@@ -206,7 +113,7 @@ faceorder=[1 2 3; 1 2 4; 1 3 4; 2 3 4];
 elemSplit=elem(indexForSplit,:);
 
 % get centroids and add them into nodes
-centroid=elemcentroid(node,elemSplit);
+centroid=meshcentroid(node,elemSplit);
 offset=size(node,1);
 node=[node; centroid];
 
@@ -260,8 +167,6 @@ if indexForSplit(end)<size(elem,1)
 end
 fprintf('Finished relabeling.\n')
 
-end
-
 %% function: label local edges for single element
 function localEdge=labelSingleElem(elem,edgeSet)
 % label a single element
@@ -277,7 +182,6 @@ for i=1:size(n2e,1)
     end
 end
 
-end
 
 %% function: obtain the radii for the labeled edges
 function radii=getVesselRadii(elem,index,noder)
@@ -297,7 +201,6 @@ for i=1:size(index,1)
     end
 end
 
-end
 
 %% function: build cfg for immc
 function cfg=inputMesh2Cfg(elem,index,radii,node,noder)
@@ -317,4 +220,3 @@ elem=[elem index radii zeros(size(radii,1),2)];
 
 cfg.node=node;
 cfg.elem=elem;
-end

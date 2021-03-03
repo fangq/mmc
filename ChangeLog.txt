@@ -1,7 +1,48 @@
 Change Log
 
+== MMC 1.9.5 (v2021.2, Moon Cake - RC1), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2021-02-26 [f2f7221] add MATLAB_MEX_FILE in the makefile for octave mex
+ 2021-02-25 [baa74bb] add c++builder project file
+ 2021-02-24 [0b83b57] fix mmclab error when running multiple GPU simulations, thanks to Dr.Konrad Schumacher
+ 2021-02-24 [9168232] add photon sharing support in branchless-badoul ray-tracer
+ 2021-02-24 [9ba1362] fix errors and warnings on mac os
+ 2021-02-24 [54db37c] update nightly build script
+ 2021-02-08 [1e09902] fix the energy leak for n-immc
+ 2021-01-17 [db86323] Remove immc.mat
+ 2021-01-17 [831e792] Working vessel demo
+ 2021-01-13 [df1251a] allow SSE mmclab to output photon seeds
+ 2021-01-10 [2e510b1] update tend to ensure that tend - tstart is multiple of tstep
+ 2021-01-07 [3265f58] Update immc demo
+ 2021-01-06 [9bc35fc] Add n-immc demo and data
+ 2020-12-28*[05c5293] Add e-immc demo
+ 2020-12-21 [47bab21] Running iMMC code
+ 2020-12-17 [21b5b3f] Completion of ray-tracer
+ 2020-12-14*[f07710c] Add main portion in ray-tracer
+ 2020-12-14 [f90420e] Add compute-distance functions for iMMC
+ 2020-12-07 [834851c] Add cfg for iMMC
+ 2020-10-25 [1e915a6] replaydet=-1 is only supported in mcxlab, not in mmclab, remove
+ 2020-10-08 [2bc0237] enable photon detection inside elements next to zero-labeled element
+ 2020-10-07 [62e972b] fix the judgement condition of photon detection: distance^2 < radius -> distance^2 < radius^2
+ 2020-09-17 [8a651d8] initialize shared memory immediately after launching to correctly save history of a new photon
+
 == MMC 1.9 (v2020, Moon Cake - beta), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2020-08-29 [e278aa0] remove warning
+ 2020-08-30 [cad8eec] allow building zmat on windows
+ 2020-08-29 [9bf4fab] update deploy script
+ 2020-08-29 [1164051] use mingw32-make on windows for travis-ci
+ 2020-08-29 [9e5e5dc] make code c99 compatible
+ 2020-08-27 [fc47461] patch cuda to add saving seeds and replay
+ 2020-08-27 [e071842] fix one memory error via valgrind
+ 2020-08-27 [1ef475a] debugged and partially fixed replay
+ 2020-08-25 [554fea8] fix comparison typo
+ 2020-08-25 [1b48e15] fix mmclab errors
+ 2020-08-25 [6d0b769] add save photon seeds and replay support
+ 2020-08-24 [93583a5] massive update to documentation, prepare for 1.9 release
+ 2020-08-15 [646b41b] remove warnings due to cl target version
+ 2020-08-12 [d34cf3c] enable fully constant expansion at run time via macros
+ 2020-08-09*[255727e] add zmat, ubj and jnifti support
  2020-08-09*[874c5bf] support multiple NVIDIA GPUs, patch from fangq/mcxcl@c1e3ebb
  2020-07-25 [41d4aef] Update README.md
  2020-07-24 [f9dd4dd] add markdown version of README, add travis badge

@@ -137,6 +137,12 @@ flux_fimmc=mmclab(cfg);
 
 %% plot the results
 figure,
-subplot(131),imagesc(log10(rot90(squeeze(flux_eimmc.data(50,1:100,1:100)))))
-subplot(132),imagesc(log10(rot90(squeeze(flux_nimmc.data(50,1:100,1:100)))))
-subplot(133),imagesc(log10(rot90(squeeze(flux_fimmc.data(50,1:100,1:100)))))
+subplot(131)
+imagesc(log10(rot90(squeeze(flux_eimmc.data(50,1:100,1:100)))))
+title('edge-iMMC');axis equal
+subplot(132)
+imagesc(log10(rot90(squeeze(flux_nimmc.data(50,1:100,1:100)))))
+title('node-iMMC');axis equal
+subplot(133)
+imagesc(log10(rot90(squeeze(flux_fimmc.data(50,1:100,1:100)))))
+title('face-iMMC');axis equal

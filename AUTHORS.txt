@@ -16,7 +16,18 @@ Email: <q.fang at neu.edu>
 The follow people had also contributed to this software:
 
 
-* Shijie <yan.shiji at husky.neu.edu> (Fang Lab @ Northeastern University)
+* Yaoshen Yuan <yuan.yaos at northeastern.edu> (Fang Lab @ Northeastern University)
+
+Yaoshen developed and published the implicit MMC (iMMC). This feature was incorporated
+with the MMC main branch in the v2021.2 release.
+
+Publication:
+
+*[Yuan2021] Yaoshen Yuan, Shijie Yan, and Qianqian Fang*, "Light transport modeling in highly complex tissues using the implicit mesh-based Monte Carlo algorithm," Biomed. Optics Express, 12(1), 147-161, (2021)
+*Summary:  Implicit MMC (iMMC)
+*Download: https://www.osapublishing.org/boe/fulltext.cfm?uri=boe-12-1-147
+
+* Shijie Yan <yan.shiji at northeastern.edu> (Fang Lab @ Northeastern University)
 
 Shijie contributed to the systematic validation of DMMC and collaborated
 with Ruoyang and completed "Photon Sharing" feature.
