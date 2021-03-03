@@ -1340,12 +1340,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			  continue;
 			}
 
-			if (ih==3) {
+			if (ih==3 && ih_prev!=-1) {
 			  // last node
 			  hit = ray_sphere_intersect(r, ih_prev, &curprop, cc_prev, nr_prev, hitstatusn_prev);
 			}
 		    }
-		    if(ih_prev==-1) {
+		    if(ih==4 && ih_prev==-1) {
 		      // all nodes have a radius of zero
 		      r->inout = 0;
 		      r->isvessel = 0;
