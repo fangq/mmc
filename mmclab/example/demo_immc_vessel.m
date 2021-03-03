@@ -1,4 +1,4 @@
-function demo_immc_vessel
+function cfg=demo_immc_vessel(cfg)
 % This example shows how to run e-iMMC on a vessel network
 
 %% load vessel data
@@ -10,69 +10,81 @@ function demo_immc_vessel
 
 %addpath('/path/to/iso2mesh/toolbox/');
 
-load vessel
+if(nargin==0)
 
-%% 1. Mesh generation
+    vs=load('vessel.mat');
 
-% (a) add the bounding box (nbox and fbox) into node and face
-offset=size(nbox,1);
-edge=edge+offset;  % change the node index after inserting bounding box
-noder=[zeros(offset,1); noder];  % add offset into noder
-node=[nbox; node];  % add nodes of bounding box into node
-fedge=[edge(:,1) edge];  %  convert edge to face for mesh generation
-face=[fbox; fedge];  %  add faces of bounding box into face
+    edge=vs.edge;   % vessel edges
+    fbox=vs.fbox;   % bounding box faces
+    nbox=vs.nbox;   % bounding box nodes
+    node=vs.node;   % nodes on the vessel network
+    noder=vs.noder; % nodal radius of each node
 
-% (b) generate .poly file
-[nodeVessel, elemVessel]=s2m(node,num2cell(face,2),1,100,'tetgen1.5',[],[],'-YY');
+    clear vs;
 
-%% 2. Label local edges
+    %% 1. Mesh generation
 
-% 1. label the local edges which are vessels for all elements
-[localEdgeIndex, edgeSet]=labelElements(edge,elemVessel);
+    % (a) add the bounding box (nbox and fbox) into node and face
+    offset=size(nbox,1);
+    edge=edge+offset;  % change the node index after inserting bounding box
+    noder=[zeros(offset,1); noder];  % add offset into noder
+    node=[nbox; node];  % add nodes of bounding box into node
+    fedge=[edge(:,1) edge];  %  convert edge to face for mesh generation
+    face=[fbox; fedge];  %  add faces of bounding box into face
 
-% 2. split the elements wich over 2 edges labeled as vessel
-indexForSplit=find(sum(logical(localEdgeIndex),2)>2);
-if ~isempty(indexForSplit)
-    [nodeVessel,elemVessel,localEdgeIndex]=relabelElement(elemVessel,localEdgeIndex,indexForSplit,nodeVessel,edgeSet);
-    noder=[noder; zeros(size(nodeVessel,1)-size(noder,1),1)];
+    % (b) generate .poly file
+    [nodeVessel, elemVessel]=s2m(node,num2cell(face,2),1,100,'tetgen1.5',[],[],'-YY');
+
+    %% 2. Label local edges
+
+    % 1. label the local edges which are vessels for all elements
+    [localEdgeIndex, edgeSet]=labelElements(edge,elemVessel);
+
+    % 2. split the elements wich over 2 edges labeled as vessel
+    indexForSplit=find(sum(logical(localEdgeIndex),2)>2);
+    if ~isempty(indexForSplit)
+        [nodeVessel,elemVessel,localEdgeIndex]=relabelElement(elemVessel,localEdgeIndex,indexForSplit,nodeVessel,edgeSet);
+        noder=[noder; zeros(size(nodeVessel,1)-size(noder,1),1)];
+    end
+
+    % 3. get radius for all edges (comment this line if you have your own vessel radii)
+    radii=getVesselRadii(elemVessel,localEdgeIndex,noder);
+
+    %% 3. Run mmc
+
+    cfg=inputMesh2Cfg(elemVessel,localEdgeIndex,radii,nodeVessel,noder);
+
+    res=0.001;  % resolution: 0.001mm
+    cfg.steps=[0.001 0.001 0.001];
+    cfg.elem(:,9:12)=cfg.elem(:,9:12)*res;
+    cfg.node=cfg.node*res;
+    cfg.srctype='pencil';
+    cfg.nphoton=1e6;
+    cfg.elemprop=ones(size(cfg.elem,1),1);
+    cfg.srcpos=[150.5 150.5 605]*res;
+    cfg.srcdir=[0 0 -1];
+    cfg.prop=[0 0 1 1;
+        0.0458   35.6541    0.9000    1.3700;   % dermis
+        23.0543    9.3985    0.9000    1.3700]; % blood
+    cfg.tstart=0;
+    cfg.tend=5e-9;
+    cfg.tstep=5e-9;
+    cfg.debuglevel='TP';
+    cfg.method='grid';
+    cfg.gpuid=-1;
+    cfg.isreflect=1;
+    cfg.outputtype='energy';
+
 end
-
-% 3. get radius for all edges (comment this line if you have your own vessel radii)
-radii=getVesselRadii(elemVessel,localEdgeIndex,noder);
-
-%% 3. Run mmc
-
-clear cfg
-
-cfg=inputMesh2Cfg(elemVessel,localEdgeIndex,radii,nodeVessel,noder);
-
-res=0.001;  % resolution: 0.001mm
-cfg.steps=[0.001 0.001 0.001];
-cfg.elem(:,9:12)=cfg.elem(:,9:12)*res;
-cfg.node=cfg.node*res;
-cfg.srctype='pencil';
-cfg.nphoton=1e6;
-cfg.elemprop=ones(size(cfg.elem,1),1);
-cfg.srcpos=[150.5 150.5 605]*res;
-cfg.srcdir=[0 0 -1];
-cfg.prop=[0 0 1 1;
-    0.0458   35.6541    0.9000    1.3700;   % dermis
-    23.0543    9.3985    0.9000    1.3700]; % blood
-cfg.tstart=0;
-cfg.tend=5e-9;
-cfg.tstep=5e-9;
-cfg.debuglevel='TP';
-cfg.method='grid';
-cfg.gpuid=-1;
-cfg.isreflect=1;
-cfg.outputtype='energy';
 
 tic
 flux=mmclab(cfg);
 toc
 
+%% plotting
 figure,imagesc(log10(rot90(squeeze(flux.data(:,150,:)))))
-
+axis equal;
+title('energy deposition map');
 
 
 %% %%%%%%%%%%% functions %%%%%%%%%%%
