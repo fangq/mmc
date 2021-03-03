@@ -45,7 +45,7 @@
 % face thickness:  the thickness of the faces in 5:8 columns
 
 %% add path
-% 1. you need to add the path to iso2mesh toolbox 
+% 1. you need to add the path to iso2mesh toolbox if not already
 %addpath('/path/to/iso2mesh/toolbox/');
 
 % 2. you need to add the path to MMC matlab folder
@@ -103,7 +103,7 @@ fbox=volface(ebox);
 nbox=[nbox; [0.5 0.5 0.5]];  % insert new nodes (node 9)
 
 % (b) generate mesh
-[node_eimmc,elem_eimmc]=s2m(nbox,num2cell(fbox,2),1,100,'tetgen1.5',[],[],'-YY');
+[node_nimmc,elem_nimmc]=s2m(nbox,num2cell(fbox,2),1,100,'tetgen1.5',[],[],'-YY');
 
 % (c) label the edge that has node 9 and 10 and add radii
 elem_nimmc=[elem_nimmc 6*ones(size(elem_nimmc)) zeros(size(elem_nimmc))];
