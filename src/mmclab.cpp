@@ -484,7 +484,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         mesh->edgeroi=(float *)calloc(sizeof(float)*arraydim[1],mesh->ne);
         for(j=0;j<6;j++)
           for(i=0;i<mesh->ne;i++)
-             mesh->edgeroi[i*mesh->elemlen+j]=val[j*mesh->ne+i];
+             mesh->edgeroi[i*6+j]=val[j*mesh->ne+i];
 	cfg->implicit=1;
         printf("mmc.edgeroi=[%d,%d];\n",mesh->ne,6);
     }else if(strcmp(name,"faceroi")==0){
@@ -497,7 +497,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         mesh->faceroi=(float *)calloc(sizeof(float)*arraydim[1],mesh->ne);
         for(j=0;j<4;j++)
           for(i=0;i<mesh->ne;i++)
-             mesh->faceroi[i*mesh->elemlen+j]=val[j*mesh->ne+i];
+             mesh->faceroi[i*4+j]=val[j*mesh->ne+i];
 	cfg->implicit=2;
         printf("mmc.faceroi=[%d,%d];\n",mesh->ne,4);
     }else if(strcmp(name,"elemprop")==0){

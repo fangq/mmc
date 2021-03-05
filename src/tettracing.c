@@ -2369,7 +2369,7 @@ void visitor_clear(visitor* visit){
 void updateroi(int immctype,ray *r, tetmesh *mesh){
         int i,edcount=0;
 	float *vid;
-	memset(r->roisize,0,size(float)*4);
+	memset(r->roisize,0,sizeof(float)*4);
 	if(immctype==1){
 	    vid = (float *)(mesh->edgeroi+(r->eid-1)*6);
 	    for(i=0;i<6;i++){
