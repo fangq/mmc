@@ -910,8 +910,8 @@ void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, fl
 	float norm, normr, st, DIS0, DIS1;
 	int en0, en1;
 
-	en0 = ee[e2n[r->vesselid[index]][0]]-1;
-	en1 = ee[e2n[r->vesselid[index]][1]]-1;
+	en0 = ee[e2n[r->edgeroiid[index]][0]]-1;
+	en1 = ee[e2n[r->edgeroiid[index]][1]]-1;
 	E0 = tracer->mesh->node[en0];
 	E1 = tracer->mesh->node[en1];
 
@@ -943,7 +943,7 @@ void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, fl
 	projdata[1] = PP1;
 	
 	float rt, rt2;
-	rt = r->vesselr[index];
+	rt = r->roisize[index];
 	rt2 = rt*rt;
 	if(DIS0>rt2+EPS2 && DIS1<rt2-EPS2){
 	  // hit, out->in
@@ -978,12 +978,11 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 	
 	// update Lmove and reflection
 	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
-	rt = r->vesselr[index];
+	rt = r->roisize[index];
 	rt2 = rt*rt;
 	// accurate intersection computation
-	if(hitstatus == 0 || hitstatus == 1) 	// hit vessel out->in or in->out
-	{
-		r->isvessel = 1;
+	if(hitstatus == 0 || hitstatus == 1){ 	// hit edgeroi out->in or in->out
+		r->isedgeroi = 1;
 
 		DIS0 = sqrtf(DIS0);
 		DIS1 = sqrtf(DIS1);
@@ -1038,14 +1037,14 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 	}
 	else if(hitstatus == 2){  // outside
 		r->inout = 0;
-		r->isvessel = 0;
+		r->isedgeroi = 0;
 		*curprop = 0;
 	}else if(hitstatus == 3){  // inside
 		r->inout = 1;
-		r->isvessel = 0;
+		r->isedgeroi = 0;
 		*curprop = 1;
 	}else{
-		r->isvessel = 0;
+		r->isedgeroi = 0;
 		*curprop = 0;
 	}
 
@@ -1057,6 +1056,7 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
  * and the distance between P1 and the labeled node.
  * P0 is the entry point and P1 is the exit point
  */
+
 void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out) {
         float npdist0,npdist1,nr2;
 	float3 PP, cc;
@@ -1097,7 +1097,7 @@ float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr,
 	nr2 = nr*nr;
 	r->E = cc;
 	if(hitstatus == 0 || hitstatus == 1){
-		r->isvessel = 2;
+		r->isedgeroi = 2;
 		oo = r->p0;
 		ll = r->vec;
 		vec_diff(&cc,&oo,&oc);
@@ -1119,14 +1119,14 @@ float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr,
 	}
         else if(hitstatus == 2){  // outside
 		r->inout = 0;
-		r->isvessel = 0;
+		r->isedgeroi = 0;
 		*curprop = 0;
 	}else if(hitstatus == 3){  // inside
 		r->inout = 1;
-		r->isvessel = 0;
+		r->isedgeroi = 0;
 		*curprop = 1;
 	}else{
-		r->isvessel = 0;
+		r->isedgeroi = 0;
 		*curprop = 0;
 	}
 	return 0;
@@ -1141,9 +1141,9 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int base
 	int flocal;
 	// float3 tempp1, tempp2;
 
-	flocal = r->vesselid[index];
+	flocal = index;
 	r->faceindex = flocal;
-	thick = r->vesselr[index];
+	thick = r->roisize[index];
 
 	pf0 = r->p0;		// P0: pf0
 	vec_mult(&r->vec,r->Lmove,&ptemp);
@@ -1161,13 +1161,13 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int base
 	distf1 = vec_dot(&pv,&fnorm);
 
 	if(distf0>thick+EPS2 && distf1<thick-EPS2){	// hit: out->in
-		r->isvessel = 3;
+		r->isedgeroi = 3;
 		r->inout = 1;
 		lm = 1-(thick-distf1)/(distf0-distf1);
 		r->Lmove = r->Lmove*lm;
 		return 1;
 	}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// hit: in->out
-		r->isvessel = 3;
+		r->isedgeroi = 3;
 		r->inout = 0;
 		lm = (thick-distf0)/(distf1-distf0);
 		r->Lmove = r->Lmove*lm;
@@ -1216,7 +1216,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
-	r->isvessel=0;
+	r->isedgeroi=0;
 	r->faceeid=-1;
 
 	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
@@ -1276,24 +1276,19 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 	    
-	    // implicit MMC
+	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
             if(cfg->implicit==1){
-	        // edge-based iMMC  
-	        float r0=r->vesselr[0], r1=r->vesselr[1];
+	        // edge-based iMMC  - ray-cylinder intersection test
+	        float r0=r->roisize[0], r1=r->roisize[1];
 	        r0*=r0;
 	        r1*=r1;
-	      
-	    	if(r->vesselid[0]<0){
-	    	  r->vesselid[0] = 6;
-	    	  r->vesselid[1] = 6;
-                }
-		if(r->vesselid[0]<6){
+
+		if(r0>0.f)
 		  compute_distances_to_edge(r, tracer, ee, 0, distdata0, projdata0, &hitstatus0);
-		}
-		if(r->vesselid[1]<6){
+
+		if(r1>0.f)
 		  compute_distances_to_edge(r, tracer, ee, 1, distdata1, projdata1, &hitstatus1);
-		}
-		
+
 		if((hitstatus0==1 && hitstatus1==1) || (hitstatus0==0 && hitstatus1==0)){
 		  if(fabs(r0-distdata0[0])<fabs(r1-distdata1[0])){
 		    hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
@@ -1313,15 +1308,15 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		}else if(hitstatus1==0){
 		  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
 		}else{
-		  // not hit any vessel in the current element
+		  // not hit any edgeroi in the current element
 		  // then go for node-based iMMC
 		    // hitstatus0==2 && hitstatus1==2
 		    hit=0;
 		    int hitstatusn=2, ih_prev=-1, hitstatusn_prev=-1, ih;
 	            float nr,nr_prev=0;
 		    float3 cc,cc_prev;
-	            for(ih=0;ih<4;ih++){	// check if hits any node vessel
-	                nr = tracer->mesh->nradius[ee[ih]-1];
+	            for(ih=0;ih<4;ih++){	// check if hits any node edgeroi
+	                nr = tracer->mesh->noderoi[ee[ih]-1];
 			if(!nr)
 		            continue;
 
@@ -1348,53 +1343,42 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		    if(ih==4 && ih_prev==-1) {
 		      // all nodes have a radius of zero
 		      r->inout = 0;
-		      r->isvessel = 0;
+		      r->isedgeroi = 0;
 		      curprop = 0;		      
 		    }
 		}
 	    }else if(cfg->implicit==2){
 	    	int noface=0, neweid, newbaseid;
-	    	int *newvid, *newee, fid;
-	    	float *newvr;
+	    	int *newee, fid;
 
-	    	neweid=r->vesselid[0];
-
-	    	if(neweid<0){
-		  // get the reference element when the current element does not have
-		  // labeled face
+                // test if this is a reference element, indicated by a negative radius
+		for(fid=0;fid<4;fid++){
+	    	    if(r->roisize[fid]<0){
+		        // get the reference element when the current element does not have
+		        // labeled face
 	    		noface = 1;
-	    		neweid = -neweid;
+	    		neweid = -r->roisize[fid]; // casting to integer
 	    		r->faceeid = neweid;
 	    		newbaseid=(neweid-1)<<2;
 	    		newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
+			memcpy(r->roisize,(float *)(tracer->mesh->faceroi+(neweid-1)*4),sizeof(float)*4);
+			break;  // currently, can only handle a single reference face
+    		    }
+		}
 
-			newvid = (int *)(tracer->mesh->vessel+(neweid-1)*4);
-			r->vesselid[0] = newvid[0];
-			r->vesselid[1] = newvid[1];
-			r->vesselid[2] = newvid[2];
-			r->vesselid[3] = newvid[3];
-			newvr = (float *)(tracer->mesh->radius+(neweid-1)*4);
-			r->vesselr[0] = newvr[0];
-			r->vesselr[1] = newvr[1];
-			r->vesselr[2] = newvr[2];
-			r->vesselr[3] = newvr[3];
-    		}
-
-
+                // test if the ray intersect with a face ROI (slab)
 	    	for(fid=0;fid<4;fid++){
-	    		if(r->vesselid[fid]==6)
+	    		if(fabs(r->roisize[fid])<EPS)
 	    			continue;
 	    		if(!noface){
 	    			hit = ray_face_intersect(r, tracer, ee, fid, baseid, eid);
-	    		}
-	    		else{
+	    		}else{
 	    			hit = ray_face_intersect(r, tracer, newee, fid, newbaseid, neweid);
 	    		}
 	    		if(hit)
 	    		  break;
 	    	}
 	    }
-
 
             if(curprop==1){
 	    	prop=tracer->mesh->med+cfg->his.maxmedia;
@@ -1404,7 +1388,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	rc=prop->n*R_C0;
 	    }
 
-	    
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
 	    T = _mm_set1_ps(bary.x);
@@ -1643,11 +1626,10 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 RandType *ran, RandType *ran0, visitor *visit){
 
 	int oldeid,fixcount=0,exitdet=0;
-	int *enb, *vid;
-	float *vr;
+	int *enb;
         float mom;
 	float kahany, kahant;
-        ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0,0,0},{0.f,0.f,0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0,0};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0,0,0},{0.f,0.f,0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0,0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1702,28 +1684,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
 
-	if(cfg->implicit==2){
-		init_face_inout(&r, tracer, mesh);
-	}
-	
-	while(1){  /*propagate a photon until exit*/
+	if(cfg->implicit==2)
+	    init_face_inout(&r, tracer);
 
-	    if(cfg->implicit>0){
-                vid = (int *)(mesh->vessel+(r.eid-1)*4);
-	        r.vesselid[0] = vid[0];
-	        r.vesselid[1] = vid[1];
-	        vr = (float *)(mesh->radius+(r.eid-1)*4);
-	        r.vesselr[0] = vr[0];
-	        r.vesselr[1] = vr[1];
-	        if(cfg->implicit==2){
-	    	    r.vesselid[2] = vid[2];
-	     	    r.vesselid[3] = vid[3];
-	     	    r.vesselr[2] = vr[2];
-	     	    r.vesselr[3] = vr[3];
-	        }
-		// printf("photonid=%d, eid=%d, vesselid0=%d, vesselid1=%d, vesselr0=%f, vesselr1=%f\n", r.photonid,r.eid, r.vesselid[0], r.vesselid[1], r.vesselr[0], r.vesselr[1]);
-	    }
-	  
+	while(1){  /*propagate a photon until exit*/
+	    if(cfg->implicit>0)
+                  updateroi(cfg->implicit,&r,tracer->mesh);
+
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
@@ -1737,16 +1704,16 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex,&r.faceeid);
+	    if(cfg->implicit>0 && cfg->isreflect && r.isedgeroi && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    	reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
-	    else if(cfg->implicit>0 && r.isvessel)
+	    else if(cfg->implicit>0 && r.isedgeroi)
 	    	continue;
 	    
 	    /*move a photon until the end of the current scattering path*/
-	    while(r.faceid>=0 && !r.isend && !r.isvessel){
+	    while(r.faceid>=0 && !r.isend && !r.isedgeroi){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
 
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
@@ -1765,7 +1732,6 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		      }
 		    }
 
-		    
 	    	    if(r.eid<=0) break;
 		    /*when a photon enters the domain from the background*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
@@ -1789,20 +1755,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %zu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-		    if(cfg->implicit>0){
-		        vid = (int *)(mesh->vessel+(r.eid-1)*4);
-	     	        r.vesselid[0] = vid[0];
-	     	        r.vesselid[1] = vid[1];
-	     	        vr = (float *)(mesh->radius+(r.eid-1)*4);
-	     	        r.vesselr[0] = vr[0];
-	     	        r.vesselr[1] = vr[1];
-	     	        if(cfg->implicit==2){
-		     	    r.vesselid[2] = vid[2];
-		     	    r.vesselid[3] = vid[3];
-		     	    r.vesselr[2] = vr[2];
-		     	    r.vesselr[3] = vr[3];
-	     	        }
-		    }
+	            if(cfg->implicit>0)
+                        updateroi(cfg->implicit,&r,tracer->mesh);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1867,12 +1821,12 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex,&r.faceeid);
+	    if(cfg->implicit>0 && cfg->isreflect && r.isedgeroi && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    	    reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
-	    else if(cfg->implicit>0 && r.isvessel)
+	    else if(cfg->implicit>0 && r.isedgeroi)
 	    	continue;
 	    
             mom=0.f;
@@ -1923,38 +1877,38 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 }
 
 /**
- * @brief Calculate the reflection/transmission of a ray at the vessel
+ * @brief Calculate the reflection/transmission of a ray at the edgeroi
  *
- * This function handles the reflection and transmission events at the vessel wall
+ * This function handles the reflection and transmission events at the edgeroi wall
  * where the refractive indices mismatch.
  *
  * \param[in] c0: the current direction vector of the ray
  * \param[in] u: the current direction vector of the edge
- * \param[in] ph: hitting position at the vessel
+ * \param[in] ph: hitting position at the edgeroi
  * \param[in] E0: any point on the edge
  * \param[in] tracer: the ray-tracer aux data structure
  * \param[in] eid: the index of the CURRENT element
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex,int *faceeid){
+float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isedgeroi,int *faceindex,int *faceeid){
 
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
 
-	if(isvessel==1){	// hit edge vessel
+	if(isedgeroi==1){	// hit edge edgeroi
 		vec_diff(E0,ph,&EH);
 		tmp0 = vec_dot(&EH,u);
 		vec_mult(u,tmp0,&ut);
 		vec_diff(&ut,&EH,pn);
 		tmp0=1.f/sqrt(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
-	}else if(isvessel==2){	// isvessel==2, hit node vessel
+	}else if(isedgeroi==2){	// isedgeroi==2, hit node edgeroi
 		vec_diff(E0,ph,pn);
 		tmp0=1.f/sqrt(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
-	}else{			// isvessel==3, hit face vessel
+	}else{			// isedgeroi==3, hit face edgeroi
 		int baseid;
 		if(*faceeid<0)
 			baseid = (*eid-1)<<2;
@@ -1973,12 +1927,12 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
         if(*inout){	// out->in
         	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
         	n2 = tracer->mesh->med[cfg->his.maxmedia].n;
-        	if(isvessel==1 || isvessel==2)
+        	if(isedgeroi==1 || isedgeroi==2)
         		vec_mult(pn,-1.f,pn);
         }else{		// in->out
         	n1 = tracer->mesh->med[cfg->his.maxmedia].n;
 		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
-		if(isvessel==3)
+		if(isedgeroi==3)
         		vec_mult(pn,-1.f,pn);
         }
 
@@ -2310,30 +2264,30 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 /**
  * Initialize the 'inout' flag for the face-based implicit MMC
  */
-void init_face_inout(ray *r, raytracer *tracer, tetmesh *mesh){
+void init_face_inout(ray *r, raytracer *tracer){
     float3 pf0,pf1,pv,fnorm,ptemp;
     float distf0,thick;
-    int flocal,eid=r->eid-1;
+    int eid=r->eid-1;
     int baseid = eid<<2;
-    int *vid, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+    int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
     float *vr;
     int index;
 
-    vid = (int *)(mesh->vessel+eid*4);
-    vr = (float *)(mesh->radius+eid*4);
+    vr = (float *)(tracer->mesh->faceroi+eid*4);
 
     for(index=0;index<4;index++){
-        flocal = vid[index];
+        if(vr[index]<=0.f)
+	   continue;
         thick = vr[index];
 
         pf0 = r->p0;		// P0
         vec_mult(&r->vec,r->Lmove,&ptemp);
         vec_add(&r->p0,&ptemp,&ptemp);		// P1
 
-        pf1 = tracer->mesh->node[ee[nc[flocal][0]]-1];	// any point on face
-        fnorm.x=(&(tracer->n[baseid].x))[flocal];		// normal vector of the face
-        fnorm.y=(&(tracer->n[baseid].x))[flocal+4];
-        fnorm.z=(&(tracer->n[baseid].x))[flocal+8];
+        pf1 = tracer->mesh->node[ee[nc[index][0]]-1];	// any point on face
+        fnorm.x=(&(tracer->n[baseid].x))[index];		// normal vector of the face
+        fnorm.y=(&(tracer->n[baseid].x))[index+4];
+        fnorm.z=(&(tracer->n[baseid].x))[index+8];
 
         vec_diff(&pf0,&pf1,&pv);
         distf0 = vec_dot(&pv,&fnorm);
@@ -2410,4 +2364,22 @@ void visitor_clear(visitor* visit){
 	visit->kahanc0=NULL;
 	free(visit->kahanc1);
 	visit->kahanc1=NULL;
+}
+
+void updateroi(int immctype,ray *r, tetmesh *mesh){
+        int i,edcount=0;
+	float *vid;
+	memset(r->roisize,0,size(float)*4);
+	if(immctype==1){
+	    vid = (float *)(mesh->edgeroi+(r->eid-1)*6);
+	    for(i=0;i<6;i++){
+	        if(vid[i]>0.f && edcount<2){
+		    r->edgeroiid[edcount]=i;
+		    r->roisize[edcount]=vid[i];
+		    edcount++;
+		}
+	    }
+        }else{
+	    memcpy(r->roisize,(float *)(mesh->faceroi+(r->eid-1)*4),sizeof(float)*4);
+        }
 }

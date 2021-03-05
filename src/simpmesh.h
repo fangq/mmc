@@ -97,10 +97,10 @@ typedef struct MMC_mesh{
 	int elemlen;           /**< number of nodes per element */
 	float3 *node;          /**< node coordinates */
 	int  *elem;            /**< element indices */
-	int  *elem2;            /**< element indices */
-        int  *vessel;	       /**< local vessel indices */
-	float *radius;         /**< vessel radius */
-	float *nradius;	       /**< node radius */
+	int  *elem2;           /**< element indices */
+	float *edgeroi;	       /**< immc: vessel edge radii */
+	float *faceroi;        /**< immc: face thicknesses */
+	float *noderoi;	       /**< immc: node radius */
 	int  *srcelem;	       /**< candidate list of elements containing the source*/
 	int  srcelemlen;       /**< length of the elements that may contain the source*/
 	int  *detelem;	       /**< candidate list of elements containing a widefield detector*/

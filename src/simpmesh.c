@@ -95,9 +95,9 @@ void mesh_init(tetmesh *mesh){
 	mesh->node=NULL;
 	mesh->elem=NULL;
 	mesh->elem2=NULL;
-	mesh->vessel=NULL;
-	mesh->radius=NULL;
-	mesh->nradius=NULL;
+	mesh->edgeroi=NULL;
+	mesh->faceroi=NULL;
+	mesh->noderoi=NULL;
 	mesh->srcelemlen=0;
 	mesh->srcelem=NULL;
 	mesh->detelemlen=0;
@@ -574,6 +574,18 @@ void mesh_clear(tetmesh *mesh){
 	if(mesh->detelem){
 		free(mesh->detelem);
 		mesh->detelem=NULL;
+	}
+	if(mesh->noderoi){
+		free(mesh->noderoi);
+		mesh->noderoi=NULL;
+	}
+	if(mesh->edgeroi){
+		free(mesh->edgeroi);
+		mesh->edgeroi=NULL;
+	}
+	if(mesh->faceroi){
+		free(mesh->faceroi);
+		mesh->faceroi=NULL;
 	}
 }
 
