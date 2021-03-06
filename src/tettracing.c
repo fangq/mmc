@@ -1135,24 +1135,22 @@ float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr,
 /**
  * Compute the next step length for the face-based iMMC
  */
-float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid){
+float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int baseid, int eid){
 	float3 pf0,pf1,pv,fnorm,ptemp;
 	float distf0,distf1,thick,lm=0;
-	int flocal;
 	// float3 tempp1, tempp2;
 
-	flocal = index;
-	r->faceindex = flocal;
-	thick = r->roisize[index];
+	r->faceindex = faceid;
+	thick = r->roisize[faceid];
 
 	pf0 = r->p0;		// P0: pf0
 	vec_mult(&r->vec,r->Lmove,&ptemp);
 	vec_add(&r->p0,&ptemp,&ptemp);		// P1: ptemp
 
-	pf1 = tracer->mesh->node[ee[nc[flocal][0]]-1];	// any point on face
-    	fnorm.x=(&(tracer->n[baseid].x))[flocal];		// normal vector of the face
-	fnorm.y=(&(tracer->n[baseid].x))[flocal+4];
-	fnorm.z=(&(tracer->n[baseid].x))[flocal+8];
+	pf1 = tracer->mesh->node[ee[nc[ifaceorder[faceid]][0]]-1];	// any point on face
+    	fnorm.x=(&(tracer->n[baseid].x))[faceid];		// normal vector of the face
+	fnorm.y=(&(tracer->n[baseid].x))[faceid+4];
+	fnorm.z=(&(tracer->n[baseid].x))[faceid+8];
 
 	vec_diff(&pf0,&pf1,&pv);
 	distf0 = vec_dot(&pv,&fnorm);
@@ -1257,7 +1255,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    int hit=0, curprop=-1;
 	    float mus;
 	    if(cfg->implicit>0 && r->inout){
-	    	prop=tracer->mesh->med+cfg->his.maxmedia;
+	    	prop=tracer->mesh->med+tracer->mesh->prop;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    }
@@ -1278,36 +1276,39 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
             if(cfg->implicit==1){
-	        // edge-based iMMC  - ray-cylinder intersection test
-	        float r0=r->roisize[0], r1=r->roisize[1];
-	        r0*=r0;
-	        r1*=r1;
+		  if(tracer->mesh->edgeroi){
+			// edge-based iMMC  - ray-cylinder intersection test
+			float r0=r->roisize[0], r1=r->roisize[1];
+			r0*=r0;
+			r1*=r1;
 
-		if(r0>0.f)
-		  compute_distances_to_edge(r, tracer, ee, 0, distdata0, projdata0, &hitstatus0);
+			if(r0>0.f)
+			  compute_distances_to_edge(r, tracer, ee, 0, distdata0, projdata0, &hitstatus0);
 
-		if(r1>0.f)
-		  compute_distances_to_edge(r, tracer, ee, 1, distdata1, projdata1, &hitstatus1);
+			if(r1>0.f)
+			  compute_distances_to_edge(r, tracer, ee, 1, distdata1, projdata1, &hitstatus1);
 
-		if((hitstatus0==1 && hitstatus1==1) || (hitstatus0==0 && hitstatus1==0)){
-		  if(fabs(r0-distdata0[0])<fabs(r1-distdata1[0])){
-		    hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-		  }else{
-		    hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
+			if((hitstatus0==1 && hitstatus1==1) || (hitstatus0==0 && hitstatus1==0)){
+			  if(fabs(r0-distdata0[0])<fabs(r1-distdata1[0])){
+			    hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
+			  }else{
+			    hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
+			  }
+			}else if(hitstatus0==3){
+			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
+			}else if(hitstatus1==3){
+			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
+			}else if(hitstatus0==1){
+			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
+			}else if(hitstatus1==1){
+			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
+			}else if(hitstatus0==0){
+			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
+			}else if(hitstatus1==0){
+			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
+			}
 		  }
-		}else if(hitstatus0==3){
-		  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-		}else if(hitstatus1==3){
-		  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-		}else if(hitstatus0==1){
-		  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-		}else if(hitstatus1==1){
-		  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-		}else if(hitstatus0==0){
-		  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-		}else if(hitstatus1==0){
-		  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-		}else{
+		  if(hitstatus0==2 && hitstatus1==2 && tracer->mesh->noderoi){
 		  // not hit any edgeroi in the current element
 		  // then go for node-based iMMC
 		    // hitstatus0==2 && hitstatus1==2
@@ -1317,7 +1318,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		    float3 cc,cc_prev;
 	            for(ih=0;ih<4;ih++){	// check if hits any node edgeroi
 	                nr = tracer->mesh->noderoi[ee[ih]-1];
-			if(!nr)
+			if(fabs(nr)<EPS)
 		            continue;
 
 			compute_distances_to_node(r, tracer, ee, ih, nr, &hitstatusn, &cc);
@@ -1353,7 +1354,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
                 // test if this is a reference element, indicated by a negative radius
 		for(fid=0;fid<4;fid++){
-	    	    if(r->roisize[fid]<0){
+	    	    if(r->roisize[fid]<0.f){
 		        // get the reference element when the current element does not have
 		        // labeled face
 	    		noface = 1;
@@ -2284,7 +2285,7 @@ void init_face_inout(ray *r, raytracer *tracer){
         vec_mult(&r->vec,r->Lmove,&ptemp);
         vec_add(&r->p0,&ptemp,&ptemp);		// P1
 
-        pf1 = tracer->mesh->node[ee[nc[index][0]]-1];	// any point on face
+        pf1 = tracer->mesh->node[ee[nc[ifaceorder[index]][0]]-1];	// any point on face
         fnorm.x=(&(tracer->n[baseid].x))[index];		// normal vector of the face
         fnorm.y=(&(tracer->n[baseid].x))[index+4];
         fnorm.z=(&(tracer->n[baseid].x))[index+8];
@@ -2369,8 +2370,8 @@ void visitor_clear(visitor* visit){
 void updateroi(int immctype,ray *r, tetmesh *mesh){
         int i,edcount=0;
 	float *vid;
-	memset(r->roisize,0,sizeof(float)*4);
-	if(immctype==1){
+	if(immctype==1 && mesh->edgeroi){
+	    memset(r->roisize,0,sizeof(float)*4);
 	    vid = (float *)(mesh->edgeroi+(r->eid-1)*6);
 	    for(i=0;i<6;i++){
 	        if(vid[i]>0.f && edcount<2){
@@ -2379,7 +2380,7 @@ void updateroi(int immctype,ray *r, tetmesh *mesh){
 		    edcount++;
 		}
 	    }
-        }else{
+        }else if(mesh->faceroi){
 	    memcpy(r->roisize,(float *)(mesh->faceroi+(r->eid-1)*4),sizeof(float)*4);
-        }
+       }
 }

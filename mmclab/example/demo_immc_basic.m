@@ -36,20 +36,23 @@ EPS=0.001;
 nbox=[nbox; [1-EPS 0.5 0.5]; [EPS 0.5 0.5]];  % insert new nodes (node 9 and 10)
 fbox=[fbox; [9 9 10]];  % insert new edge coneected by node 9 and 10
 
-clear cfg
+clear cfg0 cfg;
 
-cfg.nphoton=1e6;
-cfg.srcpos=[0.5 0.5 1];
-cfg.srcdir=[0 0 -1];
-cfg.prop=[0 0 1 1;0.0458 35.6541 0.9000 1.3700; 23.0543 9.3985 0.9000 1.3700];
-cfg.tstart=0;
-cfg.tend=5e-9;
-cfg.tstep=5e-9;
-cfg.debuglevel='TP';
-cfg.method='grid';
-cfg.steps=[0.01 0.01 0.01];
-cfg.isreflect=1;
-cfg.gpuid=-1;
+cfg0.nphoton=1e6;
+cfg0.srcpos=[0.5 0.5 1];
+cfg0.srcdir=[0 0 -1];
+cfg0.prop=[0 0 1 1;0.0458 35.6541 0.9000 1.3700; 23.0543 9.3985 0.9000 1.3700];
+cfg0.tstart=0;
+cfg0.tend=5e-9;
+cfg0.tstep=5e-9;
+cfg0.debuglevel='TP';
+cfg0.method='grid';
+cfg0.steps=[0.01 0.01 0.01];
+cfg0.isreflect=1;
+cfg0.gpuid=-1;
+
+
+cfg=cfg0;
 
 % (b) generate mesh
 [cfg.node,cfg.elem]=s2m(nbox,num2cell(fbox,2),1,100,'tetgen1.5',[],[],'-YY');
@@ -78,11 +81,13 @@ flux_eimmc=mmclab(cfg);
 fbox=volface(ebox);
 nbox=[nbox; [0.5 0.5 0.5]];  % insert new nodes (node 9)
 
+cfg=cfg0;
+
 % (b) generate mesh
 [cfg.node,cfg.elem]=s2m(nbox,num2cell(fbox,2),1,100,'tetgen1.5',[],[],'-YY');
+cfg.elemprop=ones(size(cfg.elem,1),1);
 
 % (c) label the edge that has node 9 and 10 and add radii
-
 cfg.noderoi=zeros(size(cfg.node,1),1);
 cfg.noderoi(9)=0.1;
 
@@ -92,17 +97,23 @@ flux_nimmc=mmclab(cfg);
 
 %% face-based iMMC, benchmark B3
 
+cfg=cfg0;
+
 % (a) generate bounding box and insert edge
 [cfg.node,cfg.elem]=meshgrid6(0:1,0:1,0:1);
-fbox=volface(cfg.elem);
+cfg.elemprop=ones(size(cfg.elem,1),1);
 
-elem_fimmc=[ebox 6*ones(size(ebox)) zeros(size(ebox))];
-elem_fimmc([3 4 5 6],5)=[-4 1 -6 1];
-elem_fimmc([3 4 5 6],9)=[0.1 0.1 0.1 0.1];
-node_fimmc=[nbox zeros(size(nbox,1),1)];
+% generate all triangular faces, label the top two triangles at z=1 as
+% faceroi and define a h=0.1mm thin-membrane
+facelist=nchoosek(1:4,3);
+allfaces=[];
+for i=1:length(facelist)
+   allfaces=[allfaces;cfg.elem(:,facelist(i,:))];
+end
 
-cfg.node=node_fimmc;
-cfg.elem=elem_fimmc;
+% sum(allfaces>4,2)==3 gives the triangles that are made of nodes 5/6/7/8
+cfg.faceroi=reshape(double(sum(allfaces>4,2)==3), size(cfg.elem,1),size(facelist,1));
+cfg.faceroi(cfg.faceroi>0)=0.1;
 
 % run node-based iMMC
 flux_fimmc=mmclab(cfg);
