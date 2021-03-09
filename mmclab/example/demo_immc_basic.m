@@ -17,8 +17,8 @@
 %
 %% face-based iMMC (f-iMMC)
 %
-% cfg.faceroi - a 4 column array, storing the slab-thickness of face-roi in the following order
-%               [(4,1,2), (4,2,3), (3,1,4),(2,1,3)]. A 0 indicates no ROI.
+% cfg.faceroi - a 4 column array, storing the slab-thickness of face-roi in the nchoosek order
+%               [(1,2,3),(1,2,4),(1,3,4),(2,3,4)]. A 0 indicates no ROI.
 
 %% add path
 % 1. you need to add the path to iso2mesh toolbox if not already
