@@ -1147,10 +1147,11 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 	vec_mult(&r->vec,r->Lmove,&ptemp);
 	vec_add(&r->p0,&ptemp,&ptemp);		// P1: ptemp
 
-	pf1 = tracer->mesh->node[ee[nc[ifaceorder[faceid]][0]]-1];	// any point on face
-    	fnorm.x=(&(tracer->n[baseid].x))[faceid];		// normal vector of the face
-	fnorm.y=(&(tracer->n[baseid].x))[faceid+4];
-	fnorm.z=(&(tracer->n[baseid].x))[faceid+8];
+	int ncindex = ifaceorder[faceid];
+	pf1 = tracer->mesh->node[ee[nc[ncindex][0]]-1];	// any point on face
+    	fnorm.x=(&(tracer->n[baseid].x))[ncindex];		// normal vector of the face
+	fnorm.y=(&(tracer->n[baseid].x))[ncindex+4];
+	fnorm.z=(&(tracer->n[baseid].x))[ncindex+8];
 
 	vec_diff(&pf0,&pf1,&pv);
 	distf0 = vec_dot(&pv,&fnorm);
@@ -2285,11 +2286,11 @@ void init_face_inout(ray *r, raytracer *tracer){
         vec_mult(&r->vec,r->Lmove,&ptemp);
         vec_add(&r->p0,&ptemp,&ptemp);		// P1
 
-        pf1 = tracer->mesh->node[ee[nc[ifaceorder[index]][0]]-1];	// any point on face
-        fnorm.x=(&(tracer->n[baseid].x))[index];		// normal vector of the face
-        fnorm.y=(&(tracer->n[baseid].x))[index+4];
-        fnorm.z=(&(tracer->n[baseid].x))[index+8];
-
+	int ncindex = ifaceorder[index];
+        pf1 = tracer->mesh->node[ee[nc[ncindex][1]]-1];	// any point on face
+        fnorm.x=(&(tracer->n[baseid].x))[ncindex];		// normal vector of the face
+        fnorm.y=(&(tracer->n[baseid].x))[ncindex+4];
+        fnorm.z=(&(tracer->n[baseid].x))[ncindex+8];
         vec_diff(&pf0,&pf1,&pv);
         distf0 = vec_dot(&pv,&fnorm);
 
