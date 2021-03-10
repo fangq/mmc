@@ -905,7 +905,7 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
  * and the distance between P1 and the labeled edge.
  * P0 is the entry point and P1 is the exit point
  */
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, int* hitstatus){
+void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, TRayHitType* hitstatus){
         float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
 	float norm, normr, st, DIS0, DIS1;
 	int en0, en1;
@@ -947,19 +947,19 @@ void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, fl
 	rt2 = rt*rt;
 	if(DIS0>rt2+EPS2 && DIS1<rt2-EPS2){
 	  // hit, out->in
-	  *hitstatus = 0;
+	  *hitstatus = htOutIn;
 	}else if(DIS0<rt2-EPS2 && DIS1>rt2+EPS2){
 	  // hit, in->out
-	  *hitstatus = 1;
+	  *hitstatus = htInOut;
 	}else if(DIS1>rt2+EPS2){
 	  // out
-	  *hitstatus = 2;
+	  *hitstatus = htNoHitOut;
 	}else if(DIS1<rt2-EPS2){
 	  // in
-	  *hitstatus = 3;
+	  *hitstatus = htNoHitIn;
 	} else {
 	  // inside error margin
-	  *hitstatus = 4;
+	  *hitstatus = htNone;
 	}
 }
 
@@ -1012,7 +1012,7 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 		ph1[1] = ya-yb;
 		Dp = dist2d2(pt0,pt1);
 		if(DIS0>rt && DIS1<rt){		// out->in
-			r->inout = 1;
+			r->inroi = 1;
 			*curprop = 0;
 			Lratio = dist2d2(pt0,ph1);
 			if(Dp>Lratio){
@@ -1022,7 +1022,7 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 				Lratio = sqrtf(Lratio/Dp);
 			}
 		}else{	// DIS0<rt && DIS1>rt, in->out
-			r->inout = 0;
+			r->inroi = 0;
 			*curprop = 1;
 			Lratio = dist2d2(pt1,ph1);
 			if(Dp>Lratio){
@@ -1036,11 +1036,11 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 		return 1;
 	}
 	else if(hitstatus == 2){  // outside
-		r->inout = 0;
+		r->inroi = 0;
 		r->isedgeroi = 0;
 		*curprop = 0;
 	}else if(hitstatus == 3){  // inside
-		r->inout = 1;
+		r->inroi = 1;
 		r->isedgeroi = 0;
 		*curprop = 1;
 	}else{
@@ -1107,22 +1107,22 @@ float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr,
 		d1 = -temp1+temp2;
 		d2 = -temp1-temp2;
 		if(hitstatus == 0){ // out->in
-			r->inout = 1;
+			r->inroi = 1;
 			*curprop = 0;
 			r->Lmove = (d1<d2) ? d1 : d2;
 		}else{				// in->out
-			r->inout = 0;
+			r->inroi = 0;
 			*curprop = 1;
 			r->Lmove = (d1>d2) ? d1 : d2;
 		}
 		return 1;
 	}
         else if(hitstatus == 2){  // outside
-		r->inout = 0;
+		r->inroi = 0;
 		r->isedgeroi = 0;
 		*curprop = 0;
 	}else if(hitstatus == 3){  // inside
-		r->inout = 1;
+		r->inroi = 1;
 		r->isedgeroi = 0;
 		*curprop = 1;
 	}else{
@@ -1160,20 +1160,20 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 
 	if(distf0>thick+EPS2 && distf1<thick-EPS2){	// hit: out->in
 		r->isedgeroi = 3;
-		r->inout = 1;
+		r->inroi = 1;
 		lm = 1-(thick-distf1)/(distf0-distf1);
 		r->Lmove = r->Lmove*lm;
 		return 1;
 	}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// hit: in->out
 		r->isedgeroi = 3;
-		r->inout = 0;
+		r->inroi = 0;
 		lm = (thick-distf0)/(distf1-distf0);
 		r->Lmove = r->Lmove*lm;
 		return 1;
 	}else if((distf0<=thick && distf1>=thick) || (distf0>thick && distf1>thick)){
-		r->inout = 0;
+		r->inroi = 0;
 	}else if((distf0>=thick && distf1<=thick) || (distf0<thick && distf1<thick)){
-		r->inout = 1;
+		r->inroi = 1;
 	}else{
 
 	}
@@ -1197,9 +1197,9 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
-  float3 bary={1e10f,0.f,0.f,0.f},projdata0[2],projdata1[2];
-	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f,distdata0[2],distdata1[2];
-	int tshift,faceidx=-1,baseid,eid,hitstatus0=2,hitstatus1=2;
+        float3 bary={1e10f,0.f,0.f,0.f};
+	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
+	int tshift,faceidx=-1,baseid,eid;
 	__m128 O,T,S;
 	__m128i P;
 
@@ -1254,7 +1254,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	    int hit=0, curprop=-1;
 	    float mus;
-	    if(cfg->implicit>0 && r->inout){
+	    if(cfg->implicit>0 && r->inroi){
 	    	prop=tracer->mesh->med+tracer->mesh->prop;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
@@ -1276,17 +1276,19 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
             if(cfg->implicit==1){
+	          TRayHitType hitstatus[2]={htNone,htNone};
+		  float distdata[2][2]={0.f};
+		  float3 projdata[2][2];
 		  if(tracer->mesh->edgeroi){
 			// edge-based iMMC  - ray-cylinder intersection test
-			float r0=r->roisize[0], r1=r->roisize[1];
-			r0*=r0;
-			r1*=r1;
-
-			if(r0>0.f)
-			  compute_distances_to_edge(r, tracer, ee, 0, distdata0, projdata0, &hitstatus0);
-
-			if(r1>0.f)
-			  compute_distances_to_edge(r, tracer, ee, 1, distdata1, projdata1, &hitstatus1);
+			int i, count=0;
+			float redge[2]={0.f,0.f};
+			for(i=0;i<4;i++){
+				if(r->roisize[i]>0.f){
+				    redge[count]=r->roisize[i]*r->roisize[i];
+				    compute_distances_to_edge(r, tracer, ee, count++, distdata[i], projdata[i], hitstatus+i);
+				}
+			}
 
 			if((hitstatus0==1 && hitstatus1==1) || (hitstatus0==0 && hitstatus1==0)){
 			  if(fabs(r0-distdata0[0])<fabs(r1-distdata1[0])){
@@ -1294,24 +1296,23 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			  }else{
 			    hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
 			  }
-			}else if(hitstatus0==3){
+			}else if(hitstatus0==htNoHitIn){
 			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			}else if(hitstatus1==3){
+			}else if(hitstatus1==htNoHitIn){
 			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-			}else if(hitstatus0==1){
+			}else if(hitstatus0==htInOut){
 			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			}else if(hitstatus1==1){
+			}else if(hitstatus1==hInOut){
 			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-			}else if(hitstatus0==0){
+			}else if(hitstatus0==htOutIn){
 			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			}else if(hitstatus1==0){
+			}else if(hitstatus1==htOutIn){
 			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
 			}
 		  }
-		  if(hitstatus0==2 && hitstatus1==2 && tracer->mesh->noderoi){
+		  if(hitstatus0==htNone && hitstatus1==htNone && tracer->mesh->noderoi){
 		  // not hit any edgeroi in the current element
 		  // then go for node-based iMMC
-		    // hitstatus0==2 && hitstatus1==2
 		    hit=0;
 		    int hitstatusn=2, ih_prev=-1, hitstatusn_prev=-1, ih;
 	            float nr,nr_prev=0;
@@ -1343,7 +1344,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		    }
 		    if(ih==4 && ih_prev==-1) {
 		      // all nodes have a radius of zero
-		      r->inout = 0;
+		      r->inroi = 0;
 		      r->isedgeroi = 0;
 		      curprop = 0;		      
 		    }
@@ -1402,11 +1403,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
             if(cfg->mcmethod==mmMCX){
-// #ifdef __INTEL_COMPILER
+#ifdef __INTEL_COMPILER
 	       totalloss=expf(-prop->mua*r->Lmove);
-// #else
-//	       totalloss=fast_expf9(-prop->mua*r->Lmove);
-// #endif
+#else
+	       totalloss=fast_expf9(-prop->mua*r->Lmove);
+#endif
                r->weight*=totalloss;
             }
 	    totalloss=1.f-totalloss;
@@ -1706,7 +1707,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 
 	    if(cfg->implicit>0 && cfg->isreflect && r.isedgeroi && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
+	    	reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1723,13 +1724,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 		    if(cfg->implicit>0){
 		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
-			if(! (!r.inout && r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
-			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inout);
+			if(! (!r.inroi && r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
+			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inroi);
 		    }
 		    }else{
 		      if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
 			if(! (r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
-			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inout);
+			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inroi);
 		      }
 		    }
 
@@ -1823,7 +1824,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 
 	    if(cfg->implicit>0 && cfg->isreflect && r.isedgeroi && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
+	    	    reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1892,7 +1893,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isedgeroi,int *faceindex,int *faceeid){
+float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inroi,RandType *ran,int isedgeroi,int *faceindex,int *faceeid){
 
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
@@ -1925,7 +1926,7 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
 	// /*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-        if(*inout){	// out->in
+        if(*inroi){	// out->in
         	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
         	n2 = tracer->mesh->med[cfg->his.maxmedia].n;
         	if(isedgeroi==1 || isedgeroi==2)
@@ -1951,7 +1952,7 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
 	  // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
-              *inout = !(*inout);
+              *inroi = !(*inroi);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	  }else if(cfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
@@ -1961,7 +1962,7 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
 	  }
        }else{ /*total internal reflection*/
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
-          *inout = !(*inout);
+          *inroi = !(*inroi);
        }
        tmp0=1.f/sqrt(vec_dot(c0,c0));
        vec_mult(c0,tmp0,c0);
@@ -1983,7 +1984,7 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout){
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inroi){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -2005,7 +2006,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-	if(cfg->implicit>0 && inout!=0){
+	if(cfg->implicit>0 && inroi!=0){
 	    n1=tracer->mesh->med[cfg->his.maxmedia].n;
             n2 = n1;
 	}else{
@@ -2063,7 +2064,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
         float3 origin={r->p0.x,r->p0.y,r->p0.z};
 
 	r->slen=rand_next_scatlen(ran);
-	r->inout = 0;
+	r->inroi = 0;
 	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
 		if(r->eid>0)
 		      return;
@@ -2263,7 +2264,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 
 
 /**
- * Initialize the 'inout' flag for the face-based implicit MMC
+ * Initialize the 'inroi' flag for the face-based implicit MMC
  */
 void init_face_inout(ray *r, raytracer *tracer){
     float3 pf0,pf1,pv,fnorm,ptemp;
@@ -2294,7 +2295,7 @@ void init_face_inout(ray *r, raytracer *tracer){
         distf0 = vec_dot(&pv,&fnorm);
 
         if(distf0<thick){
-                r->inout = 1;
+                r->inroi = 1;
 	        break;
         }
     }

@@ -129,5 +129,5 @@ subplot(132)
 imagesc(log10(rot90(squeeze(flux_nimmc.data(50,1:100,1:100)))))
 title('node-iMMC');axis equal
 subplot(133)
-imagesc(log10(rot90(squeeze(flux_fimmc.data(50,1:100,1:100)))))
+imagesc(log10(rot90(squeeze(abs(flux_fimmc.data(50,1:100,1:100))))))
 title('face-iMMC');axis equal

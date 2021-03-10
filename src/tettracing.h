@@ -75,7 +75,7 @@ typedef struct MMC_ray{
         int edgeroiid[4];	      /**< local edge id for edgerois */
 	float roisize[4];	      /**< edgeroi radius corresponding to edgeroiid */
 	int isedgeroi;		      /**< if 1, the photon hits the edgeroi; if 2, the photon hits the node edgeroi; if 0, does not hit edgeroi */
-	int inout;		      /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
+	int inroi;		      /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
 	float3 u;		      /**< edgeroi edge direction */
 	float3 E;		      /**< the starting node of edgeroi edge */
 	int faceindex;		      /**< local face index that the photon intersect with*/
@@ -106,7 +106,7 @@ typedef struct MMC_visitor{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, int* hitstatus);
+void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, TRayHitType* hitstatus);
 void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out);
 float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, float3* projdata, int hitstatus);
 float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr, int hitstatus);
@@ -117,8 +117,8 @@ void fixphoton(float3 *p,float3 *nodes, int *ee);
 void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 void init_face_inout(ray *r, raytracer *tracer);
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout);
-float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isedgeroi,int *faceindex,int *faceeid);
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inroi);
+float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inroi,RandType *ran,int isedgeroi,int *faceindex,int *faceeid);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void visitor_init(mcconfig *cfg, visitor* visit);
