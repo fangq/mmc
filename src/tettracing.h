@@ -106,10 +106,10 @@ typedef struct MMC_visitor{
 extern "C" {
 #endif
 void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float* distdata, float3* projdata, int* hitstatus);
-void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out);
-float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, float3* projdata, int hitstatus);
-float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr, int hitstatus);
-float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid);
+void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, float3* cc_out, int* hitstatus);
+float ray_cylinder_intersect(ray *r, int index, float* distdata, float3* projdata, int hitstatus);
+float ray_sphere_intersect(ray *r, int index, float3 cc, float nr, int hitstatus);
+float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid,int *hitstatus);
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
