@@ -72,8 +72,7 @@ typedef struct MMC_ray{
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 	unsigned int oldidx;
 	double oldweight;
-        int edgeroiid[4];	      /**< local edge id for edgerois */
-	float roisize[4];	      /**< edgeroi radius corresponding to edgeroiid */
+	float *roisize;	              /**< roisize, node/edge radii or face thickness */
 	int isedgeroi;		      /**< if 1, the photon hits the edgeroi; if 2, the photon hits the node edgeroi; if 0, does not hit edgeroi */
 	int inroi;		      /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
 	float3 u;		      /**< edgeroi edge direction */
@@ -106,7 +105,7 @@ typedef struct MMC_visitor{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, TRayHitType* hitstatus);
+void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float* distdata, float3* projdata, int* hitstatus);
 void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out);
 float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, float3* projdata, int hitstatus);
 float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr, int hitstatus);

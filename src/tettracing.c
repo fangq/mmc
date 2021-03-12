@@ -905,13 +905,13 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
  * and the distance between P1 and the labeled edge.
  * P0 is the entry point and P1 is the exit point
  */
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, TRayHitType* hitstatus){
+void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float* distdata, float3* projdata, int* hitstatus){
         float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
 	float norm, normr, st, DIS0, DIS1;
 	int en0, en1;
 
-	en0 = ee[e2n[r->edgeroiid[index]][0]]-1;
-	en1 = ee[e2n[r->edgeroiid[index]][1]]-1;
+	en0 = ee[e2n[edgeid][0]]-1;
+	en1 = ee[e2n[edgeid][1]]-1;
 	E0 = tracer->mesh->node[en0];
 	E1 = tracer->mesh->node[en1];
 
@@ -937,13 +937,13 @@ void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, fl
 	vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
 	DIS1 = vec_dot(&PP1,&PP1);
 
-	distdata[0] = DIS0;
+	distdata[0] = DIS0; // squared distance from origin to
 	distdata[1] = DIS1;
         projdata[0] = PP0;
 	projdata[1] = PP1;
 	
 	float rt, rt2;
-	rt = r->roisize[index];
+	rt = r->roisize[edgeid];
 	rt2 = rt*rt;
 	if(DIS0>rt2+EPS2 && DIS1<rt2-EPS2){
 	  // hit, out->in
@@ -981,7 +981,7 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 	rt = r->roisize[index];
 	rt2 = rt*rt;
 	// accurate intersection computation
-	if(hitstatus == 0 || hitstatus == 1){ 	// hit edgeroi out->in or in->out
+	if(hitstatus == htOutIn || hitstatus == htInOut){ 	// hit edgeroi out->in or in->out
 		r->isedgeroi = 1;
 
 		DIS0 = sqrtf(DIS0);
@@ -1026,20 +1026,19 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 			*curprop = 1;
 			Lratio = dist2d2(pt1,ph1);
 			if(Dp>Lratio){
-				Lratio = 1-sqrtf(Lratio/Dp);
+				Lratio = 1.f-sqrtf(Lratio/Dp);
 			}else{
 				Lratio = dist2d2(pt1,ph0);
-				Lratio = 1-sqrtf(Lratio/Dp);
+				Lratio = 1.f-sqrtf(Lratio/Dp);
 			}
 		}
-		r->Lmove = r->Lmove*Lratio;
-		return 1;
+		return Lratio;
 	}
-	else if(hitstatus == 2){  // outside
+	else if(hitstatus == htNoHitOut){  // outside
 		r->inroi = 0;
 		r->isedgeroi = 0;
 		*curprop = 0;
-	}else if(hitstatus == 3){  // inside
+	}else if(hitstatus == htNoHitIn){  // inside
 		r->inroi = 1;
 		r->isedgeroi = 0;
 		*curprop = 1;
@@ -1047,8 +1046,7 @@ float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, f
 		r->isedgeroi = 0;
 		*curprop = 0;
 	}
-
-	return 0;
+	return 1.f;
 }
 
 /**
@@ -1071,19 +1069,19 @@ void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, fl
 
 	if(npdist0>nr2+EPS2 && npdist1<nr2-EPS2) {
 	  // hit, out->in
-	  *hitstatus = 0;
+	  *hitstatus = htOutIn;
 	}else if(npdist0<nr2-EPS2 && npdist1>nr2+EPS2) {
 	  // hit, in->out
-	  *hitstatus = 1;
+	  *hitstatus = htInOut;
 	}else if(npdist1>nr2+EPS2){
 	  // out
-	  *hitstatus = 2;
+	  *hitstatus = htNoHitOut;
 	}else if(npdist1<nr2-EPS2){
 	  // in
-	  *hitstatus = 3;
+	  *hitstatus = htNoHitIn;
 	}else{
 	  // inside error margin
-	  *hitstatus = 4;
+	  *hitstatus = htNone;
 	}
 }
 
@@ -1276,41 +1274,27 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
             if(cfg->implicit==1){
-	          TRayHitType hitstatus[2]={htNone,htNone};
-		  float distdata[2][2]={0.f};
-		  float3 projdata[2][2];
+	          int hitstatus=htNone;
+		  float distdata[2], minlratio=1.f;
+		  float3 projdata[2];
 		  if(tracer->mesh->edgeroi){
 			// edge-based iMMC  - ray-cylinder intersection test
-			int i, count=0;
-			float redge[2]={0.f,0.f};
-			for(i=0;i<4;i++){
+			int i;
+			float lratio;
+			for(i=0;i<6;i++){
 				if(r->roisize[i]>0.f){
-				    redge[count]=r->roisize[i]*r->roisize[i];
-				    compute_distances_to_edge(r, tracer, ee, count++, distdata[i], projdata[i], hitstatus+i);
+				    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
+				    if(hitstatus==htInOut || hitstatus==htOutIn){
+				        lratio=ray_cylinder_intersect(r, i, &curprop, distdata, projdata, hitstatus);
+					if(lratio<minlratio)
+					   minlratio=lratio;
+				    }
 				}
 			}
-
-			if((hitstatus0==1 && hitstatus1==1) || (hitstatus0==0 && hitstatus1==0)){
-			  if(fabs(r0-distdata0[0])<fabs(r1-distdata1[0])){
-			    hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			  }else{
-			    hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-			  }
-			}else if(hitstatus0==htNoHitIn){
-			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			}else if(hitstatus1==htNoHitIn){
-			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-			}else if(hitstatus0==htInOut){
-			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			}else if(hitstatus1==hInOut){
-			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-			}else if(hitstatus0==htOutIn){
-			  hit = ray_cylinder_intersect(r, 0, &curprop, distdata0, projdata0, hitstatus0);
-			}else if(hitstatus1==htOutIn){
-			  hit = ray_cylinder_intersect(r, 1, &curprop, distdata1, projdata1, hitstatus1);
-			}
+			if(minlratio<1.f)
+			    r->Lmove*=minlratio;
 		  }
-		  if(hitstatus0==htNone && hitstatus1==htNone && tracer->mesh->noderoi){
+		  if(minlratio==1.f && tracer->mesh->noderoi){
 		  // not hit any edgeroi in the current element
 		  // then go for node-based iMMC
 		    hit=0;
@@ -1363,7 +1347,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    		r->faceeid = neweid;
 	    		newbaseid=(neweid-1)<<2;
 	    		newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
-			memcpy(r->roisize,(float *)(tracer->mesh->faceroi+(neweid-1)*4),sizeof(float)*4);
+			r->roisize=(float *)(tracer->mesh->faceroi+(neweid-1)*4);
 			break;  // currently, can only handle a single reference face
     		    }
 		}
@@ -1403,11 +1387,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
             if(cfg->mcmethod==mmMCX){
-#ifdef __INTEL_COMPILER
+//#ifdef __INTEL_COMPILER
 	       totalloss=expf(-prop->mua*r->Lmove);
-#else
-	       totalloss=fast_expf9(-prop->mua*r->Lmove);
-#endif
+//#else
+//	       totalloss=fast_expf9(-prop->mua*r->Lmove);
+//#endif
                r->weight*=totalloss;
             }
 	    totalloss=1.f-totalloss;
@@ -1631,7 +1615,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0,0,0},{0.f,0.f,0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0,0};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,NULL,0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0,0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -2369,19 +2353,9 @@ void visitor_clear(visitor* visit){
 }
 
 void updateroi(int immctype,ray *r, tetmesh *mesh){
-        int i,edcount=0;
-	float *vid;
 	if(immctype==1 && mesh->edgeroi){
-	    memset(r->roisize,0,sizeof(float)*4);
-	    vid = (float *)(mesh->edgeroi+(r->eid-1)*6);
-	    for(i=0;i<6;i++){
-	        if(vid[i]>0.f && edcount<2){
-		    r->edgeroiid[edcount]=i;
-		    r->roisize[edcount]=vid[i];
-		    edcount++;
-		}
-	    }
+	    r->roisize=(float *)(mesh->edgeroi+(r->eid-1)*6);
         }else if(mesh->faceroi){
-	    memcpy(r->roisize,(float *)(mesh->faceroi+(r->eid-1)*4),sizeof(float)*4);
+	    r->roisize=(float *)(mesh->faceroi+(r->eid-1)*4);
        }
 }
