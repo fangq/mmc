@@ -1212,10 +1212,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
             if(cfg->implicit==1){
+	          int i;
 	          float minratio=1.f;
-		  int hitstatus=htNone, firsthit=htNone, i;
 		  if(tracer->mesh->edgeroi){
 			// edge-based iMMC  - ray-cylinder intersection test
+		        int hitstatus=htNone, firsthit=htNone;
 		        float distdata[2];
 		        float3 projdata[2];
 			for(i=0;i<6;i++){
@@ -1232,14 +1233,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			}
 			if(minratio<1.f)
 			    r->Lmove*=minratio;
-			r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn); // htNone is treated as out
+			r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 			r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?1:0;
 		  }
 		  if(minratio==1.f && tracer->mesh->noderoi){
-		        // not hit any edgeroi in the current element
-		        // then go for node-based iMMC
+		        // not hit any edgeroi in the current element, then go for node-based iMMC
 			float nr;
 			float3 cc;
+		        int hitstatus=htNone, firsthit=htNone;
 			minratio=r->Lmove;
 			for(i=0;i<4;i++){	// check if hits any node edgeroi
 			    nr = tracer->mesh->noderoi[ee[i]-1];
@@ -1256,7 +1257,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			}
 			if(minratio<r->Lmove)
 			    r->Lmove=minratio;
-			r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn);
+			r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 			r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?2:0;
 		}
 	    }else if(tracer->mesh->faceroi){
@@ -1294,11 +1295,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	}
 		if(minratio<1.f)
 		    r->Lmove*=minratio;
-		r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn);
+		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 		r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?3:0;
 	    }
-
-            rc=prop->n*R_C0;
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
