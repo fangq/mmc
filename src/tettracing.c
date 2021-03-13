@@ -1231,9 +1231,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				    }
 				}
 			}
-			if(minratio<1.f)
+			if(minratio<1.f){
 			    r->Lmove*=minratio;
-			r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn); // htNone is treated as out
+			    r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn); // htNone is treated as out
+			    insideroi=(firsthit==htInOut || firsthit==htNoHitIn);
+			    r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?1:0;
+			}
 		  }
 		  if(minratio==1.f && tracer->mesh->noderoi){
 		        // not hit any edgeroi in the current element
@@ -1254,9 +1257,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				}
 			    }
 			}
-			if(minratio<r->Lmove)
+			if(minratio<r->Lmove){
 			    r->Lmove=minratio;
-			r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn);
+			    r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn);
+			    insideroi=(firsthit==htInOut || firsthit==htNoHitIn);
+			    r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?2:0;
+			}
 		}
 	    }else if(tracer->mesh->faceroi){
 	    	int neweid=-1, newbaseid;
@@ -1291,9 +1297,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			}
 		    }
 	    	}
-		if(minratio<1.f)
+		if(minratio<1.f){
 		    r->Lmove*=minratio;
-		r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn);
+		    r->inroi=(firsthit==htOutIn || firsthit==htNoHitIn);
+		    insideroi=(firsthit==htInOut || firsthit==htNoHitIn);
+		    r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?3:0;
+		}
 	    }
 
             if(insideroi)
