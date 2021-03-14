@@ -1121,7 +1121,7 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
 	}
     }else if(tracer->mesh->faceroi){
-    	int neweid=-1, newbaseid;
+    	int neweid=-1, newbaseid=0;
     	int *newee;
 	float lratio=1.f,minratio=1.f;
 	int hitstatus=htNone, firsthit=htNone, i;

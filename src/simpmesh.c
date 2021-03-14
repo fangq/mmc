@@ -135,6 +135,7 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
+	mesh_loadroi(mesh,cfg);
 	if(cfg->seed==SEED_FROM_FILE && cfg->seedfile[0]){
           mesh_loadseedfile(mesh,cfg);
         }
@@ -288,6 +289,48 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
            }
         }
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
+}
+
+/**
+ * @brief Load edge/node/face roi for implicit MMC
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+void mesh_loadroi(tetmesh *mesh,mcconfig *cfg){
+	FILE *fp;
+	int len,i,j,row,col;
+	float *pe=NULL;
+	char froi[MAX_FULL_PATH];
+
+	mesh_filenames("roi_%s.dat",froi,cfg);
+	if((fp=fopen(froi,"rt"))==NULL){
+		return;
+	}
+	len=fscanf(fp,"%d %d",&col,&row);
+	if(len!=2 || (col!=1 && col!=4 && col!=6) || row<=0){
+		MESH_ERROR("roi file has wrong format");
+	}
+        if(col==6){
+	    mesh->edgeroi=(float *)malloc(sizeof(float)*6*mesh->ne);
+	    pe=mesh->edgeroi;
+        }else if(col==1){
+	    mesh->noderoi=(float *)malloc(sizeof(float)*mesh->nn);
+	    pe=mesh->noderoi;
+        }else if(col==4){
+	    mesh->faceroi=(float *)malloc(sizeof(float)*4*mesh->ne);
+	    pe=mesh->faceroi;
+        }
+	for(i=0;i<row;i++){
+	    for(j=0;j<col;j++)
+		if(fscanf(fp,"%f",pe+j)!=1)
+		    break;
+	    pe+=col;
+        }
+	fclose(fp);
+	if(i<row)
+	    MESH_ERROR("roi file has wrong format");
 }
 
 /**

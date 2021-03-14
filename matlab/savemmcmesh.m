@@ -1,6 +1,7 @@
-function savemmcmesh(key,node,elem,face,evol,facenb)
+function savemmcmesh(key,node,elem,varargin)
 %
 % savemmcmesh(key,node,elem,face,evol,facenb)
+% savemmcmesh(key,node,elem,'face',face,'evol',evol,'facenb',facenb,'roi',roi)
 %
 % Export a tetrahedral mesh to the MMC mesh format
 %
@@ -15,6 +16,8 @@ function savemmcmesh(key,node,elem,face,evol,facenb)
 %      evol: the volumes of all tetrahedra, if missing, it will be calculated
 %      facenb: the 4 neighboring elements for each element, if missing, it will
 %             be calculated
+%      roi: if 1 colume, roi defines noderoi; if 4 column, roi defines
+%             faceroi, if 6 columns, roi defines edgeroi
 %
 % example:
 %     savemmcmesh('sph1',node,elem);
@@ -24,7 +27,9 @@ function savemmcmesh(key,node,elem,face,evol,facenb)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-if(nargin<5)
+opt=varargin2struct(varargin{:});
+
+if(nargin<5 || isempty(jsonopt('evol',[],opt)))
   evol=elemvolume(node,elem(:,1:4));
 end
 
@@ -51,9 +56,12 @@ if(~isempty(elem))
   fclose(fid);
 end
 
-if(nargin<6)
+if(~isempty(jsonopt('facenb',[],opt)))
+    facenb=jsonopt('facenb',[],opt);
+end
+if(nargin<6 || isempty(jsonopt('facenb',[],opt)))
   facenb=faceneighbors(elem(:,1:4));
-  if(nargin<4)
+  if(nargin<4 || isempty(jsonopt('face',[],opt)))
      face=faceneighbors(elem(:,1:4),'rowmajor');
   end
 end
@@ -83,5 +91,14 @@ if(~isempty(facenb))
   fid=fopen(['facenb_' key '.dat'],'wt');
   fprintf(fid,'%d %d\n',1,size(elem,1));
   fprintf(fid,'%d\t%d\t%d\t%d\n',facenb');
+  fclose(fid);
+end
+
+roi=jsonopt('roi',[],opt);
+if(~isempty(roi))
+  fid=fopen(['roi_' key '.dat'],'wt');
+  fprintf(fid,'%d %d\n',size(roi,2),size(roi,1));
+  format=[repmat('%d\t',1,size(roi,2)) '\n'];
+  fprintf(fid,format,roi');
   fclose(fid);
 end
