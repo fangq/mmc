@@ -919,9 +919,7 @@ void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, f
 	vec_diff(&E0,&E1,&u);
 	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
 	normr = 1.0f/norm;
-	vec_mult(&u,normr,&u);	// normal vector of the edge
-	r->u = u;
-	r->E = E0;
+	vec_mult(&u,normr,&u);	// normalized vector of the edge
 
 	PP = r->p0;				// P0
 	vec_diff(&E0,&PP,&OP);
@@ -1063,7 +1061,6 @@ float ray_sphere_intersect(ray *r, int index, float3 cc, float nr, int hitstatus
         float temp1,temp2,d1,d2;
 	float3 oc;
 
-	r->E = cc;
 	if(hitstatus == htOutIn || hitstatus == htInOut){
 		vec_diff(&cc,&r->p0,&oc);
 		temp2 = oc.x*oc.x+oc.y*oc.y+oc.z*oc.z-(nr*nr);
@@ -1083,7 +1080,6 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 	float3 pf0,pf1,pv,fnorm,ptemp;
 	float distf0,distf1,thick,ratio=1.f;
 
-	r->faceindex = faceid;
 	thick = r->roisize[faceid];
 
 	pf0 = r->p0;		// P0: pf0
@@ -1151,7 +1147,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->faceid=-1;
 	r->isend=0;
 	r->roitype=rtNone;
-	r->faceeid=-1;
+	r->refeid=-1;
 
 	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
 	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
@@ -1227,6 +1223,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 					if(lratio<minratio){
 					   minratio=lratio;
 					   firsthit=hitstatus;
+					   r->roiidx = i;
 					}
 				    }
 				}
@@ -1251,6 +1248,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				    if(lmove<minratio){
 					minratio=lmove;
 					firsthit=hitstatus;
+					r->roiidx = i;
 				    }
 				}
 			    }
@@ -1272,7 +1270,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		        // get the reference element when the current element does not have
 		        // labeled face
 	    		neweid = -r->roisize[i]; // casting to integer
-	    		r->faceeid = neweid;
+	    		r->refeid = neweid;
 	    		newbaseid=(neweid-1)<<2;
 	    		newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
 			r->roisize=(float *)(tracer->mesh->faceroi+(neweid-1)*4);
@@ -1290,6 +1288,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			if(lratio<minratio){
 			    minratio=lratio;
 			    firsthit=hitstatus;
+			    r->roiidx = i;
 			}
 		    }
 	    	}
@@ -1540,7 +1539,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int *enb;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,NULL,0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0,0};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,NULL,0,0,0,0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1616,13 +1615,12 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 
 	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.roitype,&r.faceindex,&r.faceeid);
-	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
-	    	    continue;
-	    }
-	    else if(cfg->implicit>0 && r.roitype)
+	    	reflectrayroi(cfg,&r.vec,&r.p0,tracer,&r.eid,&r.inroi,ran,r.roitype,r.roiidx,r.refeid);
+		vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
+		continue;
+	    }else if(cfg->implicit>0 && r.roitype)
 	    	continue;
-	    
+
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend && !r.roitype){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
@@ -1632,10 +1630,10 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    r.eid=enb[r.faceid];
 
 		    if(cfg->implicit>0){
-		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
-			if(! (!r.inroi && r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
-			  reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inroi);
-		    }
+		        if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
+			    if(! (!r.inroi && r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
+			      reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inroi);
+		        }
 		    }else{
 		      if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
 			if(! (r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
@@ -1733,7 +1731,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 
 	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.roitype,&r.faceindex,&r.faceeid);
+	    	    reflectrayroi(cfg,&r.vec,&r.p0,tracer,&r.eid,&r.inroi,ran,r.roitype,r.roiidx,r.refeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1788,9 +1786,9 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 }
 
 /**
- * @brief Calculate the reflection/transmission of a ray at the edgeroi
+ * @brief Calculate the reflection/transmission of a ray at the ROI surface
  *
- * This function handles the reflection and transmission events at the edgeroi wall
+ * This function handles the reflection and transmission events at the roi surface wall
  * where the refractive indices mismatch.
  *
  * \param[in] c0: the current direction vector of the ray
@@ -1802,32 +1800,35 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inroi,RandType *ran,int roitype,int *faceindex,int *faceeid){
+float reflectrayroi(mcconfig *cfg,float3 *c0,float3 *ph,raytracer *tracer,int *eid,int *inroi,RandType *ran,int roitype,int roiidx,int refeid){
 
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
 
 	if(roitype==rtEdge){	// hit edge roi
-		vec_diff(E0,ph,&EH);
-		tmp0 = vec_dot(&EH,u);
-		vec_mult(u,tmp0,&ut);
+	        float3 u, E0;
+		E0 = tracer->mesh->node[tracer->mesh->elem[((*eid-1)<<2)+e2n[roiidx][0]]-1];
+		vec_diff(&E0, tracer->mesh->node+(tracer->mesh->elem[((*eid-1)<<2)+e2n[roiidx][1]]-1),&u);
+		vec_diff(&E0,ph,&EH);
+		tmp0 = vec_dot(&EH,&u);
+		vec_mult(&u,tmp0,&ut);
 		vec_diff(&ut,&EH,pn);
 		tmp0=1.f/sqrtf(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
 	}else if(roitype==rtNode){	// hit node roi
-		vec_diff(E0,ph,pn);
+		vec_diff(tracer->mesh->node+(tracer->mesh->elem[((*eid-1)<<2)+roiidx]-1),ph,pn);
 		tmp0=1.f/sqrtf(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
 	}else{			// hit face roi
 		int baseid;
-		if(*faceeid<0)
+		if(refeid<0)
 			baseid = (*eid-1)<<2;
 		else
-			baseid = (*faceeid-1)<<2;
-		pn->x=(&(tracer->n[baseid].x))[*faceindex];
-		pn->y=(&(tracer->n[baseid].x))[*faceindex+4];
-		pn->z=(&(tracer->n[baseid].x))[*faceindex+8];
+			baseid = (refeid-1)<<2;
+		pn->x=(&(tracer->n[baseid].x))[roiidx];
+		pn->y=(&(tracer->n[baseid].x))[roiidx+4];
+		pn->z=(&(tracer->n[baseid].x))[roiidx+8];
 	}
 
 	/*pn pointing outward*/

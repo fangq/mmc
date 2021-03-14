@@ -75,10 +75,8 @@ typedef struct MMC_ray{
 	float *roisize;	              /**< roisize, node/edge radii or face thickness */
 	int roitype;		      /**< if 1, the photon hits the edgeroi; if 2, the photon hits the node edgeroi; if 0, does not hit edgeroi */
 	int inroi;		      /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
-	float3 u;		      /**< edgeroi edge direction */
-	float3 E;		      /**< the starting node of edgeroi edge */
-	int faceindex;		      /**< local face index that the photon intersect with*/
-	int faceeid;		      /**< reference element id that is used for face-based implicit MMC*/
+	int roiidx;		      /**< edge(0-5), node (0-4) or face (0-4) index in a local element with ROIs */
+	int refeid;		      /**< reference element id that is used for face-based implicit MMC*/
 } ray;
 
 /***************************************************************************//**
@@ -117,7 +115,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 void init_face_inout(ray *r, raytracer *tracer);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inroi);
-float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inroi,RandType *ran,int roitype,int *faceindex,int *faceeid);
+float reflectrayroi(mcconfig *cfg,float3 *c0,float3 *ph,raytracer *tracer,int *eid,int *inroi,RandType *ran,int roitype,int roiidx,int refeid);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void visitor_init(mcconfig *cfg, visitor* visit);

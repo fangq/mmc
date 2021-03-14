@@ -257,7 +257,7 @@ static inline float dist2(float3 *p0,float3 *p1){
 }
 
 static inline float dist(float3 *p0,float3 *p1){
-    return sqrt(dist2(p0,p1));
+    return sqrtf(dist2(p0,p1));
 }
 
 static inline float dist2d2(float *p0,float *p1){
