@@ -1150,7 +1150,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
-	r->isedgeroi=0;
+	r->roitype=rtNone;
 	r->faceeid=-1;
 
 	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
@@ -1234,7 +1234,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			if(minratio<1.f)
 			    r->Lmove*=minratio;
 			r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
-			r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?1:0;
+			r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtEdge : rtNone;
 		  }
 		  if(minratio==1.f && tracer->mesh->noderoi){
 		        // not hit any edgeroi in the current element, then go for node-based iMMC
@@ -1258,7 +1258,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			if(minratio<r->Lmove)
 			    r->Lmove=minratio;
 			r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
-			r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?2:0;
+			r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
 		}
 	    }else if(tracer->mesh->faceroi){
 	    	int neweid=-1, newbaseid;
@@ -1296,7 +1296,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		if(minratio<1.f)
 		    r->Lmove*=minratio;
 		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
-		r->isedgeroi=(firsthit==htInOut || firsthit==htOutIn)?3:0;
+		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
 	    }
 
             O = _mm_load_ps(&(r->vec.x));
@@ -1615,16 +1615,16 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.isedgeroi && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
+	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    	reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.roitype,&r.faceindex,&r.faceeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
-	    else if(cfg->implicit>0 && r.isedgeroi)
+	    else if(cfg->implicit>0 && r.roitype)
 	    	continue;
 	    
 	    /*move a photon until the end of the current scattering path*/
-	    while(r.faceid>=0 && !r.isend && !r.isedgeroi){
+	    while(r.faceid>=0 && !r.isend && !r.roitype){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
 
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
@@ -1732,12 +1732,12 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.isedgeroi && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.isedgeroi,&r.faceindex,&r.faceeid);
+	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    	    reflectedgeroi(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inroi,ran,r.roitype,&r.faceindex,&r.faceeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
-	    else if(cfg->implicit>0 && r.isedgeroi)
+	    else if(cfg->implicit>0 && r.roitype)
 	    	continue;
 	    
             mom=0.f;
@@ -1802,24 +1802,24 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inroi,RandType *ran,int isedgeroi,int *faceindex,int *faceeid){
+float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inroi,RandType *ran,int roitype,int *faceindex,int *faceeid){
 
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
 
-	if(isedgeroi==1){	// hit edge edgeroi
+	if(roitype==rtEdge){	// hit edge roi
 		vec_diff(E0,ph,&EH);
 		tmp0 = vec_dot(&EH,u);
 		vec_mult(u,tmp0,&ut);
 		vec_diff(&ut,&EH,pn);
-		tmp0=1.f/sqrt(vec_dot(pn,pn));
+		tmp0=1.f/sqrtf(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
-	}else if(isedgeroi==2){	// isedgeroi==2, hit node edgeroi
+	}else if(roitype==rtNode){	// hit node roi
 		vec_diff(E0,ph,pn);
-		tmp0=1.f/sqrt(vec_dot(pn,pn));
+		tmp0=1.f/sqrtf(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
-	}else{			// isedgeroi==3, hit face edgeroi
+	}else{			// hit face roi
 		int baseid;
 		if(*faceeid<0)
 			baseid = (*eid-1)<<2;
@@ -1838,12 +1838,12 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
         if(*inroi){	// out->in
         	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
         	n2 = tracer->mesh->med[cfg->his.maxmedia].n;
-        	if(isedgeroi==1 || isedgeroi==2)
+        	if(roitype==rtEdge || roitype==rtNode)
         		vec_mult(pn,-1.f,pn);
         }else{		// in->out
         	n1 = tracer->mesh->med[cfg->his.maxmedia].n;
 		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
-		if(isedgeroi==3)
+		if(roitype==rtFace)
         		vec_mult(pn,-1.f,pn);
         }
 
@@ -1853,7 +1853,7 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
 
         if(tmp2>0.f){ /*if no total internal reflection*/
           Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
-	  tmp2=sqrt(tmp2); /*to save one sqrt*/
+	  tmp2=sqrtf(tmp2); /*to save one sqrt*/
           Im=2.f*n1*n2*Icos*tmp2;
           Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
           Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
@@ -1873,7 +1873,7 @@ float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ra
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
           *inroi = !(*inroi);
        }
-       tmp0=1.f/sqrt(vec_dot(c0,c0));
+       tmp0=1.f/sqrtf(vec_dot(c0,c0));
        vec_mult(c0,tmp0,c0);
        return 1.f;
 }
@@ -1929,7 +1929,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 
         if(tmp2>0.f && !(*eid<=0 && cfg->isreflect==bcMirror)){ /*if no total internal reflection*/
           Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
-	  tmp2=sqrt(tmp2); /*to save one sqrt*/
+	  tmp2=sqrtf(tmp2); /*to save one sqrt*/
           Im=2.f*n1*n2*Icos*tmp2;
           Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
           Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
@@ -1951,7 +1951,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	  *eid=*oldeid;
           //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
        }
-       tmp0=1.f/sqrt(vec_dot(c0,c0));
+       tmp0=1.f/sqrtf(vec_dot(c0,c0));
        vec_mult(c0,tmp0,c0);
        return 1.f;
 }
@@ -2002,7 +2002,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		float rx=rand_uniform01(ran);
 		float ry=rand_uniform01(ran);
 		float4 v2=cfg->srcparam1;
-		v2.w*=1.f/(sqrt(cfg->srcparam1.x*cfg->srcparam1.x+cfg->srcparam1.y*cfg->srcparam1.y+cfg->srcparam1.z*cfg->srcparam1.z));
+		v2.w*=1.f/(sqrtf(cfg->srcparam1.x*cfg->srcparam1.x+cfg->srcparam1.y*cfg->srcparam1.y+cfg->srcparam1.z*cfg->srcparam1.z));
 		v2.x=v2.w*(cfg->srcdir.y*cfg->srcparam1.z - cfg->srcdir.z*cfg->srcparam1.y);
 		v2.y=v2.w*(cfg->srcdir.z*cfg->srcparam1.x - cfg->srcdir.x*cfg->srcparam1.z); 
 		v2.z=v2.w*(cfg->srcdir.x*cfg->srcparam1.y - cfg->srcdir.y*cfg->srcparam1.x);
@@ -2022,16 +2022,16 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		sphi=sinf(phi);	cphi=cosf(phi);
 		float r0;
 		if(cfg->srctype==stDisk)
-		    r0=sqrt(rand_uniform01(ran))*cfg->srcparam1.x;
+		    r0=sqrtf(rand_uniform01(ran))*cfg->srcparam1.x;
 		else if(fabs(r->focus) < 1e-5f || fabs(cfg->srcparam1.y) < 1e-5f)
-		    r0=sqrt(-log(rand_uniform01(ran)))*cfg->srcparam1.x;
+		    r0=sqrtf(-log(rand_uniform01(ran)))*cfg->srcparam1.x;
 		else{
 		    float z0=cfg->srcparam1.x*cfg->srcparam1.x*M_PI/cfg->srcparam1.y; //Rayleigh range
-		    r0=sqrt(-log(rand_uniform01(ran))*(1.f+(r->focus*r->focus/(z0*z0))))*cfg->srcparam1.x;
+		    r0=sqrtf(-log(rand_uniform01(ran))*(1.f+(r->focus*r->focus/(z0*z0))))*cfg->srcparam1.x;
 		}
 		if(cfg->srcdir.z>-1.f+EPS && cfg->srcdir.z<1.f-EPS){
 		    float tmp0=1.f-cfg->srcdir.z*cfg->srcdir.z;
-		    float tmp1=r0/sqrt(tmp0);
+		    float tmp1=r0/sqrtf(tmp0);
 		    r->p0.x=cfg->srcpos.x+tmp1*(cfg->srcdir.x*cfg->srcdir.z*cphi - cfg->srcdir.y*sphi);
 		    r->p0.y=cfg->srcpos.y+tmp1*(cfg->srcdir.y*cfg->srcdir.z*cphi + cfg->srcdir.x*sphi);
 		    r->p0.z=cfg->srcpos.z-tmp1*tmp0*cphi;
@@ -2065,7 +2065,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		float ang,stheta,ctheta,sphi,cphi;
 		ang=TWO_PI*rand_uniform01(ran); //next arimuth angle
 		sphi=sinf(ang);	cphi=cosf(ang);
-		ang=sqrt(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran0))*cfg->srcparam1.x;
+		ang=sqrtf(-2.f*log(rand_uniform01(ran)))*(1.f-2.f*rand_uniform01(ran0))*cfg->srcparam1.x;
 		stheta=sinf(ang);
 		ctheta=cosf(ang);
 		r->vec.x=stheta*cphi;
@@ -2082,7 +2082,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 	              float s,p;
 		      t=1.f-2.f*rand_uniform01(ran);
 		      s=1.f-2.f*rand_uniform01(ran);
-		      p=sqrt(1.f-r->vec.x*r->vec.x-r->vec.y*r->vec.y)*(rand_uniform01(ran)>0.5f ? 1.f : -1.f);
+		      p=sqrtf(1.f-r->vec.x*r->vec.x-r->vec.y*r->vec.y)*(rand_uniform01(ran)>0.5f ? 1.f : -1.f);
 		      float3 vv;
 		      vv.x=r->vec.y*p-r->vec.z*s;
 		      vv.y=r->vec.z*t-r->vec.x*p;
@@ -2110,7 +2110,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
                      r->vec.y=origin.y-r->p0.y;
                      r->vec.z=origin.z-r->p0.z;
 		}
-		Rn2=1.f/sqrt(vec_dot(&r->vec,&r->vec)); // normalize
+		Rn2=1.f/sqrtf(vec_dot(&r->vec,&r->vec)); // normalize
 		vec_mult(&r->vec,Rn2,&r->vec);
 	}
 
