@@ -755,21 +755,6 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	       r->faceid=faceorder[i];
 	    }
 	}
-/*	for(i=0;i<4;i++){
-	    float det,dett;
-	    float3 *n=tracer->n+eid*12+i*3;
-	    det = vec_dot(n,r->vec);
-	    if(det<0.f){
-	  	 continue;
-	    }
-	    dett =n->w-vec_dot(n,r->p0);
-	    t[i]=dett/det;
-	    if(t[i]<bary.x){
-	       bary.x=t[i];
-	       faceidx=i;
-	       r->faceid=faceorder[i];
-	    }
-	}*/
 	if(r->faceid>=0){
 	    medium *prop;
 	    int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
@@ -876,107 +861,87 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 
 /**
+ * \brief Compute distances to edge (cylindrical) ROIs in the element
+ *
  * Commpute the distance between P0 and the labeled edge
  * and the distance between P1 and the labeled edge.
  * P0 is the entry point and P1 is the exit point
  */
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float* distdata, float3* projdata, int* hitstatus){
-        float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
-	float norm, normr, st, DIS0, DIS1;
-	int en0, en1;
-	float rt, rt2;
+void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float d2d[2], float3 p2d[2], int* hitstatus){
+	float3 u, OP;
+	float r2;
 
-	en0 = ee[e2n[edgeid][0]]-1;
-	en1 = ee[e2n[edgeid][1]]-1;
-	E0 = tracer->mesh->node[en0];
-	E1 = tracer->mesh->node[en1];
+	p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]]-1];
+	p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]]-1];
 
-	vec_diff(&E0,&E1,&u);
-	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
-	normr = 1.0f/norm;
-	vec_mult(&u,normr,&u);	// normalized vector of the edge
+	vec_diff(p2d+1,p2d,&u);
+	r2 = dist(p2d+1,p2d);	// get coordinates and compute distance between two nodes
+	r2 = 1.0f/r2;
+	vec_mult(&u,r2,&u);	// normalized vector of the edge
 
-	PP = r->p0;				// P0
-	vec_diff(&E0,&PP,&OP);
-	st = vec_dot(&OP,&u);
-	vec_mult(&u,st,&Pt);
-	vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-	DIS0 = vec_dot(&PP0,&PP0);
+	vec_diff(p2d+1,&r->p0,&OP);
+	r2 = vec_dot(&OP,&u);
+	vec_mult(&u,r2,p2d);
+	vec_diff(p2d,&OP,p2d);		// PP0: P0 projection on plane
+	d2d[0] = vec_dot(p2d,p2d);
 
-	vec_mult(&r->vec,r->Lmove,&PP);
-	vec_add(&r->p0,&PP,&PP);		// P1
-	vec_diff(&E0,&PP,&OP);
-	st = vec_dot(&OP,&u);
-	vec_mult(&u,st,&Pt);
-	vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
-	DIS1 = vec_dot(&PP1,&PP1);
+	vec_mult(&r->vec,r->Lmove,&OP);
+	vec_add(&r->p0,&OP,&OP);		// P1
+	vec_diff(p2d+1,&OP,&OP);
+	r2 = vec_dot(&OP,&u);
+	vec_mult(&u,r2,p2d+1);
+	vec_diff(p2d+1,&OP,p2d+1);		// PP1: P1 projection on plane
+	d2d[1] = vec_dot(p2d+1,p2d+1);
 
-	distdata[0] = DIS0; // squared distance from origin to
-	distdata[1] = DIS1;
-        projdata[0] = PP0;
-	projdata[1] = PP1;
-	
-	rt = r->roisize[edgeid];
-	rt2 = rt*rt;
+	r2 = r->roisize[edgeid]*r->roisize[edgeid];
 	*hitstatus = htNone;
-	if(DIS0>rt2+EPS2 && DIS1<rt2-EPS2){
+	if(d2d[0]>r2+EPS2 && d2d[1]<r2-EPS2){
 	  *hitstatus = htOutIn;
-	}else if(DIS0<rt2-EPS2 && DIS1>rt2+EPS2){
+	}else if(d2d[0]<r2-EPS2 && d2d[1]>r2+EPS2){
 	  *hitstatus = htInOut;
-	}else if(DIS1>rt2+EPS2){
+	}else if(d2d[1]>r2+EPS2){
 	  *hitstatus = htNoHitOut;
-	}else if(DIS1<rt2-EPS2){
+	}else if(d2d[1]<r2-EPS2){
 	  *hitstatus = htNoHitIn;
 	}
 }
 
 /**
- * Compute the next step length for edge-based iMMC
+ * \brief Compute the next step length for edge-based iMMC
  */
-float ray_cylinder_intersect(ray *r, int index, float* distdata, float3* projdata, int hitstatus){
-	float3 PP0, PP1;
-	float pt0[2], pt1[2], theta, ph0[2], ph1[2], Lratio;
-	float DIS0, DIS1;
+float ray_cylinder_intersect(ray *r, int index, float d2d[2], float3 p2d[2], int hitstatus){
+	float pt0[2], pt1[2], ph0[2], ph1[2], Lratio, theta;
 
-        PP0 = projdata[0];
-	PP1 = projdata[1];
-	DIS0 = distdata[0];
-	DIS1 = distdata[1];
-	
 	// update Lmove and reflection
-	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
+	float dx, dy, dr2, delta, rt, sgn, Dp;
 	rt = r->roisize[index];
-	rt2 = rt*rt;
+
 	// accurate intersection computation
 	if(hitstatus == htOutIn || hitstatus == htInOut){ 	// hit edgeroi out->in or in->out
-		DIS0 = sqrtf(DIS0);
-		DIS1 = sqrtf(DIS1);
+		d2d[0] = sqrtf(d2d[0]);
+		d2d[1] = sqrtf(d2d[1]);
 
-		theta = vec_dot(&PP0,&PP1);
+		theta = vec_dot(p2d,p2d+1);
 
-		theta = theta/(DIS0*DIS1+EPS);
-		pt0[0] = DIS0;
+		theta = theta/(d2d[0]*d2d[1]+EPS);
+		pt0[0] = d2d[0];
 		pt0[1] = 0.f;
-		pt1[0] = DIS1*theta;
-		pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+		pt1[0] = d2d[1]*theta;
+		pt1[1] = d2d[1]*sqrtf(fabs(1-theta*theta));
 
 		dx = pt1[0]-pt0[0];
 		dy = pt1[1]-pt0[1];
 		dr2 = dx*dx+dy*dy;
-		drr2 = 1.0f/dr2;
-		Dt = pt0[0]*pt1[1];
-		delta = sqrtf(rt2*dr2-Dt*Dt);	// must be >0
+		Dp = pt0[0]*pt1[1];
+		delta = sqrtf(rt*rt*dr2-Dp*Dp);	// must be >0
+		dr2 = 1.0f/dr2;
 		sgn = (dy>=0) ? 1.0f : -1.0f;
-		xa = Dt*dy*drr2;
-		xb = sgn*dx*delta*drr2;
-		ya = -Dt*dx*drr2;
-		yb = fabs(dy)*delta*drr2;
-		ph0[0] = xa+xb;
-		ph0[1] = ya+yb;
-		ph1[0] = xa-xb;
-		ph1[1] = ya-yb;
+		ph0[0] = (Dp*dy  + sgn*dx*delta)*dr2;
+		ph0[1] = (-Dp*dx + fabs(dy)*delta)*dr2;
+		ph1[0] = (Dp*dy  - sgn*dx*delta)*dr2;
+		ph1[1] = (-Dp*dx - fabs(dy)*delta)*dr2;
 		Dp = dist2d2(pt0,pt1);
-		if(DIS0>rt && DIS1<rt){		// out->in
+		if(d2d[0]>rt && d2d[1]<rt){		// out->in
 			Lratio = dist2d2(pt0,ph1);
 			if(Dp>Lratio){
 				Lratio = sqrtf(Lratio/Dp);
@@ -984,7 +949,7 @@ float ray_cylinder_intersect(ray *r, int index, float* distdata, float3* projdat
 				Lratio = dist2d2(pt0,ph0);
 				Lratio = sqrtf(Lratio/Dp);
 			}
-		}else{	// DIS0<rt && DIS1>rt, in->out
+		}else{	// d2d[0]<rt && d2d[1]>rt, in->out
 			Lratio = dist2d2(pt1,ph1);
 			if(Dp>Lratio){
 				Lratio = 1.f-sqrtf(Lratio/Dp);
@@ -999,30 +964,32 @@ float ray_cylinder_intersect(ray *r, int index, float* distdata, float3* projdat
 }
 
 /**
- * Commpute the distance between P0 and the labeled node
+ * \brief Compute distances to node (spherical) ROIs if defined in the element
+ *
+ * Compute the distance between P0 and the labeled node
  * and the distance between P1 and the labeled node.
  * P0 is the entry point and P1 is the exit point
  */
 
-void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, float3* cc_out, int* hitstatus) {
-        float npdist0,npdist1,nr2;
-	float3 PP, cc;
-	nr2 = nr*nr;
-	cc = tracer->mesh->node[ee[index]-1];
-	*cc_out = cc;
+void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, float3 **center, int* hitstatus) {
+        float npdist0,npdist1;
+	float3 PP;
+
+	nr = nr*nr;
+	*center=tracer->mesh->node+ee[index]-1;
 	
-	npdist0=dist2(&r->p0,&cc);		// P0
+	npdist0=dist2(&r->p0,*center);		// P0
 	vec_mult(&r->vec,r->Lmove,&PP);
 	vec_add(&r->p0,&PP,&PP);
-	npdist1=dist2(&PP,&cc);			// P1
+	npdist1=dist2(&PP,*center);			// P1
 
-	if(npdist0>nr2+EPS2 && npdist1<nr2-EPS2) {
+	if(npdist0>nr+EPS2 && npdist1<nr-EPS2) {
 	  *hitstatus = htOutIn;
-	}else if(npdist0<nr2-EPS2 && npdist1>nr2+EPS2) {
+	}else if(npdist0<nr-EPS2 && npdist1>nr+EPS2) {
 	  *hitstatus = htInOut;
-	}else if(npdist1>nr2+EPS2){
+	}else if(npdist1>nr+EPS2){
 	  *hitstatus = htNoHitOut;
-	}else if(npdist1<nr2-EPS2){
+	}else if(npdist1<nr-EPS2){
 	  *hitstatus = htNoHitIn;
 	}else{
 	  *hitstatus = htNone;
@@ -1030,16 +997,16 @@ void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, fl
 }
 
 /**
- * Compute the next step length for node-based iMMC
+ * \brief Compute the next step length for node-based iMMC
  */
-float ray_sphere_intersect(ray *r, int index, float3 cc, float nr, int hitstatus){
+float ray_sphere_intersect(ray *r, int index, float3 *center, float nr, int hitstatus){
         float temp1,temp2,d1,d2;
 	float3 oc;
 
 	if(hitstatus == htOutIn || hitstatus == htInOut){
-		vec_diff(&cc,&r->p0,&oc);
-		temp2 = oc.x*oc.x+oc.y*oc.y+oc.z*oc.z-(nr*nr);
+		vec_diff(center,&r->p0,&oc);
 		temp1 = vec_dot(&r->vec,&oc);
+		temp2 = oc.x*oc.x+oc.y*oc.y+oc.z*oc.z-(nr*nr);
 		temp2 = sqrtf(fabs(temp1*temp1-temp2));
 		d1 = -temp1+temp2;
 		d2 = -temp1-temp2;
@@ -1049,15 +1016,14 @@ float ray_sphere_intersect(ray *r, int index, float3 cc, float nr, int hitstatus
 }
 
 /**
- * Compute the next step length for the face-based iMMC
+ * \brief Compute the next step length for the face-based iMMC
  */
 float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int baseid, int eid, int *hitstatus){
-	float3 pf0,pf1,pv,fnorm,ptemp;
+	float3 pf1,pv,fnorm,ptemp;
 	float distf0,distf1,thick,ratio=1.f;
 
 	thick = r->roisize[faceid];
 
-	pf0 = r->p0;		// P0: pf0
 	vec_mult(&r->vec,r->Lmove,&ptemp);
 	vec_add(&r->p0,&ptemp,&ptemp);		// P1: ptemp
 
@@ -1066,7 +1032,7 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 	fnorm.y=(&(tracer->n[baseid].x))[ifaceorder[faceid]+4];
 	fnorm.z=(&(tracer->n[baseid].x))[ifaceorder[faceid]+8];
 
-	vec_diff(&pf0,&pf1,&pv);
+	vec_diff(&r->p0,&pf1,&pv);
 	distf0 = vec_dot(&pv,&fnorm);
 
 	vec_diff(&ptemp,&pf1,&pv);
@@ -1085,6 +1051,104 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 		*hitstatus=htNoHitIn;
 	}
 	return ratio;
+}
+
+/**
+ * \brief Implicit MMC ray-tracing core function
+ */
+void traceroi(ray *r, raytracer *tracer, int roitype){
+    int eid=r->eid-1;
+    int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+    if(roitype==1){
+          int i;
+          float minratio=1.f;
+	  if(tracer->mesh->edgeroi){
+		// edge-based iMMC  - ray-cylinder intersection test
+	        int hitstatus=htNone, firsthit=htNone;
+	        float distdata[2];
+	        float3 projdata[2];
+		for(i=0;i<6;i++){
+			if(r->roisize[i]>0.f){
+			    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
+			    if(hitstatus==htInOut || hitstatus==htOutIn){
+			        float lratio=ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
+				if(lratio<minratio){
+				   minratio=lratio;
+				   firsthit=hitstatus;
+				   r->roiidx = i;
+				}
+			    }
+			}
+		}
+		if(minratio<1.f)
+		    r->Lmove*=minratio;
+		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtEdge : rtNone;
+	  }
+	  if(minratio==1.f && tracer->mesh->noderoi){
+	        // not hit any edgeroi in the current element, then go for node-based iMMC
+		float nr;
+		float3 *center;
+	        int hitstatus=htNone, firsthit=htNone;
+		minratio=r->Lmove;
+		for(i=0;i<4;i++){	// check if hits any node edgeroi
+		    nr = tracer->mesh->noderoi[ee[i]-1];
+		    if(nr>0.f){
+			compute_distances_to_node(r, tracer, ee, i, nr, &center, &hitstatus);
+			if(hitstatus==htInOut || hitstatus==htOutIn){
+			    float lmove=ray_sphere_intersect(r, i, center, nr, hitstatus);
+			    if(lmove<minratio){
+				minratio=lmove;
+				firsthit=hitstatus;
+				r->roiidx = i;
+			    }
+			}
+		    }
+		}
+		if(minratio<r->Lmove)
+		    r->Lmove=minratio;
+		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
+	}
+    }else if(tracer->mesh->faceroi){
+    	int neweid=-1, newbaseid;
+    	int *newee;
+	float lratio=1.f,minratio=1.f;
+	int hitstatus=htNone, firsthit=htNone, i;
+
+        // test if this is a reference element, indicated by a negative radius
+	for(i=0;i<4;i++){
+    	    if(r->roisize[i]<0.f){
+	        // get the reference element when the current element does not have
+	        // labeled face
+    		neweid = -r->roisize[i]; // casting to integer
+    		r->refeid = neweid;
+    		newbaseid=(neweid-1)<<2;
+    		newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
+		r->roisize=(float *)(tracer->mesh->faceroi+(neweid-1)*4);
+		break;  // currently, can only handle a single reference face
+    	    }
+	}
+
+        // test if the ray intersect with a face ROI (slab)
+    	for(i=0;i<4;i++){
+	    if(r->roisize[i]>0.f){
+    		if(neweid<0)
+    			lratio = ray_face_intersect(r, tracer, ee, i, eid<<2, eid, &hitstatus);
+    		else
+    			lratio = ray_face_intersect(r, tracer, newee, i, newbaseid, neweid, &hitstatus);
+		if(lratio<minratio){
+		    minratio=lratio;
+		    firsthit=hitstatus;
+		    r->roiidx = i;
+		}
+	    }
+    	}
+	if(minratio<1.f)
+	    r->Lmove*=minratio;
+	r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+	r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
+    }
 }
 
 /** 
@@ -1162,7 +1226,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
 	    float mus;
 
-	    if(cfg->implicit>0 && r->inroi){
+	    if(cfg->implicit && r->inroi){
 	    	prop=tracer->mesh->med+tracer->mesh->prop;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
@@ -1183,96 +1247,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
-            if(cfg->implicit==1){
-	          int i;
-	          float minratio=1.f;
-		  if(tracer->mesh->edgeroi){
-			// edge-based iMMC  - ray-cylinder intersection test
-		        int hitstatus=htNone, firsthit=htNone;
-		        float distdata[2];
-		        float3 projdata[2];
-			for(i=0;i<6;i++){
-				if(r->roisize[i]>0.f){
-				    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
-				    if(hitstatus==htInOut || hitstatus==htOutIn){
-				        float lratio=ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
-					if(lratio<minratio){
-					   minratio=lratio;
-					   firsthit=hitstatus;
-					   r->roiidx = i;
-					}
-				    }
-				}
-			}
-			if(minratio<1.f)
-			    r->Lmove*=minratio;
-			r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
-			r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtEdge : rtNone;
-		  }
-		  if(minratio==1.f && tracer->mesh->noderoi){
-		        // not hit any edgeroi in the current element, then go for node-based iMMC
-			float nr;
-			float3 cc;
-		        int hitstatus=htNone, firsthit=htNone;
-			minratio=r->Lmove;
-			for(i=0;i<4;i++){	// check if hits any node edgeroi
-			    nr = tracer->mesh->noderoi[ee[i]-1];
-			    if(nr>0.f){
-				compute_distances_to_node(r, tracer, ee, i, nr, &cc, &hitstatus);
-				if(hitstatus==htInOut || hitstatus==htOutIn){
-				    float lmove=ray_sphere_intersect(r, i, cc, nr, hitstatus);
-				    if(lmove<minratio){
-					minratio=lmove;
-					firsthit=hitstatus;
-					r->roiidx = i;
-				    }
-				}
-			    }
-			}
-			if(minratio<r->Lmove)
-			    r->Lmove=minratio;
-			r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
-			r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
-		}
-	    }else if(tracer->mesh->faceroi){
-	    	int neweid=-1, newbaseid;
-	    	int *newee;
-		float lratio=1.f,minratio=1.f;
-		int hitstatus=htNone, firsthit=htNone, i;
-
-                // test if this is a reference element, indicated by a negative radius
-		for(i=0;i<4;i++){
-	    	    if(r->roisize[i]<0.f){
-		        // get the reference element when the current element does not have
-		        // labeled face
-	    		neweid = -r->roisize[i]; // casting to integer
-	    		r->refeid = neweid;
-	    		newbaseid=(neweid-1)<<2;
-	    		newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
-			r->roisize=(float *)(tracer->mesh->faceroi+(neweid-1)*4);
-			break;  // currently, can only handle a single reference face
-    		    }
-		}
-
-                // test if the ray intersect with a face ROI (slab)
-	    	for(i=0;i<4;i++){
-		    if(r->roisize[i]>0.f){
-	    		if(neweid<0)
-	    			lratio = ray_face_intersect(r, tracer, ee, i, baseid, eid, &hitstatus);
-	    		else
-	    			lratio = ray_face_intersect(r, tracer, newee, i, newbaseid, neweid, &hitstatus);
-			if(lratio<minratio){
-			    minratio=lratio;
-			    firsthit=hitstatus;
-			    r->roiidx = i;
-			}
-		    }
-	    	}
-		if(minratio<1.f)
-		    r->Lmove*=minratio;
-		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
-		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
-	    }
+            if(cfg->implicit)
+                traceroi(r,tracer,cfg->implicit);
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
@@ -1558,11 +1534,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
 
-	if(cfg->implicit==2)
+	if(mesh->faceroi)
 	    init_face_inout(&r, tracer);
 
 	while(1){  /*propagate a photon until exit*/
-	    if(cfg->implicit>0)
+	    if(cfg->implicit)
                   updateroi(cfg->implicit,&r,tracer->mesh);
 
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
@@ -1578,11 +1554,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && r.roiidx>=0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    if(cfg->implicit && cfg->isreflect && r.roitype && r.roiidx>=0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
 	    	reflectrayroi(cfg,&r.vec,&r.p0,tracer,&r.eid,&r.inroi,ran,r.roitype,r.roiidx,r.refeid);
 		vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 		continue;
-	    }else if(cfg->implicit>0 && r.roitype)
+	    }else if(cfg->implicit && r.roitype)
 	    	continue;
 
 	    /*move a photon until the end of the current scattering path*/
@@ -1593,7 +1569,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
 
-		    if(cfg->implicit>0){
+		    if(cfg->implicit){
 		        if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
 			    if(! (!r.inroi && r.eid<=0 && ((mesh->med[mesh->type[oldeid-1]].n == cfg->nout && cfg->isreflect!=(int)bcMirror) || cfg->isreflect==(int)bcAbsorbExterior) ) )
 			      reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inroi);
@@ -1628,7 +1604,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %zu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-	            if(cfg->implicit>0)
+	            if(cfg->implicit)
                         updateroi(cfg->implicit,&r,tracer->mesh);
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
@@ -1694,12 +1670,12 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && r.roiidx>=0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    if(cfg->implicit && cfg->isreflect && r.roitype && r.roiidx>=0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
 	    	    reflectrayroi(cfg,&r.vec,&r.p0,tracer,&r.eid,&r.inroi,ran,r.roitype,r.roiidx,r.refeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
-	    else if(cfg->implicit>0 && r.roitype)
+	    else if(cfg->implicit && r.roitype)
 	    	continue;
 	    
             mom=0.f;
@@ -1880,7 +1856,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-	if(cfg->implicit>0 && inroi!=0){
+	if(cfg->implicit && inroi!=0){
 	    n1=tracer->mesh->med[cfg->his.maxmedia].n;
             n2 = n1;
 	}else{
@@ -2141,40 +2117,35 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
  * Initialize the 'inroi' flag for the face-based implicit MMC
  */
 void init_face_inout(ray *r, raytracer *tracer){
-    float3 pf0,pf1,pv,fnorm,ptemp;
-    float distf0,thick;
+    float3 *pf1,pv,fnorm;
+    float distf0;
     int eid=r->eid-1;
     int baseid = eid<<2;
     int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
     float *vr;
-    int index;
+    int i;
 
     vr = (float *)(tracer->mesh->faceroi+eid*4);
 
-    for(index=0;index<4;index++){
-        if(vr[index]<=0.f)
+    for(i=0;i<4;i++){
+        if(vr[i]<=0.f)
 	   continue;
-        thick = vr[index];
+        pf1 = tracer->mesh->node + (ee[nc[ifaceorder[i]][0]]-1);	// any point on face
+        fnorm.x=(&(tracer->n[baseid].x))[ifaceorder[i]];		// normal vector of the face
+        fnorm.y=(&(tracer->n[baseid].x))[ifaceorder[i]+4];
+        fnorm.z=(&(tracer->n[baseid].x))[ifaceorder[i]+8];
 
-        pf0 = r->p0;		// P0
-        vec_mult(&r->vec,r->Lmove,&ptemp);
-        vec_add(&r->p0,&ptemp,&ptemp);		// P1
-
-        pf1 = tracer->mesh->node[ee[nc[ifaceorder[index]][0]]-1];	// any point on face
-        fnorm.x=(&(tracer->n[baseid].x))[ifaceorder[index]];		// normal vector of the face
-        fnorm.y=(&(tracer->n[baseid].x))[ifaceorder[index]+4];
-        fnorm.z=(&(tracer->n[baseid].x))[ifaceorder[index]+8];
-
-        vec_diff(&pf0,&pf1,&pv);
+        vec_diff(&r->p0,pf1,&pv);
         distf0 = vec_dot(&pv,&fnorm);
 
-        if(distf0<thick){
+        if(distf0<vr[i]){
                 r->inroi = 1;
 	        break;
         }
     }
     return;
 }
+
 
 /**
  * @brief Deal with absorption using MCML-like algorithm (albedo-weight MC)
