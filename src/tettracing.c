@@ -1055,6 +1055,10 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 
 /**
  * \brief Implicit MMC ray-tracing core function
+ *
+ * if doinit is set to 1, this function only initialize r->inroi for 3 roi types
+ * if doinit is set to 0, this function only updates r->{Lmove, roiidx, inroi}. r->roitype update is not necessary
+ * in the latter case, if reference element is found, it also updates r->refeid and r->roisize pointers
  */
 void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     int eid=r->eid-1;
@@ -1070,7 +1074,9 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 		for(i=0;i<6;i++){
 			if(r->roisize[i]>0.f){
 			    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
-			    if(hitstatus==htInOut || hitstatus==htOutIn){
+			    if(doinit)
+			        r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
+			    else if(hitstatus==htInOut || hitstatus==htOutIn){
 			        float lratio=ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
 				if(lratio<minratio){
 				   minratio=lratio;
@@ -1078,8 +1084,6 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 				   r->roiidx = i;
 				}
 			    }
-			    if(doinit)
-			        r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
 			}
 		}
 		if(minratio<1.f)
@@ -1098,7 +1102,9 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 		    nr = tracer->mesh->noderoi[ee[i]-1];
 		    if(nr>0.f){
 			compute_distances_to_node(r, tracer, ee, i, nr, &center, &hitstatus);
-			if(hitstatus==htInOut || hitstatus==htOutIn){
+			if(doinit)
+			    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
+			else if(hitstatus==htInOut || hitstatus==htOutIn){
 			    float lmove=ray_sphere_intersect(r, i, center, nr, hitstatus);
 			    if(lmove<minratio){
 				minratio=lmove;
@@ -1106,8 +1112,6 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 				r->roiidx = i;
 			    }
 			}
-			if(doinit)
-			    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
 		    }
 		}
 		if(minratio<r->Lmove)
@@ -1138,13 +1142,13 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     			lratio = ray_face_intersect(r, tracer, ee, i, eid<<2, eid, &hitstatus);
     		else
     			lratio = ray_face_intersect(r, tracer, newee, i, newbaseid, neweid, &hitstatus);
-		if(lratio<minratio){
+		if(doinit)
+		    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
+		else if(lratio<minratio){
 		    minratio=lratio;
 		    firsthit=hitstatus;
 		    r->roiidx = i;
 		}
-		if(doinit)
-		    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
 	    }
     	}
 	if(minratio<1.f)
