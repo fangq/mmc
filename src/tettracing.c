@@ -1056,7 +1056,7 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
 /**
  * \brief Implicit MMC ray-tracing core function
  */
-void traceroi(ray *r, raytracer *tracer, int roitype){
+void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     int eid=r->eid-1;
     int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
     if(roitype==1){
@@ -1078,11 +1078,14 @@ void traceroi(ray *r, raytracer *tracer, int roitype){
 				   r->roiidx = i;
 				}
 			    }
+			    if(doinit)
+			        r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
 			}
 		}
 		if(minratio<1.f)
 		    r->Lmove*=minratio;
-		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+	        if(!doinit)
+		    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtEdge : rtNone;
 	  }
 	  if(minratio==1.f && tracer->mesh->noderoi){
@@ -1103,11 +1106,14 @@ void traceroi(ray *r, raytracer *tracer, int roitype){
 				r->roiidx = i;
 			    }
 			}
+			if(doinit)
+			    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
 		    }
 		}
 		if(minratio<r->Lmove)
 		    r->Lmove=minratio;
-		r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+	        if(!doinit)
+		    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
 	}
     }else if(tracer->mesh->faceroi){
@@ -1137,11 +1143,14 @@ void traceroi(ray *r, raytracer *tracer, int roitype){
 		    firsthit=hitstatus;
 		    r->roiidx = i;
 		}
+		if(doinit)
+		    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
 	    }
     	}
 	if(minratio<1.f)
 	    r->Lmove*=minratio;
-	r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+	if(!doinit)
+	    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 	r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
     }
 }
@@ -1243,7 +1252,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
             if(cfg->implicit)
-                traceroi(r,tracer,cfg->implicit);
+                traceroi(r,tracer,cfg->implicit, 0);
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
@@ -1529,8 +1538,10 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
 
-	if(mesh->faceroi)
-	    init_face_inout(&r, tracer);
+        if(cfg->implicit){
+	    updateroi(cfg->implicit,&r,tracer->mesh);
+            traceroi(&r,tracer,cfg->implicit, 1);
+	}
 
 	while(1){  /*propagate a photon until exit*/
 	    if(cfg->implicit)
@@ -2105,40 +2116,6 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		MESH_ERROR("initial element does not enclose the source!");
 }
 	}
-}
-
-
-/**
- * Initialize the 'inroi' flag for the face-based implicit MMC
- */
-void init_face_inout(ray *r, raytracer *tracer){
-    float3 *pf1,pv,fnorm;
-    float distf0;
-    int eid=r->eid-1;
-    int baseid = eid<<2;
-    int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
-    float *vr;
-    int i;
-
-    vr = (float *)(tracer->mesh->faceroi+eid*4);
-
-    for(i=0;i<4;i++){
-        if(vr[i]<=0.f)
-	   continue;
-        pf1 = tracer->mesh->node + (ee[nc[ifaceorder[i]][0]]-1);	// any point on face
-        fnorm.x=(&(tracer->n[baseid].x))[ifaceorder[i]];		// normal vector of the face
-        fnorm.y=(&(tracer->n[baseid].x))[ifaceorder[i]+4];
-        fnorm.z=(&(tracer->n[baseid].x))[ifaceorder[i]+8];
-
-        vec_diff(&r->p0,pf1,&pv);
-        distf0 = vec_dot(&pv,&fnorm);
-
-        if(distf0<vr[i]){
-                r->inroi = 1;
-	        break;
-        }
-    }
-    return;
 }
 
 
