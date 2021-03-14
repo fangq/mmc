@@ -1117,17 +1117,12 @@ void traceroi(ray *r, raytracer *tracer, int roitype){
 	int hitstatus=htNone, firsthit=htNone, i;
 
         // test if this is a reference element, indicated by a negative radius
-	for(i=0;i<4;i++){
-    	    if(r->roisize[i]<0.f){
-	        // get the reference element when the current element does not have
-	        // labeled face
-    		neweid = -r->roisize[i]; // casting to integer
-    		r->refeid = neweid;
-    		newbaseid=(neweid-1)<<2;
-    		newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
-		r->roisize=(float *)(tracer->mesh->faceroi+(neweid-1)*4);
-		break;  // currently, can only handle a single reference face
-    	    }
+	if(r->roisize[0]<-4.f){
+	    neweid=(int)(-r->roisize[0])-4;
+	    r->refeid = neweid;
+	    newbaseid=(neweid-1)<<2;
+	    newee=(int *)(tracer->mesh->elem+(neweid-1)*tracer->mesh->elemlen);
+	    r->roisize=(float *)(tracer->mesh->faceroi+(neweid-1)*4);
 	}
 
         // test if the ray intersect with a face ROI (slab)

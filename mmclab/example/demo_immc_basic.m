@@ -114,8 +114,6 @@ end
 % sum(allfaces>4,2)==3 gives the triangles that are made of nodes 5/6/7/8
 cfg.faceroi=reshape(double(sum(allfaces>4,2)==3), size(cfg.elem,1),size(facelist,1));
 cfg.faceroi(cfg.faceroi>0)=0.1;
-cfg.faceroi(3,1)=-4;
-cfg.faceroi(5,1)=-6;
 
 % run node-based iMMC
 flux_fimmc=mmclab(cfg);
