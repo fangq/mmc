@@ -39,7 +39,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "tettracing.h"
-#include "fastmath.h"
 
 /**<  Macro to enable SSE4 based ray-tracers */
 
@@ -317,18 +316,10 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
                 if(cfg->mcmethod==mmMCX){
-#ifdef __INTEL_COMPILER
 	           r->weight*=expf(-prop->mua*r->Lmove);
-#else
-	           r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
                 }
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
-#ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
-#else
-		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
-#endif
                     currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
 		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
@@ -570,18 +561,10 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
                 if(cfg->mcmethod==mmMCX){
-#ifdef __INTEL_COMPILER
 		   r->weight*=expf(-prop->mua*r->Lmove);
-#else
-		   r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
                 }
 		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
-#ifdef __INTEL_COMPILER
 		    currweight=expf(-DELTA_MUA*r->Lmove);
-#else
-		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
-#endif
                     currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
 		}else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
@@ -811,18 +794,10 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
             if(cfg->mcmethod==mmMCX){
-#ifdef __INTEL_COMPILER
 	       r->weight*=expf(-prop->mua*r->Lmove);
-#else
-	       r->weight*=fast_expf9(-prop->mua*r->Lmove);
-#endif
             }
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
-#ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
-#else
-		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
-#endif
                 currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
 	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
@@ -1148,6 +1123,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->isend=0;
 	r->roitype=rtNone;
 	r->refeid=-1;
+	r->roiidx=-1;
 
 	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
 	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
@@ -1311,20 +1287,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
             if(cfg->mcmethod==mmMCX){
-//#ifdef __INTEL_COMPILER
 	       totalloss=expf(-prop->mua*r->Lmove);
-//#else
-//	       totalloss=fast_expf9(-prop->mua*r->Lmove);
-//#endif
                r->weight*=totalloss;
             }
 	    totalloss=1.f-totalloss;
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
-#ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
-#else
-		currweight=fast_expf9(-DELTA_MUA*r->Lmove);
-#endif
                 currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
 	    }else if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWL){
@@ -1419,11 +1387,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			    int i, seg=(int)(r->Lmove/cfg->steps.x)+1;
 			    seg=(seg<<1);
 			    dstep=r->Lmove/seg;
-#ifdef __INTEL_COMPILER
 	                    segloss=expf(-prop->mua*dstep);
-#else
-	                    segloss=fast_expf9(-prop->mua*dstep);
-#endif
 			    T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
 			    O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
 			    S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
@@ -1614,7 +1578,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && r.roiidx>=0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
 	    	reflectrayroi(cfg,&r.vec,&r.p0,tracer,&r.eid,&r.inroi,ran,r.roitype,r.roiidx,r.refeid);
 		vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 		continue;
@@ -1730,7 +1694,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 
-	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    if(cfg->implicit>0 && cfg->isreflect && r.roitype && r.roiidx>=0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
 	    	    reflectrayroi(cfg,&r.vec,&r.p0,tracer,&r.eid,&r.inroi,ran,r.roitype,r.roiidx,r.refeid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
