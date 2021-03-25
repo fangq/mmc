@@ -67,7 +67,7 @@ if(nargin==0)
     cfg.node=vnode*res;
     cfg.edgeroi=eroi*res;
     cfg.noderoi=zeros(size(vnode,1),1);
-%     cfg.noderoi(1:size(noder,1))=noder;
+    cfg.noderoi(1:size(noder,1))=noder*res;
 end
 
 tic

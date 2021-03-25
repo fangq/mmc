@@ -135,6 +135,7 @@ void mesh_init_from_cfg(tetmesh *mesh,mcconfig *cfg){
         mesh_loadfaceneighbor(mesh,cfg);
         mesh_loadmedia(mesh,cfg);
         mesh_loadelemvol(mesh,cfg);
+	mesh_loadroi(mesh,cfg);
 	if(cfg->seed==SEED_FROM_FILE && cfg->seedfile[0]){
           mesh_loadseedfile(mesh,cfg);
         }
@@ -288,6 +289,48 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
            }
         }
 	cfg->his.maxmedia=mesh->prop; /*skip media 0*/
+}
+
+/**
+ * @brief Load edge/node/face roi for implicit MMC
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+void mesh_loadroi(tetmesh *mesh,mcconfig *cfg){
+	FILE *fp;
+	int len,i,j,row,col;
+	float *pe=NULL;
+	char froi[MAX_FULL_PATH];
+
+	mesh_filenames("roi_%s.dat",froi,cfg);
+	if((fp=fopen(froi,"rt"))==NULL){
+		return;
+	}
+	len=fscanf(fp,"%d %d",&col,&row);
+	if(len!=2 || (col!=1 && col!=4 && col!=6) || row<=0){
+		MESH_ERROR("roi file has wrong format");
+	}
+        if(col==6){
+	    mesh->edgeroi=(float *)malloc(sizeof(float)*6*mesh->ne);
+	    pe=mesh->edgeroi;
+        }else if(col==1){
+	    mesh->noderoi=(float *)malloc(sizeof(float)*mesh->nn);
+	    pe=mesh->noderoi;
+        }else if(col==4){
+	    mesh->faceroi=(float *)malloc(sizeof(float)*4*mesh->ne);
+	    pe=mesh->faceroi;
+        }
+	for(i=0;i<row;i++){
+	    for(j=0;j<col;j++)
+		if(fscanf(fp,"%f",pe+j)!=1)
+		    break;
+	    pe+=col;
+        }
+	fclose(fp);
+	if(i<row)
+	    MESH_ERROR("roi file has wrong format");
 }
 
 /**
@@ -623,7 +666,7 @@ void tracer_init(raytracer *tracer,tetmesh *pmesh,char methodid){
  */
 
 void tracer_prep(raytracer *tracer,mcconfig *cfg){
-        int i, ne=tracer->mesh->ne;
+        int i, j, ne=tracer->mesh->ne;
 	if(tracer->n==NULL && tracer->m==NULL && tracer->d==NULL){
 	    if(tracer->mesh!=NULL)
 		tracer_build(tracer);
@@ -659,6 +702,30 @@ void tracer_prep(raytracer *tracer,mcconfig *cfg){
 	        bary[i]/=s;
 	    }
 	}
+	// build acceleration data structure to speed up first-neighbor immc face-roi calculation
+	// loop over each faceroi, count how many roi in each elem, and write to the first elem as negative integer
+	if(tracer->mesh->faceroi){
+	  for(i=0;i<ne;i++){
+	     int count=0;
+	     for(j=0;j<4;j++)
+	         if(tracer->mesh->faceroi[(i<<2)+j]>0.f)
+		    count++;
+	     if(count && fabs(tracer->mesh->faceroi[i<<2])<EPS)
+	         tracer->mesh->faceroi[i<<2]=-count;   // number -1 to -4 indicates how many faces have ROIs
+	  }
+	  for(i=0;i<ne;i++){
+	     if(fabs(tracer->mesh->faceroi[i<<2])<EPS){ // if I don't have roi
+	       for(j=0;j<tracer->mesh->elemlen;j++){    // loop over my neighbors
+	         int id=tracer->mesh->facenb[i*tracer->mesh->elemlen+j]; // loop over neighboring elements
+		 if(id>0 && tracer->mesh->faceroi[(id-1)<<2]<0.f){ // if I don't have roi, but neighbor has, set ref id as -elemid-4, only handle 1 roi neighbor case
+	             tracer->mesh->faceroi[i<<2]=-id-4;
+		     break;
+		 }
+	       }
+	     }
+	  }
+	}
+	// loop over each external surface triangle (facenb[]==0) and sequentially number them as negative integer
 	ne=tracer->mesh->ne*tracer->mesh->elemlen;
 	tracer->mesh->nf=0;
 	for(i=0;i<ne;i++){

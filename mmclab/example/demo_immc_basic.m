@@ -17,8 +17,8 @@
 %
 %% face-based iMMC (f-iMMC)
 %
-% cfg.faceroi - a 4 column array, storing the slab-thickness of face-roi in the following order
-%               [(4,1,2), (4,2,3), (3,1,4),(2,1,3)]. A 0 indicates no ROI.
+% cfg.faceroi - a 4 column array, storing the slab-thickness of face-roi in the nchoosek order
+%               [(1,2,3),(1,2,4),(1,3,4),(2,3,4)]. A 0 indicates no ROI.
 
 %% add path
 % 1. you need to add the path to iso2mesh toolbox if not already
@@ -114,8 +114,6 @@ end
 % sum(allfaces>4,2)==3 gives the triangles that are made of nodes 5/6/7/8
 cfg.faceroi=reshape(double(sum(allfaces>4,2)==3), size(cfg.elem,1),size(facelist,1));
 cfg.faceroi(cfg.faceroi>0)=0.1;
-cfg.faceroi(3,1)=-4;
-cfg.faceroi(5,1)=-6;
 
 % run node-based iMMC
 flux_fimmc=mmclab(cfg);
@@ -129,5 +127,5 @@ subplot(132)
 imagesc(log10(rot90(squeeze(flux_nimmc.data(50,1:100,1:100)))))
 title('node-iMMC');axis equal
 subplot(133)
-imagesc(log10(rot90(squeeze(flux_fimmc.data(50,1:100,1:100)))))
+imagesc(log10(rot90(squeeze(abs(flux_fimmc.data(50,1:100,1:100))))))
 title('face-iMMC');axis equal

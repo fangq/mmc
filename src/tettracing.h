@@ -72,14 +72,11 @@ typedef struct MMC_ray{
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 	unsigned int oldidx;
 	double oldweight;
-        int edgeroiid[4];	      /**< local edge id for edgerois */
-	float roisize[4];	      /**< edgeroi radius corresponding to edgeroiid */
-	int isedgeroi;		      /**< if 1, the photon hits the edgeroi; if 2, the photon hits the node edgeroi; if 0, does not hit edgeroi */
-	int inout;		      /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
-	float3 u;		      /**< edgeroi edge direction */
-	float3 E;		      /**< the starting node of edgeroi edge */
-	int faceindex;		      /**< local face index that the photon intersect with*/
-	int faceeid;		      /**< reference element id that is used for face-based implicit MMC*/
+	float *roisize;	              /**< roisize, node/edge radii or face thickness */
+	int roitype;		      /**< if 1, the photon hits the edgeroi; if 2, the photon hits the node edgeroi; if 0, does not hit edgeroi */
+	int inroi;		      /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
+	int roiidx;		      /**< edge(0-5), node (0-4) or face (0-4) index in a local element with ROIs */
+	int refeid;		      /**< reference element id that is used for face-based implicit MMC*/
 } ray;
 
 /***************************************************************************//**
@@ -106,24 +103,24 @@ typedef struct MMC_visitor{
 #ifdef	__cplusplus
 extern "C" {
 #endif
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int index, float* distdata, float3* projdata, int* hitstatus);
-void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, int* hitstatus, float3* cc_out);
-float ray_cylinder_intersect(ray *r, int index, int *curprop, float* distdata, float3* projdata, int hitstatus);
-float ray_sphere_intersect(ray *r, int index, int *curprop, float3 cc, float nr, int hitstatus);
-float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid);
 void interppos(float3 *w,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void getinterp(float w1,float w2,float w3,float3 *p1,float3 *p2,float3 *p3,float3 *pout);
 void fixphoton(float3 *p,float3 *nodes, int *ee);
 void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType *ran,RandType *ran0, visitor *visit);
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
-void init_face_inout(ray *r, raytracer *tracer);
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout);
-float reflectedgeroi(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isedgeroi,int *faceindex,int *faceeid);
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inroi);
+float reflectrayroi(mcconfig *cfg,float3 *c0,float3 *ph,raytracer *tracer,int *eid,int *inroi,RandType *ran,int roitype,int roiidx,int refeid);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void visitor_init(mcconfig *cfg, visitor* visit);
 void visitor_clear(visitor* visit);
 void updateroi(int immctype,ray *r, tetmesh *mesh);
+int traceroi(ray *r, raytracer *tracer, int roitype, int doinit);
+  void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float* d2d, float3* p2d, int* hitstatus);
+void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, float3 **center, int* hitstatus);
+  float ray_cylinder_intersect(ray *r, int index, float* d2d, float3* p2d, int hitstatus);
+float ray_sphere_intersect(ray *r, int index, float3 *center, float nr, int hitstatus);
+float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid,int *hitstatus);
 
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus

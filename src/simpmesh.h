@@ -158,6 +158,7 @@ void mesh_savedetimage(float *detmap, mcconfig *cfg);
 float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg);
 void mesh_srcdetelem(tetmesh *mesh,mcconfig *cfg);
 void mesh_createdualmesh(tetmesh *mesh,mcconfig *cfg);
+void mesh_loadroi(tetmesh *mesh,mcconfig *cfg);
 
 void tracer_init(raytracer *tracer,tetmesh *mesh,char methodid);
 void tracer_build(raytracer *tracer);
@@ -257,7 +258,7 @@ static inline float dist2(float3 *p0,float3 *p1){
 }
 
 static inline float dist(float3 *p0,float3 *p1){
-    return sqrt(dist2(p0,p1));
+    return sqrtf(dist2(p0,p1));
 }
 
 static inline float dist2d2(float *p0,float *p1){
