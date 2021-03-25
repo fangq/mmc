@@ -1059,15 +1059,15 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int faceid, int bas
  * if doinit is set to 0, this function only updates r->{Lmove, roiidx, inroi}. r->roitype update is not necessary
  * in the latter case, if reference element is found, it also updates r->refeid and r->roisize pointers
  */
-void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
+int traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     int eid=r->eid-1;
     int *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
     if(roitype==1){
           int i;
           float minratio=1.f;
+	  int hitstatus=htNone, firsthit=htNone, firstinout=htNone;
 	  if(tracer->mesh->edgeroi){
 		// edge-based iMMC  - ray-cylinder intersection test
-	        int hitstatus=htNone, firsthit=htNone;
 	        float distdata[2];
 	        float3 projdata[2];
 		for(i=0;i<6;i++){
@@ -1075,27 +1075,39 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 			    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
 			    if(doinit)
 			        r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
-			    else if(hitstatus==htInOut || hitstatus==htOutIn){
+			    else{
+			      if(hitstatus==htInOut || hitstatus==htOutIn){
 			        float lratio=ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
 				if(lratio<minratio){
 				   minratio=lratio;
 				   firsthit=hitstatus;
 				   r->roiidx = i;
 				}
+			      }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
+				firstinout=firstinout==htNone ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout);
+			      }
 			    }
 			}
 		}
 		if(minratio<1.f)
 		    r->Lmove*=minratio;
-	        if(!doinit)
-		    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+	        if(!doinit){
+		  if(firsthit!=htNone){
+		    // hit happens
+		    r->inroi=(firsthit==htOutIn) ? 1 : 0;
+		  }else if(firstinout!=htNone){
+		    // hit not happens
+		    r->inroi=(firstinout==htNoHitIn) ? 1 : 0;
+		  }
+		}
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtEdge : rtNone;
 	  }
-	  if(minratio==1.f && tracer->mesh->noderoi){
+	  
+	  if(firsthit==htNone && firstinout!=htNoHitIn && tracer->mesh->noderoi){
 	        // not hit any edgeroi in the current element, then go for node-based iMMC
 		float nr;
 		float3 *center;
-	        int hitstatus=htNone, firsthit=htNone;
+	        hitstatus=htNone, firsthit=htNone, firstinout=htNone;
 		minratio=r->Lmove;
 		for(i=0;i<4;i++){	// check if hits any node edgeroi
 		    nr = tracer->mesh->noderoi[ee[i]-1];
@@ -1103,27 +1115,44 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 			compute_distances_to_node(r, tracer, ee, i, nr, &center, &hitstatus);
 			if(doinit)
 			    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
-			else if(hitstatus==htInOut || hitstatus==htOutIn){
+			else{
+			  if(hitstatus==htInOut || hitstatus==htOutIn){
 			    float lmove=ray_sphere_intersect(r, i, center, nr, hitstatus);
 			    if(lmove<minratio){
 				minratio=lmove;
 				firsthit=hitstatus;
 				r->roiidx = i;
 			    }
+		          }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
+		              firstinout=firstinout==htNone ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout);
+			  }
 			}
 		    }
 		}
 		if(minratio<r->Lmove)
 		    r->Lmove=minratio;
-	        if(!doinit)
-		    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+		if(!doinit){
+		  if(firsthit!=htNone){
+		    // hit happens
+		    r->inroi=(firsthit==htOutIn) ? 1 : 0;
+		  }else if(firstinout!=htNone){
+		    // hit not happens
+		    r->inroi=(firstinout==htNoHitIn) ? 1 : 0;
+		  }
+		}
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
-	}
+	  }
+	  if(firsthit==htNone && firstinout==htNone){
+	    // use elem properties
+	    return 0;
+	  }
+	  return -1;
+	
     }else if(tracer->mesh->faceroi){
     	int neweid=-1, newbaseid=0;
     	int *newee;
 	float lratio=1.f,minratio=1.f;
-	int hitstatus=htNone, firsthit=htNone, i;
+	int hitstatus=htNone, firsthit=htNone, firstinout=htNone, i;
 
         // test if this is a reference element, indicated by a negative radius
 	if(r->roisize[0]<-4.f){
@@ -1135,7 +1164,7 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 	}
 
         // test if the ray intersect with a face ROI (slab)
-    	for(i=0;i<4;i++){
+        for(i=0;i<4;i++){
 	    if(r->roisize[i]>0.f){
     		if(neweid<0)
     			lratio = ray_face_intersect(r, tracer, ee, i, eid<<2, eid, &hitstatus);
@@ -1143,19 +1172,37 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     			lratio = ray_face_intersect(r, tracer, newee, i, newbaseid, neweid, &hitstatus);
 		if(doinit)
 		    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
-		else if(lratio<minratio){
-		    minratio=lratio;
-		    firsthit=hitstatus;
-		    r->roiidx = i;
+		else{
+		  if(hitstatus==htInOut || hitstatus==htOutIn){
+		    if(lratio<minratio){
+		      minratio=lratio;
+		      firsthit=hitstatus;
+		      r->roiidx = i;
+	            }
+		  }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
+		    firstinout=firstinout==htNone ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout);
+	          }
 		}
 	    }
     	}
 	if(minratio<1.f)
 	    r->Lmove*=minratio;
-	if(!doinit)
-	    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
+	if(!doinit){
+            if(firsthit!=htNone){
+              // hit happens
+              r->inroi=(firsthit==htOutIn) ? 1 : 0;
+            }else if(firstinout!=htNone){
+              // hit not happens
+              r->inroi=(firstinout==htNoHitIn) ? 1 : 0;
+            }
+        }
 	r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
+	if(firsthit==htNone && firstinout==htNone){
+          // use elem properties
+          return 0;
+        }
     }
+    return -1;
 }
 
 /** 
@@ -1254,9 +1301,16 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 	    
 	    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
+	    int roiprop=-1;
+	    int oldroi=r->inroi;
             if(cfg->implicit)
-                traceroi(r,tracer,cfg->implicit, 0);
+                roiprop=traceroi(r,tracer,cfg->implicit, 0);
 
+	    if(oldroi==1 && roiprop==0){
+	        prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+		rc=prop->n*R_C0;
+	    }
+	    
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
 	    T = _mm_set1_ps(bary.x);

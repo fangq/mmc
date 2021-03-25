@@ -31,6 +31,7 @@
 
 /***************************************************************************//**
 \file    tettracing.h
+
 \brief   Definition of the core ray-tracing functions
 *******************************************************************************/
 
@@ -46,6 +47,7 @@
 /***************************************************************************//**
 \struct MMC_ray tettracing.h
 \brief  Data structure associated with the current photon/ray
+
 *******************************************************************************/   
 
 typedef struct MMC_ray{
@@ -80,6 +82,7 @@ typedef struct MMC_ray{
 /***************************************************************************//**
 \struct MMC_visitor tettracing.h
 \brief  A structure that accumulates the statistics about the simulation
+
 *******************************************************************************/  
 
 typedef struct MMC_visitor{
@@ -112,10 +115,10 @@ void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void visitor_init(mcconfig *cfg, visitor* visit);
 void visitor_clear(visitor* visit);
 void updateroi(int immctype,ray *r, tetmesh *mesh);
-void traceroi(ray *r, raytracer *tracer, int roitype, int doinit);
-void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float d2d[2], float3 p2d[2], int* hitstatus);
+int traceroi(ray *r, raytracer *tracer, int roitype, int doinit);
+  void compute_distances_to_edge(ray *r, raytracer *tracer, int *ee, int edgeid, float* d2d, float3* p2d, int* hitstatus);
 void compute_distances_to_node(ray *r, raytracer *tracer, int *ee, int index, float nr, float3 **center, int* hitstatus);
-float ray_cylinder_intersect(ray *r, int index, float d2d[2], float3 p2d[2], int hitstatus);
+  float ray_cylinder_intersect(ray *r, int index, float* d2d, float3* p2d, int hitstatus);
 float ray_sphere_intersect(ray *r, int index, float3 *center, float nr, int hitstatus);
 float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid,int *hitstatus);
 
