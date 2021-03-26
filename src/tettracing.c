@@ -1083,7 +1083,8 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 				   firsthit=hitstatus;
 				   r->roiidx = i;
 				}
-			    }
+			    }else if(hitstatus==htNoHitIn)
+			        r->inroi=1;
 			}
 		}
 		if(minratio<1.f)
@@ -1111,7 +1112,8 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 				firsthit=hitstatus;
 				r->roiidx = i;
 			    }
-			}
+			}else if(hitstatus==htNoHitIn)
+			    r->inroi=1;
 		    }
 		}
 		if(minratio<r->Lmove)
@@ -1148,7 +1150,8 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 		    minratio=lratio;
 		    firsthit=hitstatus;
 		    r->roiidx = i;
-		}
+		}else if(hitstatus==htNoHitIn)
+		    r->inroi=1;
 	    }
     	}
 	if(minratio<1.f)
@@ -1157,6 +1160,8 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 	    r->inroi= (firsthit==htNone? r->inroi : (firsthit==htOutIn || firsthit==htNoHitIn));
 	r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
     }
+    if(r->roiidx<0)
+        r->inroi=0;
 }
 
 /** 
