@@ -195,6 +195,9 @@
   #define FL3(f) (f)
   #define __constant__  __constant
   #define __device__
+  #ifndef NULL
+      #define NULL 0
+  #endif
 
   #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
@@ -1291,8 +1294,8 @@ __device__ void onephoton(unsigned int id,__local float *ppath, __constant MCXPa
 			    r.vec.x,r.vec.y,r.vec.z,r.weight,r.eid));
 #ifdef MCX_SAVE_DETECTORS
                        if(GPU_PARAM(gcfg,issavedet) && GPU_PARAM(gcfg,issaveexit)){                                     /*when issaveexit is set to 1*/
-                            copystate(ppath+(GPU_PARAM(gcfg,reclen)-7),(float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
-                            copystate(ppath+(GPU_PARAM(gcfg,reclen)-4),(float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
+                            copystate(ppath+(GPU_PARAM(gcfg,reclen)-7),(__private float *)&(r.p0),3);  /*columns 7-5 from the right store the exit positions*/
+                            copystate(ppath+(GPU_PARAM(gcfg,reclen)-4),(__private float *)&(r.vec),3); /*columns 4-2 from the right store the exit dirs*/
                        }
 #endif
 #ifdef MCX_SAVE_DREF
