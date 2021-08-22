@@ -1066,55 +1066,57 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     if(roitype==1){ /** edge and node immc - edge also depends on node */
           int i;
           float minratio=1.f;
-         int hitstatus=htNone, firsthit=htNone, firstinout=htNone;
-         if(tracer->mesh->edgeroi){ /** if edge roi is defined */
+          int hitstatus=htNone, firsthit=htNone, firstinout=htNone;
+          if(tracer->mesh->edgeroi){ /** if edge roi is defined */
 		// edge-based iMMC  - ray-cylinder intersection test
 	        float distdata[2];
 	        float3 projdata[2];
-               for(i=0;i<6;i++){  /** loop over each edge in current element */
+                for(i=0;i<6;i++){  /** loop over each edge in current element */
 			if(r->roisize[i]>0.f){
-                           /** decide if photon is in the roi or not */
+                            /** decide if photon is in the roi or not */
 			    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
-                           /**
-                              hitstatus has 4 possible outputs:
-                              htInOut: photon path intersects with cylinder, moving from in to out
-                              htOutIn: photon path intersects with cylinder, moving from out to in
-                              htNoHitIn: both ends of photon path are inside cylinder, no intersection
-                              htNoHitOut: both ends of photon path are outside cylinder, no intersection
-                              htNone: unexpected, should never happen
-                            */
+                            /**
+                               hitstatus has 4 possible outputs:
+                               htInOut: photon path intersects with cylinder, moving from in to out
+                               htOutIn: photon path intersects with cylinder, moving from out to in
+                               htNoHitIn: both ends of photon path are inside cylinder, no intersection
+                               htNoHitOut: both ends of photon path are outside cylinder, no intersection
+                               htNone: unexpected, should never happen
+                             */
 			    if(doinit)
 			        r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
-                           else{
-                               if(hitstatus==htInOut || hitstatus==htOutIn){ /** if intersection is found */
-                                   /** calculate the first intersection distance normalied by path seg length */
-                                   float lratio=ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
-                                   if(lratio<minratio){
-                                      minratio=lratio;
-                                      firsthit=hitstatus;
-                                      r->roiidx = i;
-                                   }
-                               }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
-                                   firstinout= ((firstinout==htNone) ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout));
+                            else{
+                                if(hitstatus==htInOut || hitstatus==htOutIn){ /** if intersection is found */
+                                    /** calculate the first intersection distance normalied by path seg length */
+                                    float lratio=ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
+                                    if(lratio<minratio){
+                                       minratio=lratio;
+                                       firsthit=hitstatus;
+                                       r->roiidx = i;
+                                    }
+                                }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
+                                    firstinout= ((firstinout==htNone) ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout));
 				}
                            }
 			}
 		}
 		if(minratio<1.f)
 		    r->Lmove*=minratio;
-	        if(!doinit)
+	        if(!doinit){
                    r->inroi= (firsthit!=htNone? (firsthit==htOutIn) : (firstinout!=htNone ? (firstinout==htNoHitIn) : r->inroi ));
+		   r->inroi=(firsthit==htNone && firstinout==htNone) ? 0 : r->inroi;
+		}
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtEdge : rtNone;
 	  }
-         if(firsthit==htNone && firstinout!=htNoHitIn && tracer->mesh->noderoi){
+          if(firsthit==htNone && firstinout!=htNoHitIn && tracer->mesh->noderoi){
 	        // not hit any edgeroi in the current element, then go for node-based iMMC
 		float nr;
 		float3 *center;
                
 		minratio=r->Lmove;
-               hitstatus=htNone;
-               firsthit=htNone;
-               firstinout=htNone;
+                hitstatus=htNone;
+                firsthit=htNone;
+                firstinout=htNone;
 
 		for(i=0;i<4;i++){	// check if hits any node edgeroi
 		    nr = tracer->mesh->noderoi[ee[i]-1];
@@ -1122,27 +1124,29 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
 			compute_distances_to_node(r, tracer, ee, i, nr, &center, &hitstatus);
 			if(doinit)
 			    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
-                       else{
-                           if(hitstatus==htInOut || hitstatus==htOutIn){
-                               float lmove=ray_sphere_intersect(r, i, center, nr, hitstatus);
-                               if(lmove<minratio){
-                                   minratio=lmove;
-                                   firsthit=hitstatus;
-                                   r->roiidx = i;
-                               }
-                           }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
-                               firstinout= ((firstinout==htNone) ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout));
-			    }
-                       }
+                        else{
+                            if(hitstatus==htInOut || hitstatus==htOutIn){
+                                float lmove=ray_sphere_intersect(r, i, center, nr, hitstatus);
+                                if(lmove<minratio){
+                                    minratio=lmove;
+                                    firsthit=hitstatus;
+                                    r->roiidx = i;
+                                }
+                            }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
+                                firstinout= ((firstinout==htNone) ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout));
+		 	    }
+                        }
 		    }
 		}
 		if(minratio<r->Lmove)
 		    r->Lmove=minratio;
-	        if(!doinit)
+	        if(!doinit){
                    r->inroi= (firsthit!=htNone? (firsthit==htOutIn) : (firstinout!=htNone ? (firstinout==htNoHitIn) : r->inroi ));
+		   r->inroi=(firsthit==htNone && firstinout==htNone) ? 0 : r->inroi;
+		}
 		r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtNode : rtNone;
 	}
-       r->inroi=(firsthit==htNone && firstinout==htNone) ? 0 : r->inroi;
+
     }else if(tracer->mesh->faceroi){
     	int neweid=-1, newbaseid=0;
     	int *newee;
@@ -1167,25 +1171,26 @@ void traceroi(ray *r, raytracer *tracer, int roitype, int doinit){
     			lratio = ray_face_intersect(r, tracer, newee, i, newbaseid, neweid, &hitstatus);
 		if(doinit)
 		    r->inroi |= (hitstatus==htInOut || hitstatus==htNoHitIn);
-               else{
-                   if(hitstatus==htInOut || hitstatus==htOutIn){ /** if intersection is found */
-                       if(lratio<minratio){
-                          minratio=lratio;
-                          firsthit=hitstatus;
-                          r->roiidx = i;
-                       }
-                   }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
-                       firstinout= ((firstinout==htNone) ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout));
-                   }
-               }
+                else{
+                    if(hitstatus==htInOut || hitstatus==htOutIn){ /** if intersection is found */
+                        if(lratio<minratio){
+                           minratio=lratio;
+                           firsthit=hitstatus;
+                           r->roiidx = i;
+                        }
+                    }else if(hitstatus==htNoHitIn || hitstatus==htNoHitOut){
+                        firstinout= ((firstinout==htNone) ? hitstatus : (hitstatus==htNoHitIn ? hitstatus : firstinout));
+                    }
+                }
 	    }
     	}
 	if(minratio<1.f)
 	    r->Lmove*=minratio;
-	if(!doinit)
-           r->inroi= (firsthit!=htNone? (firsthit==htOutIn) : (firstinout!=htNone ? (firstinout==htNoHitIn) : r->inroi ));
+	if(!doinit){
+            r->inroi= (firsthit!=htNone? (firsthit==htOutIn) : (firstinout!=htNone ? (firstinout==htNoHitIn) : r->inroi ));
+            r->inroi=(firsthit==htNone && firstinout==htNone) ? 0 : r->inroi;
+	}
 	r->roitype=(firsthit==htInOut || firsthit==htOutIn) ? rtFace : rtNone;
-       r->inroi=(firsthit==htNone && firstinout==htNone) ? 0 : r->inroi;
     }
 }
 
