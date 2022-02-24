@@ -268,8 +268,6 @@
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
 #define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
 
-enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
-
 typedef struct MMC_Ray{
 	float3 p0;                    /**< current photon position */
 	float3 vec;                   /**< current photon direction vector */
@@ -350,6 +348,8 @@ __constant__ Medium   gmed[MAX_PROP];
 #define GPU_PARAM(a,b) (a->b)
 
 #else
+
+enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
 
 #ifndef USE_MACRO_CONST
     #define GPU_PARAM(a,b) (a->b)
