@@ -1575,12 +1575,12 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
-#endif
 
         if(cfg->implicit){
 	    updateroi(cfg->implicit,&r,tracer->mesh);
             traceroi(&r,tracer,cfg->implicit, 1);
 	}
+#endif
 
 	while(1){  /*propagate a photon until exit*/
 	    if(cfg->implicit)
