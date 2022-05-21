@@ -1,7 +1,7 @@
 ROOTDIR = ..
 BINARY=mmc
 
-FILES=xorshift128p_rand simpmesh tettracing mcx_utils tictoc mmc mmc_host cjson/cJSON
+FILES=mmc_rand_xorshift128p mmc_mesh mmc_raytrace mmc_utils mmc_tictoc mmc mmc_host cjson/cJSON mmc_highorder ubj/ubjw
 
 PLATFORM = $(shell uname -s)        
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)

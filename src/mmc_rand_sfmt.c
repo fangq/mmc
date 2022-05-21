@@ -6,23 +6,23 @@
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
-**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing 
+**          "Mesh-based Monte Carlo Method Using Fast Ray-Tracing
 **          in Plucker Coordinates,"</a> Biomed. Opt. Express, 1(1) 165-175 (2010).
-**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli, 
+**  \li \c (\b Fang2012) Qianqian Fang and David R. Kaeli,
 **           <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223">
-**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a> 
+**          "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"</a>
 **          Biomed. Opt. Express 3(12), 3223-3230 (2012)
-**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang, 
+**  \li \c (\b Yao2016) Ruoyang Yao, Xavier Intes, and Qianqian Fang,
 **          <a href="https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171">
-**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection 
+**          "Generalized mesh-based Monte Carlo for wide-field illumination and detection
 **           via mesh retessellation,"</a> Biomed. Optics Express, 7(1), 171-184 (2016)
-**  \li \c (\b Fang2019) Qianqian Fang and Shijie Yan, 
+**  \li \c (\b Fang2019) Qianqian Fang and Shijie Yan,
 **          <a href="http://dx.doi.org/10.1117/1.JBO.24.11.115002">
-**          "Graphics processing unit-accelerated mesh-based Monte Carlo photon transport 
+**          "Graphics processing unit-accelerated mesh-based Monte Carlo photon transport
 **           simulations,"</a> J. of Biomedical Optics, 24(11), 115002 (2019)
-**  \li \c (\b Yuan2021) Yaoshen Yuan, Shijie Yan, and Qianqian Fang, 
+**  \li \c (\b Yuan2021) Yaoshen Yuan, Shijie Yan, and Qianqian Fang,
 **          <a href="https://www.osapublishing.org/boe/fulltext.cfm?uri=boe-12-1-147">
-**          "Light transport modeling in highly complex tissues using the implicit 
+**          "Light transport modeling in highly complex tissues using the implicit
 **           mesh-based Monte Carlo algorithm,"</a> Biomed. Optics Express, 12(1) 147-161 (2021)
 **
 **  \section slicense License
@@ -38,12 +38,12 @@
 #ifndef _MMC_SFMT_RAND_H
 #define _MMC_SFMT_RAND_H
 
-#include "sfmt_rand.h"
+#include "mmc_rand_sfmt.h"
 #include "SFMT/SFMT.h"
 
 #ifdef MMC_USE_SSE_MATH
-#include "sse_math/sse_math.h"
-#include <smmintrin.h>
+    #include "sse_math/sse_math.h"
+    #include <smmintrin.h>
 #endif
 
 #define MAX_SFMT_RAND        4294967296           //2^32
@@ -52,35 +52,37 @@
 #define INIT_MULT            1812433253
 
 // generate random number for the next zenith angle
-__device__ void rand_need_more(RandType t[RAND_BUF_LEN],RandType tnew[RAND_BUF_LEN]){
+__device__ void rand_need_more(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN]) {
 }
 
-__device__ void sfmt_init(RandType *t,RandType *tnew,uint n_seed[],uint idx){
-     uint32_t ini[2];
-     ini[0]=n_seed[idx*RAND_SEED_WORD_LEN];
-     ini[1]=n_seed[idx*RAND_SEED_WORD_LEN+1];
-     init_by_array(ini, 2);
-     #pragma omp critical
-     {
-        fill_array32(t,RAND_BUF_LEN);
-     }
+__device__ void sfmt_init(RandType* t, RandType* tnew, uint n_seed[], uint idx) {
+    uint32_t ini[2];
+    ini[0] = n_seed[idx * RAND_SEED_WORD_LEN];
+    ini[1] = n_seed[idx * RAND_SEED_WORD_LEN + 1];
+    init_by_array(ini, 2);
+    #pragma omp critical
+    {
+        fill_array32(t, RAND_BUF_LEN);
+    }
 }
 // transform into [0,1] random number
-__device__ float rand_uniform01(RandType t[RAND_BUF_LEN]){
+__device__ float rand_uniform01(RandType t[RAND_BUF_LEN]) {
     static __thread unsigned int pos;
-    if(pos>=RAND_BUF_LEN) {
+
+    if (pos >= RAND_BUF_LEN) {
         #pragma omp critical
-	{
-	    fill_array32(t,RAND_BUF_LEN);
-	}
-	pos=0;
+        {
+            fill_array32(t, RAND_BUF_LEN);
+        }
+        pos = 0;
     }
-    return t[pos++]*R_MAX_SFMT_RAND;
+
+    return t[pos++] * R_MAX_SFMT_RAND;
 }
-__device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN],uint *n_seed,int idx){
-    sfmt_init(t,tnew,n_seed,idx);
+__device__ void rng_init(RandType t[RAND_BUF_LEN], RandType tnew[RAND_BUF_LEN], uint* n_seed, int idx) {
+    sfmt_init(t, tnew, n_seed, idx);
 }
 
-#include "rng_common.h"
+#include "mmc_rand_common.h"
 
 #endif

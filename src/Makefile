@@ -1,7 +1,7 @@
 ROOTDIR = ..
 BINARY=mmc
 
-FILES=xorshift128p_rand simpmesh tettracing mcx_utils tictoc mmc cjson/cJSON mmc_host highordermesh mmc_cl_utils mmc_cl_host ubj/ubjw
+FILES=mmc_rand_xorshift128p mmc_mesh mmc_raytrace mmc_utils mmc_tictoc mmc cjson/cJSON mmc_host mmc_highorder mmc_cl_utils mmc_cl_host ubj/ubjw
 CLPROGRAM=mmc_core
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
@@ -9,7 +9,7 @@ ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
   MEXLINKOPT:=$(EXTRALIB)
 endif
 
-DOXYCFG=mmcdoxy.cfg
+DOXYCFG=mmc_doxygen.cfg
 
 USERCCFLAGS=-DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT
 
@@ -23,4 +23,3 @@ ifeq ($(MAKECMDGOALS),cuda)
 endif
 
 include $(ROOTDIR)/commons/Makefile_common.mk
-

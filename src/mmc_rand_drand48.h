@@ -29,51 +29,61 @@
 **          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
-#ifndef _MCEXTREME_GPU_LAUNCH_H
-#define _MCEXTREME_GPU_LAUNCH_H
+/***************************************************************************//**
+\file    drand48_r_libgw32c.h
 
-#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-#define CL_USE_DEPRECATED_OPENCL_2_0_APIS
-#define CL_TARGET_OPENCL_VERSION 120
+\brief   Windows 32 port of drand48_r random number generator from libgw2c
+*******************************************************************************/
 
-#ifdef __APPLE__
-    #include <OpenCL/cl.h>
-#else
-    #include <CL/cl.h>
-#endif
+#ifndef _MMC_POSIX_RAND_LIBGW32C_H
+#define _MMC_POSIX_RAND_LIBGW32C_H
 
-#include "mmc_utils.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <float.h>
+#include <ieee754.h>
+#include <string.h>
+
+//typedef unsigned long long uint64_t
+
+typedef signed __int8 sint8;
+typedef unsigned __int8 uint8;
+typedef signed __int16 sint16;
+typedef unsigned __int16 uint16;
+typedef signed __int32 sint32;
+typedef unsigned __int32 uint32;
+typedef signed __int64 sint64;
+typedef unsigned __int64 uint64;
+
+
+/**
+\struct drand48_data drand48_r_libgw32c.h
+\brief Data structure for communication with thread safe versions.
+
+This type is to be regarded as opaque. It's only exported because users
+have to allocate objects of this type.
+*/
+struct drand48_data {
+    unsigned short int __x[3]; /* Current state. */
+    unsigned short int __old_x[3]; /* Old state. */
+    unsigned short int __c; /* Additive const. in congruential formula. */
+    unsigned short int __init; /* Flag for initializing. */
+    uint64 __a; /* Factor in congruential formula. */
+};
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
-#define ABS(a)  ((a)<0?-(a):(a))
 
-#define MCX_DEBUG_RNG       2                   /**< MCX debug flags */
-#define MCX_DEBUG_MOVE      1
-#define MCX_DEBUG_PROGRESS  2048
+/* Global state for non-reentrant functions. */
+int __drand48_iterate (unsigned short int xsubi[3], struct drand48_data* buffer );
+int __erand48_r (unsigned short int xsubi[3], struct drand48_data* buffer, double* result);
+int drand48_r (struct drand48_data* buffer, double* result);
+int seed48_r (unsigned short int seed16v[3], struct drand48_data* buffer);
+double erand48 ( unsigned short int xsubi[3]);
 
-#define MIN(a,b)           ((a)<(b)?(a):(b))
-
-#define OCL_ASSERT(x)  ocl_assess((x),__FILE__,__LINE__)
-
-#define CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV           0x4000
-#define CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV           0x4001
-#define CL_DEVICE_REGISTERS_PER_BLOCK_NV                0x4002
-#define CL_DEVICE_WARP_SIZE_NV                          0x4003
-#define CL_DEVICE_GPU_OVERLAP_NV                        0x4004
-#define CL_DEVICE_KERNEL_EXEC_TIMEOUT_NV                0x4005
-#define CL_DEVICE_INTEGRATED_MEMORY_NV                  0x4006
-
-#define CL_DEVICE_BOARD_NAME_AMD                        0x4038
-#define CL_DEVICE_SIMD_PER_COMPUTE_UNIT_AMD             0x4040
-#define CL_DEVICE_WAVEFRONT_WIDTH_AMD                   0x4043
-#define CL_DEVICE_GFXIP_MAJOR_AMD                       0x404A
-#define CL_DEVICE_GFXIP_MINOR_AMD                       0x404B
-
-cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device_id* activedevlist, GPUInfo** info);
-void ocl_assess(int cuerr, const char* file, const int linenum);
 
 #ifdef  __cplusplus
 }

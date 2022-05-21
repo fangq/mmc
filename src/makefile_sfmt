@@ -3,16 +3,16 @@ BINARY=mmc_sfmt
 
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW32,$(PLATFORM)), MINGW32)
-  FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc drand48_r_libgw32c mmc mmc_host cjson/cJSON
+  FILES=SFMT/SFMT mmc_rand_sfmt mmc_mesh tettracing mmc_utils mmc_tictoc mmc_rand_drand48 mmc mmc_host cjson/cJSON mmc_highorder ubj/ubjw
 else
-  FILES=SFMT/SFMT sfmt_rand simpmesh tettracing mcx_utils tictoc mmc mmc_host cjson/cJSON
+  FILES=SFMT/SFMT mmc_rand_sfmt mmc_mesh tettracing mmc_utils mmc_tictoc mmc mmc_host cjson/cJSON ubj/ubjw
 endif
 
 #ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
 #  EXTRALIB:=-static-libgcc
 #endif
 
-DOXYCFG=mmcdoxy.cfg
+DOXYCFG=mmc_doxyen.cfg
 
 USERCCFLAGS=-DMMC_SFMT -DUSE_OS_TIMER -DMEXP=19937
 
