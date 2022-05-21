@@ -277,7 +277,6 @@ pretty:
 	    --align-reference=type \
 	    --add-brackets \
 	    --convert-tabs \
-	    --close-templates \
 	    --lineend=linux \
 	    --preserve-date \
 	    --suffix=none \

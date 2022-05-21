@@ -49,10 +49,10 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
     unsigned int setlen;
     int* ee;
 
-    std::set<std::pair<int, int>> edgeset;
-    std::set<std::pair<int, int>>::iterator iset;
-    std::list<std::pair<int, int>> edgelist;
-    std::list<std::pair<int, int>>::iterator it;
+    std::set< std::pair<int, int> > edgeset;
+    std::set< std::pair<int, int> >::iterator iset;
+    std::list <std::pair<int, int> > edgelist;
+    std::list <std::pair<int, int> >::iterator it;
 
     std::pair<int, int> edge;
     it = edgelist.begin();
@@ -75,7 +75,7 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
                 edgelist.insert(it, edge);
                 pos = edgelist.size() - 1;
             } else {
-                std::list<std::pair<int, int>>::iterator edidx =
+                std::list< std::pair<int, int> >::iterator edidx =
                                                 std::find(edgelist.begin(), edgelist.end(), edge);
                 pos = std::distance( edgelist.begin(), edidx) ;
             }
