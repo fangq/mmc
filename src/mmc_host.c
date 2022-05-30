@@ -326,7 +326,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     MMCDEBUG(cfg, dlTime, (cfg->flog, "speed ...\t"S_BOLD""S_BLUE"%.2f photon/ms"S_RESET", %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n", (double)cfg->nphoton / dt, raytri, raytri0, raytri / dt));
 
     if (cfg->issavedet) {
-        fprintf(cfg->flog, "detected %d photons\n", master.detcount);
+        MMC_FPRINTF(cfg->flog, "detected %d photons\n", master.detcount);
     }
 
     if (cfg->isnormalized) {
