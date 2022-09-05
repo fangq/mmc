@@ -150,7 +150,7 @@ const char maskmap[16] = {4, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3};
  * \param[out] pout: output 3D position
  */
 
-inline void interppos(float3* w, float3* p1, float3* p2, float3* p3, float3* pout) {
+inline void interppos(MMCfloat3* w, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3, MMCfloat3* pout) {
     pout->x = w->x * p1->x + w->y * p2->x + w->z * p3->x;
     pout->y = w->x * p1->y + w->y * p2->y + w->z * p3->y;
     pout->z = w->x * p1->z + w->y * p2->z + w->z * p3->z;
@@ -169,7 +169,7 @@ inline void interppos(float3* w, float3* p1, float3* p2, float3* p3, float3* pou
  * \param[out] pout: output 3D position
  */
 
-inline void getinterp(float w1, float w2, float w3, float3* p1, float3* p2, float3* p3, float3* pout) {
+inline void getinterp(float w1, float w2, float w3, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3, MMCfloat3* pout) {
     pout->x = w1 * p1->x + w2 * p2->x + w3 * p3->x;
     pout->y = w1 * p1->y + w2 * p2->y + w3 * p3->y;
     pout->z = w1 * p1->z + w2 * p2->z + w3 * p3->z;
@@ -186,8 +186,8 @@ inline void getinterp(float w1, float w2, float w3, float3* p1, float3* p2, floa
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-void fixphoton(float3* p, float3* nodes, int* ee) {
-    float3 c0 = {0.f, 0.f, 0.f};
+void fixphoton(MMCfloat3* p, MMCfloat3* nodes, int* ee) {
+    MMCfloat3 c0 = {0.f, 0.f, 0.f};
     int i;
 
     /*calculate element centroid*/
@@ -214,7 +214,7 @@ void fixphoton(float3* p, float3* nodes, int* ee) {
 
 float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    float3 pcrx = {0.f}, p1 = {0.f};
+    MMCfloat3 pcrx = {0.f}, p1 = {0.f};
     medium* prop;
     int* ee;
     int i, tshift, eid, faceidx = -1;
@@ -510,7 +510,7 @@ inline __m128 rcp_nr(const __m128 a) {
  * \param[out] d: current ray direction
  */
 
-inline int havel_sse4(float3* vecN, float3* bary, const __m128 o, const __m128 d) {
+inline int havel_sse4(MMCfloat3* vecN, MMCfloat3* bary, const __m128 o, const __m128 d) {
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
 
@@ -556,7 +556,7 @@ inline int havel_sse4(float3* vecN, float3* bary, const __m128 o, const __m128 d
 
 float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    float3 bary = {1e10f, 0.f, 0.f, 0.f};
+    MMCfloat3 bary = {1e10f, 0.f, 0.f, 0.f};
     float barypout[4] __attribute__ ((aligned(16)));
     float rc, currweight, dlen, ww, Lp0, mus;
     int i, j, k, tshift, *enb = NULL, *nextenb = NULL, eid;
@@ -809,7 +809,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
 float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    float3 bary = {1e10f, 0.f, 0.f, 0.f};
+    MMCfloat3 bary = {1e10f, 0.f, 0.f, 0.f};
     float Lp0 = 0.f, rc, currweight, dlen, ww, t[4] = {1e10f, 1e10f, 1e10f, 1e10f};
     int i, tshift, faceidx = -1, eid;
 
@@ -981,8 +981,8 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
  * and the distance between P1 and the labeled edge.
  * P0 is the entry point and P1 is the exit point
  */
-void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], float3 p2d[2], int* hitstatus) {
-    float3 u, OP;
+void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], MMCfloat3 p2d[2], int* hitstatus) {
+    MMCfloat3 u, OP;
     float r2;
 
     p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1];
@@ -1024,7 +1024,7 @@ void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, f
 /**
  * \brief Compute the next step length for edge-based iMMC
  */
-float ray_cylinder_intersect(ray* r, int index, float d2d[2], float3 p2d[2], int hitstatus) {
+float ray_cylinder_intersect(ray* r, int index, float d2d[2], MMCfloat3 p2d[2], int hitstatus) {
     float pt0[2], pt1[2], ph0[2], ph1[2], Lratio, theta;
 
     // update Lmove and reflection
@@ -1091,9 +1091,9 @@ float ray_cylinder_intersect(ray* r, int index, float d2d[2], float3 p2d[2], int
  * P0 is the entry point and P1 is the exit point
  */
 
-void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, float3** center, int* hitstatus) {
+void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, MMCfloat3** center, int* hitstatus) {
     float npdist0, npdist1;
-    float3 PP;
+    MMCfloat3 PP;
 
     nr = nr * nr;
     *center = tracer->mesh->node + ee[index] - 1;
@@ -1119,9 +1119,9 @@ void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, fl
 /**
  * \brief Compute the next step length for node-based iMMC
  */
-float ray_sphere_intersect(ray* r, int index, float3* center, float nr, int hitstatus) {
+float ray_sphere_intersect(ray* r, int index, MMCfloat3* center, float nr, int hitstatus) {
     float temp1, temp2, d1, d2;
-    float3 oc;
+    MMCfloat3 oc;
 
     if (hitstatus == htOutIn || hitstatus == htInOut) {
         vec_diff(center, &r->p0, &oc);
@@ -1140,7 +1140,7 @@ float ray_sphere_intersect(ray* r, int index, float3* center, float nr, int hits
  * \brief Compute the next step length for the face-based iMMC
  */
 float ray_face_intersect(ray* r, raytracer* tracer, int* ee, int faceid, int baseid, int eid, int* hitstatus) {
-    float3 pf1, pv, fnorm, ptemp;
+    MMCfloat3 pf1, pv, fnorm, ptemp;
     float distf0, distf1, thick, ratio = 1.f;
 
     thick = r->roisize[faceid];
@@ -1195,7 +1195,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
         if (tracer->mesh->edgeroi) { /** if edge roi is defined */
             // edge-based iMMC  - ray-cylinder intersection test
             float distdata[2];
-            float3 projdata[2];
+            MMCfloat3 projdata[2];
 
             for (i = 0; i < 6; i++) { /** loop over each edge in current element */
                 if (r->roisize[i] > 0.f) {
@@ -1244,7 +1244,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
         if (firsthit == htNone && firstinout != htNoHitIn && tracer->mesh->noderoi) {
             // not hit any edgeroi in the current element, then go for node-based iMMC
             float nr;
-            float3* center;
+            MMCfloat3* center;
 
             minratio = r->Lmove;
             hitstatus = htNone;
@@ -1357,7 +1357,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
 
 float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    float3 bary = {1e10f, 0.f, 0.f, 0.f};
+    MMCfloat3 bary = {1e10f, 0.f, 0.f, 0.f};
     float Lp0 = 0.f, rc, currweight, dlen, ww, totalloss = 0.f;
     int tshift, faceidx = -1, baseid, eid;
     __m128 O, T, S;
@@ -2049,14 +2049,14 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectrayroi(mcconfig* cfg, float3* c0, float3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid) {
+float reflectrayroi(mcconfig* cfg, MMCfloat3* c0, MMCfloat3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid) {
 
     /*to handle refractive index mismatch*/
-    float3 pnorm = {0.f}, *pn = &pnorm, EH, ut;
+    MMCfloat3 pnorm = {0.f}, *pn = &pnorm, EH, ut;
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
 
     if (roitype == rtEdge) { // hit edge roi
-        float3 u, E0;
+        MMCfloat3 u, E0;
         E0 = tracer->mesh->node[tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][0]] - 1];
         vec_diff(&E0, tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][1]] - 1), &u);
         vec_diff(&E0, ph, &EH);
@@ -2152,9 +2152,9 @@ float reflectrayroi(mcconfig* cfg, float3* c0, float3* ph, raytracer* tracer, in
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi) {
+float reflectray(mcconfig* cfg, MMCfloat3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi) {
     /*to handle refractive index mismatch*/
-    float3 pnorm = {0.f}, *pn = &pnorm;
+    MMCfloat3 pnorm = {0.f}, *pn = &pnorm;
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
     int offs = (*oldeid - 1) << 2;
 
@@ -2236,7 +2236,7 @@ float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int*
 
 void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType* ran0) {
     int canfocus = 1;
-    float3 origin = {r->p0.x, r->p0.y, r->p0.z};
+    MMCfloat3 origin = {r->p0.x, r->p0.y, r->p0.z};
 
     r->slen = rand_next_scatlen(ran);
     r->inroi = 0;
@@ -2367,12 +2367,12 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
             t = 1.f - 2.f * rand_uniform01(ran);
             s = 1.f - 2.f * rand_uniform01(ran);
             p = sqrtf(1.f - r->vec.x * r->vec.x - r->vec.y * r->vec.y) * (rand_uniform01(ran) > 0.5f ? 1.f : -1.f);
-            float3 vv;
+            MMCfloat3 vv;
             vv.x = r->vec.y * p - r->vec.z * s;
             vv.y = r->vec.z * t - r->vec.x * p;
             vv.z = r->vec.x * s - r->vec.y * t;
             r->vec = vv;
-            //*((float3*)&(r->vec))=(float3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
+            //*((MMCfloat3*)&(r->vec))=(MMCfloat3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
         }
 
         origin.x += (cfg->srcparam1.x) * 0.5f;
@@ -2404,7 +2404,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
     vec_mult_add(&(r->p0), &(r->vec), 1.f, EPS, &(r->p0));
 
     /*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
-    float3 vecS = {0.f}, *nodes = mesh->node, vecAB, vecAC, vecN;
+    MMCfloat3 vecS = {0.f}, *nodes = mesh->node, vecAB, vecAC, vecN;
     int is, i, ea, eb, ec;
     float bary[4] = {0.f};
 

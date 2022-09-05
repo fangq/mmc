@@ -86,7 +86,7 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
     pos = 0;
 
     mesh->nn += edgelist.size();
-    mesh->node = (float3*)realloc((void*)mesh->node, sizeof(float3) * (mesh->nn));
+    mesh->node = (MMCfloat3*)realloc((void*)mesh->node, sizeof(MMCfloat3) * (mesh->nn));
     mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * mesh->nn * cfg->maxgate);
     memset(mesh->weight, 0, sizeof(double)*mesh->nn * cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
 

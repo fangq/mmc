@@ -39,7 +39,7 @@
 #define _MMC_UTILITIES_H
 
 #include <stdio.h>
-#include <vector_types.h>
+#include "mmc_vector_types.h"
 #include "cjson/cJSON.h"
 
 #ifdef _OPENMP                      ///< use multi-threading for running simulation on multiple GPUs
@@ -89,7 +89,7 @@ enum TDebugLevel {dlMove = 1, dlTracing = 2, dlBary = 4, dlWeight = 8, dlDist = 
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};
 enum TMCMethod {mmMCX, mmMCML};
-enum TComputeBackend {cbSSE, cbOpenCL, cbCUDA};
+enum TComputeBackend {cbSSE, cbOpenCL, cbCUDA, cbOptiX};
 
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX,
@@ -187,7 +187,7 @@ typedef struct MMC_config {
     int nthread;                   /**<num of total threads, multiple of 128*/
     int seed;                      /**<random number generator seed*/
     int e0;                        /**<initial element id*/
-    float3 srcpos;                 /**<src position in mm*/
+    MMCfloat3 srcpos;              /**<src position in mm*/
     float4 srcdir;                 /**<src normal direction*/
     int srctype;                   /**<src type: 0 - pencil beam, 1 - isotropic ... */
     float4 srcparam1;          /**<source parameters set 1*/
@@ -198,7 +198,7 @@ typedef struct MMC_config {
     float tstart;                  /**<start time in second*/
     float tstep;                   /**<time step in second*/
     float tend;                    /**<end time in second*/
-    float3 steps;                  /**<voxel sizes along x/y/z in mm*/
+    MMCfloat3 steps;               /**<voxel sizes along x/y/z in mm*/
     uint3 dim;                     /**<dim.x is the initial element number in MMC, dim.y is faceid*/
     uint4 crop0;                   /**<sub-volume for cache*/
     uint4 crop1;                   /**<the other end of the caching box*/

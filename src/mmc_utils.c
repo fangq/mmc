@@ -233,7 +233,7 @@ void mcx_initcfg(mcconfig* cfg) {
     memset(cfg->jsonfile, 0, MAX_PATH_LENGTH);
     cfg->shapedata = NULL;
 
-#if defined(USE_OPENCL) || defined(USE_CUDA)
+#if defined(USE_OPENCL) || defined(USE_CUDA) || defined(USE_OPTIX)
     cfg->method = rtBLBadouelGrid;
 #else
 #ifndef MMC_USE_SSE

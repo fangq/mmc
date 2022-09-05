@@ -118,6 +118,11 @@ void mesh_init(tetmesh* mesh) {
     mesh->nmax.y = -VERY_BIG;
     mesh->nmax.z = -VERY_BIG;
     mesh->nmax.w = 1.f;
+    mesh->nface = 0;
+    mesh->fnode = NULL;
+    mesh->face = NULL;
+    mesh->front = NULL;
+    mesh->back = NULL;
 }
 
 /**
@@ -204,7 +209,7 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
         MESH_ERROR("node file has wrong format");
     }
 
-    mesh->node = (float3*)calloc(sizeof(float3), mesh->nn);
+    mesh->node = (MMCfloat3*)calloc(sizeof(MMCfloat3), mesh->nn);
 
     for (i = 0; i < mesh->nn; i++) {
         if (fscanf(fp, "%d %f %f %f", &tmp, &(mesh->node[i].x), &(mesh->node[i].y), &(mesh->node[i].z)) != 4) {
@@ -748,6 +753,22 @@ void mesh_clear(tetmesh* mesh) {
         free(mesh->faceroi);
         mesh->faceroi = NULL;
     }
+    if (mesh->fnode) {
+        free(mesh->fnode);
+        mesh->fnode = NULL;
+    }
+    if (mesh->face) {
+        free(mesh->face);
+        mesh->face = NULL;
+    }
+    if (mesh->front) {
+        free(mesh->front);
+        mesh->front = NULL;
+    }
+    if (mesh->back) {
+        free(mesh->back);
+        mesh->back = NULL;
+    }
 }
 
 
@@ -794,7 +815,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         }
     } else if ( (cfg->srctype == stPencil || cfg->srctype == stIsotropic || cfg->srctype == stCone || cfg->srctype == stArcSin)  && cfg->e0 > 0) {
         int eid = cfg->e0 - 1;
-        float3 vecS = {0.f}, *nodes = tracer->mesh->node, vecAB, vecAC, vecN;
+        MMCfloat3 vecS = {0.f}, *nodes = tracer->mesh->node, vecAB, vecAC, vecN;
         int ea, eb, ec;
         float s = 0.f, *bary = &(cfg->bary0.x);
         int* elems = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen); // convert int4* to int*
@@ -895,7 +916,7 @@ void tracer_build(raytracer* tracer) {
     int ne, i, j;
     const int pairs[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 
-    float3* nodes;
+    MMCfloat3* nodes;
     int* elems, ebase;
     int e1, e0;
     float Rn2;
@@ -915,11 +936,11 @@ void tracer_build(raytracer* tracer) {
 
     if (tracer->method == rtPlucker) {
         int ea, eb, ec;
-        float3 vecAB = {0.f}, vecAC = {0.f};
+        MMCfloat3 vecAB = {0.f}, vecAC = {0.f};
 
-        tracer->d = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
-        tracer->m = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
-        tracer->n = (float3*)calloc(sizeof(float3), ne * 4); // 4 face norms
+        tracer->d = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 6); // 6 edges/elem
+        tracer->m = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 6); // 6 edges/elem
+        tracer->n = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 4); // 4 face norms
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
@@ -944,16 +965,16 @@ void tracer_build(raytracer* tracer) {
         }
     } else if (tracer->method == rtHavel || tracer->method == rtBadouel) {
         int ea, eb, ec;
-        float3 vecAB = {0.f}, vecAC = {0.f};
+        MMCfloat3 vecAB = {0.f}, vecAC = {0.f};
 
         tracer->d = NULL;
-        tracer->m = (float3*)calloc(sizeof(float3), ne * 12);
+        tracer->m = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 12);
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
 
             for (j = 0; j < 4; j++) {
-                float3* vecN = tracer->m + 3 * (ebase + j);
+                MMCfloat3* vecN = tracer->m + 3 * (ebase + j);
 
                 ea = elems[ebase + out[j][0]] - 1;
                 eb = elems[ebase + out[j][1]] - 1;
@@ -980,10 +1001,10 @@ void tracer_build(raytracer* tracer) {
         }
     } else if (tracer->method == rtBLBadouel || tracer->method == rtBLBadouelGrid) {
         int ea, eb, ec;
-        float3 vecAB = {0.f}, vecAC = {0.f}, vN = {0.f};
+        MMCfloat3 vecAB = {0.f}, vecAC = {0.f}, vN = {0.f};
 
         tracer->d = NULL;
-        tracer->n = (float3*)calloc(sizeof(float3), ne * 4);
+        tracer->n = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 4);
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
@@ -1051,11 +1072,11 @@ void tracer_clear(raytracer* tracer) {
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom) {
+float mc_next_scatter(float g, MMCfloat3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom) {
 
     float nextslen;
     float sphi = 0.f, cphi = 0.f, tmp0, theta, stheta, ctheta, tmp1;
-    float3 p;
+    MMCfloat3 p;
 
     rand_need_more(ran, ran0);
 

@@ -18,6 +18,9 @@ MMCDIR  ?= $(ROOTDIR)
 
 MMCSRC :=$(MMCDIR)/src
 
+CUDAHOME ?= /usr/local/cuda
+OPTIXHOME ?= /pub/optix-7.5
+
 CXX        := g++
 AR         := $(CC)
 CUDACC     :=nvcc
@@ -26,7 +29,7 @@ BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
 CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
-INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
+INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj -I$(CUDAHOME)/include -I$(OPTIXHOME)/include -I$(OPTIXHOME)/SDK -I$(OPTIXHOME)/SDK/support
 AROUTPUT   += -o
 MAKE       ?= make
 
@@ -35,7 +38,7 @@ USERARFLAGS?=$(ZMATLIB) -lz
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL  ?=-lOpenCL
-EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
+EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR) -lcudart -lcuda -ldl
 
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
@@ -168,7 +171,7 @@ web: BINDIR:=webmmc
 web: AR=emcc
 web: EXTRALIB=-s SIMD=1 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
-mex oct mexomp octomp:   EXTRALIB=
+mex oct mexomp octomp:   EXTRALIB=-L/usr/local/cuda/lib64 -lcudart -ldl -lcuda
 mex oct mexomp octomp:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
 mex oct mexomp octomp:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
 mex oct mexomp octomp:   BINDIR=../mmclab
