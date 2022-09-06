@@ -45,6 +45,10 @@
     #include "mmc_cu_host.h"
 #endif
 
+#ifdef USE_OPTIX
+    #include "mmc_optix_host.h"
+#endif
+
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the
 necessary data structures. This include the command line options (cfg),
@@ -82,6 +86,12 @@ int main(int argc, char** argv) {
 #ifdef USE_CUDA
     else if (cfg.compute == cbCUDA) {
         mmc_run_cu(&cfg, &mesh, &tracer, mcx_progressbar, &cfg);
+    }
+
+#endif
+#ifdef USE_OPTIX
+    else if (cfg.compute == cbOptiX) {
+        mmc_run_optix(&cfg, &mesh, &tracer, mcx_progressbar, &cfg);
     }
 
 #endif

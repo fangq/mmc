@@ -192,7 +192,7 @@ const char* zipformat[] = {"zlib", "gzip", "base64", "lzip", "lzma", "lz4", "lz4
  * Flag to decide which platform to run mmc
  */
 
-const char* computebackend[] = {"sse", "opencl", "cuda", ""};
+const char* computebackend[] = {"sse", "opencl", "cuda", "optix", ""};
 
 /**
  * @brief Initializing the simulation configuration with default values

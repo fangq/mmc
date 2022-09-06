@@ -292,5 +292,6 @@ extern "C" __global__ void __closesthit__ch() {
 }
 
 extern "C" __global__ void __miss__ms() {
+    // concave case needs further investigation
     optixSetPayload_13(0);
 }

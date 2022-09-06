@@ -28,9 +28,6 @@
 
 #define inlinefun __device__
 
-#include "mmc_const.h"
-#include "mmc_cu_host.h"
-#include "mmc_tictoc.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,8 +35,12 @@
 #ifdef _OPENMP
     #include <omp.h>
 #endif
-#include "mmc_const.h"
 
+#include "mmc_const.h"
+#include "mmc_cu_host.h"
+#include "mmc_cuda_query_gpu.h"
+#include "mmc_tictoc.h"
+#include "mmc_const.h"
 #include "mmc_core.cu"
 
 /************************************************************************** In
@@ -47,144 +48,6 @@ this unit, we first launch a master thread and initialize the necessary data
 structures.This include the command line options(cfg), tetrahedral mesh(mesh)
 and the ray tracer precomputed data (tracer).
 ******************************************************************************/
-#define CUDA_ASSERT(a)                                                         \
-    mcx_cu_assess((a), __FILE__, __LINE__) ///< macro to report CUDA error
-int mcx_corecount(int v1, int v2) {
-    int v = v1 * 10 + v2;
-
-    if (v < 20) {
-        return 8;
-    } else if (v < 21) {
-        return 32;
-    } else if (v < 30) {
-        return 48;
-    } else if (v < 50) {
-        return 192;
-    } else {
-        return 128;
-    }
-}
-
-int mcx_smxblock(int v1, int v2) {
-    int v = v1 * 10 + v2;
-
-    if (v < 30) {
-        return 8;
-    } else if (v < 50) {
-        return 16;
-    } else {
-        return 32;
-    }
-}
-
-/**
-  assert cuda memory allocation result
- */
-void mcx_cu_assess(cudaError_t cuerr, const char* file, const int linenum) {
-    if (cuerr != cudaSuccess) {
-        mcx_error(-(int)cuerr, (char*)cudaGetErrorString(cuerr), file, linenum);
-    }
-}
-
-/*
-   master driver code to run MC simulations
-*/
-int mcx_list_cu_gpu(mcconfig* cfg, GPUInfo** info) {
-#if __DEVICE_EMULATION__
-    return 1;
-#else
-    int dev;
-    int deviceCount, activedev = 0;
-
-    CUDA_ASSERT(cudaGetDeviceCount(&deviceCount));
-
-    if (deviceCount == 0) {
-        MMC_FPRINTF(stderr,
-                    S_RED "ERROR: No CUDA-capable GPU device found\n" S_RESET);
-        return 0;
-    }
-
-    *info = (GPUInfo*)calloc(deviceCount, sizeof(GPUInfo));
-
-    if (cfg->gpuid && cfg->gpuid > (uint)deviceCount) {
-        MMC_FPRINTF(stderr,
-                    S_RED "ERROR: Specified GPU ID is out of range\n" S_RESET);
-        return 0;
-    }
-
-    // scan from the first device
-    for (dev = 0; dev < deviceCount; dev++) {
-        cudaDeviceProp dp;
-        CUDA_ASSERT(cudaGetDeviceProperties(&dp, dev));
-
-        if (cfg->isgpuinfo == 3) {
-            activedev++;
-        } else if (cfg->deviceid[dev] == '1') {
-            cfg->deviceid[dev] = '\0';
-            cfg->deviceid[activedev] = dev + 1;
-            activedev++;
-        }
-
-        strncpy((*info)[dev].name, dp.name, MAX_SESSION_LENGTH);
-        (*info)[dev].id = dev + 1;
-        (*info)[dev].devcount = deviceCount;
-        (*info)[dev].major = dp.major;
-        (*info)[dev].minor = dp.minor;
-        (*info)[dev].globalmem = dp.totalGlobalMem;
-        (*info)[dev].constmem = dp.totalConstMem;
-        (*info)[dev].sharedmem = dp.sharedMemPerBlock;
-        (*info)[dev].regcount = dp.regsPerBlock;
-        (*info)[dev].clock = dp.clockRate;
-        (*info)[dev].sm = dp.multiProcessorCount;
-        (*info)[dev].core =
-            dp.multiProcessorCount * mcx_corecount(dp.major, dp.minor);
-        (*info)[dev].maxmpthread = dp.maxThreadsPerMultiProcessor;
-        (*info)[dev].maxgate = cfg->maxgate;
-        (*info)[dev].autoblock =
-            (*info)[dev].maxmpthread / mcx_smxblock(dp.major, dp.minor);
-        (*info)[dev].autothread = (*info)[dev].autoblock *
-                                  mcx_smxblock(dp.major, dp.minor) *
-                                  (*info)[dev].sm;
-
-        if (strncmp(dp.name, "Device Emulation", 16)) {
-            if (cfg->isgpuinfo) {
-                MMC_FPRINTF(stdout,
-                            S_BLUE "=============================   GPU Infomation  ================================\n" S_RESET);
-                MMC_FPRINTF(stdout, "Device %d of %d:\t\t%s\n", (*info)[dev].id,
-                            (*info)[dev].devcount, (*info)[dev].name);
-                MMC_FPRINTF(stdout, "Compute Capability:\t%u.%u\n", (*info)[dev].major,
-                            (*info)[dev].minor);
-                MMC_FPRINTF(stdout,
-                            "Global Memory:\t\t%u B\nConstant Memory:\t%u B\n"
-                            "Shared Memory:\t\t%u B\nRegisters:\t\t%u\nClock "
-                            "Speed:\t\t%.2f GHz\n",
-                            (unsigned int)(*info)[dev].globalmem,
-                            (unsigned int)(*info)[dev].constmem,
-                            (unsigned int)(*info)[dev].sharedmem,
-                            (unsigned int)(*info)[dev].regcount,
-                            (*info)[dev].clock * 1e-6f);
-#if CUDART_VERSION >= 2000
-                MMC_FPRINTF(stdout, "Number of MPs:\t\t%u\nNumber of Cores:\t%u\n",
-                            (*info)[dev].sm, (*info)[dev].core);
-#endif
-                MMC_FPRINTF(stdout, "SMX count:\t\t%u\n", (*info)[dev].sm);
-            }
-        }
-    }
-
-    if (cfg->isgpuinfo == 2 &&
-            cfg->parentid == mpStandalone) { // list GPU info only
-        exit(0);
-    }
-
-    if (activedev < MAX_DEVICE) {
-        cfg->deviceid[activedev] = '\0';
-    }
-
-    return activedev;
-#endif
-}
-
 void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu, void (*progressfun)(float, void*), void* handle) {
     uint i, j;
     float t, twindow0, twindow1;
@@ -864,7 +727,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
     GPUInfo* gpuinfo = NULL;      /** gpuinfo: structure to store GPU information */
     unsigned int activedev = 0;   /** activedev: count of total active GPUs to be used */
-
     if (!(activedev = mcx_list_cu_gpu(cfg, &gpuinfo))) {
         mcx_error(-1, "No GPU device found\n", __FILE__, __LINE__);
     }
