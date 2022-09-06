@@ -119,9 +119,9 @@ __device__ __forceinline__ void accumulateOutput(const float3 &p0, const float3 
     float currtof = tof + seglen * R_C0 * prop.n; // current time of flight
     for (int i = 0; i < segcount; ++i) {
         // find the index of the grid to store the absorbed weight
-        int3 idx = make_int3(__float2int_rd(segmid.x * gcfg.dstep),
-                             __float2int_rd(segmid.y * gcfg.dstep),
-                             __float2int_rd(segmid.z * gcfg.dstep));
+        int3 idx = make_int3(segmid.x > 0.0f ? __float2int_rd(segmid.x * gcfg.dstep) : 0,
+                             segmid.y > 0.0f ? __float2int_rd(segmid.y * gcfg.dstep) : 0,
+                             segmid.z > 0.0f ? __float2int_rd(segmid.z * gcfg.dstep) : 0);
         int tshift = min(((int)((currtof - gcfg.tstart) * gcfg.Rtstep)),
             gcfg.maxgate - 1) * gcfg.crop0.z;
         int idx1d = (idx.z * gcfg.crop0.y + idx.y * gcfg.crop0.x + idx.x) + tshift;

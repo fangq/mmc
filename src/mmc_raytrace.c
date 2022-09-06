@@ -120,7 +120,7 @@ extern const int ifacemap[4];
  * etc.
  */
 
-const int faceorder[] = {1, 3, 2, 0, -1};
+extern const int faceorder[5];
 
 /**
  * \brief Index mapping from the i-th face defined in nc[][] to the face-neighbor (facenb) face orders
@@ -131,7 +131,7 @@ const int faceorder[] = {1, 3, 2, 0, -1};
  * etc.
  */
 
-const int ifaceorder[] = {3, 0, 2, 1};
+extern const int ifaceorder[4];
 
 /**
  * \brief A mapping from SSE4 mask output to the face index

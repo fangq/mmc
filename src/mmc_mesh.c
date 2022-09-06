@@ -80,6 +80,28 @@ const int facemap[] = {2, 0, 1, 3};
 const int ifacemap[] = {1, 2, 0, 3};
 
 /**
+ * \brief Index mapping from the i-th face-neighbors (facenb) to the face defined in nc[][]
+ *
+ * facenb[i] <-> nc[faceorder[i]]
+ * the 1st tet neighbor shares the 2nd face of this tet, i.e. nc[1]={3,1,2}
+ * the 2nd tet neighbor shares the 4th face of this tet, i.e. nc[3]={1,0,2}
+ * etc.
+ */
+
+const int faceorder[] = {1, 3, 2, 0, -1};
+
+/**
+ * \brief Index mapping from the i-th face defined in nc[][] to the face-neighbor (facenb) face orders
+ *
+ * nc[ifaceorder[i]] <-> facenb[i]
+ * nc[0], made of nodes {3,0,1}, is the face connecting to the 4th neighbor (facenb[3]),
+ * nc[1], made of nodes {3,1,2}, is the face connecting to the 1st neighbor (facenb[0]),
+ * etc.
+ */
+
+const int ifaceorder[] = {3, 0, 2, 1};
+
+/**
  * @brief Initializing the mesh data structure with default values
  *
  * Constructor of the mesh object, initializing all field to default values
@@ -806,6 +828,53 @@ void tracer_init(raytracer* tracer, tetmesh* pmesh, char methodid) {
 
 void tracer_prep(raytracer* tracer, mcconfig* cfg) {
     int i, j, ne = tracer->mesh->ne;
+
+    if (cfg->compute == cbOptiX) {
+        tetmesh *pmesh = tracer->mesh;
+        int *fnb = (int*)malloc(pmesh->ne * pmesh->elemlen * sizeof(int));
+        memcpy(fnb, tracer->mesh->facenb, (pmesh->ne * pmesh->elemlen) * sizeof(int));
+
+        // copy node from a float4 array into a float3 array
+        pmesh->fnode = (float3*)malloc(pmesh->nn * sizeof(float3));
+        for(int i = 0; i < pmesh->nn; ++i){
+            pmesh->fnode[i].x = pmesh->node[i].x;
+            pmesh->fnode[i].y = pmesh->node[i].y;
+            pmesh->fnode[i].z = pmesh->node[i].z;
+        }
+
+        // find triangle meshes, front and back medium types
+        pmesh->nface = 0;
+        pmesh->face = (uint3*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint3));
+        pmesh->front = (uint*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint));
+        pmesh->back = (uint*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint));
+        for(int i = 0; i < pmesh->ne; ++i){
+            for(int j = 0; j < pmesh->elemlen; ++j){
+                int nexteid = fnb[(i * pmesh->elemlen) + j];
+                if((nexteid > 0 && pmesh->type[nexteid - 1] != pmesh->type[i]) || nexteid == 0) {
+                    pmesh->face[pmesh->nface].x = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][0]] - 1;
+                    pmesh->face[pmesh->nface].y = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][1]] - 1;
+                    pmesh->face[pmesh->nface].z = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][2]] - 1;
+                    pmesh->front[pmesh->nface] = ((nexteid == 0) ? 0 : pmesh->type[nexteid - 1]);
+                    pmesh->back[pmesh->nface] = pmesh->type[i];
+                    fnb[(i * pmesh->elemlen) + j] = -1;
+                    if(nexteid > 0){
+                        for(int k = 0; k < pmesh->elemlen; ++k){
+                            if(fnb[((nexteid - 1) * pmesh->elemlen) + k] == i + 1) {
+                                fnb[((nexteid - 1) * pmesh->elemlen) + k] = -1;
+                                break;
+                            }
+                        }
+                    }
+                    ++pmesh->nface;
+                }
+            }
+        }
+        pmesh->face = (uint3*)realloc(pmesh->face, pmesh->nface * sizeof(uint3));
+        pmesh->front = (uint*)realloc(pmesh->front, pmesh->nface * sizeof(uint));
+        pmesh->back = (uint*)realloc(pmesh->back, pmesh->nface * sizeof(uint));
+
+        if (fnb) free(fnb);
+    }
 
     if (tracer->n == NULL && tracer->m == NULL && tracer->d == NULL) {
         if (tracer->mesh != NULL) {

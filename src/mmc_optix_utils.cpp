@@ -85,15 +85,27 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     fflush(cfg->flog);
 
     // ==================================================================
-    // Save output: combine two outputs into one
+    // Save output
     // ==================================================================
     optixcfg.outputBuffer.download(optixcfg.outputHostBuffer, optixcfg.outputBufferSize);
     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
     for (size_t i = 0; i < optixcfg.launchParams.crop0.w; i++) {
+        // combine two outputs into one
         #pragma omp atomic
         mesh->weight[i] += optixcfg.outputHostBuffer[i] +
             optixcfg.outputHostBuffer[i + optixcfg.launchParams.crop0.w];
+    }
+
+    #pragma omp master
+    {
+        if (cfg->issave2pt && cfg->parentid == mpStandalone) {
+            MMC_FPRINTF(cfg->flog, "saving data to file ...\t");
+            mesh_saveweight(mesh, cfg, 0);
+            MMC_FPRINTF(cfg->flog, "saving data complete : %d ms\n\n",
+                        GetTimeMillis() - tic0);
+            fflush(cfg->flog);
+        }
     }
 
     // ==================================================================

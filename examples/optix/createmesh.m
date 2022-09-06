@@ -1,6 +1,4 @@
-clear
-clc
-close all
+clear cfg
 
 %% create surface mesh
 [no_box,el_box]=meshgrid6(0:60:60,0:60:60,0:60:60);
@@ -11,15 +9,11 @@ fc_box=volface(el_box);
 
 %% create volume mesh
 ISO2MESH_TETGENOPT='-Y -A';
-[node,elem,face]=surf2mesh(no,fc,[0 0 0],[60 60 60],1.0,100,...
+[cfg.node,cfg.elem]=surf2mesh(no,fc,[0 0 0],[60 60 60],1.0,100,...
     [1,1,1;30,30,30]);
 
 %% set up cfg
-clear cfg
 cfg.nphoton=1e8;
-
-cfg.node=node;
-cfg.elem=elem;
 
 cfg.srcpos=[30 30 0.01];
 cfg.srcdir=[0 0 1];
@@ -48,26 +42,5 @@ cfg.isnormalized=0;
 % gpu setting
 cfg.gpuid=1;
 
-%% run optix MMC simulation
-cfg.compute='optix';
-
-output=mmclab(cfg);
-energy=output.data(1:end-1,1:end-1,1:end-1,:);
-energyoptix=sum(energy,4);
-
-%% run opencl MMC simulation
-cfg.compute='opencl';
-output=mmclab(cfg);
-energy=output.data(1:end-1,1:end-1,1:end-1,:);
-energyopencl=sum(energy,4);
-
-%% compare results
-figure;
-clines=-20:2:10;
-contourf(log(squeeze(energyopencl(30,:,:))'),clines,'k-','displayname','OpenCL');
-hold on;
-contour(log(squeeze(energyoptix(30,:,:))'),clines,'r--','displayname','Optix');
-axis equal;
-legend;
-colorbar;
-title("Energy deposition (10^8) photons");
+% save configuration
+mmc2json(cfg,'optix');

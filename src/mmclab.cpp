@@ -1001,63 +1001,6 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         printf("mmc.workload=<<%zu>>;\n", (size_t)arraydim[0]*arraydim[1]);
     } else if (strcmp(name, "isreoriented") == 0) {
         /*internal flag, don't need to do anything*/
-    } else if (strcmp(name, "face") == 0) {
-        arraydim = mxGetDimensions(item);
-
-        if (arraydim[0] <= 0 || arraydim[1] != 3) {
-            MEXERROR("the 'face' field must have 3 columns (v0,v1,v2)");
-        }
-
-        if (mesh->nface && (mesh->nface != arraydim[0])) {
-            MEXERROR("the length of 'face' does not match that of 'front' or 'back'");
-        }
-
-        double* val = mxGetPr(item);
-        mesh->nface = arraydim[0];
-
-        if (mesh->face) free(mesh->face);
-        mesh->face = (uint3*)calloc(sizeof(uint3), mesh->nface);
-
-        for (j = 0; j < 3; j++)
-            for (i = 0; i < (int)mesh->nface; i++) {
-                ((uint*)(&mesh->face[i]))[j] = val[j * mesh->nface + i] - 1; // zero-indexed
-            }
-
-        printf("mmc.nface=%d;\n", mesh->nface);
-    } else if (strcmp(name, "front") == 0) {
-        arraydim = mxGetDimensions(item);
-
-        if (mesh->face && (mesh->nface != MAX(arraydim[0], arraydim[1]))) {
-            MEXERROR("the length of 'front' does not match that of 'face' or 'back'");
-        }
-
-        double* val = mxGetPr(item);
-        mesh->nface = MAX(arraydim[0], arraydim[1]);
-
-        if (mesh->front) free(mesh->front);
-
-        mesh->front = (uint*)malloc(sizeof(uint) * mesh->nface);
-
-        for (i = 0; i < (int)mesh->nface; i++) {
-            mesh->front[i] = val[i];
-        }
-    } else if (strcmp(name, "back") == 0) {
-        arraydim = mxGetDimensions(item);
-
-        if (mesh->face && (mesh->nface != MAX(arraydim[0], arraydim[1]))) {
-            MEXERROR("the length of 'back' does not match that of 'face' or 'front'");
-        }
-
-        double* val = mxGetPr(item);
-        mesh->nface = MAX(arraydim[0], arraydim[1]);
-
-        if (mesh->back) free(mesh->back);
-
-        mesh->back = (uint*)malloc(sizeof(uint) * mesh->nface);
-
-        for (i = 0; i < (int)mesh->nface; i++) {
-            mesh->back[i] = val[i];
-        }
     } else {
         printf("WARNING: redundant field '%s'\n", name);
     }
@@ -1195,12 +1138,6 @@ void mmc_validate_config(mcconfig* cfg, tetmesh* mesh) {
             MEXERROR("You must define 'replayweight' when you specify 'seed'.");
         } else {
             MEXERROR("The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
-        }
-    }
-
-    if (cfg->compute == cbOptiX) {
-        if (!mesh->nface || !mesh->fnode || !mesh->face || !mesh->front || !mesh->back) {
-            MEXERROR("Triangular faces, front and back medium must be provided.");
         }
     }
 
