@@ -41,7 +41,7 @@ __device__ __forceinline__ void launchPhoton(optixray &r) {
  * @brief Move a photon one step forward
  */
 __device__ __forceinline__ void movePhoton(optixray &r) {
-    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.00001f, std::numeric_limits<float>::max(),
+    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0001f, std::numeric_limits<float>::max(),
         0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
         *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
         *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
