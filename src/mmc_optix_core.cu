@@ -216,11 +216,20 @@ extern "C" __global__ void __closesthit__ch() {
     // get rng
     mcx::Random rng = getRNG();
 
+    // get intersection information
+    const float hitlen = optixGetRayTmax(); // distance
+    const int primid = optixGetPrimitiveIndex(); // triangle id
+
+    // triangle information
+    const TriangleMeshSBTData &sbtData =
+        *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
+    const uint4 index = sbtData.face[primid];
+
+    // current medium id (this step is critical because tmin is not zero!)
+    r.mediumid = optixIsFrontFaceHit() ? (index.w >> 16) : (index.w & 0xFF);
+
     // get medium properties
     const Medium currprop = gcfg.medium[r.mediumid];
-
-    // distance to intersection
-    const float hitlen = optixGetRayTmax();
     
     // determine path length
     const float lmove = (r.slen > hitlen * currprop.mus) ?
@@ -243,11 +252,7 @@ extern "C" __global__ void __closesthit__ch() {
         // after hitting a boundary, update remaining scattering length
         r.slen -= lmove * currprop.mus;
 
-        // get triangle information
-        const TriangleMeshSBTData &sbtData = 
-            *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
-        const int primid = optixGetPrimitiveIndex();
-        const uint4 index = sbtData.face[primid];
+        // triangle nodes
         const float3 &v0 = sbtData.node[index.x];
         const float3 &v1 = sbtData.node[index.y];
         const float3 &v2 = sbtData.node[index.z];
@@ -257,11 +262,7 @@ extern "C" __global__ void __closesthit__ch() {
         r.p0 = (1.0f - bary.x - bary.y) * v0 + bary.x * v1 + bary.y * v2;
 
         // update medium id (assume matched boundary)
-        if (optixIsFrontFaceHit()) {
-            r.mediumid = (index.w & 0xFF); // back medium
-        } else {
-            r.mediumid = (index.w >> 16);  // front medium
-        }
+        r.mediumid = optixIsFrontFaceHit() ? (index.w & 0xFF) : (index.w >> 16);
 
         // todo: update ray direction at a mismatched boundary
     } else {
