@@ -21,17 +21,17 @@ extern "C" {
 /**
  * @brief Init RNG seed for each thread
  */
-__device__ __forceinline__ void initRNGSeed(optixray &r, const int &idx) {
-    r.random = mcx::Random(((uint4*)gcfg.seedbuffer)[idx]);
+__device__ __forceinline__ void initRNGSeed(mcx::Random &rng, const int &idx) {
+    rng = mcx::Random(((uint4*)gcfg.seedbuffer)[idx]);
 }
 
 /**
  * @brief Launch a new photon
  */
-__device__ __forceinline__ void launchPhoton(optixray &r) {
+__device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
     r.p0 = gcfg.srcpos;
     r.dir = gcfg.srcdir;
-    r.slen = r.random.rand_next_scatlen();
+    r.slen = rng.rand_next_scatlen();
     r.weight = 1.0f;
     r.photontimer = 0.0f;
     r.mediumid = gcfg.mediumid0;
@@ -40,14 +40,14 @@ __device__ __forceinline__ void launchPhoton(optixray &r) {
 /**
  * @brief Move a photon one step forward
  */
-__device__ __forceinline__ void movePhoton(optixray &r) {
+__device__ __forceinline__ void movePhoton(optixray &r, mcx::Random &rng) {
     optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0001f, std::numeric_limits<float>::max(),
         0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
         *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
         *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
         *(uint32_t*)&(r.slen), *(uint32_t*)&(r.weight), *(uint32_t*)&(r.photontimer),
-        r.random.intSeed.x, r.random.intSeed.y, r.random.intSeed.z, r.random.intSeed.w,
-        r.mediumid);
+        r.mediumid,
+        rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
 }
 
 /**
@@ -101,22 +101,18 @@ __device__ __forceinline__ float3 selectScatteringDirection(const float3 &dir,
 /**
  * @brief Accumualte output quantities to a 3D grid
  */
-__device__ __forceinline__ void accumulateOutput(const float3 &p0, const float3 &dir, 
-    const float &currweight, const float &lmove, const Medium &prop, const float &tof) {
-    // update photon weight
-    float nextweight = currweight * expf(-prop.mua *lmove);
-    optixSetPayload_7(__float_as_uint(nextweight));
-
+__device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium &prop,
+    const float &lmove) {
     // divide path into segments of equal length
     int segcount = ((int)(lmove * gcfg.dstep) + 1) << 1;
     float seglen = lmove / segcount;
     float segdecay = expf(-prop.mua * seglen);
-    float segloss = currweight * (1.0f - segdecay);
-    float3 step = seglen * dir;
+    float segloss = r.weight * (1.0f - segdecay);
 
     // deposit weight loss of each segment to the corresponding grid
-    float3 segmid = p0 - gcfg.nmin + 0.5f * step; // segment midpoint
-    float currtof = tof + seglen * R_C0 * prop.n; // current time of flight
+    float3 step = seglen * r.dir;
+    float3 segmid = r.p0 - gcfg.nmin + 0.5f * step; // segment midpoint
+    float currtof = r.photontimer + seglen * R_C0 * prop.n; // current time of flight
     for (int i = 0; i < segcount; ++i) {
         // find the index of the grid to store the absorbed weight
         int3 idx = make_int3(segmid.x > 0.0f ? __float2int_rd(segmid.x * gcfg.dstep) : 0,
@@ -144,75 +140,26 @@ __device__ __forceinline__ void accumulateOutput(const float3 &p0, const float3 
 }
 
 /**
- * @brief Set photon position
- */
-__device__ __forceinline__ void setPosition(const float3 &p) {
-    optixSetPayload_0(__float_as_uint(p.x));
-    optixSetPayload_1(__float_as_uint(p.y));
-    optixSetPayload_2(__float_as_uint(p.z));
-}
-
-/**
- * @brief Set ray direction
- */
-__device__ __forceinline__ void setDirection(const float3 &v) {
-    optixSetPayload_3(__float_as_uint(v.x));
-    optixSetPayload_4(__float_as_uint(v.y));
-    optixSetPayload_5(__float_as_uint(v.z));
-}
-
-/**
- * @brief Update time of flight for a photon
- */
-__device__ __forceinline__ void setPhotonTimer(const float &tof,
-    const float &lmove, const Medium &prop) {
-    optixSetPayload_8(__float_as_uint(tof + lmove * R_C0 * prop.n));
-}
-
-/**
- * @brief Update RNG seed
- */
-__device__ __forceinline__ void setRNGSeed(const mcx::Random &random) {
-    optixSetPayload_9(random.intSeed.x);
-    optixSetPayload_10(random.intSeed.y);
-    optixSetPayload_11(random.intSeed.z);
-    optixSetPayload_12(random.intSeed.w);
-}
-
-/**
- * @brief Set medium id
- */
-__device__ __forceinline__ void setMediumID(const unsigned int &id) {
-    optixSetPayload_13(id);
-}
-
-/**
- * @brief print ray information
- */
-__device__ __forceinline__ void printRay(const optixray &r) {
-    printf("pos:[%f %f %f], dir:[%f %f %f], slen:%f, weight:%f, tof:%fns, type:%u\n",
-        r.p0.x, r.p0.y, r.p0.z,
-        r.dir.x, r.dir.y, r.dir.z,
-        r.slen, r.weight, r.photontimer * 1e9, r.mediumid);
-}
-
-/**
  * @brief Launch photon and trace ray iteratively
  */
 extern "C" __global__ void __raygen__rg() {
     uint3 launchindex = optixGetLaunchIndex();
 
+    // init RNG seed for each thread
+    mcx::Random rng;
+    initRNGSeed(rng, launchindex.x);
+
+    // init a ray
     optixray r;
-    initRNGSeed(r, launchindex.x);
-    launchPhoton(r);
+    launchPhoton(r, rng);
 
     int ndone = 0;  // number of simulated photons
     while (ndone < (gcfg.threadphoton + (launchindex.x < gcfg.oddphoton))) {
-        movePhoton(r);
+        movePhoton(r, rng);
 
         // when a photon escapes or tof reaches the upper limit
         if (!(r.mediumid && r.photontimer < gcfg.tend)) {
-            launchPhoton(r);
+            launchPhoton(r, rng);
             ++ndone;
         }
     }
@@ -223,36 +170,42 @@ extern "C" __global__ void __raygen__rg() {
  */
 extern "C" __global__ void __closesthit__ch() {
     // get photon and ray information from payload
-    const float3 p0 = make_float3(__uint_as_float(optixGetPayload_0()), 
-        __uint_as_float(optixGetPayload_1()), __uint_as_float(optixGetPayload_2()));
-    const float3 dir = make_float3(__uint_as_float(optixGetPayload_3()), 
-        __uint_as_float(optixGetPayload_4()), __uint_as_float(optixGetPayload_5()));
-    const float slen = __uint_as_float(optixGetPayload_6());
-    const float weight = __uint_as_float(optixGetPayload_7());
-    const float tof = __uint_as_float(optixGetPayload_8());
-    const Medium currprop = gcfg.medium[optixGetPayload_13()];
+    optixray r = getRay();
+
+    // get rng
+    mcx::Random rng = getRNG();
+
+    // get medium properties
+    const Medium currprop = gcfg.medium[r.mediumid];
 
     // distance to intersection
     const float hitlen = optixGetRayTmax();
     
-    // determine path length and save output
-    const float lmove = (slen > hitlen * currprop.mus) ? hitlen : slen / currprop.mus;
-    accumulateOutput(p0, dir, weight, lmove, currprop, tof);
+    // determine path length
+    const float lmove = (r.slen > hitlen * currprop.mus) ?
+        hitlen : r.slen / currprop.mus;
 
-    // update remaining scattering length
-    optixSetPayload_6(__float_as_uint(slen - lmove * currprop.mus));
+    // save output
+    accumulateOutput(r, currprop, lmove);
 
-    // next photon position
-    float3 p1 = p0 + dir * lmove;
+    // update photon position
+    r.p0 += r.dir * lmove;
+
+    // update photon weight
+    r.weight *= expf(-currprop.mua * lmove);
+
+    // update photon timer
+    r.photontimer += lmove * R_C0 * currprop.n;
 
     // update photon direction if needed
-    if (slen > hitlen * currprop.mus) {
-        // after hitting a boundary
+    if (r.slen > hitlen * currprop.mus) {
+        // after hitting a boundary, update remaining scattering length
+        r.slen -= lmove * currprop.mus;
+
+        // get triangle information
         const TriangleMeshSBTData &sbtData = 
             *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
         const int primid = optixGetPrimitiveIndex();
-
-        // get triangle information
         const uint4 index = sbtData.face[primid];
         const float3 &v0 = sbtData.node[index.x];
         const float3 &v1 = sbtData.node[index.y];
@@ -260,38 +213,30 @@ extern "C" __global__ void __closesthit__ch() {
 
         // get intersection (barycentric coordinate)
         const float2 bary = optixGetTriangleBarycentrics();
-        p1 = (1 - bary.x - bary.y) * v0 + bary.x * v1 + bary.y * v2;
+        r.p0 = (1.0f - bary.x - bary.y) * v0 + bary.x * v1 + bary.y * v2;
 
         // update medium id (assume matched boundary)
         if (optixIsFrontFaceHit()) {
-            setMediumID(index.w & 0xFF); // back medium
+            r.mediumid = (index.w & 0xFF); // back medium
         } else {
-            setMediumID(index.w >> 16);  // front medium
+            r.mediumid = (index.w >> 16);  // front medium
         }
+
         // todo: update ray direction at a mismatched boundary
     } else {
-        // after a scattering event
-        mcx::Random random = mcx::Random(make_uint4(optixGetPayload_9(), 
-                                                    optixGetPayload_10(),
-                                                    optixGetPayload_11(),
-                                                    optixGetPayload_12()));
-
-        // update direction and scattering length
-        setDirection(selectScatteringDirection(dir, currprop.g, random));
-        optixSetPayload_6(__float_as_uint(random.rand_next_scatlen()));
-
-        // update RNG seed
-        setRNGSeed(random);
+        // after a scattering event, new direction and scattering length
+        r.dir = selectScatteringDirection(r.dir, currprop.g, rng);
+        r.slen = rng.rand_next_scatlen();
     }
 
-    // update photon timer
-    setPhotonTimer(tof, lmove, currprop);
+    // update rng
+    setRNG(rng);
 
-    // update photon position and ray direction
-    setPosition(p1);
+    // update ray
+    setRay(r);
 }
 
 extern "C" __global__ void __miss__ms() {
     // concave case needs further investigation
-    optixSetPayload_13(0);
+    setMediumID(0);
 }
