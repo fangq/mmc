@@ -99,7 +99,47 @@ __device__ __forceinline__ float3 selectScatteringDirection(const float3 &dir,
 }
 
 /**
- * @brief Accumualte output quantities to a 3D grid
+ * @brief Convert 3D indices to 1D
+ */
+__device__ __forceinline__ uint subToInd(const uint3 &idx3d) {
+    return idx3d.z * gcfg.crop0.y + idx3d.y * gcfg.crop0.x + idx3d.x;
+}
+
+/**
+ * @brief Get the index of the voxel that encloses p
+ */
+__device__ __forceinline__ uint getVoxelIdx(const float3 &p) {
+    return subToInd(make_uint3(p.x > 0.0f ? __float2int_rd(p.x * gcfg.dstep) : 0,
+                              p.y > 0.0f ? __float2int_rd(p.y * gcfg.dstep) : 0,
+                              p.z > 0.0f ? __float2int_rd(p.z * gcfg.dstep) : 0));
+}
+
+/**
+ * @brief Get the offset of the current time frame
+ */
+__device__ __forceinline__ uint getTimeFrame(const float &tof) {
+    return min(((int)((tof - gcfg.tstart) * gcfg.Rtstep)),
+        gcfg.maxgate - 1) * gcfg.crop0.z;
+}
+
+/**
+ * @brief Save output to a buffer
+ */
+__device__ __forceinline__ void saveToBuffer(const uint &eid, const float &w) {
+    // to minimize numerical error, use the same trick as MCX
+    // becomes much slower when using atomicAdd(*double, double)
+    float accum = atomicAdd(&((float*)gcfg.outputbuffer)[eid], w);
+    if (accum > MAX_ACCUM) {
+        if (atomicAdd(&((float*)gcfg.outputbuffer)[eid], -accum) < 0.0f) {
+            atomicAdd(&((float*)gcfg.outputbuffer)[eid], accum);
+        } else {
+            atomicAdd(&((float*)gcfg.outputbuffer)[eid + gcfg.crop0.w], accum);
+        }
+    }
+}
+
+/**
+ * @brief Accumulate output quantities to a 3D grid
  */
 __device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium &prop,
     const float &lmove) {
@@ -113,30 +153,31 @@ __device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium
     float3 step = seglen * r.dir;
     float3 segmid = r.p0 - gcfg.nmin + 0.5f * step; // segment midpoint
     float currtof = r.photontimer + seglen * R_C0 * prop.n; // current time of flight
-    for (int i = 0; i < segcount; ++i) {
-        // find the index of the grid to store the absorbed weight
-        int3 idx = make_int3(segmid.x > 0.0f ? __float2int_rd(segmid.x * gcfg.dstep) : 0,
-                             segmid.y > 0.0f ? __float2int_rd(segmid.y * gcfg.dstep) : 0,
-                             segmid.z > 0.0f ? __float2int_rd(segmid.z * gcfg.dstep) : 0);
-        int tshift = min(((int)((currtof - gcfg.tstart) * gcfg.Rtstep)),
-            gcfg.maxgate - 1) * gcfg.crop0.z;
-        int idx1d = (idx.z * gcfg.crop0.y + idx.y * gcfg.crop0.x + idx.x) + tshift;
 
-        // to minimize numerical error, use the same trick as MCX
-        // becomes much slower when using atomicAdd(*double, double)
-        float oldval = atomicAdd(&((float*)gcfg.outputbuffer)[idx1d], segloss);
-        if (oldval > MAX_ACCUM) {
-            if (atomicAdd(&((float*)gcfg.outputbuffer)[idx1d], -oldval) < 0.0f) {
-                atomicAdd(&((float*)gcfg.outputbuffer)[idx1d], oldval);
-            } else {
-                atomicAdd(&((float*)gcfg.outputbuffer)[idx1d + gcfg.crop0.w], oldval);
-            }
-        }
+    // find the information of the first segment
+    uint oldeid = getTimeFrame(currtof) + getVoxelIdx(segmid);
+    float oldweight = segloss;
 
+    // iterater over the rest of the segments
+    for (int i = 1; i < segcount; ++i) {
+        // update information for the curr segment
         segloss *= segdecay;
         segmid += step;
         currtof += seglen * R_C0 * prop.n;
+        uint neweid = getTimeFrame(currtof) + getVoxelIdx(segmid);
+
+        // save when entering a new element or during the last segment
+        if (neweid != oldeid) {
+            saveToBuffer(oldeid, oldweight);
+            // reset oldeid and weight bucket
+            oldeid = neweid;
+            oldweight = 0.0f;
+        }
+        oldweight += segloss;
     }
+
+    // save the weight loss of the last segment
+    saveToBuffer(oldeid, oldweight);
 }
 
 /**
