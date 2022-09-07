@@ -226,7 +226,7 @@ extern "C" __global__ void __closesthit__ch() {
     const uint4 index = sbtData.face[primid];
 
     // current medium id (this step is critical because tmin is not zero!)
-    r.mediumid = optixIsFrontFaceHit() ? (index.w >> 16) : (index.w & 0xFF);
+    r.mediumid = optixIsFrontFaceHit() ? (index.w >> 16) : (index.w & 0xFFFF);
 
     // get medium properties
     const Medium currprop = gcfg.medium[r.mediumid];
@@ -262,7 +262,7 @@ extern "C" __global__ void __closesthit__ch() {
         r.p0 = (1.0f - bary.x - bary.y) * v0 + bary.x * v1 + bary.y * v2;
 
         // update medium id (assume matched boundary)
-        r.mediumid = optixIsFrontFaceHit() ? (index.w & 0xFF) : (index.w >> 16);
+        r.mediumid = optixIsFrontFaceHit() ? (index.w & 0xFFFF) : (index.w >> 16);
 
         // todo: update ray direction at a mismatched boundary
     } else {
