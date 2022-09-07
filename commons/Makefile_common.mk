@@ -140,8 +140,10 @@ ARFLAGS    :=
 OBJSUFFIX  := .o
 BINSUFFIX  := 
 CLHEADER=.clh
+DEPENDSUFFIX := .d
 
 OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
+DEPENDS := $(addsuffix $(DEPENDSUFFIX), $(OBJS))
 OBJS       := $(subst $(OBJDIR)/$(MMCSRC)/,$(MMCSRC)/,$(OBJS))
 OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
@@ -223,22 +225,22 @@ makedocdir:
 
 ##  Compile .cu files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cu
-	$(CUDACC) -c $(CUCCOPT) -o $@  $<
+	$(CUDACC) -c $(CUCCOPT) -MMD -MP -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -MMD -MP -o $@  $<
 
 ##  Compile .cpp files ##
 %$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -MMD -MP -o $@  $<
 
 ##  Compile .c files  ##
 $(OBJDIR)/%$(OBJSUFFIX): %.c
 	@$(ECHO) Building $@
-	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -MMD -MP -o $@  $<
 
 %$(CLHEADER): %.cl
 	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
@@ -248,6 +250,7 @@ $(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	@$(ECHO) Building $@
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
 
+-include $(DEPENDS)
 
 $(ZMATLIB):
 	-$(MAKE) -C zmat lib AR=ar CPPOPT="$(DLLFLAG)" CCOPT="$(DLLFLAG)" USERLINKOPT=
@@ -259,7 +262,7 @@ doc: makedocdir
 ## Clean
 clean:
 	-$(MAKE) -C zmat clean
-	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR)
+	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(DEPENDS)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
 endif
