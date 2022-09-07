@@ -2,8 +2,10 @@ ROOTDIR = ..
 BINARY=mmc
 
 FILES=mmc_rand_xorshift128p mmc_mesh mmc_raytrace mmc_utils mmc_tictoc mmc cjson/cJSON \
-      mmc_host mmc_highorder mmc_cl_utils mmc_cl_host ubj/ubjw mmc_optix_host mmc_optix_utils mmc_cuda_query_gpu
+      mmc_host mmc_highorder mmc_cl_utils mmc_cl_host ubj/ubjw mmc_optix_host mmc_cuda_query_gpu
+OPTIXFILES=mmc_optix_utils
 CLPROGRAM=mmc_core
+OPTIXPROGRAM=mmc_optix_core
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
   EXTRALIB:=-static-libgcc -lgcc_eh

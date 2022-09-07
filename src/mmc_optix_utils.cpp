@@ -12,7 +12,7 @@
 #include "mmc_tictoc.h"
 #include "incbin.h"
 
-INCTXT(mmcShaderPtx, mmcShaderPtxSize, "mmc_optix_core.ptx");
+INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
 
 void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu,
     void (*progressfun)(float, void*), void* handle) {

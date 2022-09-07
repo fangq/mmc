@@ -28,7 +28,8 @@ BIN        := bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
-CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
+CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -MMD -MP#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
+PTXFLAGS   += -O3 -Xptxas -allow-expensive-optimizations -ptx --expt-relaxed-constexpr -use_fast_math -MMD -MP
 INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj -I$(CUDAHOME)/include -I$(OPTIXHOME)/include -I$(OPTIXHOME)/SDK -I$(OPTIXHOME)/SDK/support
 AROUTPUT   += -o
 MAKE       ?= make
@@ -43,7 +44,7 @@ EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR) -lcudart -lcuda -ldl
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
-CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v --compiler-options -fPIC
+CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v -Xcompiler -fPIC -MMD -MP
 CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
 
 ECHO	   := echo
@@ -52,6 +53,7 @@ MKDIR      := mkdir
 ARCH = $(shell uname -m)
 ifeq ($(findstring x86_64,$(ARCH)), x86_64)
      CCFLAGS+=-m64
+     PTXFLAGS+=-Xcompiler -m64
 endif
 
 MEXLINKOPT +=$(OPENMPLIB)
@@ -140,13 +142,23 @@ ARFLAGS    :=
 OBJSUFFIX  := .o
 BINSUFFIX  := 
 CLHEADER=.clh
-DEPENDSUFFIX := .d
+DEPSUFFIX := .d
+OPTIXOBJSUFFIX := .ptx.o
+PTXSUFFIX := .ptx
 
 OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
-DEPENDS := $(addsuffix $(DEPENDSUFFIX), $(OBJS))
+DEPENDS    := $(addsuffix $(DEPSUFFIX), $(OBJS))
 OBJS       := $(subst $(OBJDIR)/$(MMCSRC)/,$(MMCSRC)/,$(OBJS))
 OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
+
+OPTIXOBJS  := $(addprefix $(OBJDIR)/, $(OPTIXFILES))
+DEPENDS    += $(addsuffix $(DEPSUFFIX), $(OPTIXOBJS))
+OPTIXOBJS  := $(addsuffix $(OPTIXOBJSUFFIX), $(OPTIXOBJS))
+
+PTXSOURCE := $(addprefix $(OBJDIR)/, $(OPTIXPROGRAM))
+DEPENDS   += $(addsuffix $(DEPSUFFIX), $(PTXSOURCE))
+PTXSOURCE := $(addsuffix $(PTXSUFFIX), $(PTXSOURCE))
 
 release:   CCFLAGS+= -O3
 sse ssemath mex oct: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
@@ -222,33 +234,40 @@ makedocdir:
 
 .SUFFIXES : $(OBJSUFFIX) .cpp
 
+.PRECIOUS: $(PTXSOURCE)
+
+##  Compile ptx-embedded .cpp files ##
+$(OBJDIR)/%$(OPTIXOBJSUFFIX): %.cpp $(PTXSOURCE)
+	@$(ECHO) Building $@
+	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+
+##  Compile .cu files to .ptx ##
+$(OBJDIR)/%$(PTXSUFFIX): %.cu
+	@$(ECHO) Building $@
+	$(CUDACC) -c $(PTXFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 ##  Compile .cu files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cu
-	$(CUDACC) -c $(CUCCOPT) -MMD -MP -o $@  $<
+	@$(ECHO) Building $@
+	$(CUDACC) -c $(CUCCOPT) -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -MMD -MP -o $@  $<
-
-##  Compile .cpp files ##
-%$(OBJSUFFIX): %.cpp
-	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -MMD -MP -o $@  $<
+	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 ##  Compile .c files  ##
 $(OBJDIR)/%$(OBJSUFFIX): %.c
 	@$(ECHO) Building $@
-	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -MMD -MP -o $@  $<
+	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 %$(CLHEADER): %.cl
 	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
 
 ##  Link  ##
-$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
+$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS) $(OPTIXOBJS)
 	@$(ECHO) Building $@
-	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
+	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(OPTIXOBJS) $(USERARFLAGS) $(EXTRALIB)
 
 -include $(DEPENDS)
 
@@ -262,7 +281,7 @@ doc: makedocdir
 ## Clean
 clean:
 	-$(MAKE) -C zmat clean
-	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(DEPENDS)
+	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(DEPENDS) $(PTXSOURCE) $(OPTIXOBJS)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
 endif
