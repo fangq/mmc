@@ -300,12 +300,14 @@ for i=1:len
     if(~isfield(cfg(i),'evol') || isempty(cfg(i).evol))
         cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
     end
-    if(find(cfg(i).evol==0))
-        fprintf(1,['degenerated elements are detected: [' sprintf('%d ',find(cfg(i).evol==0)) ']\n']);
-        error(['input mesh can not contain degenerated elements, ' ...
-            'please double check your input mesh; if you use a ' ...
-            'widefield source, please rerun mmcsrcdomain and setting ' ...
-            '''Expansion'' option to a larger value (default is 1)']);
+    if(~(isfield(cfg(i),'compute') && strcmp(cfg(i).compute,'optix')))
+        if(find(cfg(i).evol==0))
+            fprintf(1,['degenerated elements are detected: [' sprintf('%d ',find(cfg(i).evol==0)) ']\n']);
+            error(['input mesh can not contain degenerated elements, ' ...
+                'please double check your input mesh; if you use a ' ...
+                'widefield source, please rerun mmcsrcdomain and setting ' ...
+                '''Expansion'' option to a larger value (default is 1)']);
+        end
     end
     if(~isfield(cfg(i),'srcpos'))
         error('cfg.srcpos field is missing');
