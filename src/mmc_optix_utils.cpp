@@ -3,6 +3,7 @@
 #include <time.h>
 #include <cstring>
 #include <optix_function_table_definition.h>
+#include <iomanip>
 #ifdef _OPENMP
     #include <omp.h>
 #endif
@@ -244,7 +245,23 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
     if(cuRes != CUDA_SUCCESS)
         fprintf(stderr, "Error querying current context: error code %d\n", cuRes);
 
-    OPTIX_CHECK(optixDeviceContextCreate(optixcfg->cudaContext, 0, &optixcfg->optixContext));
+    OptixDeviceContextOptions options = {};
+    options.logCallbackFunction = [](unsigned int level, const char* tag, const char* message,
+                                      void*) {
+                                      std::cerr << "[" << std::setw( 2 ) << level
+                                          << "][" << std::setw( 12 ) << tag << "]: "
+                                          << message << "\n";
+                                  };
+#ifndef NDEBUG
+    options.logCallbackLevel = 4;
+    options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+#else
+    options.logCallbackLevel = 0;
+    options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_OFF;
+#endif
+
+    OPTIX_CHECK(optixDeviceContextCreate(optixcfg->cudaContext, &options,
+        &optixcfg->optixContext));
 }
 
 /**
