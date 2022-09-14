@@ -10,8 +10,9 @@
 #include "mmc_optix_ray.h"
 #include "mmc_optix_launchparam.h"
 
-constexpr float R_C0 = 3.335640951981520e-12f; //1/C0 in s/mm
+constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
+constexpr float SAFETY_DISTANCE = 0.0001f; // ensure ray cut through triangle
 
 // simulation configuration and medium optical properties
 extern "C" {
@@ -41,7 +42,7 @@ __device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
  * @brief Move a photon one step forward
  */
 __device__ __forceinline__ void movePhoton(optixray &r, mcx::Random &rng) {
-    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0001f, std::numeric_limits<float>::max(),
+    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0f, std::numeric_limits<float>::max(),
         0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
         *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
         *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
@@ -225,21 +226,22 @@ extern "C" __global__ void __closesthit__ch() {
         *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
     const uint4 index = sbtData.face[primid];
 
-    // current medium id (this step is critical because tmin is not zero!)
-    r.mediumid = optixIsFrontFaceHit() ? (index.w >> 16) : (index.w & 0xFFFF);
+    // current medium id
+    const bool isfronthit = optixIsFrontFaceHit();
+    r.mediumid = isfronthit ? (index.w >> 16) : (index.w & 0xFFFF);
 
     // get medium properties
     const Medium currprop = gcfg.medium[r.mediumid];
     
     // determine path length
-    const float lmove = (r.slen > hitlen * currprop.mus) ?
-        hitlen : r.slen / currprop.mus;
+    const bool isend = (hitlen * currprop.mus > r.slen);
+    const float lmove = isend ? r.slen / currprop.mus : hitlen;
 
     // save output
     accumulateOutput(r, currprop, lmove);
 
     // update photon position
-    r.p0 += r.dir * lmove;
+    r.p0 += r.dir * (lmove + (isend ? 0.0f : SAFETY_DISTANCE));
 
     // update photon weight
     r.weight *= expf(-currprop.mua * lmove);
@@ -248,27 +250,23 @@ extern "C" __global__ void __closesthit__ch() {
     r.photontimer += lmove * R_C0 * currprop.n;
 
     // update photon direction if needed
-    if (r.slen > hitlen * currprop.mus) {
+    if (isend) {
+        // after a scattering event, new direction and scattering length
+        r.dir = selectScatteringDirection(r.dir, currprop.g, rng);
+        r.slen = rng.rand_next_scatlen();
+    } else {
         // after hitting a boundary, update remaining scattering length
         r.slen -= lmove * currprop.mus;
 
         // triangle nodes
-        const float3 &v0 = sbtData.node[index.x];
-        const float3 &v1 = sbtData.node[index.y];
-        const float3 &v2 = sbtData.node[index.z];
-
-        // get intersection (barycentric coordinate)
-        const float2 bary = optixGetTriangleBarycentrics();
-        r.p0 = (1.0f - bary.x - bary.y) * v0 + bary.x * v1 + bary.y * v2;
+        // const float3 &v0 = sbtData.node[index.x];
+        // const float3 &v1 = sbtData.node[index.y];
+        // const float3 &v2 = sbtData.node[index.z];
 
         // update medium id (assume matched boundary)
         r.mediumid = optixIsFrontFaceHit() ? (index.w & 0xFFFF) : (index.w >> 16);
 
         // todo: update ray direction at a mismatched boundary
-    } else {
-        // after a scattering event, new direction and scattering length
-        r.dir = selectScatteringDirection(r.dir, currprop.g, rng);
-        r.slen = rng.rand_next_scatlen();
     }
 
     // update rng
