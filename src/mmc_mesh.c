@@ -142,6 +142,7 @@ void mesh_init(tetmesh* mesh) {
     mesh->nmax.w = 1.f;
     mesh->nface = 0;
     mesh->fnode = NULL;
+    mesh->fnorm = NULL;
     mesh->face = NULL;
     mesh->front = NULL;
     mesh->back = NULL;
@@ -779,6 +780,10 @@ void mesh_clear(tetmesh* mesh) {
         free(mesh->fnode);
         mesh->fnode = NULL;
     }
+    if (mesh->fnorm) {
+        free(mesh->fnorm);
+        mesh->fnorm = NULL;
+    }
     if (mesh->face) {
         free(mesh->face);
         mesh->face = NULL;
@@ -845,15 +850,29 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         // find triangle meshes, front and back medium types
         pmesh->nface = 0;
         pmesh->face = (uint3*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint3));
+        pmesh->fnorm = (float3*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(float3));
         pmesh->front = (uint*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint));
         pmesh->back = (uint*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint));
+        float3 v0, v1, v2, vec01, vec02, vnorm;
         for(int i = 0; i < pmesh->ne; ++i){
             for(int j = 0; j < pmesh->elemlen; ++j){
                 int nexteid = fnb[(i * pmesh->elemlen) + j];
                 if((nexteid > 0 && pmesh->type[nexteid - 1] != pmesh->type[i]) || nexteid == 0) {
+                    // face node
                     pmesh->face[pmesh->nface].x = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][0]] - 1;
                     pmesh->face[pmesh->nface].y = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][1]] - 1;
                     pmesh->face[pmesh->nface].z = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][2]] - 1;
+                    // face norm: pointing from back to front
+                    v0 = pmesh->fnode[pmesh->face[pmesh->nface].x];
+                    v1 = pmesh->fnode[pmesh->face[pmesh->nface].y];
+                    v2 = pmesh->fnode[pmesh->face[pmesh->nface].z];
+                    vec_diff((MMCfloat3*)&v0, (MMCfloat3*)&v1, (MMCfloat3*)&vec01);
+                    vec_diff((MMCfloat3*)&v0, (MMCfloat3*)&v2, (MMCfloat3*)&vec02);
+                    vec_cross((MMCfloat3*)&vec01, (MMCfloat3*)&vec02, (MMCfloat3*)&vnorm);
+                    float mag = 1.0f / sqrtf(vec_dot((MMCfloat3*)&vnorm, (MMCfloat3*)&vnorm));
+                    vec_mult((MMCfloat3*)&vnorm, mag, (MMCfloat3*)&vnorm);
+                    pmesh->fnorm[pmesh->nface] = vnorm;
+                    // front and back media types
                     pmesh->front[pmesh->nface] = ((nexteid == 0) ? 0 : pmesh->type[nexteid - 1]);
                     pmesh->back[pmesh->nface] = pmesh->type[i];
                     fnb[(i * pmesh->elemlen) + j] = -1;
@@ -870,6 +889,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
             }
         }
         pmesh->face = (uint3*)realloc(pmesh->face, pmesh->nface * sizeof(uint3));
+        pmesh->fnorm = (float3*)realloc(pmesh->fnorm, pmesh->nface * sizeof(float3));
         pmesh->front = (uint*)realloc(pmesh->front, pmesh->nface * sizeof(uint));
         pmesh->back = (uint*)realloc(pmesh->back, pmesh->nface * sizeof(uint));
 

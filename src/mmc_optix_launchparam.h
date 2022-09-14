@@ -1,7 +1,7 @@
 #ifndef _MMC_OPTIX_LAUNCHPARAM_H
 #define _MMC_OPTIX_LAUNCHPARAM_H
 
-#define MAX_PROP           4000                     /*maximum property number*/
+#define MAX_PROP           4000              /*maximum property number*/
 
 /**
  * @brief struct for medium optical properties
@@ -37,8 +37,9 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
 } MMCParam;
 
 struct TriangleMeshSBTData {
-    float3 *node;  /**< x,y,z: node position in a 3-D Cartesian coordinate system */
-    uint4  *face;  /**< x,y,z: node index; w: front(upper word) and back(lower word) face medium type */
+    /**< x,y,z: face normal; w: front(upper 2-byte) and
+     * back(lower 2-byte) face medium type */
+    float4 *fnorm;
 };
 
 #endif

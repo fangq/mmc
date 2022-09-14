@@ -572,16 +572,16 @@ void buildSBT(tetmesh* mesh, OptixParams* optixcfg) {
     HitgroupRecord rec;
     // all meshes use the same code, so all same hit group
     OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->hitgroupPGs[0],&rec));
-    rec.data.node = (float3*)optixcfg->vertexBuffer.d_pointer();
 
-    // combine face + front + back into a uint4 array
-    uint4 *face = (uint4*)calloc(mesh->nface, sizeof(uint4));
+    // combine face normal + front + back into a float4 array
+    float4 *fnorm = (float4*)calloc(mesh->nface, sizeof(float4));
     for (size_t i = 0; i < mesh->nface; ++i) {
-        face[i] = make_uint4(mesh->face[i].x, mesh->face[i].y, mesh->face[i].z,
-            (mesh->front[i] << 16) | (0xFF & mesh->back[i]));
+        uint media = (mesh->front[i] << 16) | (0xFF & mesh->back[i]);
+        fnorm[i] = make_float4(mesh->fnorm[i].x, mesh->fnorm[i].y, mesh->fnorm[i].z,
+            *(float*)&media);
     }
-    optixcfg->faceBuffer.alloc_and_upload(face, mesh->nface);
-    rec.data.face = (uint4*)optixcfg->faceBuffer.d_pointer();
+    optixcfg->faceBuffer.alloc_and_upload(fnorm, mesh->nface);
+    rec.data.fnorm = (float4*)optixcfg->faceBuffer.d_pointer();
     hitgroupRecords.push_back(rec);
 
     optixcfg->hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);

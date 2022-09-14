@@ -224,11 +224,12 @@ extern "C" __global__ void __closesthit__ch() {
     // triangle information
     const TriangleMeshSBTData &sbtData =
         *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
-    const uint4 index = sbtData.face[primid];
+    const float4 fnorm = sbtData.fnorm[primid];
+    const uint media = __float_as_uint(fnorm.w);
 
     // current medium id
     const bool isfronthit = optixIsFrontFaceHit();
-    r.mediumid = isfronthit ? (index.w >> 16) : (index.w & 0xFFFF);
+    r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
 
     // get medium properties
     const Medium currprop = gcfg.medium[r.mediumid];
@@ -259,12 +260,9 @@ extern "C" __global__ void __closesthit__ch() {
         r.slen -= lmove * currprop.mus;
 
         // triangle nodes
-        // const float3 &v0 = sbtData.node[index.x];
-        // const float3 &v1 = sbtData.node[index.y];
-        // const float3 &v2 = sbtData.node[index.z];
 
         // update medium id (assume matched boundary)
-        r.mediumid = optixIsFrontFaceHit() ? (index.w & 0xFFFF) : (index.w >> 16);
+        r.mediumid = optixIsFrontFaceHit() ? (media & 0xFFFF) : (media >> 16);
 
         // todo: update ray direction at a mismatched boundary
     }
