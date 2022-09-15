@@ -31,8 +31,12 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     float Rtstep;
     int maxgate;
     unsigned int mediumid0;             /**< initial medium type */
+
+    uint isreflect;
+
     int threadphoton;
     int oddphoton;
+
     Medium medium[MAX_PROP];
 } MMCParam;
 

@@ -24,12 +24,12 @@ cfg.elem=elem;
 cfg.srcpos=[30 30 0.01];
 cfg.srcdir=[0 0 1];
 
-cfg.prop=[0.000, 0,1,1;
-          0.005, 1,0,1;  %box
-          0.010,10,0,1]; %sphere
+cfg.prop=[0.000,  0, 1, 1;
+          0.005,  1, 0, 1.37;  %box
+          0.010, 10, 0, 1]; %sphere
 
 % disable reflection
-cfg.isreflect=0;
+cfg.isreflect=1;
 
 % time-gate
 cfg.tstart=0;

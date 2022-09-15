@@ -13,6 +13,7 @@
 constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // ensure ray cut through triangle
+constexpr float DOUBLE_SAFETY_DISTANCE = 0.0002f;
 
 // simulation configuration and medium optical properties
 extern "C" {
@@ -182,6 +183,49 @@ __device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium
 }
 
 /**
+ * @brief reflect or refract a ray at mismatched boundary
+ */
+__device__ __forceinline__ bool reflectray(const float3 &norm, const float &n1,
+    const float &n2, mcx::Random &rng, optixray &r) {
+    float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2;
+
+    Icos = fabs(dot(r.dir, norm));
+    tmp0 = n1 * n1;
+    tmp1 = n2 * n2;
+    tmp2 = 1.f - tmp0 / tmp1 * (1.f - Icos * Icos);
+
+    if (tmp2 > 0.0f) {
+        // if no total internal reflection
+        Re = tmp0 * Icos * Icos + tmp1 * tmp2; /*transmission angle*/
+        tmp2 = sqrtf(tmp2); /*to save one sqrt*/
+        Im = 2.f * n1 * n2 * Icos * tmp2;
+        Rtotal = (Re - Im) / (Re + Im); /*Rp*/
+        Re = tmp1 * Icos * Icos + tmp0 * tmp2 * tmp2;
+        Rtotal = (Rtotal + (Re - Im) / (Re + Im)) * 0.5f; /*(Rp+Rs)/2*/
+
+        if (rng.uniform(0.0f, 1.0f) <= Rtotal) {
+            // do reflection, correct photon position
+            r.p0 -= r.dir * DOUBLE_SAFETY_DISTANCE;
+            r.dir += -2.0f * Icos * norm;
+        } else {
+            // do transmission
+            r.dir += -Icos * norm;
+            r.dir = tmp2 * norm + n1 / n2 * r.dir;
+            return false;
+        }
+    } else {
+        // total internel reflection, correct photon position
+        r.p0 -= r.dir * DOUBLE_SAFETY_DISTANCE;
+        r.dir += -2.0f * Icos * norm;
+    }
+
+    // normalize new direction
+    tmp0 = rsqrtf(dot(r.dir, r.dir));
+    r.dir *= tmp0;
+    return true;
+}
+
+/**
  * @brief Launch photon and trace ray iteratively
  */
 extern "C" __global__ void __raygen__rg() {
@@ -217,18 +261,22 @@ extern "C" __global__ void __closesthit__ch() {
     // get rng
     mcx::Random rng = getRNG();
 
-    // get intersection information
-    const float hitlen = optixGetRayTmax(); // distance
-    const int primid = optixGetPrimitiveIndex(); // triangle id
+    // distance to the intersection
+    const float hitlen = optixGetRayTmax();
 
-    // triangle information
+    // intersected triangle id
+    const int primid = optixGetPrimitiveIndex();
+
+    // hit front or back face
+    const bool isfronthit = optixIsFrontFaceHit();
+
+    // get info of triangle, including face normal, back and front media
     const TriangleMeshSBTData &sbtData =
         *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
-    const float4 fnorm = sbtData.fnorm[primid];
+    float4 fnorm = sbtData.fnorm[primid];
     const uint media = __float_as_uint(fnorm.w);
 
     // current medium id
-    const bool isfronthit = optixIsFrontFaceHit();
     r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
 
     // get medium properties
@@ -242,7 +290,7 @@ extern "C" __global__ void __closesthit__ch() {
     accumulateOutput(r, currprop, lmove);
 
     // update photon position
-    r.p0 += r.dir * (lmove + (isend ? 0.0f : SAFETY_DISTANCE));
+    r.p0 += r.dir * lmove;
 
     // update photon weight
     r.weight *= expf(-currprop.mua * lmove);
@@ -259,12 +307,21 @@ extern "C" __global__ void __closesthit__ch() {
         // after hitting a boundary, update remaining scattering length
         r.slen -= lmove * currprop.mus;
 
-        // triangle nodes
-
         // update medium id (assume matched boundary)
-        r.mediumid = optixIsFrontFaceHit() ? (media & 0xFFFF) : (media >> 16);
+        r.mediumid = isfronthit ? (media & 0xFFFF) : (media >> 16);
 
-        // todo: update ray direction at a mismatched boundary
+        // update photon position to cut through the hit triangle
+        r.p0 += r.dir * SAFETY_DISTANCE;
+
+        // update ray direction at mismatched boundary
+        if (gcfg.isreflect && currprop.n != gcfg.medium[r.mediumid].n) {
+            fnorm = isfronthit ? -fnorm : fnorm;
+            if (reflectray(*(float3*)&fnorm, currprop.n, gcfg.medium[r.mediumid].n,
+                rng, r)) {
+                // if the ray is reflected
+                r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
+            }
+        }
     }
 
     // update rng

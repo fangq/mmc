@@ -167,6 +167,9 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     // init medium ID using element based
     optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0-1];
 
+    // simulation flags
+    optixcfg->launchParams.isreflect = cfg->isreflect;
+
     // number of photons for each thread
     int totalthread = cfg->nthread;
 
