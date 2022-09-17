@@ -28,9 +28,6 @@ cfg.prop=[0.000,  0, 1, 1;
           0.005,  1, 0, 1.37;  %box
           0.010, 10, 0, 1]; %sphere
 
-% disable reflection
-cfg.isreflect=1;
-
 % time-gate
 cfg.tstart=0;
 cfg.tend=5e-9;
@@ -40,10 +37,7 @@ cfg.tstep=5e-10;
 cfg.method='grid';
 
 % output energy deposition
-cfg.outputtype='energy';
-
-% disable normalization
-cfg.isnormalized=0;
+cfg.outputtype='fluence';
 
 % gpu setting
 cfg.gpuid=1;
@@ -57,13 +51,14 @@ energyoptix=sum(energy,4);
 
 %% run opencl MMC simulation
 cfg.compute='opencl';
+
 output=mmclab(cfg);
 energy=output.data(1:end-1,1:end-1,1:end-1,:);
 energyopencl=sum(energy,4);
 
 %% compare results
 figure;
-clines=-20:2:10;
+clines=-25:2:-5;
 contourf(log(squeeze(energyopencl(30,:,:))'),clines,'k-','displayname','OpenCL');
 hold on;
 contour(log(squeeze(energyoptix(30,:,:))'),clines,'r--','displayname','Optix');

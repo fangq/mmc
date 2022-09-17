@@ -10,6 +10,9 @@
 #include "mmc_optix_ray.h"
 #include "mmc_optix_launchparam.h"
 
+// as of 09/17/2022, only otFlux, otFluence, otEnergy are supported
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
+
 constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // ensure ray cut through triangle
@@ -149,7 +152,8 @@ __device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium
     int segcount = ((int)(lmove * gcfg.dstep) + 1) << 1;
     float seglen = lmove / segcount;
     float segdecay = expf(-prop.mua * seglen);
-    float segloss = r.weight * (1.0f - segdecay);
+    float segloss = (gcfg.outputtype == otEnergy) ? r.weight * (1.0f - segdecay) :
+        (prop.mua ? r.weight * (1.0f - segdecay) / prop.mua : 0.0f);
 
     // deposit weight loss of each segment to the corresponding grid
     float3 step = seglen * r.dir;

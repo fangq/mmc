@@ -33,6 +33,7 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     unsigned int mediumid0;             /**< initial medium type */
 
     uint isreflect;
+    int outputtype;
 
     int threadphoton;
     int oddphoton;

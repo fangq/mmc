@@ -170,6 +170,9 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     // simulation flags
     optixcfg->launchParams.isreflect = cfg->isreflect;
 
+    // output type
+    optixcfg->launchParams.outputtype = static_cast<int>(cfg->outputtype);
+
     // number of photons for each thread
     int totalthread = cfg->nthread;
 
