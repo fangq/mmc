@@ -98,6 +98,24 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
             optixcfg.outputHostBuffer[i + optixcfg.launchParams.crop0.w];
     }
 
+    // ==================================================================
+    // normalize output
+    // ==================================================================
+    if (cfg->isnormalized) {
+        MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
+        fflush(cfg->flog);
+
+        // not used if cfg->method == rtBLBadouelGrid
+        cfg->energyabs = 0.0f;
+
+        // for now assume initial weight of each photon is 1.0
+        cfg->energytot = cfg->nphoton;
+        mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
+        MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
+            GetTimeMillis() - tic0);
+        fflush(cfg->flog);
+    }
+
     #pragma omp master
     {
         if (cfg->issave2pt && cfg->parentid == mpStandalone) {
