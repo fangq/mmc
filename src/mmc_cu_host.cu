@@ -210,6 +210,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     MCXReporter* greporter;
     uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)
                    << cfg->nbuffer; // use 4 copies to reduce racing
+    cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
 
     float* field, *dref = NULL;
 
@@ -372,7 +373,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     oddphotons =
         (int)(cfg->nphoton * cfg->workload[gpuid] / (fullload * cfg->respin) -
               threadphoton * gpu[gpuid].autothread);
-    field = (float*)calloc(sizeof(float) * meshlen, cfg->maxgate);
+    field = (float*)calloc(sizeof(float) * meshlen * 2, cfg->maxgate);
     dref = (float*)calloc(sizeof(float) * mesh->nf, cfg->maxgate);
     Pdet = (float*)calloc(cfg->maxdetphoton * sizeof(float), hostdetreclen);
 
@@ -457,8 +458,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                     gseed, Pseed, sizeof(uint) * gpu[gpuid].autothread * RAND_SEED_WORD_LEN,
                     cudaMemcpyHostToDevice));
 
-    CUDA_ASSERT(cudaMalloc((void**)&gweight, sizeof(float) * fieldlen));
-    CUDA_ASSERT(cudaMemcpy(gweight, field, sizeof(float) * fieldlen,
+    CUDA_ASSERT(cudaMalloc((void**)&gweight, sizeof(float) * fieldlen * 2));
+    CUDA_ASSERT(cudaMemcpy(gweight, field, sizeof(float) * fieldlen * 2,
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&gdref, sizeof(float) * nflen));
@@ -683,16 +684,16 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
             // handling the 2pt distributions
             if (cfg->issave2pt) {
-                float* rawfield = (float*)malloc(sizeof(float) * fieldlen);
+                float* rawfield = (float*)malloc(sizeof(float) * fieldlen * 2);
 
-                CUDA_ASSERT(cudaMemcpy(rawfield, gweight, sizeof(float) * fieldlen,
+                CUDA_ASSERT(cudaMemcpy(rawfield, gweight, sizeof(float) * fieldlen * 2,
                                        cudaMemcpyDeviceToHost));
                 MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n",
                             GetTimeMillis() - tic);
                 fflush(cfg->flog);
 
                 for (i = 0; i < fieldlen; i++) { // accumulate field, can be done in the GPU
-                    field[(i >> cfg->nbuffer)] += rawfield[i];    //+rawfield[i+fieldlen];
+                    field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
                 }
 
                 free(rawfield);
