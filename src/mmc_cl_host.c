@@ -93,6 +93,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
     cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) << cfg->nbuffer; // use 4 copies to reduce racing
+    cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
 
     cl_float*  field, *dref = NULL;
 
@@ -119,7 +120,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         0.f,
 #endif
         mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x, mesh->nmin.y, mesh->nmin.z}}, cfg->nout,
-        cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x, cfg->crop0.y, cfg->crop0.z}},
+        cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x, cfg->crop0.y, cfg->crop0.z, cfg->crop0.w}},
         mesh->srcelemlen, {{cfg->bary0.x, cfg->bary0.y, cfg->bary0.z, cfg->bary0.w}},
         cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
@@ -238,7 +239,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         fullload = totalcucore;
     }
 
-    field = (cl_float*)calloc(sizeof(cl_float) * meshlen, cfg->maxgate);
+    field = (cl_float*)calloc(sizeof(cl_float) * meshlen * 2, cfg->maxgate);
     dref = (cl_float*)calloc(sizeof(cl_float) * mesh->nf, cfg->maxgate);
     Pdet = (float*)calloc(cfg->maxdetphoton * sizeof(float), hostdetreclen);
 
@@ -303,7 +304,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         }
 
         OCL_ASSERT(((gseed[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN, Pseed, &status), status)));
-        OCL_ASSERT(((gweight[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * fieldlen, field, &status), status)));
+        OCL_ASSERT(((gweight[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * fieldlen * 2, field, &status), status)));
         OCL_ASSERT(((gdref[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * nflen, dref, &status), status)));
         OCL_ASSERT(((gdetphoton[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * cfg->maxdetphoton * hostdetreclen, Pdet, &status), status)));
 
@@ -652,15 +653,15 @@ is more than what your have specified (%d), please use the -H option to specify 
 
                 //handling the 2pt distributions
                 if (cfg->issave2pt) {
-                    float* rawfield = (float*)malloc(sizeof(float) * fieldlen);
+                    float* rawfield = (float*)malloc(sizeof(float) * fieldlen * 2);
 
-                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gweight[devid], CL_TRUE, 0, sizeof(cl_float)*fieldlen,
+                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gweight[devid], CL_TRUE, 0, sizeof(cl_float)*fieldlen * 2,
                                                     rawfield, 0, NULL, NULL)));
                     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic);
                     fflush(cfg->flog);
 
                     for (i = 0; i < fieldlen; i++) { //accumulate field, can be done in the GPU
-                        field[(i >> cfg->nbuffer)] += rawfield[i];    //+rawfield[i+fieldlen];
+                        field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
                     }
 
                     free(rawfield);
