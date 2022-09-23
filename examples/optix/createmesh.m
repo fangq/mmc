@@ -18,12 +18,9 @@ cfg.nphoton=1e8;
 cfg.srcpos=[30 30 0.01];
 cfg.srcdir=[0 0 1];
 
-cfg.prop=[0.000, 0,1,1;
-          0.005, 1,0,1;  %box
-          0.010,10,0,1]; %sphere
-
-% disable reflection
-cfg.isreflect=0;
+cfg.prop=[0.000,  0, 1, 1;
+          0.005,  1, 0, 1.37;  %box
+          0.010, 10, 0, 1]; %sphere
 
 % time-gate
 cfg.tstart=0;
@@ -34,10 +31,7 @@ cfg.tstep=5e-10;
 cfg.method='grid';
 
 % output energy deposition
-cfg.outputtype='energy';
-
-% disable normalization
-cfg.isnormalized=0;
+cfg.outputtype='fluence';
 
 % gpu setting
 cfg.gpuid=1;

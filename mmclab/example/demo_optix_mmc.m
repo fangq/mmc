@@ -46,22 +46,22 @@ cfg.gpuid=1;
 cfg.compute='optix';
 
 output=mmclab(cfg);
-energy=output.data(1:end-1,1:end-1,1:end-1,:);
-energyoptix=sum(energy,4);
+fluence=output.data(1:end-1,1:end-1,1:end-1,:);
+fluenceoptix=sum(fluence,4);
 
 %% run opencl MMC simulation
 cfg.compute='opencl';
 
 output=mmclab(cfg);
-energy=output.data(1:end-1,1:end-1,1:end-1,:);
-energyopencl=sum(energy,4);
+fluence=output.data(1:end-1,1:end-1,1:end-1,:);
+fluenceopencl=sum(fluence,4);
 
 %% compare results
 figure;
 clines=-25:2:-5;
-contourf(log(squeeze(energyopencl(30,:,:))'),clines,'k-','displayname','OpenCL');
+contourf(log(squeeze(fluenceopencl(30,:,:))'),clines,'k-','displayname','OpenCL');
 hold on;
-contour(log(squeeze(energyoptix(30,:,:))'),clines,'r--','displayname','Optix');
+contour(log(squeeze(fluenceoptix(30,:,:))'),clines,'r--','displayname','Optix');
 axis equal;
 legend;
 colorbar;
