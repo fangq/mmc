@@ -227,6 +227,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     }
     optixcfg->seedBuffer.alloc_and_upload(hseed, totalthread);
     optixcfg->launchParams.seedbuffer = optixcfg->seedBuffer.d_pointer();
+    if (hseed) free(hseed);
 
     // upload launch parameters to device
     optixcfg->launchParamsBuffer.alloc_and_upload(&optixcfg->launchParams, 1);
