@@ -445,7 +445,7 @@ OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg) {
     triangleInput.triangleArray.numIndexTriplets    = mesh->nface;
     triangleInput.triangleArray.indexBuffer         = d_indices;
 
-    uint32_t triangleInputFlags[1] = { 0 }; // OPTIX_GEOMETRY_FLAG_NONE?
+    uint32_t triangleInputFlags[1] = { OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT };
 
     // in this example we have one SBT entry, and no per-primitive
     // materials:
