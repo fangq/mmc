@@ -76,7 +76,7 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
                 pos = edgelist.size() - 1;
             } else {
                 std::list< std::pair<int, int> >::iterator edidx =
-                                                std::find(edgelist.begin(), edgelist.end(), edge);
+                    std::find(edgelist.begin(), edgelist.end(), edge);
                 pos = std::distance( edgelist.begin(), edidx) ;
             }
 

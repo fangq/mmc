@@ -412,6 +412,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         sprintf(opt + strlen(opt), " -DUSE_BLBADOUEL");
     }
 
+    if (gpu[0].vendor == dvNVIDIA) {
+        sprintf(opt + strlen(opt), " -DUSE_NVIDIA_GPU");
+    }
+
     if (strstr(opt, "USE_MACRO_CONST")) {
         IPARAM_TO_MACRO(opt, param, debuglevel);
         FPARAM_TO_MACRO(opt, param, dstep);
