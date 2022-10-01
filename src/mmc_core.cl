@@ -445,6 +445,21 @@ __device__ float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]) {
 
 #ifndef __NVCC__
 
+#if defined(USE_NVIDIA_GPU) && !defined(USE_OPENCL_ATOMIC)
+// float atomicadd on NVIDIA GPU via PTX
+// https://stackoverflow.com/a/72049624/4271392
+
+__device__ inline float atomicadd(volatile __global float* address, const float value) {
+    float old;
+    asm volatile(
+        "atom.global.add.f32 %0, [%1], %2;"
+        : "=f"(old)
+        : "l"(address), "f"(value)
+        : "memory"
+    );
+    return old;
+}
+#else
 // OpenCL float atomicadd hack:
 // http://suhorukov.blogspot.co.uk/2011/12/opencl-11-atomic-operations-on-floating.html
 // https://devtalk.nvidia.com/default/topic/458062/atomicadd-float-float-atomicmul-float-float-/
@@ -452,10 +467,11 @@ __device__ float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]) {
 __device__ inline float atomicadd(volatile __global float* address, const float value) {
     float old = value, orig;
 
-    while ((old = atomic_xchg(address, (orig=atomic_xchg(address, 0.0f)) + old)) != 0.0f);
+    while ((old = atomic_xchg(address, (orig = atomic_xchg(address, 0.0f)) + old)) != 0.0f);
 
     return orig;
 }
+#endif
 
 /*
 
@@ -681,6 +697,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                     if (r->oldweight > 0.f) {
 #ifdef USE_ATOMIC
                         float oldval = atomicadd(weight + r->oldidx, r->oldweight);
+
                         if (oldval > MAX_ACCUM) {
                             if (atomicadd(weight + r->oldidx, -oldval) < 0.0f) {
                                 atomicadd(weight + r->oldidx, oldval);
@@ -688,6 +705,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w, oldval);
                             }
                         }
+
 #else
                         weight[r->oldidx] += r->oldweight;
 #endif
@@ -705,6 +723,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                 if (r->faceid == -2 || !r->isend) {
 #ifdef USE_ATOMIC
                     float oldval = atomicadd(weight + newidx, r->oldweight);
+
                     if (oldval > MAX_ACCUM) {
                         if (atomicadd(weight + r->oldidx, -oldval) < 0.0f) {
                             atomicadd(weight + r->oldidx, oldval);
@@ -712,6 +731,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                             atomicadd(weight + r->oldidx + gcfg->crop0.w, oldval);
                         }
                     }
+
 #else
                     weight[newidx] += r->oldweight;
 #endif
@@ -759,6 +779,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #ifndef DO_NOT_SAVE
 #ifdef USE_ATOMIC
                         float oldval = atomicadd(weight + r->oldidx, r->oldweight);
+
                         if (oldval > MAX_ACCUM) {
                             if (atomicadd(weight + r->oldidx, -oldval) < 0.0f) {
                                 atomicadd(weight + r->oldidx, oldval);
@@ -766,6 +787,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w, oldval);
                             }
                         }
+
 #else
                         weight[r->oldidx] += r->oldweight;
 #endif
@@ -781,6 +803,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                     if (r->faceid == -2 || !r->isend) {
 #ifdef USE_ATOMIC
                         float oldval = atomicadd(weight + r->oldidx, r->oldweight);
+
                         if (oldval > MAX_ACCUM) {
                             if (atomicadd(weight + r->oldidx, -oldval) < 0.0f) {
                                 atomicadd(weight + r->oldidx, oldval);
@@ -788,6 +811,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w, oldval);
                             }
                         }
+
 #else
                         weight[newidx] += r->oldweight;
 #endif
