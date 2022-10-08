@@ -2909,7 +2909,7 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig* cfg) {
-    MMC_ERROR(MMC_INFO, "MMC $Rev::      $v2021.2");
+    MMC_ERROR(MMC_INFO, "MMC $Rev::      $v2022.10");
 }
 
 /**
@@ -2922,7 +2922,7 @@ void mcx_printheader(mcconfig* cfg) {
     MMC_FPRINTF(cfg->flog, S_YELLOW"\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
-#          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          #\n\
+#          Copyright (c) 2010-2022 Qianqian Fang <q.fang at neu.edu>          #\n\
 #                            http://mcx.space/#mmc                            #\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
@@ -2930,7 +2930,7 @@ void mcx_printheader(mcconfig* cfg) {
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $v2021.2$Date::                       $ by $Author::              $\n\
+$Rev::      $v2022.10$Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 

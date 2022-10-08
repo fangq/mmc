@@ -1,5 +1,47 @@
 Change Log
 
+== MMC 1.9.6 (v2022.10, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2022-10-01 [77411c4] using nvidia native atomicadd for float add 40% speedup
+ 2022-09-21 [e661011] add double-buffer to solve fangq/mcx#41
+ 2022-05-30 [c3b15b2] print detected photon number in matlab
+ 2022-05-21 [2ea4414] disable astyle close-templates to allow gcc 4.9 to compile
+ 2022-05-20 [d4eb92d] complete reformat of source code using astyle with 'make pretty'
+ 2022-03-09 [f1df4bd] fix make omp linker error
+ 2022-02-24 [658943b] move bc flags to opencl only
+ 2021-10-24 [869c58e] fix #73, port mirror BC and absorption bc on exterior surface to GPU
+ 2021-08-22 [2ed3213] update r->inroi only when doinit is false
+ 2021-08-22 [33eb98a] manually patching PR #68 by Yaoshen because immc was broken
+ 2021-06-18 [a31a85b] force output data format for both GPU and CPU
+ 2021-06-07 [f15d137] explicitly casting variable to allow JIT compiler to work on certain drivers
+ 2021-03-26 [929775e] update vessel demo script by Yaoshen to use the latest interface
+ 2021-03-26 [c6ae4d7] fix vessel example photon leaking bug
+ 2021-03-14 [c0537cc] support immc in the command line mode
+ 2021-03-14 [c92be73] slightly optimize doinit flow
+ 2021-03-14 [0b58920] remove init_face_inout, perform initial roi inclusion test for all roi types
+ 2021-03-14 [c710105] search for all first-level neighbor faceroi, no need to manually set
+ 2021-03-14 [fd3de3a] wrap implicit mmc to a reusable function,cut register use by 75%
+ 2021-03-14 [d6b9966] fix f-immc stray voxel bug, remove fast_exp9, in DMMC, Lmove can be big
+ 2021-03-13 [688f697] get rid of r->u and r->E to reduce register use
+ 2021-03-13 [b667b82] rename isedgeroi to roitype
+ 2021-03-13 [3c36f32] fix incorrect asborption fraction in immc demo
+ 2021-03-13 [d675737] remove insideroi variable, because it should not change the current prop
+ 2021-03-12 [49df21b] updating inroi and isedgeroi
+ 2021-03-12 [c1795ed] more simplification to the overly complex immc new codes, not yet working
+ 2021-03-12 [3087117] much simplified e-immc testing
+ 2021-03-10 [e4fc100] trying to simplify the immc flow, not working yet
+ 2021-03-09 [3057a0e] update the help info on faceroi face orders
+ 2021-03-09 [2e18153] fixing f-immc demo bug, thanks Yaoshen
+ 2021-03-05 [b14347c] immc example runs, but fimmc result is incorrect
+ 2021-03-05 [9ac29ec] fix two bugs, now e-immc and n-immc demo works fine
+ 2021-03-04 [087df42] revamping immc code
+ 2021-03-03 [0be4a0f] make demo_immc_vesel a function to run in matlab2010
+ 2021-03-03 [1e93a4f] fix n-immc bug, make demo_immc_basic.m example work
+ 2021-03-03 [948bb9f] update documentation for v2021.2 release
+ 2021-03-02 [735c9ee] fix typo in output variable name
+ 2021-03-02 [2218ee4] replace 3 separate steps by a single s2m call
+ 2021-03-02 [46183d8] remove unnecessarily duplicated functions, use iso2mesh functions
+
 == MMC 1.9.5 (v2021.2, Moon Cake - RC1), Qianqian Fang <q.fang at neu.edu> ==
 
  2021-02-26 [f2f7221] add MATLAB_MEX_FILE in the makefile for octave mex

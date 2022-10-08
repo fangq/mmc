@@ -6,7 +6,7 @@
 
 *Author:  Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPL v3), see License.txt
-*Version: 1.9.5 (v2021.2, Moon Cake - RC1)
+*Version: 1.9.6 (v2022.10, Moon Cake)
 *URL:     http://mcx.space/mmc
 
 ---------------------------------------------------------------------
@@ -19,13 +19,19 @@ Table of Content:
 
 == # What's New ==
 
-MMC v2021.2 (1.9.5) includes a major feature upgrade - implicit MMC (iMMC) - to
+MMC v2022.10 (1.9.6) includes a major feature upgrade - implicit MMC (iMMC) - to
 enable simulations of highly complex anatomical structures. The details of the
 iMMC algorithm, developed by Yaoshen Yuan, are described in his recent paper 
 [Yuan2021]. Briefly, iMMC permits one to associate cylindrical inclusions, 
 spherical inclusions, and thin-membrane with the edges, vertices and faces, 
 respectively, in a tetrahedral mesh. Currently, this feature is only supported
-on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`). 
+on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`).
+
+In 2020, we have also merged the `mmc-trinity` branch to the main code tree.
+The "trinity" version of MMC simultaneously supports CPU/SSE4, OpenCL and CUDA
+as the compute-backend, and can be selected using `--compute opencl|sse|cuda`
+command line flag. By default, we do not compile the CUDA editor in the binary.
+However, users can compile the "trinity" binary by `make cuda`.
 
 A detailed (long) list of updates can be found in the ChangeLog.txt or the 
 Github commit history: <https://github.com/fangq/mmc/commits/master>
