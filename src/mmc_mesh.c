@@ -831,6 +831,23 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         }
     }
 
+    // build acceleration data structure to speed up first-neighbor immc edge-roi calculation
+    // loop over each edgeroi, count how many roi in each elem, and write to the first elem as negative integer
+    if (tracer->mesh->edgeroi) {
+        for (i = 0; i < ne; i++) {
+            int count = 0;
+
+            for (j = 0; j < 6; j++)
+                if (tracer->mesh->edgeroi[(i * 6) + j] > 0.f) {
+                    count++;
+                }
+
+            if (count && fabs(tracer->mesh->edgeroi[i * 6]) < EPS) {
+                tracer->mesh->edgeroi[i * 6] = -count;    // number -1 to -6 indicates how many faces have ROIs
+            }
+        }
+    }
+
     // build acceleration data structure to speed up first-neighbor immc face-roi calculation
     // loop over each faceroi, count how many roi in each elem, and write to the first elem as negative integer
     if (tracer->mesh->faceroi) {

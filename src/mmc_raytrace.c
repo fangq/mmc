@@ -1416,6 +1416,10 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
         int* enb, *ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
         float mus;
 
+        if (cfg->implicit == 1 && r->inroi && tracer->mesh->edgeroi && fabs(tracer->mesh->edgeroi[eid * 6]) < EPS) {
+            r->inroi = 0;
+        }
+
         if (cfg->implicit && r->inroi) {
             prop = tracer->mesh->med + tracer->mesh->prop;
         } else {

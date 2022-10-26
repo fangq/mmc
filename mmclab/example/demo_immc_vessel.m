@@ -1,4 +1,4 @@
-function cfg=demo_immc_vessel(cfg)
+function [cfg, flux]=demo_immc_vessel(cfg)
 % This example shows how to run e-iMMC on a vessel network
 
 %% load vessel data
