@@ -47,7 +47,12 @@
 #include "mex.h"
 #include "mmc_mesh.h"
 #include "mmc_host.h"
-#include "mmc_cl_host.h"
+#ifdef USE_OPENCL
+    #include "mmc_cl_host.h"
+#endif
+#ifdef USE_CUDA
+    #include "mmc_cu_host.h"
+#endif
 #include "mmc_tictoc.h"
 #include "mmc_raytrace.h"
 #include "waitmex/waitmex.c"

@@ -201,6 +201,8 @@ ifeq ($(TARGETSUFFIX),.a)
 endif
 
 cuda: sse
+cudamex: mex
+cudaoct: oct
 
 all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug cuda: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
