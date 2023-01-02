@@ -1,6 +1,6 @@
 Change Log
 
-== MMC 1.9.6 (v2022.10, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
+== MMC 1.9.6 (v2023.01, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
 
  2022-10-01 [77411c4] using nvidia native atomicadd for float add 40% speedup
  2022-09-21 [e661011] add double-buffer to solve fangq/mcx#41

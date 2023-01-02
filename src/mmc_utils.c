@@ -2909,7 +2909,7 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig* cfg) {
-    MMC_ERROR(MMC_INFO, "MMC $Rev::      $v2022.10");
+    MMC_ERROR(MMC_INFO, "MMC $Rev::      $v2023.01");
 }
 
 /**
@@ -2930,7 +2930,7 @@ void mcx_printheader(mcconfig* cfg) {
 #                                                                             #\n\
 #                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $v2022.10$Date::                       $ by $Author::             $\n\
+$Rev::      $v2023.01$Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 

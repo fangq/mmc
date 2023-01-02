@@ -1162,7 +1162,7 @@ extern "C" int mmc_throw_exception(const int id, const char* msg, const char* fi
  */
 
 void mmclab_usage() {
-    printf("MMCLAB v2022.10\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
+    printf("MMCLAB v2023.01\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
 }
 
 /**
