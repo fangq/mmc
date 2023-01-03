@@ -39,7 +39,7 @@
 #define _MMC_UTILITIES_H
 
 #include <stdio.h>
-#include <vector_types.h>
+#include "vector_types.h"
 #include "cjson/cJSON.h"
 
 #ifdef _OPENMP                      ///< use multi-threading for running simulation on multiple GPUs
@@ -323,6 +323,7 @@ int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type,
 void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, mcconfig* cfg);
 void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, mcconfig* cfg);
 void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);
+void mcx_fflush(FILE* out);
 
 #ifdef MCX_CONTAINER
 #ifdef _OPENMP

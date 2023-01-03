@@ -2158,6 +2158,21 @@ int mcx_parsedebugopt(char* debugopt) {
     return debuglevel;
 }
 
+
+/**
+ * @brief Flush command line output
+ *
+ * @param[in] out: the stream to be flushed
+ */
+
+void mcx_fflush(FILE* out) {
+#ifdef MCX_CONTAINER
+    mcx_matlab_flush();
+#else
+    fflush(out);
+#endif
+}
+
 /**
  * @brief Print a progress bar
  *
@@ -2210,11 +2225,8 @@ void mcx_progressbar(float percent, void* cfg) {
         }
 
         MMC_FPRINTF(stdout, "] %3d%%" S_RESET, (int)(percent * 100));
-#ifdef MCX_CONTAINER
-        mcx_matlab_flush();
-#else
-        fflush(stdout);
-#endif
+
+        mcx_fflush(stdout);
     }
 }
 

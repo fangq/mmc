@@ -30,9 +30,9 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    mmc_host.c
+\file    mmc_cl_host.c
 
-\brief   << Driver program of MMC >>
+\brief   OpenCL host code for OpenCL based MMC simulations
 *******************************************************************************/
 
 #include <stdlib.h>
@@ -358,7 +358,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     MMC_FPRINTF(cfg->flog, "initializing streams ...\t");
 
     MMC_FPRINTF(cfg->flog, "init complete : %d ms\n", GetTimeMillis() - tic);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     OCL_ASSERT(((mcxprogram = clCreateProgramWithSource(mcxcontext, 1, (const char**) & (cfg->clsource), NULL, &status), status)));
 
@@ -474,7 +474,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     }
 
     MMC_FPRINTF(cfg->flog, "build program complete : %d ms\n", GetTimeMillis() - tic);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     mcxkernel = (cl_kernel*)malloc(workdev * sizeof(cl_kernel));
 
@@ -515,7 +515,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     }
 
     MMC_FPRINTF(cfg->flog, "set kernel arguments complete : %d ms %d\n", GetTimeMillis() - tic, param.method);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     if (cfg->exportfield == NULL) {
         cfg->exportfield = mesh->weight;
@@ -543,13 +543,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
 
         MMC_FPRINTF(cfg->flog, "lauching mcx_main_loop for time window [%.1fns %.1fns] ...\n"
                     , twindow0 * 1e9, twindow1 * 1e9);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
 
         //total number of repetition for the simulations, results will be accumulated to field
         for (iter = 0; iter < cfg->respin; iter++) {
             MMC_FPRINTF(cfg->flog, "simulation run#%2d ... \n", iter + 1);
-            fflush(cfg->flog);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
             param.tstart = twindow0;
             param.tend = twindow1;
 
@@ -596,7 +596,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
             tic1 = GetTimeMillis();
             toc += tic1 - tic0;
             MMC_FPRINTF(cfg->flog, "kernel complete:  \t%d ms\nretrieving flux ... \t", tic1 - tic);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
 
             if (cfg->runtime < tic1 - tic) {
                 cfg->runtime = tic1 - tic;
@@ -662,7 +662,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gweight[devid], CL_TRUE, 0, sizeof(cl_float)*fieldlen * 2,
                                                     rawfield, 0, NULL, NULL)));
                     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic);
-                    fflush(cfg->flog);
+                    mcx_fflush(cfg->flog);
 
                     for (i = 0; i < fieldlen; i++) { //accumulate field, can be done in the GPU
                         field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
@@ -740,7 +740,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 
     if (cfg->isnormalized) {
         MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
 
         cfg->energyabs = cfg->energytot - cfg->energyesc;
         mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
@@ -750,7 +750,7 @@ is more than what your have specified (%d), please use the -H option to specify 
         MMC_FPRINTF(cfg->flog, "saving data to file ...\t");
         mesh_saveweight(mesh, cfg, 0);
         MMC_FPRINTF(cfg->flog, "saving data complete : %d ms\n\n", GetTimeMillis() - tic);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
     }
 
     if (cfg->issavedet && cfg->parentid == mpStandalone && cfg->exportdetected) {
@@ -770,7 +770,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                 cfg->nphoton, cfg->nphoton, workdev, reporter.raytet, (double)cfg->nphoton / toc);
     MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
                 cfg->energytot, (cfg->energytot - cfg->energyesc) / cfg->energytot * 100.f);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     OCL_ASSERT(clReleaseMemObject(gprogress[0]));
 

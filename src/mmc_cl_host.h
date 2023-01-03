@@ -30,9 +30,9 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    mcx_host_cl.hpp
+\file    mcx_cl_host.hpp
 
-\brief   Definitions of mmc high-level driver functions for OpenCL backend
+\brief   OpenCL host code for OpenCL based MMC simulations
 *******************************************************************************/
 
 #ifndef _MMC_HOSTCODE_CL_H

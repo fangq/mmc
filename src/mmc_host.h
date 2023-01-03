@@ -32,7 +32,7 @@
 /***************************************************************************//**
 \file    mmc_host.h
 
-\brief   Definition of mmc high-level driver functions
+\brief   OpenMP host code for CPU-based MMC simulations
 *******************************************************************************/
 
 #ifndef _MMC_HOSTCODE_H

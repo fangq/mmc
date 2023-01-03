@@ -21,10 +21,12 @@
  **          GPL v3, see LICENSE.txt for details
  *******************************************************************************/
 
-/**
-  \file    mmc_host.c
-  \brief   << Driver program of MMC >>
-*/
+/***************************************************************************//**
+\file    mmc_cu_host.c
+
+\brief   CUDA host code for NVIDIA GPUs
+*******************************************************************************/
+
 
 #define inlinefun __device__
 
@@ -42,8 +44,8 @@
 
 #include "mmc_core.cu"
 
-/************************************************************************** In
-this unit, we first launch a master thread and initialize the necessary data
+/******************************************************************************
+In this unit, we first launch a master thread and initialize the necessary data
 structures.This include the command line options(cfg), tetrahedral mesh(mesh)
 and the ray tracer precomputed data (tracer).
 ******************************************************************************/
@@ -538,7 +540,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 #endif
         MMC_FPRINTF(cfg->flog, "- compiled with: [RNG] %s [Seed Length] %d\n",
                     MCX_RNG_NAME, RAND_SEED_WORD_LEN);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
     }
     #pragma omp barrier
 
@@ -561,14 +563,14 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         MMC_FPRINTF(cfg->flog,
                     "lauching mcx_main_loop for time window [%.1fns %.1fns] ...\n",
                     twindow0 * 1e9, twindow1 * 1e9);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
 
         // total number of repetition for the simulations, results will be
         // accumulated to field
         for (int iter = 0; iter < cfg->respin; iter++) {
             MMC_FPRINTF(cfg->flog, "simulation run#%2d ... \n", iter + 1);
-            fflush(cfg->flog);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
             param.tstart = twindow0;
             param.tend = twindow1;
 
@@ -614,7 +616,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             MMC_FPRINTF(cfg->flog,
                         "kernel complete:  \t%d ms\nretrieving flux ... \t",
                         tic1 - tic);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
             #pragma omp critical
 
             if (cfg->runtime < tic1 - tic) {
@@ -690,7 +692,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                                        cudaMemcpyDeviceToHost));
                 MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n",
                             GetTimeMillis() - tic);
-                fflush(cfg->flog);
+                mcx_fflush(cfg->flog);
 
                 for (i = 0; i < fieldlen; i++) { // accumulate field, can be done in the GPU
                     field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
@@ -765,7 +767,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
         if (cfg->isnormalized) {
             MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
 
             cfg->energyabs = cfg->energytot - cfg->energyesc;
             mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
@@ -776,7 +778,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             mesh_saveweight(mesh, cfg, 0);
             MMC_FPRINTF(cfg->flog, "saving data complete : %d ms\n\n",
                         GetTimeMillis() - tic);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
         }
 
         if (cfg->issavedet && cfg->parentid == mpStandalone &&
@@ -805,7 +807,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                     "initial specular reflection is excluded in the total)\n",
                     cfg->energytot,
                     (cfg->energytot - cfg->energyesc) / cfg->energytot * 100.f);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
     }
     #pragma omp barrier
     CUDA_ASSERT(cudaFree(gnode));
