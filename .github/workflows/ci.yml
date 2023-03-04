@@ -1,4 +1,5 @@
 name: CI
+on:
   push:
     branches:
       - master
@@ -37,7 +38,7 @@ jobs:
         shell: bash
         run: |
           cd src
-	  make clean
+          make clean
           make
       - name: Upload mmclab
         uses: actions/upload-artifact@v3
