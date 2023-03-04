@@ -22,7 +22,7 @@ jobs:
         with:
           submodules: 'recursive'
       - name: Install dependencies
-        run: sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
+        run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
       - name: Update RCS keywords
         shell: bash
         run: |
