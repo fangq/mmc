@@ -1,0 +1,46 @@
+name: CI
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - master
+
+env:
+  RELEASE_VERSION: "test"
+
+jobs:
+  build_linux:
+    name: Build Linux
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - name: Install dependencies
+        run: sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
+      - name: Update RCS keywords
+        shell: bash
+        run: |
+          printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
+          rm -rf src/*.c
+          git checkout src/*.c
+      - name: Build mmclab for Octave
+        shell: bash
+        run: |
+          cd src
+          make oct
+      - name: Build binary
+        shell: bash
+        run: |
+          cd src
+	  make clean
+          make
+      - name: Upload mmclab
+        uses: actions/upload-artifact@v3
+        with:
+          name: mmclab-${{ env.RELEASE_VERSION }}-linux64
+          path: mmclab

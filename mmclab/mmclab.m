@@ -285,7 +285,11 @@ for i=1:len
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
-        [cfg(i).elem, evol, idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+        if(isfield(cfg(i),'edgeroi') || isfield(cfg(i),'faceroi'))
+            [cfg(i).elem, evol, idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+	else
+	    [cfg(i).elem, evol]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+	end
 	if(isfield(cfg(i),'edgeroi'))
 	    cfg(i).edgeroi(idx,:)=cfg(i).edgeroi(idx,[1 3 2 5 4 6]);
 	end
@@ -342,13 +346,17 @@ for i=1:len
             end
             [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
             cfg(i).elemprop=cfg(i).elem(:,5);
-            [cfg(i).elem, evol, idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            if(isfield(cfg(i),'edgeroi') || isfield(cfg(i),'faceroi'))
+                [cfg(i).elem, evol, idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            else
+                [cfg(i).elem, evol]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            end
             if(isfield(cfg(i),'edgeroi'))
 	        cfg(i).edgeroi(idx,:)=cfg(i).edgeroi(idx,[1 3 2 5 4 6]);
-	    end
-	    if(isfield(cfg(i),'faceroi'))
+            end
+            if(isfield(cfg(i),'faceroi'))
 	        cfg(i).faceroi(idx,:)=cfg(i).faceroi(idx,[2 1 3 4]);
-	    end
+            end
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;
