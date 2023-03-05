@@ -20,8 +20,7 @@ jobs:
           submodules: 'recursive'
       - name: Install dependencies
         run: |
-          brew update
-          brew install octave@5.2.0
+          brew install octave
       - name: Update RCS keywords
         shell: bash
         run: |
