@@ -1,4 +1,4 @@
-name: build_linux
+name: build_macos
 on:
   push:
     branches:
@@ -10,16 +10,18 @@ on:
       - master
 
 jobs:
-  build_linux:
-    name: Build Linux
-    runs-on: ubuntu-20.04
+  build_macos:
+    name: Build MacOS
+    runs-on: macos-10.15
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
           submodules: 'recursive'
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev upx-ucl
+        run: |
+          brew update
+          brew install octave@5.2.0
       - name: Update RCS keywords
         shell: bash
         run: |
@@ -33,21 +35,17 @@ jobs:
         shell: bash
         run: |
           cd src
-          make oct >> mmclab/AUTO_BUILD_${{ env.RELEASE_VERSION }}.log 2>&1
+          make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" >> mmclab/AUTO_BUILD_${{ env.RELEASE_VERSION }}.log 2>&1
       - name: Build binary
         shell: bash
         run: |
           cd src
           make clean
-          make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -lOpenCL -lm" &> AUTO_BUILD_${{ env.RELEASE_VERSION }}.log
-      # - name: Compress binary
-      #  shell: bash
-      #  run: |
-      #    upx -9 mmclab/mmc.mex src/bin/mmc
+          make &> AUTO_BUILD_${{ env.RELEASE_VERSION }}.log
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-linux-x64_64-${{ env.RELEASE_VERSION }}
+          name: mmclab-macos-x64_64-${{ env.RELEASE_VERSION }}
           path: mmclab
       - name: Prepare mmc package
         shell: bash
@@ -61,5 +59,5 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-linux-x64_64-${{ env.RELEASE_VERSION }}
+          name: mmc-macos-x64_64-${{ env.RELEASE_VERSION }}
           path: .
