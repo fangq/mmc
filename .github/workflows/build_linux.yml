@@ -28,7 +28,7 @@ jobs:
           git checkout src/*.c
       - name: Get current date
         id: date
-        run: echo "RELEASE_VERSION=$(date +'%Y-%m-%d')" >> $GITHUB_STATE
+        run: echo "RELEASE_VERSION=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
       - name: Build mmclab for Octave
         shell: bash
         run: |
@@ -47,13 +47,13 @@ jobs:
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-${{ env.RELEASE_VERSION }}-linux64
+          name: mmclab-linux-x64_64-${{ env.RELEASE_VERSION }}
           path: mmclab
       - name: Prepare mmc package
         shell: bash
         run: |
           mv src/bin .
-          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis win32 deploy
+          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
           mkdir -p src/bin
           cd src/bin
           ln -s ../../bin/mmc .
