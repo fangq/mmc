@@ -34,13 +34,13 @@ jobs:
         shell: bash
         run: |
           cd src
-          make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" >> ../mmclab/AUTO_BUILD_${{ env.RELEASE_VERSION }}.log 2>&1
+          make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
       - name: Build binary
         shell: bash
         run: |
           cd src
           make clean
-          make &> ../AUTO_BUILD_${{ env.RELEASE_VERSION }}.log
+          make
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
