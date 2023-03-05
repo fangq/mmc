@@ -40,10 +40,10 @@ jobs:
           cd src
           make clean
           make
-      - name: Compress binary
-        shell: bash
-        run: |
-          upx -9 mmclab/mmc.mex src/bin/mmc
+      # - name: Compress binary
+      #  shell: bash
+      #  run: |
+      #    upx -9 mmclab/mmc.mex src/bin/mmc
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
