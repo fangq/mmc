@@ -43,7 +43,7 @@ jobs:
       - name: Compress binary
         shell: bash
         run: |
-          upx -9 ../mmclab/mmclab.mex bin/mmc
+          upx -9 ../mmclab/mmc.mex bin/mmc
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
