@@ -19,7 +19,7 @@ jobs:
         with:
           submodules: 'recursive'
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
+        run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev upx-ucl
       - name: Update RCS keywords
         shell: bash
         run: |
@@ -28,11 +28,7 @@ jobs:
           git checkout src/*.c
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
-      - name: Update release tag
-        run: echo $RELEASE_VERSION
-        env:
-          RELEASE_VERSION: nightly-${{ steps.date.outputs.date }}
+        run: echo "RELEASE_VERSION=$(date +'%Y-%m-%d')" >> $GITHUB_STATE
       - name: Build mmclab for Octave
         shell: bash
         run: |
@@ -44,6 +40,10 @@ jobs:
           cd src
           make clean
           make
+      - name: Compress binary
+        shell: bash
+        run: |
+          upx -9 ../mmclab/mmclab.mex bin/mmc
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           mv src/bin .
-          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github
+          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis win32 deploy
           mkdir -p src/bin
           cd src/bin
           ln -s ../../bin/mmc .
@@ -61,5 +61,5 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-${{ env.RELEASE_VERSION }}-linux64
+          name: mmc-linux-x64_64-${{ env.RELEASE_VERSION }}
           path: .
