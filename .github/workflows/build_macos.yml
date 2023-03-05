@@ -20,8 +20,10 @@ jobs:
           submodules: 'recursive'
       - name: Link libgomp.a
         run: |
-          ls /usr/local/opt/gcc/lib/gcc/11/libgomp.a
-          sudo ln -s /usr/local/opt/gcc/lib/gcc/11/libgomp.a /usr/local/lib/libgomp.a
+          sudo /usr/libexec/locate.updatedb
+          locate libgomp.a
+          ls /usr/local/opt/gcc/lib/gcc/10/libgomp.a
+          sudo ln -s /usr/local/opt/gcc/lib/gcc/10/libgomp.a /usr/local/lib/libgomp.a
       - name: Install dependencies
         run: |
           brew install octave
