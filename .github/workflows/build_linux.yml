@@ -1,4 +1,4 @@
-name: CI
+name: build_linux
 on:
   push:
     branches:
@@ -9,13 +9,10 @@ on:
     branches:
       - master
 
-env:
-  RELEASE_VERSION: "test"
-
 jobs:
   build_linux:
     name: Build Linux
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -29,19 +26,40 @@ jobs:
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+      - name: Update release tag
+        run: echo $RELEASE_VERSION
+        env:
+          RELEASE_VERSION: nightly-${{ steps.date.outputs.date }}
       - name: Build mmclab for Octave
         shell: bash
         run: |
           cd src
-          make oct
+          make oct >> AUTO_BUILD_${RELEASE_VERSION}.log
       - name: Build binary
         shell: bash
         run: |
           cd src
           make clean
           make
-      - name: Upload mmclab
+      - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-${{ env.RELEASE_VERSION }}-linux64
           path: mmclab
+      - name: Prepare mmc package
+        shell: bash
+        run: |
+          mv src/bin .
+          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github
+          mkdir -p src/bin
+          cd src/bin
+          ln -s ../../bin/mmc .
+          cd ../../
+      - name: Upload mmc package
+        uses: actions/upload-artifact@v3
+        with:
+          name: mmc-${{ env.RELEASE_VERSION }}-linux64
+          path: .
