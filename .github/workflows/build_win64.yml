@@ -20,7 +20,7 @@ jobs:
           submodules: 'recursive'
       - name: Install dependencies
         run: |
-          winget install --id=GNU.Octave -v "6.2.0" -e
+          choco install octave --version=5.2.0.102
       - name: Update RCS keywords
         shell: bash
         run: |
