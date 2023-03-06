@@ -20,7 +20,8 @@ jobs:
           submodules: 'recursive'
       - name: Install dependencies
         run: |
-          choco install octave.install
+          choco install octave.portable --version=5.2.0
+          ls 'C:\ProgramData\chocolatey\lib\octave.portable\tools\octave\mingw64\bin'
       - name: Update RCS keywords
         shell: bash
         run: |
