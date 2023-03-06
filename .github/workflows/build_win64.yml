@@ -20,7 +20,7 @@ jobs:
           submodules: 'recursive'
       - name: Install dependencies
         run: |
-          choco install octave --version=5.2.0.102
+          choco install octave.install
       - name: Update RCS keywords
         shell: bash
         run: |
