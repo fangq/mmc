@@ -20,10 +20,7 @@ jobs:
           submodules: 'recursive'
       - name: Link libgomp.a
         run: |
-          sudo /usr/libexec/locate.updatedb
-          locate libgomp.a
-          ls /usr/local/opt/gcc/lib/gcc/10/libgomp.a
-          sudo ln -s /usr/local/opt/gcc/lib/gcc/10/libgomp.a /usr/local/lib/libgomp.a
+          sudo ln -s /usr/local/lib/gcc/9/libgomp.a /usr/local/lib/libgomp.a
       - name: Install dependencies
         run: |
           brew install octave
@@ -40,13 +37,13 @@ jobs:
         shell: bash
         run: |
           cd src
-          make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
+          make oct CC=gcc-9 CXX=g++-9 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
       - name: Build binary
         shell: bash
         run: |
           cd src
           make clean
-          make CC=gcc-10 CXX=g++-10
+          make CC=gcc-9 CXX=g++-9
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
