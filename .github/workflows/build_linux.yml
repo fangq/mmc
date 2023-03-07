@@ -12,7 +12,10 @@ on:
 jobs:
   build_linux:
     name: Build Linux
-    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -34,12 +37,14 @@ jobs:
         run: |
           cd src
           make oct >> ../mmclab/AUTO_BUILD_${{ env.RELEASE_VERSION }}.log 2>&1
+          ldd ../mmclab/mmc.mex
       - name: Build binary
         shell: bash
         run: |
           cd src
           make clean
           make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -lOpenCL -lm" &> ../AUTO_BUILD_${{ env.RELEASE_VERSION }}.log
+          ldd bin/mmc
       # - name: Compress binary
       #  shell: bash
       #  run: |
