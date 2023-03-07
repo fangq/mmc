@@ -32,15 +32,18 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
-      - name: Install libraries
-        uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          install: >-
-            zlib-devel
-            base-devel
-            mingw-w64-x86_64-gcc-libs
-            mingw-w64-x86_64-zlib
+      #- name: Install libraries
+      #  uses: msys2/setup-msys2@v2
+      #  with:
+      #    update: true
+      #    install: >-
+      #      zlib-devel
+      #      base-devel
+      #      mingw-w64-x86_64-gcc-libs
+      #      mingw-w64-x86_64-zlib
+      #- name: Search library paths
+      #  run: |
+      #    Get-Childitem –Path C:\ -Include libgomp* -File -Recurse -ErrorAction SilentlyContinue
       - name: Update RCS keywords
         shell: bash
         run: |
@@ -60,7 +63,7 @@ jobs:
         run: |
           cd src
           make clean
-          make CC=gcc CXX=g++ USERARFLAGS="-L/release/mxe-octave-w64/usr/x86_64-w64-mingw32/lib libzmat.a -lz"
+          make CC=gcc CXX=g++ USERARFLAGS="-Lc:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib -Lc:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc/x86_64-w64-mingw32/9.2.0 libzmat.a -lz"
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
