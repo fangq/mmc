@@ -45,6 +45,7 @@ jobs:
             mingw-w64-x86_64-gcc-libs
             mingw-w64-x86_64-zlib
       - name: Search library paths
+        shell: pwsh
         run: |
           Get-Childitem –Path C:\ -Include libgomp* libz.* libpthread.* -File -Recurse -ErrorAction SilentlyContinue
       - name: Update RCS keywords
