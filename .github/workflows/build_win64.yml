@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           cd src
-          make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll'
+          make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
       - name: Build binary
         shell: bash
         run: |
