@@ -44,20 +44,9 @@ jobs:
             base-devel
             mingw-w64-x86_64-gcc-libs
             mingw-w64-x86_64-zlib
-      - name: Install file search tool everything
-        shell: pwsh
+      - name: List msys libraries
         run: |
-          choco install es
-      - name: Search everything by name
-        shell: pwsh
-        run: |
-          es libz.a
-          es libgomp.
-          es libpthread.
-      - name: Search library paths
-        shell: pwsh
-        run: |
-          Get-Childitem –Path C:\ -Include libgomp*,libz.*,libpthread.* -File -Recurse -ErrorAction SilentlyContinue
+            tree c:/msys64/mingw64/lib/
       - name: Update RCS keywords
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
