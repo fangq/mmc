@@ -31,10 +31,9 @@ jobs:
         with:
           update: true
           install: >-
-            zlib-devel
-            base-devel
-            mingw-w64-x86_64-gcc-libs
-            mingw-w64-x86_64-zlib
+            mingw-w64-gcc
+            mingw-w64-zlib
+            mingw-w64-winpthreads-git
       - name: Install OpenCL.dll and static libraries
         run: |
           mkdir opencl
@@ -42,7 +41,7 @@ jobs:
           curl http://mcx.space/wiki/upload/mmc_static_lib.zip --output mmc_static_lib.zip
           unzip mmc_static_lib.zip
           cp bin/OpenCL.dll 'c:\Windows\System32'
-          cp bin/*.a c:/msys64/mingw64/lib/
+          #cp bin/*.a c:/msys64/mingw64/lib/
           cd ..
           rm -rf opencl
       - name: Update RCS keywords
@@ -58,14 +57,11 @@ jobs:
           cd src
           make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
       - name: Build binary
+        shell: msys2 {0}
         run: |
           cd src
           make clean
-          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib'
-          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc'
-          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc/x86_64-w64-mingw32/9.2.0/'
-          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/x86_64-w64-mingw32/lib'
-          make CC=gcc CXX=g++ USERARFLAGS="-Lc:/msys64/mingw64/lib/ libzmat.a -lz"
+          make CC=gcc CXX=g++ USERARFLAGS="libzmat.a -lz"
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
