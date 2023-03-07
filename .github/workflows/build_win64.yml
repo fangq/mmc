@@ -60,7 +60,7 @@ jobs:
         run: |
           cd src
           make clean
-          make CC=gcc CXX=g++ USERARFLAGS="libzmat.a -lz"
+          make CC=gcc CXX=g++ AR=g++ USERARFLAGS="libzmat.a -lz"
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
