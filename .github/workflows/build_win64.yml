@@ -32,6 +32,13 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
+      - name: Find libraries
+        shell: bash
+        run: |
+          updatedb
+          locate libz
+          locate libgomp
+          locate libpthread
       - name: Update RCS keywords
         shell: bash
         run: |
