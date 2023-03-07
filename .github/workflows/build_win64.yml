@@ -27,7 +27,7 @@ jobs:
           mkdir opencl
           cd opencl
           curl https://anaconda.org/conda-forge/khronos-opencl-icd-loader/2022.09.30/download/win-64/khronos-opencl-icd-loader-2022.09.30-h64bf75a_2.tar.bz2 --output opencl.tar.bz2
-          tar -xvf opencl.tar.bz2
+          tar xjvf opencl.tar.bz2
           cp Library\bin\OpenCL.dll c:\Windows\System32\OpenCL.dll
           cd ..
           rm -rf opencl
