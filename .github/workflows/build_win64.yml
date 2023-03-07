@@ -44,6 +44,16 @@ jobs:
             base-devel
             mingw-w64-x86_64-gcc-libs
             mingw-w64-x86_64-zlib
+      - name: Install file search tool everything
+        shell: pwsh
+        run: |
+          choco install es
+      - name: Search everything by name
+        shell: pwsh
+        run: |
+          es libz.a
+          es libgomp.
+          es libpthread.
       - name: Search library paths
         shell: pwsh
         run: |
