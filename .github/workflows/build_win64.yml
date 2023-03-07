@@ -67,7 +67,7 @@ jobs:
           cd src
           which gcc
           make clean
-          make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib -Lc:/msys64/mingw64/lib libzmat.a -lz"
+          make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib -Lc:/msys64/mingw64/lib libzmat.a -lz -lssp"
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
