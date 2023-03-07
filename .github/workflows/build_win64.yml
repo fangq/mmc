@@ -32,9 +32,9 @@ jobs:
           update: true
           install: >-
             base-devel
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-winpthreads-git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-winpthreads-git
       - name: Install OpenCL.dll and static libraries
         run: |
           mkdir opencl
@@ -56,13 +56,20 @@ jobs:
       - name: Build mmclab for Octave
         run: |
           cd src
+          which gcc
+          which cc
           make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
+      - name: Use mingw64 gcc
+        shell: pwsh
+        run: |
+          echo 'C:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\bin\' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build binary
-        shell: msys2 {0}
         run: |
           cd src
+          which gcc
+          which cc
           make clean
-          make CC=gcc CXX=g++ USERARFLAGS="libzmat.a -lz"
+          make USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib -Lc:/msys64/mingw64/lib libzmat.a -lz"
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
