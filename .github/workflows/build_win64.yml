@@ -57,7 +57,6 @@ jobs:
         run: |
           cd src
           which gcc
-          which cc
           make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
       - name: Use mingw64 gcc
         shell: pwsh
@@ -67,7 +66,6 @@ jobs:
         run: |
           cd src
           which gcc
-          which cc
           make clean
           make USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib -Lc:/msys64/mingw64/lib libzmat.a -lz"
       - name: Upload mmclab package
