@@ -32,6 +32,14 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            zlib-devel
+            base-devel
+            mingw-w64-x86_64-gcc-libs
+            mingw-w64-x86_64-zlib
       - name: Find libraries
         shell: bash
         run: |
