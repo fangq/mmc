@@ -51,6 +51,10 @@ jobs:
         run: |
           cd src
           make clean
+          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib'
+          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc'
+          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc/x86_64-w64-mingw32/9.2.0/'
+          ls 'c:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/x86_64-w64-mingw32/lib'
           make CC=gcc CXX=g++ USERARFLAGS="-Lc:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib -Lc:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/x86_64-w64-mingw32/lib -Lc:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc -Lc:/programdata/chocolatey/lib/octave.portable/tools/octave/mingw64/lib/gcc/x86_64-w64-mingw32/9.2.0/ libzmat.a -lz"
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
