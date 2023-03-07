@@ -12,7 +12,10 @@ on:
 jobs:
   build_win64:
     name: Build Win64
-    runs-on: windows-2019
+    strategy:
+      matrix:
+        os: [windows-2019, windows-2022]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
