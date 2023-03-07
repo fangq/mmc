@@ -50,7 +50,7 @@ jobs:
           which gcc
           gcc -v
           make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
-          ldd ../mmclab/mmc.mex
+          file ../mmclab/mmc.mex
       - name: Build binary
         run: |
           cd src
