@@ -31,6 +31,7 @@ jobs:
         with:
           update: true
           install: >-
+            base-devel
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-zlib
             mingw-w64-ucrt-x86_64-winpthreads-git
