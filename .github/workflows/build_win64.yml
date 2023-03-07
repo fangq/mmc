@@ -28,7 +28,7 @@ jobs:
           mkdir opencl
           cd opencl
           curl http://mcx.space/wiki/upload/opencl.zip --output opencl.zip
-          tar xjvf opencl.zip
+          unzip opencl.zip
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
