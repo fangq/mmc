@@ -46,7 +46,7 @@ jobs:
             mingw-w64-x86_64-zlib
       - name: List msys libraries
         run: |
-            tree c:/msys64/mingw64/lib/
+            find c:/msys64/mingw64/lib/ -name "lib*.a"
       - name: Update RCS keywords
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
