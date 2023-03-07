@@ -35,6 +35,18 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
+      - name: Install libraries
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            zlib-devel
+            base-devel
+            mingw-w64-x86_64-gcc-libs
+            mingw-w64-x86_64-zlib
+      - name: Search library paths
+        run: |
+          Get-Childitem –Path C:\ -Include libgomp* libz.* libpthread.* -File -Recurse -ErrorAction SilentlyContinue
       - name: Update RCS keywords
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
