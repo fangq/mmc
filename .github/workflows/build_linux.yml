@@ -43,7 +43,7 @@ jobs:
         run: |
           cd src
           make clean
-          make AR=c++ EXTRALIB="-static -static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
+          make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
           ldd bin/mmc
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
