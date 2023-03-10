@@ -82,5 +82,5 @@ jobs:
           host: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
           key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          source: "packages/mmc-macos-x64_64-${{ github.ref }}.zip,packages/mmclab-macos-x64_64-${{ github.ref }}.zip"
+          source: "mmc-macos-x64_64-${{ github.ref }}.zip,mmclab-macos-x64_64-${{ github.ref }}.zip"
           target: "fanglab/mcx.space/nightly/github"
