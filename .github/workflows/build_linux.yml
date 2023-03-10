@@ -45,7 +45,7 @@ jobs:
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-linux-x64_64-${{ github.ref }}
+          name: mmclab-linux-x64_64-${{ github.ref_name }}
           path: mmclab
       - name: Prepare mmc package
         run: |
@@ -58,7 +58,7 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-linux-x64_64-${{ github.ref }}
+          name: mmc-linux-x64_64-${{ github.ref_name }}
           path: .
 
   upload_package:
@@ -69,12 +69,12 @@ jobs:
       - name: Download mmclab
         uses: actions/download-artifact@v3
         with:
-          name: mmclab-linux-x64_64-${{ github.ref }}
+          name: mmclab-linux-x64_64-${{ github.ref_name }}
           path: packages
       - name: Download mmc
         uses: actions/download-artifact@v3
         with:
-          name: mmc-linux-x64_64-${{ github.ref }}
+          name: mmc-linux-x64_64-${{ github.ref_name }}
           path: packages
       - name: Display structure of downloaded files
         run: ls -R packages
@@ -84,5 +84,5 @@ jobs:
           host: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
           key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          source: "packages/mmc-linux-x64_64-${{ github.ref }}.zip,packages/mmclab-linux-x64_64-${{ github.ref }}.zip"
+          source: "packages/mmc-linux-x64_64-${{ github.ref_name }}.zip,packages/mmclab-linux-x64_64-${{ github.ref_name }}.zip"
           target: "fanglab/mcx.space/nightly/github"

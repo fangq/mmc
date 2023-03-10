@@ -50,7 +50,7 @@ jobs:
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-macos-x64_64-${{ github.ref }}
+          name: mmclab-macos-x64_64-${{ github.ref_name }}
           path: mmclab
       - name: Prepare mmc package
         run: |
@@ -63,7 +63,7 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-macos-x64_64-${{ github.ref }}
+          name: mmc-macos-x64_64-${{ github.ref_name }}
           path: .
 
   upload_package:
@@ -74,12 +74,12 @@ jobs:
       - name: Download mmclab
         uses: actions/download-artifact@v3
         with:
-          name: mmclab-macos-x64_64-${{ github.ref }}
+          name: mmclab-macos-x64_64-${{ github.ref_name }}
           path: packages
       - name: Download mmc
         uses: actions/download-artifact@v3
         with:
-          name: mmc-macos-x64_64-${{ github.ref }}
+          name: mmc-macos-x64_64-${{ github.ref_name }}
           path: packages
       - name: Copy package to server
         uses: appleboy/scp-action@master
@@ -87,5 +87,5 @@ jobs:
           host: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
           key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          source: "mmc-macos-x64_64-${{ github.ref }}.zip,mmclab-macos-x64_64-${{ github.ref }}.zip"
+          source: "mmc-macos-x64_64-${{ github.ref_name }}.zip,mmclab-macos-x64_64-${{ github.ref_name }}.zip"
           target: "fanglab/mcx.space/nightly/github"

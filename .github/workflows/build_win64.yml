@@ -62,7 +62,7 @@ jobs:
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-win-x64_64-${{ github.ref }}
+          name: mmclab-win-x64_64-${{ github.ref_name }}
           path: mmclab
       - name: Prepare mmc package
         run: |
@@ -75,7 +75,7 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-win-x64_64-${{ github.ref }}
+          name: mmc-win-x64_64-${{ github.ref_name }}
           path: .
 
   upload_package:
@@ -94,5 +94,5 @@ jobs:
           host: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
           key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          source: "packages/mmc-win-x64_64-${{ github.ref }}.zip,packages/mmclab-win-x64_64-${{ github.ref }}.zip"
+          source: "packages/mmc-win-x64_64-${{ github.ref_name }}.zip,packages/mmclab-win-x64_64-${{ github.ref_name }}.zip"
           target: "fanglab/mcx.space/nightly/github"
