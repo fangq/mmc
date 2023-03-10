@@ -63,16 +63,16 @@ jobs:
           ln -s ../../bin/mmc .
           cd ../../
       - name: Upload mmc package
-        if: ${{ runner.name == 'ubuntu-20.04' }}
+        if: ${{ runner.name }} == 'ubuntu-20.04'
         uses: actions/upload-artifact@v3
         with:
           name: mmc-linux-x64_64-${{ github.ref_name }}
           path: .
       - name: Zip mmc
         run: |
-          zip -FSr packages/mmc-linux-x64_64-${{ github.ref_name }}.zip . -x packages
+          zip -FSr packages/mmc-linux-x64_64-${{ github.ref_name }}.zip . -x 'packages*'
       - name: Copy package to server
-        if: ${{ runner.name == 'ubuntu-20.04' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        if: ${{ runner.name }} == 'ubuntu-20.04' && ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.MCX_SERVER }}
