@@ -16,6 +16,9 @@ jobs:
       matrix:
         os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -24,7 +27,6 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
       - name: Update RCS keywords
-        shell: bash
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
@@ -33,13 +35,11 @@ jobs:
         id: date
         run: echo "RELEASE_VERSION=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
       - name: Build mmclab for Octave
-        shell: bash
         run: |
           cd src
           make oct
           ldd ../mmclab/mmc.mex
       - name: Build binary
-        shell: bash
         run: |
           cd src
           make clean
@@ -51,7 +51,6 @@ jobs:
           name: mmclab-linux-x64_64-${{ env.RELEASE_VERSION }}
           path: mmclab
       - name: Prepare mmc package
-        shell: bash
         run: |
           mv src/bin .
           rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
@@ -64,3 +63,21 @@ jobs:
         with:
           name: mmc-linux-x64_64-${{ env.RELEASE_VERSION }}
           path: .
+
+  upload_package:
+    needs: build_linux
+    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: packages
+          path: packages
+      - name: Copy package to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.MCX_SERVER }}
+          username: ${{ secrets.MCX_SERVER_USER }}
+          key: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          source: "packages/mmc-linux-x64_64-${{ github.ref }}.zip,packages/mmclab-linux-x64_64-${{ github.ref }}.zip"
+          target: "fanglab/mcx.space/nightly/github"

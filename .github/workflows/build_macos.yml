@@ -16,6 +16,10 @@ jobs:
       matrix:
         os: [macos-10.15, macos-11]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -28,22 +32,16 @@ jobs:
         run: |
           brew install octave
       - name: Update RCS keywords
-        shell: bash
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
-      - name: Get current date
-        id: date
-        run: echo "RELEASE_VERSION=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
       - name: Build mmclab for Octave
-        shell: bash
         run: |
           cd src
           make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
           otool -L ../mmclab/mmc.mex
       - name: Build binary
-        shell: bash
         run: |
           cd src
           make clean
@@ -52,10 +50,9 @@ jobs:
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-macos-x64_64-${{ env.RELEASE_VERSION }}
+          name: mmclab-macos-x64_64-${{ github.ref }}
           path: mmclab
       - name: Prepare mmc package
-        shell: bash
         run: |
           mv src/bin .
           rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
@@ -66,5 +63,23 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-macos-x64_64-${{ env.RELEASE_VERSION }}
+          name: mmc-macos-x64_64-${{ github.ref }}
           path: .
+
+  upload_package:
+    needs: build_macos
+    runs-on: macos-11
+    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: packages
+          path: packages
+      - name: Copy package to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.MCX_SERVER }}
+          username: ${{ secrets.MCX_SERVER_USER }}
+          key: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          source: "packages/mmc-macos-x64_64-${{ github.ref }}.zip,packages/mmclab-macos-x64_64-${{ github.ref }}.zip"
+          target: "fanglab/mcx.space/nightly/github"
