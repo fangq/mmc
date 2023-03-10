@@ -43,10 +43,17 @@ jobs:
           make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
           ldd bin/mmc
       - name: Upload mmclab package
+        if: ${{ runner.name }} == 'ubuntu-20.04'
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-linux-x64_64-${{ github.ref_name }}
           path: mmclab
+      - name: Create package folder
+        run: |
+          mkdir packages
+      - name: Zip mmclab
+        run: |
+          zip -FSr packages/mmclab-linux-x64_64-${{ github.ref_name }}.zip mmclab
       - name: Prepare mmc package
         run: |
           mv src/bin .
@@ -56,29 +63,16 @@ jobs:
           ln -s ../../bin/mmc .
           cd ../../
       - name: Upload mmc package
+        if: ${{ runner.name == 'ubuntu-20.04' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmc-linux-x64_64-${{ github.ref_name }}
           path: .
-
-  upload_package:
-    needs: build_linux
-    runs-on: ubuntu-20.04
-    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
-    steps:
-      - name: Download mmclab
-        uses: actions/download-artifact@v3
-        with:
-          name: mmclab-linux-x64_64-${{ github.ref_name }}
-          path: packages
-      - name: Download mmc
-        uses: actions/download-artifact@v3
-        with:
-          name: mmc-linux-x64_64-${{ github.ref_name }}
-          path: packages
-      - name: Display structure of downloaded files
-        run: ls -R packages
+      - name: Zip mmc
+        run: |
+          zip -FSr packages/mmc-linux-x64_64-${{ github.ref_name }}.zip . -x packages
       - name: Copy package to server
+        if: ${{ runner.name == 'ubuntu-20.04' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.MCX_SERVER }}
