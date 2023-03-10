@@ -31,9 +31,6 @@ jobs:
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
-      - name: Get current date
-        id: date
-        run: echo "RELEASE_VERSION=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
       - name: Build mmclab for Octave
         run: |
           cd src
@@ -48,7 +45,7 @@ jobs:
       - name: Upload mmclab package
         uses: actions/upload-artifact@v3
         with:
-          name: mmclab-linux-x64_64-${{ env.RELEASE_VERSION }}
+          name: mmclab-linux-x64_64-${{ github.ref }}
           path: mmclab
       - name: Prepare mmc package
         run: |
@@ -61,7 +58,7 @@ jobs:
       - name: Upload mmc package
         uses: actions/upload-artifact@v3
         with:
-          name: mmc-linux-x64_64-${{ env.RELEASE_VERSION }}
+          name: mmc-linux-x64_64-${{ github.ref }}
           path: .
 
   upload_package:
@@ -69,11 +66,18 @@ jobs:
     runs-on: ubuntu-20.04
     if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
     steps:
-      - name: Download artifacts
+      - name: Download mmclab
         uses: actions/download-artifact@v3
         with:
-          name: packages
+          name: mmclab-linux-x64_64-${{ github.ref }}
           path: packages
+      - name: Download mmc
+        uses: actions/download-artifact@v3
+        with:
+          name: mmc-linux-x64_64-${{ github.ref }}
+          path: packages
+      - name: Display structure of downloaded files
+        run: ls -R packages
       - name: Copy package to server
         uses: appleboy/scp-action@master
         with:
