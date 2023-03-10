@@ -82,6 +82,7 @@ jobs:
     needs: build_win64
     runs-on: windows-2019
     if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+    steps:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:

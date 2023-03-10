@@ -70,6 +70,7 @@ jobs:
     needs: build_macos
     runs-on: macos-11
     if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+    steps:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:

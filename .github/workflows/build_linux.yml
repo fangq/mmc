@@ -68,6 +68,7 @@ jobs:
     needs: build_linux
     runs-on: ubuntu-20.04
     if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+    steps:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
