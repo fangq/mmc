@@ -123,11 +123,10 @@ jobs:
       - name: Zip mmc
         run: |
           pwd
-          cd ../
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            7z a -tzip packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -xr!mmc/packages
+            7z a -tzip packages/mmc-${{ env.RELEASE_TAG }}.zip ../mmc -xr!packages
           else
-            zip -FSr --symlink packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -x 'mmc/packages*'
+            zip -FSr --symlink packages/mmc-${{ env.RELEASE_TAG }}.zip ../mmc -x 'packages*'
           fi
       - name: Upload mmc package
         if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-10.15' || matrix.os == 'windows-2019' }}
