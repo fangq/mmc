@@ -43,7 +43,7 @@ jobs:
           make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
           ldd bin/mmc
       - name: Upload mmclab package
-        if: ${{ runner.name }} == 'ubuntu-20.04'
+        if: runner.name == 'ubuntu-20.04'
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-linux-x64_64-${{ github.ref_name }}
@@ -51,6 +51,8 @@ jobs:
       - name: Create package folder
         run: |
           mkdir packages
+	  echo ${{ runner.name }}
+	  echo runner.name
       - name: Zip mmclab
         run: |
           zip -FSr packages/mmclab-linux-x64_64-${{ github.ref_name }}.zip mmclab
@@ -63,7 +65,7 @@ jobs:
           ln -s ../../bin/mmc .
           cd ../../
       - name: Upload mmc package
-        if: ${{ runner.name }} == 'ubuntu-20.04'
+        if: runner.name == 'ubuntu-20.04'
         uses: actions/upload-artifact@v3
         with:
           name: mmc-linux-x64_64-${{ github.ref_name }}
@@ -72,7 +74,7 @@ jobs:
         run: |
           zip -FSr packages/mmc-linux-x64_64-${{ github.ref_name }}.zip . -x 'packages*'
       - name: Copy package to server
-        if: ${{ runner.name }} == 'ubuntu-20.04' && ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        if: runner.name == 'ubuntu-20.04' && ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.MCX_SERVER }}
