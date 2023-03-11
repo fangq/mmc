@@ -43,7 +43,7 @@ jobs:
           make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
           ldd bin/mmc
       - name: Upload mmclab package
-        if: ${{ runner.name == 'ubuntu-20.04' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-linux-x64_64-${{ github.ref_name }}
@@ -53,7 +53,7 @@ jobs:
           mkdir packages
       - name: Zip mmclab
         run: |
-          zip -FSr --symlink packages/mmclab-linux-x64_64-${{ github.ref_name }}-${{ runner.name }}.zip mmclab
+          zip -FSr --symlink packages/mmclab-linux-x64_64-${{ github.ref_name }}-${{ matrix.os }}.zip mmclab
       - name: Prepare mmc package
         run: |
           mv src/bin .
@@ -63,16 +63,16 @@ jobs:
           ln -s ../../bin/mmc .
           cd ../../
       - name: Upload mmc package
-        if: ${{ runner.name == 'ubuntu-20.04' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmc-linux-x64_64-${{ github.ref_name }}
           path: .
       - name: Zip mmc
         run: |
-          zip -FSr --symlink packages/mmc-linux-x64_64-${{ github.ref_name }}-${{ runner.name }}.zip . -x 'packages*'
+          zip -FSr --symlink packages/mmc-linux-x64_64-${{ github.ref_name }}-${{ matrix.os }}.zip . -x 'packages*'
       - name: Copy package to server
-        if: ${{ runner.name == 'ubuntu-20.04' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        if: ${{ matrix.os == 'ubuntu-20.04' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
           server: ${{ secrets.MCX_SERVER }}

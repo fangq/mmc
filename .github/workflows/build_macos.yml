@@ -48,7 +48,7 @@ jobs:
           make CC=gcc-10 CXX=g++-10
           otool -L bin/mmc
       - name: Upload mmclab package
-        if: ${{ runner.name == 'macos-10.15' }}
+        if: ${{ matrix.os == 'macos-10.15' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-macos-x64_64-${{ github.ref_name }}
@@ -68,7 +68,7 @@ jobs:
           ln -s ../../bin/mmc .
           cd ../../
       - name: Upload mmc package
-        if: ${{ runner.name == 'macos-10.15' }}
+        if: ${{ matrix.os == 'macos-10.15' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmc-macos-x64_64-${{ github.ref_name }}
@@ -77,7 +77,7 @@ jobs:
         run: |
           zip -FSr --symlink packages/mmc-macos-x64_64-${{ github.ref_name }}.zip . -x packages
       - name: Copy package to server
-        if: ${{ runner.name == 'macos-10.15' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        if: ${{ matrix.os == 'macos-10.15' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
           server: ${{ secrets.MCX_SERVER }}

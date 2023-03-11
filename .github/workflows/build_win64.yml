@@ -60,7 +60,7 @@ jobs:
           make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz"
           ldd bin/mmc
       - name: Upload mmclab package
-        if: ${{ runner.name == 'windows-2019' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-win-x64_64-${{ github.ref_name }}
@@ -80,7 +80,7 @@ jobs:
           cmd /c "mklink /h mmc.exe ..\..\bin\mmc.exe"
           cd ../../
       - name: Upload mmc package
-        if: ${{ runner.name == 'windows-2019' }}
+        if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmc-win-x64_64-${{ github.ref_name }}
@@ -89,7 +89,7 @@ jobs:
         run: |
           zip -FSr --symlink packages/mmc-win-x64_64-${{ github.ref_name }}.zip . -x packages
       - name: Copy package to server
-        if: ${{ runner.name == 'windows-2019' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        if: ${{ matrix.os == 'windows-2019' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
           server: ${{ secrets.MCX_SERVER }}
