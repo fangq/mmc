@@ -86,7 +86,7 @@ jobs:
         if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
-	  name: mmc
+          name: mmc
           path: packages/mmc-win-x64_64-${{ github.ref_name }}.zip
 
   upload_package:
