@@ -79,4 +79,4 @@ jobs:
           username: ${{ secrets.MCX_SERVER_USER }}
           ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
           local_path: "packages/*"
-          target: ${{ secrets.MCX_CI_PATH }}
+          remote_path: ${{ secrets.MCX_CI_PATH }}

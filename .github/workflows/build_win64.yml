@@ -90,7 +90,7 @@ jobs:
           zip -FSr --symlink packages/mmc-win-x64_64-${{ github.ref_name }}.zip . -x packages
       - name: Copy package to server
         if: ${{ matrix.os == 'windows-2019' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
-        uses: actions/checkout@master
+        uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
