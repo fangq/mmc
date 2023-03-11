@@ -115,15 +115,19 @@ jobs:
           rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
           mkdir -p src/bin
           cd src/bin
-          ln -s ../../bin/mmc .
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmd /c "mklink /h mmc.exe ..\..\bin\mmc.exe"
+          else
+            ln -s ../../bin/mmc .
+          fi
           cd ../../
       - name: Zip mmc
         run: |
-          pwd
+          cd .. && pwd
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            7z a -tzip packages/mmc-${{ env.RELEASE_TAG }}.zip ../mmc -xr!../mmc/packages
+            7z a -tzip mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -xr!mmc/packages
           else
-            zip -FSr --symlink packages/mmc-${{ env.RELEASE_TAG }}.zip ../mmc -x '../mmc/packages*'
+            zip -FSr --symlink mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -x 'mmc/packages*'
           fi
       - name: Upload mmc package
         if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-10.15' || matrix.os == 'windows-2019' }}
@@ -145,7 +149,7 @@ jobs:
       - name: Create all-in-one octave mmclab
         run: |
           cd packages
-          unzip -n 'mmclab*.zip' -d mmclab
+          unzip -n 'mmclab*.zip'
           zip -FSr --symlink mmclab-octave-allinone-github-latest.zip mmclab
           rm -rf mmclab
       - name: Display structure of downloaded files
