@@ -79,4 +79,4 @@ jobs:
           username: ${{ secrets.MCX_SERVER_USER }}
           ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
           local_path: "packages/*"
-          remote_path: "fanglab/mcx.space/nightly/github"
+          target: ${{ secrets.MCX_CI_PATH }}
