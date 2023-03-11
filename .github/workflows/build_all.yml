@@ -54,8 +54,6 @@ jobs:
           rm -rf opencl
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2-beta
-        with:
-          release: R2020a
       - name: Update RCS keywords
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
