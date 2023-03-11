@@ -83,8 +83,10 @@ jobs:
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
           else
-            make mex CC=gcc CXX=g++ MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
+            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
           fi
       - name: Build binary
         run: |
