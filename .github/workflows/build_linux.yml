@@ -80,4 +80,4 @@ jobs:
           ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
           local_path: "packages/*"
           remote_path: "fanglab/mcx.space/nightly/github"
-	  sftpArgs: '-o ConnectTimeout=5'
+          sftpArgs: '-o ConnectTimeout=5'
