@@ -73,11 +73,10 @@ jobs:
           zip -FSr packages/mmc-linux-x64_64-${{ github.ref_name }}.zip . -x 'packages*'
       - name: Copy package to server
         if: runner.name == 'ubuntu-20.04' && ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        uses: garygrossgarten/github-action-scp@release
         with:
-          server: ${{ secrets.MCX_SERVER }}
+          host: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
-          ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          local_path: "packages/*"
+          privateKey: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          local_path: "packages"
           remote_path: "fanglab/mcx.space/nightly/github"
-          sftpArgs: '-o ConnectTimeout=5'
