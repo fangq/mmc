@@ -163,9 +163,8 @@ jobs:
         run: |
           cd packages
           unzip -n 'mmclab*.zip'
-          cd mmclab
+          tree .
           zip -FSr --symlink ../mmclab-octave-allinone-github-latest.zip mmclab
-          cd ../
           rm -rf mmclab
       - name: Display structure of downloaded files
         run: ls -R packages
