@@ -89,6 +89,15 @@ jobs:
             make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz"
             ldd bin/mmc
           fi
+      - name: Set up MATLAB (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        uses: matlab-actions/setup-matlab@v1
+      - name: Build mmclab for MATLAB (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        uses: matlab-actions/setup-matlab@v1
+        run: |
+          which mex
+          mex --version
       - name: Create package folder
         run: |
           mkdir packages
@@ -150,7 +159,9 @@ jobs:
         run: |
           cd packages
           unzip -n 'mmclab*.zip'
-          zip -FSr --symlink mmclab-octave-allinone-github-latest.zip mmclab
+          cd mmclab
+          zip -FSr --symlink ../mmclab-octave-allinone-github-latest.zip mmclab
+          cd ../
           rm -rf mmclab
       - name: Display structure of downloaded files
         run: ls -R packages
