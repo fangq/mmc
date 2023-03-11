@@ -1,0 +1,154 @@
+name: build_mmc
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build_all:
+    name: Build All MMC Packages
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04, macos-10.15, macos-11, windows-2019]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - name: Install dependencies (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
+      - name: Install dependencies (MacOS only)
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          brew install octave
+      - name: Link libgomp.a (MacOS only)
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          sudo ln -s /usr/local/lib/gcc/10/libgomp.a /usr/local/lib/libgomp.a
+      - name: Install dependencies (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          choco install octave.portable --version=5.2.0
+          echo 'C:\ProgramData\chocolatey\lib\octave.portable\tools\octave\mingw64\bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo 'C:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\bin\' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Install OpenCL.dll and static libraries (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          mkdir opencl
+          cd opencl
+          curl http://mcx.space/wiki/upload/opencl.zip --output opencl.zip
+          unzip opencl.zip
+          cp bin/OpenCL.dll 'c:\Windows\System32'
+          cd ..
+          rm -rf opencl
+      - name: Update RCS keywords
+        run: |
+          printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
+          rm -rf src/*.c
+          git checkout src/*.c
+      - name: Build mmclab for Octave
+        run: |
+          cd src
+          which gcc
+          gcc -v
+	  mkoctfile --version
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+	    make oct
+	    ldd ../mmclab/mmc.mex
+	  elif [[ "$RUNNER_OS" == "macOS" ]]; then 
+	    make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
+	    otool -L ../mmclab/mmc.mex
+	  else
+            make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
+            file ../mmclab/mmc.mex
+	  fi
+      - name: Build binary
+        run: |
+          cd src
+          make clean
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
+            ldd bin/mmc
+	  elif [[ "$RUNNER_OS" == "macOS" ]]; then 
+            make CC=gcc-10 CXX=g++-10
+            otool -L bin/mmc
+	  else
+            make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz"
+            ldd bin/mmc
+	  fi
+      - name: Create package folder
+        run: |
+          mkdir packages
+      - name: Create release tag
+        run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
+      - name: Zip mmclab
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
+	  else
+            zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
+	  fi
+      - name: Upload mmclab package
+        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-10.15' || matrix.os == 'windows-2019' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: mmc
+          path: packages/mmclab-${{ env.RELEASE_TAG }}.zip
+      - name: Prepare mmc package
+        run: |
+          mv src/bin .
+          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
+          mkdir -p src/bin
+          cd src/bin
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmd /c "mklink /h mmc.exe ..\..\bin\mmc.exe"
+	  else
+            ln -s ../../bin/mmc .
+	  fi
+          cd ../../
+      - name: Zip mmc
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a -tzip packages/mmc-${{ env.RELEASE_TAG }}.zip . -xr!packages
+	  else
+            zip -FSr --symlink packages/mmc-${{ env.RELEASE_TAG }}.zip . -x 'packages*'
+	  fi
+      - name: Upload mmc package
+        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-10.15' || matrix.os == 'windows-2019' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: mmc
+          path: packages/mmc-${{ env.RELEASE_TAG }}.zip
+
+  upload_package:
+    needs: build_all
+    runs-on: ubuntu-20.04
+    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+    steps:
+      - name: Download mmclab
+        uses: actions/download-artifact@v3
+        with:
+          name: mmc
+          path: packages
+      - name: Display structure of downloaded files
+        run: ls -R packages
+      - name: Copy package to server
+        if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.MCX_SERVER }}
+          username: ${{ secrets.MCX_SERVER_USER }}
+          ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          local_path: "packages/*"
+          remote_path: ${{ secrets.MCX_CI_PATH }}
