@@ -62,17 +62,17 @@ jobs:
           cd src
           which gcc
           gcc -v
-	  mkoctfile --version
+          mkoctfile --version
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-	    make oct
-	    ldd ../mmclab/mmc.mex
-	  elif [[ "$RUNNER_OS" == "macOS" ]]; then 
-	    make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
-	    otool -L ../mmclab/mmc.mex
-	  else
+            make oct
+            ldd ../mmclab/mmc.mex
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
+            otool -L ../mmclab/mmc.mex
+          else
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
             file ../mmclab/mmc.mex
-	  fi
+          fi
       - name: Build binary
         run: |
           cd src
@@ -80,13 +80,13 @@ jobs:
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm -lz"
             ldd bin/mmc
-	  elif [[ "$RUNNER_OS" == "macOS" ]]; then 
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
             make CC=gcc-10 CXX=g++-10
             otool -L bin/mmc
-	  else
+          else
             make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz"
             ldd bin/mmc
-	  fi
+          fi
       - name: Create package folder
         run: |
           mkdir packages
@@ -96,9 +96,9 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
-	  else
+          else
             zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
-	  fi
+          fi
       - name: Upload mmclab package
         if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-10.15' || matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
@@ -113,17 +113,17 @@ jobs:
           cd src/bin
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cmd /c "mklink /h mmc.exe ..\..\bin\mmc.exe"
-	  else
+          else
             ln -s ../../bin/mmc .
-	  fi
+          fi
           cd ../../
       - name: Zip mmc
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             7z a -tzip packages/mmc-${{ env.RELEASE_TAG }}.zip . -xr!packages
-	  else
+          else
             zip -FSr --symlink packages/mmc-${{ env.RELEASE_TAG }}.zip . -x 'packages*'
-	  fi
+          fi
       - name: Upload mmc package
         if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-10.15' || matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
