@@ -94,7 +94,6 @@ jobs:
         uses: matlab-actions/setup-matlab@v1
       - name: Build mmclab for MATLAB (Linux only)
         if: ${{ runner.os == 'Linux' }}
-        uses: matlab-actions/setup-matlab@v1
         run: |
           which mex
           mex --version
