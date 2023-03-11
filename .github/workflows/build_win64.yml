@@ -64,7 +64,7 @@ jobs:
           mkdir packages
       - name: Zip mmclab
         run: |
-          zip -FSr --symlink packages/mmclab-win-x64_64-${{ github.ref_name }}.zip mmclab
+          7z a -tzip packages/mmclab-win-x64_64-${{ github.ref_name }}.zip mmclab
       - name: Upload mmclab package
         if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
@@ -81,7 +81,7 @@ jobs:
           cd ../../
       - name: Zip mmc
         run: |
-          zip -FSr --symlink packages/mmc-win-x64_64-${{ github.ref_name }}.zip . -x packages
+          7z a -tzip packages/mmc-win-x64_64-${{ github.ref_name }}.zip . -xr!packages
       - name: Upload mmc package
         if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
