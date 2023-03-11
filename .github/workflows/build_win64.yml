@@ -60,10 +60,17 @@ jobs:
           make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz"
           ldd bin/mmc
       - name: Upload mmclab package
+        if: ${{ runner.name == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-win-x64_64-${{ github.ref_name }}
           path: mmclab
+      - name: Create package folder
+        run: |
+          mkdir packages
+      - name: Zip mmclab
+        run: |
+          zip -FSr --symlink packages/mmclab-win-x64_64-${{ github.ref_name }}.zip mmclab
       - name: Prepare mmc package
         run: |
           mv src/bin .
@@ -73,26 +80,20 @@ jobs:
           cmd /c "mklink /h mmc.exe ..\..\bin\mmc.exe"
           cd ../../
       - name: Upload mmc package
+        if: ${{ runner.name == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmc-win-x64_64-${{ github.ref_name }}
           path: .
-
-  upload_package:
-    needs: build_win64
-    runs-on: windows-2019
-    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: packages
-          path: packages
+      - name: Zip mmc
+        run: |
+          zip -FSr --symlink packages/mmc-win-x64_64-${{ github.ref_name }}.zip . -x packages
       - name: Copy package to server
-        uses: appleboy/scp-action@master
+        if: ${{ runner.name == 'windows-2019' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          host: ${{ secrets.MCX_SERVER }}
+          server: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
-          key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          source: "packages/mmc-win-x64_64-${{ github.ref_name }}.zip,packages/mmclab-win-x64_64-${{ github.ref_name }}.zip"
-          target: "fanglab/mcx.space/nightly/github"
+          ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          local_path: "packages/*"
+          remote_path: "fanglab/mcx.space/nightly/github"

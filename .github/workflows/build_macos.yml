@@ -48,6 +48,7 @@ jobs:
           make CC=gcc-10 CXX=g++-10
           otool -L bin/mmc
       - name: Upload mmclab package
+        if: ${{ runner.name == 'macos-10.15' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmclab-macos-x64_64-${{ github.ref_name }}
@@ -57,7 +58,7 @@ jobs:
           mkdir packages
       - name: Zip mmclab
         run: |
-          zip -FSr packages/mmclab-macos-x64_64-${{ github.ref_name }}.zip mmclab
+          zip -FSr --symlink packages/mmclab-macos-x64_64-${{ github.ref_name }}.zip mmclab
       - name: Prepare mmc package
         run: |
           mv src/bin .
@@ -67,24 +68,20 @@ jobs:
           ln -s ../../bin/mmc .
           cd ../../
       - name: Upload mmc package
+        if: ${{ runner.name == 'macos-10.15' }}
         uses: actions/upload-artifact@v3
         with:
           name: mmc-macos-x64_64-${{ github.ref_name }}
           path: .
       - name: Zip mmc
         run: |
-          zip -FSr packages/mmc-macos-x64_64-${{ github.ref_name }}.zip . -x packages
-
-  upload_package:
-    needs: build_macos
-    runs-on: macos-11
-    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
-    steps:
+          zip -FSr --symlink packages/mmc-macos-x64_64-${{ github.ref_name }}.zip . -x packages
       - name: Copy package to server
-        uses: appleboy/scp-action@master
+        if: ${{ runner.name == 'macos-10.15' && github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          host: ${{ secrets.MCX_SERVER }}
+          server: ${{ secrets.MCX_SERVER }}
           username: ${{ secrets.MCX_SERVER_USER }}
-          key: ${{ secrets.MCX_SERVER_SSH_KEY }}
-          source: "packages/mmc-macos-x64_64-${{ github.ref_name }}.zip,packages/mmclab-macos-x64_64-${{ github.ref_name }}.zip"
-          target: "fanglab/mcx.space/nightly/github"
+          ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          local_path: "packages/*"
+          remote_path: "fanglab/mcx.space/nightly/github"
