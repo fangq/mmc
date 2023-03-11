@@ -73,8 +73,8 @@ jobs:
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
             file ../mmclab/mmc.mex
           fi
-          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer])"
-          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer])" >> $GITHUB_ENV
+          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])"
+          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])" >> $GITHUB_ENV
       - name: Build binary
         run: |
           cd src
@@ -145,7 +145,7 @@ jobs:
       - name: Create all-in-one octave mmclab
         run: |
           cd packages
-          unzip mmclab*.zip -d mmclab
+          unzip 'mmclab*.zip' -d mmclab
           zip -FSr --symlink mmclab-octave-allinone-github-latest.zip mmclab
           rm -rf mmclab
       - name: Display structure of downloaded files
