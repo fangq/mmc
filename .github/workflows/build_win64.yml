@@ -69,7 +69,7 @@ jobs:
         if: ${{ matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
-	  name: mmc
+          name: mmc
           path: packages/mmclab-win-x64_64-${{ github.ref_name }}.zip
       - name: Prepare mmc package
         run: |
