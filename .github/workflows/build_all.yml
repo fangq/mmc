@@ -84,7 +84,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
           else
-            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
+            make mex CC=gcc CXX=g++ MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
           fi
       - name: Build binary
         run: |
@@ -162,7 +162,7 @@ jobs:
           cd packages
           unzip -n 'mmclab*.zip'
           tree .
-          zip -FSr --symlink ../mmclab-octave-allinone-github-latest.zip mmclab
+          zip -FSr --symlink mmclab-allinone-github-latest.zip mmclab
           rm -rf mmclab
       - name: Display structure of downloaded files
         run: ls -R packages
