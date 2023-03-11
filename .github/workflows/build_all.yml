@@ -52,6 +52,9 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
+      - name: Set up MATLAB (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        uses: matlab-actions/setup-matlab@v1
       - name: Update RCS keywords
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
@@ -75,6 +78,16 @@ jobs:
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])" >> $GITHUB_ENV
+      - name: Build mmclab for MATLAB (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          which mex
+          cd src
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            make mex
+          else
+            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
+          fi
       - name: Build binary
         run: |
           cd src
@@ -89,14 +102,6 @@ jobs:
             make CC=gcc CXX=g++ USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz"
             ldd bin/mmc
           fi
-      - name: Set up MATLAB (Linux only)
-        if: ${{ runner.os == 'Linux' }}
-        uses: matlab-actions/setup-matlab@v1
-      - name: Build mmclab for MATLAB (Linux only)
-        if: ${{ runner.os == 'Linux' }}
-        run: |
-          which mex
-          mex --version
       - name: Create package folder
         run: |
           mkdir packages
