@@ -51,8 +51,6 @@ jobs:
       - name: Create package folder
         run: |
           mkdir packages
-	  echo ${{ runner.name }}
-	  echo runner.name
       - name: Zip mmclab
         run: |
           zip -FSr packages/mmclab-linux-x64_64-${{ github.ref_name }}.zip mmclab
