@@ -38,7 +38,7 @@ jobs:
           mkdir -p /Users/runner/bin/
           which gcc
           ln -s `which gcc-10` /Users/runner/bin/gcc
-          ln -s `which g++-10` /Users/runner/bin/gcc
+          ln -s `which g++-10` /Users/runner/bin/g++
           ln -s `which gcc-10` /Users/runner/bin/cc
       - name: Install dependencies (Windows only)
         if: ${{ runner.os == 'Windows' }}
