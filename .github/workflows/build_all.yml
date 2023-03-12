@@ -35,11 +35,6 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           sudo ln -s /usr/local/lib/gcc/10/libgomp.a /usr/local/lib/libgomp.a
-          mkdir -p ~/bin/
-          which gcc
-          ln -s `which gcc-10` ~/bin/gcc
-          ln -s `which g++-10` ~/bin/g++
-          ln -s `which gcc-10` ~/bin/cc
       - name: Install dependencies (Windows only)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
@@ -61,7 +56,7 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         uses: matlab-actions/setup-matlab@v1
       - name: Set up MATLAB v2 (MacOS Only)
-        if: ${{ runner.os == 'MacOS' }}
+        if: ${{ runner.os != 'Linux' }}
         uses: matlab-actions/setup-matlab@v2-beta
       - name: Update RCS keywords
         run: |
@@ -84,8 +79,8 @@ jobs:
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
             file ../mmclab/mmc.mex
           fi
-          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])"
-          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])" >> $GITHUB_ENV
+          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
+          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
       - name: Build mmclab for MATLAB
         if: ${{ runner.os != 'Windows' }}
         run: |
@@ -93,8 +88,10 @@ jobs:
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
+            ldd ../mmclab/mmc.mex*
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
+            otool -L ../mmclab/mmc.mex*
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
           fi

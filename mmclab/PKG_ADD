@@ -1,5 +1,5 @@
 if(exist(file_in_loadpath('mmc.mex')))
     autoload('mmc',file_in_loadpath('mmc.mex'))
 else
-    autoload('mmc',file_in_loadpath(['octave' filesep computer('arch') filesep 'mmc.mex']))
+    autoload('mmc',file_in_loadpath(['octave' filesep regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-') filesep 'mmc.mex']))
 end
