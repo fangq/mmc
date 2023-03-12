@@ -58,7 +58,7 @@ jobs:
           cd ..
           rm -rf opencl
       - name: Set up MATLAB
-        if [[ "$RUNNER_OS" != "Windows" ]]; then
+        if: ${{ runner.os != 'Windows' }}
         uses: matlab-actions/setup-matlab@v2-beta
       - name: Update RCS keywords
         run: |
@@ -84,7 +84,7 @@ jobs:
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' computer('arch')])" >> $GITHUB_ENV
       - name: Build mmclab for MATLAB
-        if [[ "$RUNNER_OS" != "Windows" ]]; then
+        if: ${{ runner.os != 'Windows' }}
         run: |
           which mex
           cd src
