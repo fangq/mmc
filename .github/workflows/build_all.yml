@@ -94,7 +94,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            make mex CC=gcc-10 CXX=g++-10 LDFLAGS='' MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -lomp -I/usr/local/opt/libomp/include -L/usr/local/opt/libomp/lib"
+            make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
           fi
