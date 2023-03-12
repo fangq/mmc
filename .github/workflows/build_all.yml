@@ -31,8 +31,9 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           brew install octave
-          echo $PATH
-          which octave
+          ln -s `which gcc-10` /Users/runner/bin/gcc
+          ln -s `which g++-10` /Users/runner/bin/gcc
+          ln -s `which gcc-10` /Users/runner/bin/cc
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
