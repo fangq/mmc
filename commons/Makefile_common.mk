@@ -128,8 +128,8 @@ ifeq ($(CC),icc)
 endif
 
 ifeq ($(CC),clang)
-	OPENMP   := -fopenmp
-        OPENMPLIB:= -fopenmp=libiomp5
+        OPENMP   := -Xpreprocessor -fopenmp
+        OPENMPLIB:= -lomp
 endif
 
 ARFLAGS    := 
