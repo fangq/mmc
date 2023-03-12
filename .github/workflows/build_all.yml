@@ -88,13 +88,13 @@ jobs:
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
-            ldd ../mmclab/mmc.mex*
+            objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
             otool -L ../mmclab/mmc.mex*
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
-            objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
+            ldd ../mmclab/mmc.mex*
           fi
       - name: Build binary
         run: |
