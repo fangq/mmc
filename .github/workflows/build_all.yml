@@ -77,7 +77,7 @@ jobs:
             otool -L ../mmclab/mmc.mex
           else
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
-            ldd ../mmclab/mmc.mex
+            objdump -p ../mmclab/mmc.mex | grep "DLL Name:"
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
@@ -94,7 +94,7 @@ jobs:
             otool -L ../mmclab/mmc.mex*
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
-            ldd ../mmclab/mmc.mex*
+            objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           fi
       - name: Build binary
         run: |
