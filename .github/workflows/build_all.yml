@@ -31,7 +31,8 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           brew install octave
-          brew link --force libomp
+          sudo /usr/libexec/locate.updatedb
+          locate gcc
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
