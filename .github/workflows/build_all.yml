@@ -89,7 +89,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
           else
-            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
+            make mex MEXLINKOPT="-v -static-libstdc++ -static-libgcc -fopenmp"
           fi
       - name: Build binary
         run: |
