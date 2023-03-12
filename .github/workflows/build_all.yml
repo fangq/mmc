@@ -31,6 +31,7 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           brew install octave
+          brew link --force libomp
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
@@ -83,8 +84,6 @@ jobs:
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             make mex
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp"
           fi
