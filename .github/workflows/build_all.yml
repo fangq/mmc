@@ -56,7 +56,7 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         uses: matlab-actions/setup-matlab@v1
       - name: Set up MATLAB v2 (MacOS Only)
-        if: ${{ runner.os == 'MacOS' }}
+        if: ${{ runner.os == 'macOS' }}
         uses: matlab-actions/setup-matlab@v2-beta
       - name: Update RCS keywords
         run: |
@@ -77,7 +77,7 @@ jobs:
             otool -L ../mmclab/mmc.mex
           else
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose'
-            file ../mmclab/mmc.mex
+            ldd ../mmclab/mmc.mex
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
@@ -94,6 +94,7 @@ jobs:
             otool -L ../mmclab/mmc.mex*
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
+            ldd ../mmclab/mmc.mex*
           fi
       - name: Build binary
         run: |
