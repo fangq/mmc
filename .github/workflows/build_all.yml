@@ -79,12 +79,13 @@ jobs:
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
       - name: Build mmclab for MATLAB
         run: |
-          which mex
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ls '/c/Program Files/MATLAB/R2022b/bin'
             make mex
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            which mex
             make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
             otool -L ../mmclab/mmc.mex*
           else
