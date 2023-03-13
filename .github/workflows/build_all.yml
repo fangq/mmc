@@ -53,6 +53,8 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
+          ls /c/msys64/usr/
+          ln -s /c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin/* /c/msys64/usr/bin/
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v1
       - name: Update RCS keywords
