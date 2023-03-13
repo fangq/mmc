@@ -52,7 +52,7 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
-      - name: Set up MATLAB v1
+      - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v1
       - name: Update RCS keywords
         run: |
@@ -78,7 +78,6 @@ jobs:
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
       - name: Build mmclab for MATLAB
-        if: ${{ runner.os != 'Windows' }}
         run: |
           which mex
           cd src
