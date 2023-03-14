@@ -88,7 +88,7 @@ jobs:
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             env
-            MW_MINGW64_LOC=/c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/ make mex EXTRALIB="-v"
+            make mex USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Lc:/ghcup/ghc/9.0.2/mingw/x86_64-w64-mingw32/lib libzmat.a -lz -v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
