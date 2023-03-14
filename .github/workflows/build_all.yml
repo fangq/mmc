@@ -93,7 +93,7 @@ jobs:
       - name: Build mmclab for MATLAB (Windows only)
         if: ${{ runner.os == 'Windows' }}
         env:
-	  MW_MINGW64_LOC: c:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\
+          MW_MINGW64_LOC: c:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\
         run: |
           cd src
           env
