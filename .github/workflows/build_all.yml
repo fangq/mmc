@@ -53,11 +53,6 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
-          ln -s /c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin/gcc.exe /c/msys64/usr/bin/
-          ln -s /c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin/gcc.exe /c/msys64/usr/bin/cc.exe
-          ln -s /c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin/g++.exe /c/msys64/usr/bin/
-          ln -s /c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin/c++.exe /c/msys64/usr/bin/
-          ls /c/msys64/usr/bin
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v1
       - name: Update RCS keywords
@@ -83,14 +78,11 @@ jobs:
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
-      - name: Build mmclab for MATLAB
+      - name: Build mmclab for MATLAB (MacOS and Linux)
+        if: ${{ runner.os != 'Windows' }}
         run: |
           cd src
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            env
-            make mex USERARFLAGS="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -Lc:/ghcup/ghc/9.0.2/mingw/lib -Ic:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/include -Ic:/msys64/usr/include -Ic:/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/include libzmat.a -lz -v"
-            objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
             make mex CC=gcc-10 CXX=g++-10 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
             otool -L ../mmclab/mmc.mex*
@@ -98,6 +90,15 @@ jobs:
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
             ldd ../mmclab/mmc.mex*
           fi
+      - name: Build mmclab for MATLAB (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        env:
+	  MW_MINGW64_LOC: c:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\
+        run: |
+          cd src
+          env
+          make mex USERARFLAGS="-v"
+          objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
       - name: Build binary
         run: |
           cd src
