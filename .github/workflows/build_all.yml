@@ -82,7 +82,7 @@ jobs:
         run: |
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            make mex LDFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic libzmat.a -lm" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -lz -v"
+            make mex LFLAGS="-static libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -lz -v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
@@ -103,7 +103,7 @@ jobs:
             make CC=gcc-10 CXX=g++-10
             otool -L bin/mmc
           else
-            make CC=gcc CXX=g++ USERARFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic libzmat.a -Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -lz"
+            make CC=gcc CXX=g++ USERARFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic libzmat.a -Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -lz"
             ldd bin/mmc
           fi
       - name: Create package folder
@@ -154,6 +154,7 @@ jobs:
           path: packages/mmc-${{ env.RELEASE_TAG }}.zip
 
   upload_package:
+    name: Upload Packages
     needs: build_all
     runs-on: ubuntu-20.04
     if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
