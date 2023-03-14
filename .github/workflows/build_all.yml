@@ -82,7 +82,7 @@ jobs:
         run: |
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            make mex EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic libzmat.a -lm -lz -v"
+            make mex LDFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic libzmat.a -lm -lz" EXTRALIB="-v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
