@@ -70,7 +70,7 @@ jobs:
             make oct LFLAGS='-static-libgcc -static-libstdc++ -Wl,-Bstatic -lz -Wl,-Bdynamic'
             ldd ../mmclab/mmc.mex
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" LFLAGS='-Wl,-Bstatic -lz -Wl,-Bdynamic'
+            make oct CC=gcc-10 CXX=g++-10 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
             otool -L ../mmclab/mmc.mex
           else
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose' LFLAGS='-static'
