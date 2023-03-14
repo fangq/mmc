@@ -49,9 +49,9 @@ jobs:
         with:
           update: true
           install: >-
-            mingw-w64-gcc
-            mingw-w64-zlib
-            mingw-w64-winpthreads-git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-winpthreads-git
       - name: Install OpenCL.dll and static libraries (Windows only)
         if: ${{ runner.os == 'Windows' }}
         run: |
