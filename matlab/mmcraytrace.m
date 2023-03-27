@@ -23,7 +23,11 @@ function [p,e0]=mmcraytrace(node,elem,p0,v0,e0)
 %
 
 p=p0;
-face=volface(elem);
+if(size(elem,2)==3)
+    face=elem;
+else
+    face=volface(elem);
+end
 [t,u,v,idx]=raytrace(p0,v0,node,face);
 if(isempty(idx))
     error('ray does not intersect with the mesh');
@@ -48,15 +52,23 @@ else
     % update source position
     p=p0+t(idx1(loc))*v0;
 
+    if(nargout<2)
+        return;
+    end
+
     % find initial element id
-    felem=sort(face(faceidx,:));
-    f=elem;
-    f=[f(:,[1,2,3]);
-       f(:,[2,1,4]);
-       f(:,[1,3,4]);
-       f(:,[2,4,3])];
-    [tf,loc]=ismember(felem,sort(f,2),'rows');
-    loc=mod(loc,size(elem,1));
-    if(loc==0) loc=size(elem,1); end
-    e0=loc;
+    if(size(elem,2)==3)
+        e0=faceidx;
+    else
+       felem=sort(face(faceidx,:));
+       f=elem;
+       f=[f(:,[1,2,3]);
+          f(:,[2,1,4]);
+          f(:,[1,3,4]);
+          f(:,[2,4,3])];
+       [tf,loc]=ismember(felem,sort(f,2),'rows');
+       loc=mod(loc,size(elem,1));
+       if(loc==0) loc=size(elem,1); end
+       e0=loc;
+    end
 end
