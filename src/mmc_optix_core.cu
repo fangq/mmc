@@ -15,7 +15,7 @@ enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 
 constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
-constexpr float SAFETY_DISTANCE = 0.0001f; // ensure ray cut through triangle
+constexpr float SAFETY_DISTANCE = 0.0001f; // heuristic to ensure ray cut through triangle
 constexpr float DOUBLE_SAFETY_DISTANCE = 0.0002f;
 
 // simulation configuration and medium optical properties
@@ -46,7 +46,8 @@ __device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
  * @brief Move a photon one step forward
  */
 __device__ __forceinline__ void movePhoton(optixray &r, mcx::Random &rng) {
-    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0f, std::numeric_limits<float>::max(),
+    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0f,
+        gcfg.medium[r.mediumid].mus ? r.slen / gcfg.medium[r.mediumid].mus : std::numeric_limits<float>::max(),
         0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
         *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
         *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
@@ -114,9 +115,9 @@ __device__ __forceinline__ uint subToInd(const uint3 &idx3d) {
  * @brief Get the index of the voxel that encloses p
  */
 __device__ __forceinline__ uint getVoxelIdx(const float3 &p) {
-    return subToInd(make_uint3(p.x > 0.0f ? __float2int_rd(p.x * gcfg.dstep) : 0,
-                              p.y > 0.0f ? __float2int_rd(p.y * gcfg.dstep) : 0,
-                              p.z > 0.0f ? __float2int_rd(p.z * gcfg.dstep) : 0));
+    return subToInd(make_uint3(p.x > 0.0f ? __float2int_rd(min(p.x, gcfg.nmax.x) * gcfg.dstep) : 0,
+                               p.y > 0.0f ? __float2int_rd(min(p.y, gcfg.nmax.y) * gcfg.dstep) : 0,
+                               p.z > 0.0f ? __float2int_rd(min(p.z, gcfg.nmax.z) * gcfg.dstep) : 0));
 }
 
 /**
@@ -285,10 +286,57 @@ extern "C" __global__ void __closesthit__ch() {
 
     // get medium properties
     const Medium currprop = gcfg.medium[r.mediumid];
-    
-    // determine path length
-    const bool isend = (hitlen * currprop.mus > r.slen);
-    const float lmove = isend ? r.slen / currprop.mus : hitlen;
+
+    // resolve some edge cases where hitlen is sligthly larger than slen
+    const float lmove = min(hitlen, currprop.mus ? r.slen / currprop.mus : std::numeric_limits<float>::max());
+
+    // save output
+    accumulateOutput(r, currprop, lmove);
+
+    // update photon position
+    r.p0 += r.dir * (lmove + SAFETY_DISTANCE);
+
+    // update photon weight
+    r.weight *= expf(-currprop.mua * lmove);
+
+    // update photon timer
+    r.photontimer += lmove * R_C0 * currprop.n;
+
+    // after hitting a boundary, update remaining scattering length
+    r.slen -= lmove * currprop.mus;
+
+    // update medium id (assume matched boundary)
+    r.mediumid = isfronthit ? (media & 0xFFFF) : (media >> 16);
+
+    // update ray direction at mismatched boundary
+    if (gcfg.isreflect && currprop.n != gcfg.medium[r.mediumid].n) {
+        fnorm = isfronthit ? -fnorm : fnorm;
+        if (reflectray(*(float3*)&fnorm, currprop.n, gcfg.medium[r.mediumid].n,
+            rng, r)) {
+            // if the ray is reflected
+            r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
+        }
+    }
+
+    // update rng
+    setRNG(rng);
+
+    // update ray
+    setRay(r);
+}
+
+extern "C" __global__ void __miss__ms() {
+    // get photon and ray information from payload
+    optixray r = getRay();
+
+    // get rng
+    mcx::Random rng = getRNG();
+
+    // get medium properties
+    const Medium currprop = gcfg.medium[r.mediumid];
+
+    // distance to the scattering event site
+    float lmove = r.slen / currprop.mus;
 
     // save output
     accumulateOutput(r, currprop, lmove);
@@ -302,40 +350,13 @@ extern "C" __global__ void __closesthit__ch() {
     // update photon timer
     r.photontimer += lmove * R_C0 * currprop.n;
 
-    // update photon direction if needed
-    if (isend) {
-        // after a scattering event, new direction and scattering length
-        r.dir = selectScatteringDirection(r.dir, currprop.g, rng);
-        r.slen = rng.rand_next_scatlen();
-    } else {
-        // after hitting a boundary, update remaining scattering length
-        r.slen -= lmove * currprop.mus;
-
-        // update medium id (assume matched boundary)
-        r.mediumid = isfronthit ? (media & 0xFFFF) : (media >> 16);
-
-        // update photon position to cut through the hit triangle
-        r.p0 += r.dir * SAFETY_DISTANCE;
-
-        // update ray direction at mismatched boundary
-        if (gcfg.isreflect && currprop.n != gcfg.medium[r.mediumid].n) {
-            fnorm = isfronthit ? -fnorm : fnorm;
-            if (reflectray(*(float3*)&fnorm, currprop.n, gcfg.medium[r.mediumid].n,
-                rng, r)) {
-                // if the ray is reflected
-                r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
-            }
-        }
-    }
+    // scattering event
+    r.dir = selectScatteringDirection(r.dir, currprop.g, rng);
+    r.slen = rng.rand_next_scatlen();
 
     // update rng
     setRNG(rng);
 
     // update ray
     setRay(r);
-}
-
-extern "C" __global__ void __miss__ms() {
-    // concave case needs further investigation
-    setMediumID(0);
 }

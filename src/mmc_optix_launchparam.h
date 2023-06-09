@@ -25,6 +25,7 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     float3 srcpos;
     float3 srcdir;
     float3 nmin;
+    float3 nmax;
     uint4 crop0;
     float dstep;
     float tstart, tend;

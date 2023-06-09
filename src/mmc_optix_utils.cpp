@@ -170,6 +170,9 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.nmin = make_float3(mesh->nmin.x,
                                               mesh->nmin.y,
                                               mesh->nmin.z);
+    optixcfg->launchParams.nmax = make_float3(mesh->nmax.x - mesh->nmin.x,
+                                              mesh->nmax.y - mesh->nmin.y,
+                                              mesh->nmax.z - mesh->nmin.z);
     optixcfg->launchParams.crop0 = make_uint4(cfg->crop0.x,
                                                cfg->crop0.y,
                                                cfg->crop0.z,
