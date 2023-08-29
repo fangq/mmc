@@ -2921,7 +2921,7 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig* cfg) {
-    MMC_ERROR(MMC_INFO, "MMC $Rev::      $v2023.01");
+    MMC_ERROR(MMC_INFO, "MMC $Rev::      $" MMC_VERSION);
 }
 
 /**
@@ -2931,18 +2931,22 @@ void mcx_version(mcconfig* cfg) {
  */
 
 void mcx_printheader(mcconfig* cfg) {
-    MMC_FPRINTF(cfg->flog, S_YELLOW"\
+    MMC_FPRINTF(cfg->flog, S_YELLOW "\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
-#          Copyright (c) 2010-2022 Qianqian Fang <q.fang at neu.edu>          #\n\
-#                            http://mcx.space/#mmc                            #\n\
+#          Copyright (c) 2010-2023 Qianqian Fang <q.fang at neu.edu>          #\n\
+#" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.org/              " S_YELLOW "#\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #\n\
-#                                                                             #\n\
-#                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $v2023.01$Date::                       $ by $Author::             $\n\
+#    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #\n\
+###############################################################################\n\
+#  Open-source codes and reusable scientific data are essential for research, #\n\
+# MCX proudly developed human-readable JSON-based data formats for easy reuse,#\n\
+#  Please consider using JSON (" S_BLUE "https://neurojson.org/" S_YELLOW ") for your research data #\n\
+###############################################################################\n\
+$Rev::      $ " S_GREEN MMC_VERSION S_YELLOW "  $Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 

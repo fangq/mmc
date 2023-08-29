@@ -1,7 +1,18 @@
 Change Log
 
-== MMC 1.9.6 (v2023.01, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
+== MMC 2.0.0 (v2023, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2023-03-04 [465ef20] implement github ci
+ 2023-01-03 [3ddff2b] force flushing in terminal and matlab
+ 2023-01-02 [849d09a] bump up version number
+ 2023-01-02 [423047b] fix travis error after adding cuda related targets
+ 2022-11-02 [9809be0] add cudamex and cudaoct makefile targets
+ 2022-10-25 [f455d1e] reduce photon leakage for edge-immc, still leaks, need more work
+
+
+== MMC 1.9.6 (v2022.10, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2022-10-08 [4c8bdae] mmc v2022.10
  2022-10-01 [77411c4] using nvidia native atomicadd for float add 40% speedup
  2022-09-21 [e661011] add double-buffer to solve fangq/mcx#41
  2022-05-30 [c3b15b2] print detected photon number in matlab

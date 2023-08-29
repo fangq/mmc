@@ -13,7 +13,7 @@
 # and linking
 ########################################################
 
-ROOTDIR ?= .
+ROOTDIR ?= ..
 MMCDIR  ?= $(ROOTDIR)
 
 MMCSRC :=$(MMCDIR)/src
@@ -21,7 +21,7 @@ MMCSRC :=$(MMCDIR)/src
 CXX        := g++
 AR         := $(CC)
 CUDACC     :=nvcc
-BIN        := bin
+BIN        := $(MMCDIR)/bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
@@ -30,8 +30,8 @@ INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
 MAKE       ?= make
 
-ZMATLIB    :=libzmat.a
-USERARFLAGS?=$(ZMATLIB) -lz
+ZMATLIB    :=lib/libzmat.a
+USERARFLAGS?=$(ZMATLIB)
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL  ?=-lOpenCL

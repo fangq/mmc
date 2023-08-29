@@ -32,6 +32,11 @@
 #ifndef _MCEXTREME_CONSTANT_H
 #define _MCEXTREME_CONSTANT_H
 
+#define MMC_VERSION        "v2023"
+#define MMC_VERSION_MAJOR  2
+#define MMC_VERSION_MINOR  0
+#define MMC_VERSION_PATCH  0
+
 #define DET_MASK           0xFFFF0000
 #define MED_MASK           0x0000FFFF
 

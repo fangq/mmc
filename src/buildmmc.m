@@ -62,6 +62,15 @@ end
 opt=struct(varargin{:});
 pname='mmc';
 
+clsource = fileread('mmc_core.cl');
+clsrc = sprintf('0x%02x, ', char(clsource));
+clhex = ['unsigned char mmc_core_cl[] = {' sprintf('\n') clsrc(1:end-2) sprintf('\n')  ...
+    sprintf('};\nunsigned int mmc_core_cl_len = %d;\n', length(clsource))];
+
+fp=fopen('mmc_core.clh','wb');
+fwrite(fp, clhex, 'char');
+fclose(fp);
+
 cflags='-c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -fopenmp  -DUSE_OS_TIMER -DUSE_OPENCL';
 
 filelist={'mmc_rand_xorshift128p.c','mmc_mesh.c','mmc_raytrace.c',...

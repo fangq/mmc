@@ -45,6 +45,7 @@
 #endif
 
 #include "mex.h"
+#include "mmc_const.h"
 #include "mmc_mesh.h"
 #include "mmc_host.h"
 #ifdef USE_OPENCL
@@ -1162,7 +1163,7 @@ extern "C" int mmc_throw_exception(const int id, const char* msg, const char* fi
  */
 
 void mmclab_usage() {
-    printf("MMCLAB v2023.01\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
+    printf("MMCLAB " MMC_VERSION "\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
 }
 
 /**

@@ -6,7 +6,7 @@
 
 *Author:  Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPL v3), see License.txt
-*Version: 1.9.6 (v2023.01, Moon Cake)
+*Version: 2.0.0 (v2023, Moon Cake)
 *URL:     http://mcx.space/mmc
 
 ---------------------------------------------------------------------
@@ -19,7 +19,7 @@ Table of Content:
 
 == # What's New ==
 
-MMC v2023.01 (1.9.6) includes a major feature upgrade - implicit MMC (iMMC) - to
+MMC v2023 (2.0.0) includes a major feature upgrade - implicit MMC (iMMC) - to
 enable simulations of highly complex anatomical structures. The details of the
 iMMC algorithm, developed by Yaoshen Yuan, are described in his recent paper 
 [Yuan2021]. Briefly, iMMC permits one to associate cylindrical inclusions, 
