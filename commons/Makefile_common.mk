@@ -46,6 +46,8 @@ CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
 ECHO	   := echo
 MKDIR      := mkdir
 
+MEXLINKLIBS=-L"\$$MATLABROOT/extern/lib/\$$ARCH" -L"\$$MATLABROOT/bin/\$$ARCH" -lmx -lmex $(ZMATLIB)
+
 ARCH = $(shell uname -m)
 ifeq ($(findstring x86_64,$(ARCH)), x86_64)
      CCFLAGS+=-m64
@@ -53,7 +55,7 @@ endif
 
 MEXLINKOPT +=$(OPENMPLIB)
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXLIBS='$$CXXLIBS $(LIBOPENCL) $(LIBCUDART)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='-L$$TMW_ROOT$$MATLABROOT/sys/os/$$ARCH $$LDFLAGS $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' LINKLIBS="$(MEXLINKLIBS) $(MEXLINKOPT)" COMPFLAGS='' DEFINES='' CXXLIBS='$$CXXLIBS $(MEXLINKOPT) $(LIBOPENCL) $(LIBCUDART)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile -v
 
 DLLFLAG=-fPIC
@@ -68,6 +70,7 @@ ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
     EXTRALIB   +=-static
     CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG    =
+    MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring MSYS,$(PLATFORM)), MSYS)
     MKMEX      :=cmd //c mex.bat
     INCLUDEDIRS+=-I"./mingw64/include"
@@ -76,6 +79,7 @@ else ifeq ($(findstring MSYS,$(PLATFORM)), MSYS)
     EXTRALIB   +=-static
     CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG    =
+    MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
     MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
@@ -84,6 +88,7 @@ else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     EXTRALIB   +=-static
     CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG     =
+    MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
     INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
     LIBOPENCL=-framework OpenCL
