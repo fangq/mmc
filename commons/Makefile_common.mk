@@ -52,6 +52,7 @@ ARCH = $(shell uname -m)
 ifeq ($(findstring x86_64,$(ARCH)), x86_64)
      CCFLAGS+=-m64
 endif
+ISCLANG = $(shell $(CC) --version | grep clang)
 
 MEXLINKOPT +=$(OPENMPLIB)
 MKMEX      :=mex
@@ -93,7 +94,13 @@ else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
     INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
-    OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
+    ifeq ($(ISCLANG),)
+        OPENMPLIB=-static-libgcc -static-libstdc++ /usr/local/lib/libgomp.a
+        OPENMP=-fopenmp
+    else
+        OPENMPLIB=/usr/local/lib/libomp.a
+        OPENMP=-Xclang -fopenmp
+    endif
     CUDA_STATIC=--cudart static
 endif
 
@@ -102,7 +109,11 @@ ifeq ($(BACKEND),ocelot)
   CUCCOPT=-D__STRICT_ANSI__ -g #--maxrregcount 32
 else ifeq ($(BACKEND),cudastatic)
   ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-      CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+      ifeq ($(ISCLANG),)
+          CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+      else
+          CUDART=-lcudadevrt -lcudart_static -ldl /usr/local/lib/libomp.a
+      endif
   else
       CUDART=-lcudadevrt -lcudart_static -ldl -lrt -static-libgcc -static-libstdc++
   endif
