@@ -98,13 +98,13 @@ jobs:
           make clean
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm"
-            ldd bin/mmc
+            ldd ../bin/mmc
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             make CC=gcc-11 CXX=g++-11
-            otool -L bin/mmc
+            otool -L ../bin/mmc
           else
             make CC=gcc CXX=g++ USERARFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic libzmat.a -Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib"
-            ldd bin/mmc
+            ldd ../bin/mmc
           fi
       - name: Create package folder
         run: |
@@ -128,16 +128,7 @@ jobs:
           path: packages/mmclab-${{ env.RELEASE_TAG }}.zip
       - name: Prepare mmc package
         run: |
-          mv src/bin .
           rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
-          mkdir -p src/bin
-          cd src/bin
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cmd /c "mklink /h mmc.exe ..\..\bin\mmc.exe"
-          else
-            ln -s ../../bin/mmc .
-          fi
-          cd ../../
       - name: Zip mmc
         run: |
           cd .. && pwd
