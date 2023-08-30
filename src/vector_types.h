@@ -38,6 +38,9 @@
 #ifndef _MMC_VECTOR_H
 #define _MMC_VECTOR_H
 
+#ifndef __VECTOR_TYPES_H__
+
+
 #ifdef _MSC_VER
     #define PRE_ALIGN(x) __declspec(align(x))
     #define POST_ALIGN(x)
@@ -126,5 +129,7 @@ typedef struct MMC_uint2 {
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
+
+#endif
 
 #endif

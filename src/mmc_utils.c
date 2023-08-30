@@ -550,8 +550,37 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     jsonstr = malloc(datalen << 1);
     root = ubjw_open_memory(jsonstr, jsonstr + (datalen << 1));
 
-    /* the "NIFTIHeader" section */
     ubjw_begin_object(root, UBJ_MIXED, 0);
+    /* the "_DataInfo_" section */
+    ubjw_write_key(root, "_DataInfo_");
+    ubjw_begin_object(root, UBJ_MIXED, 0);
+    UBJ_WRITE_KEY(root, "JNIFTIVersion", string, "0.5");
+    UBJ_WRITE_KEY(root, "Comment", string, "Created by MCX (http://mcx.space)");
+    UBJ_WRITE_KEY(root, "AnnotationFormat", string, "https://neurojson.org/jnifti/draft1");
+    UBJ_WRITE_KEY(root, "SerialFormat", string, "https://neurojson.org/bjdata/draft2");
+    ubjw_write_key(root, "Parser");
+    ubjw_begin_object(root, UBJ_MIXED, 0);
+    ubjw_write_key(root, "Python");
+    ubjw_begin_array(root, UBJ_STRING, 2);
+    ubjw_write_string(root, "https://pypi.org/project/jdata");
+    ubjw_write_string(root, "https://pypi.org/project/bjdata");
+    ubjw_end(root);
+    ubjw_write_key(root, "MATLAB");
+    ubjw_begin_array(root, UBJ_STRING, 2);
+    ubjw_write_string(root, "https://github.com/NeuroJSON/jnifty");
+    ubjw_write_string(root, "https://github.com/NeuroJSON/jsonlab");
+    ubjw_end(root);
+    ubjw_write_key(root, "JavaScript");
+    ubjw_begin_array(root, UBJ_STRING, 2);
+    ubjw_write_string(root, "https://www.npmjs.com/package/jda");
+    ubjw_write_string(root, "https://www.npmjs.com/package/bjd");
+    ubjw_end(root);
+    UBJ_WRITE_KEY(root, "CPP", string, "https://github.com/NeuroJSON/json");
+    UBJ_WRITE_KEY(root, "C", string, "https://github.com/NeuroJSON/ubj");
+    ubjw_end(root);
+    ubjw_end(root);
+
+    /* the "NIFTIHeader" section */
     ubjw_write_key(root, "NIFTIHeader");
     ubjw_begin_object(root, UBJ_MIXED, 0);
     UBJ_WRITE_KEY(root, "NIIHeaderSize", uint16, 348);
@@ -587,13 +616,13 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     UBJ_WRITE_KEY(root, "TimeOffset", uint8, 0);
 
     if (cfg->outputtype >= 0) {
-        const char* typestr[] = {"MCX volumetric output: Fluence rate (W/mm^2)", "MCX volumetric output: Fluence (J/mm^2)",
-                                 "MCX volumetric output: Energy density (J/mm^3)", "MCX volumetric output: Jacobian for mua (J/mm)", "MCX volumetric output: Scattering count",
-                                 "MCX volumetric output: Partial momentum transfer"
+        const char* typestr[] = {"MMC volumetric output: Fluence rate (W/mm^2)", "MMC volumetric output: Fluence (J/mm^2)",
+                                 "MMC volumetric output: Energy density (J/mm^3)", "MMC volumetric output: Jacobian for mua (J/mm)", "MMC volumetric output: Scattering count",
+                                 "MMC volumetric output: Partial momentum transfer"
                                 };
         UBJ_WRITE_KEY(root, "Description", string, typestr[(int)cfg->outputtype]);
     } else {
-        UBJ_WRITE_KEY(root, "Description", string, "MCX volumetric output");
+        UBJ_WRITE_KEY(root, "Description", string, "MMC volumetric output");
     }
 
     UBJ_WRITE_KEY(root, "AuxFile", string, "");
@@ -672,10 +701,27 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     FILE* fp;
     char fname[MAX_FULL_PATH] = {'\0'};
     int affine[] = {0, 0, 1, 0, 0, 0};
+    const char* libpy[] = {"https://pypi.org/project/jdata", "https://pypi.org/project/bjdata"};
+    const char* libmat[] = {"https://github.com/NeuroJSON/jnifty", "https://github.com/NeuroJSON/jsonlab"};
+    const char* libjs[] = {"https://www.npmjs.com/package/jda", "https://www.npmjs.com/package/bjd"};
+    const char* libc[]  = {"https://github.com/DaveGamble/cJSON", "https://github.com/NeuroJSON/ubj"};
 
-    cJSON* root = NULL, *hdr = NULL, *dat = NULL, *sub = NULL;
+    cJSON* root = NULL, *hdr = NULL, *dat = NULL, *sub = NULL, *info = NULL, *parser = NULL;
     char* jsonstr = NULL;
     root = cJSON_CreateObject();
+
+    /* the "_DataInfo_" section */
+    cJSON_AddItemToObject(root, "_DataInfo_", info = cJSON_CreateObject());
+    cJSON_AddStringToObject(info, "JNIFTIVersion", "0.5");
+    cJSON_AddStringToObject(info, "Comment", "Created by MCX (http://mcx.space)");
+    cJSON_AddStringToObject(info, "AnnotationFormat", "https://neurojson.org/jnifti/draft1");
+    cJSON_AddStringToObject(info, "SerialFormat", "https://json.org");
+    cJSON_AddItemToObject(info, "Parser", parser = cJSON_CreateObject());
+    cJSON_AddItemToObject(parser, "Python", cJSON_CreateStringArray(libpy, 2));
+    cJSON_AddItemToObject(parser, "MATLAB", cJSON_CreateStringArray(libmat, 2));
+    cJSON_AddItemToObject(parser, "JavaScript", cJSON_CreateStringArray(libjs, 2));
+    cJSON_AddStringToObject(parser, "CPP", "https://github.com/NeuroJSON/json");
+    cJSON_AddItemToObject(parser, "C", cJSON_CreateStringArray(libc, 2));
 
     /* the "NIFTIHeader" section */
     cJSON_AddItemToObject(root, "NIFTIHeader", hdr = cJSON_CreateObject());
@@ -706,13 +752,13 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     cJSON_AddNumberToObject(hdr, "TimeOffset", 0);
 
     if (cfg->outputtype >= 0) {
-        const char* typestr[] = {"MCX volumetric output: Fluence rate (W/mm^2)", "MCX volumetric output: Fluence (J/mm^2)",
-                                 "MCX volumetric output: Energy density (J/mm^3)", "MCX volumetric output: Jacobian for mua (J/mm)", "MCX volumetric output: Scattering count",
-                                 "MCX volumetric output: Partial momentum transfer"
+        const char* typestr[] = {"MMC volumetric output: Fluence rate (W/mm^2)", "MMC volumetric output: Fluence (J/mm^2)",
+                                 "MMC volumetric output: Energy density (J/mm^3)", "MMC volumetric output: Jacobian for mua (J/mm)", "MMC volumetric output: Scattering count",
+                                 "MMC volumetric output: Partial momentum transfer"
                                 };
         cJSON_AddStringToObject(hdr, "Description", typestr[(int)cfg->outputtype]);
     } else {
-        cJSON_AddStringToObject(hdr, "Description", "MCX volumetric output");
+        cJSON_AddStringToObject(hdr, "Description", "MMC volumetric output");
     }
 
     cJSON_AddStringToObject(hdr, "AuxFile", "");
@@ -3019,19 +3065,19 @@ where possible parameters include (the first item in [] is the default value)\n\
 			       by faces=faceneighbors(cfg.elem,'rowmajor');\n\
                                where 'faceneighbors' is part of Iso2Mesh.\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
- -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
+ -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
                                'hdr' (Analyze) or 'nii' (nifti, double)\n\
                                mc2 - MCX mc2 format (binary 32bit float)\n\
-                               jnii - JNIfTI format (http://openjdata.org)\n\
-                               bnii - Binary JNIfTI (http://openjdata.org)\n\
+                               jnii - JNIfTI format (https://neurojson.org)\n\
+                               bnii - Binary JNIfTI (https://neurojson.org)\n\
                                nii - NIfTI format\n\
                                hdr - Analyze 7.5 hdr/img format\n\
 	the bnii/jnii formats support compression (-Z) and generate small files\n\
 	load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:\n\
-	  MATLAB/Octave: JNIfTI toolbox   https://github.com/fangq/jnifti, \n\
+	  MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, \n\
 	  MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, \n\
 	  Python:        PyJData:         https://pypi.org/project/jdata\n\
-	  JavaScript:    JSData:          https://github.com/fangq/jsdata\n\
+	  JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata\n\
  -Z [zlib|...] (--zip)         set compression method if -F jnii or --dumpjson\n\
                                is used (when saving data to JSON/JNIfTI format)\n\
 			       0 zlib: zip format (moderate compression,fast) \n\
@@ -3042,7 +3088,7 @@ where possible parameters include (the first item in [] is the default value)\n\
 			       5 lz4: LZ4 format (low compression,extrem. fast)\n\
 			       6 lz4hc: LZ4HC format (moderate compression,fast)\n\
  --dumpjson [-,2,'file.json']  export all settings, including volume data using\n\
-                               JSON/JData (http://openjdata.org) format for \n\
+                               JSON/JData (https://neurojson.org) format for \n\
 			       easy sharing; can be reused using -f\n\
 			       if followed by nothing or '-', mcx will print\n\
 			       the JSON to the console; write to a file if file\n\

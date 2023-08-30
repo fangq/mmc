@@ -209,9 +209,10 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-cuda: sse
+cuda: ssemath
 cudamex: mex
 cudaoct: oct
+trinity: cuda
 
 all release sse ssemath prof omp mex oct mexomp octomp web debug cuda: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
@@ -298,4 +299,4 @@ pretty:
 
 .PHONY: regression clean arch makedirs dep $(SUBDIRS)
 
-.DEFAULT_GOAL := sse
+.DEFAULT_GOAL := ssemath

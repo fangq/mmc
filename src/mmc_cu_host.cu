@@ -531,11 +531,11 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
 #ifdef MCX_TARGET_NAME
         MMC_FPRINTF(
-            cfg->flog, "- variant name: [%s] compiled by nvcc [%d.%d] with CUDA [%d]\n",
-            "Fermi", __CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__, CUDART_VERSION);
+            cfg->flog, "- code name: [%s] compiled by nvcc [%d.%d] with CUDA [%d]\n",
+            "MMC-Trinity", __CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__, CUDART_VERSION);
 #else
         MMC_FPRINTF(
-            cfg->flog, "- code name: [Vanilla MCX] compiled by nvcc [%d.%d] with CUDA [%d]\n",
+            cfg->flog, "- code name: [MMC-Trinity] compiled by nvcc [%d.%d] with CUDA [%d]\n",
             __CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__, CUDART_VERSION);
 #endif
         MMC_FPRINTF(cfg->flog, "- compiled with: [RNG] %s [Seed Length] %d\n",

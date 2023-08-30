@@ -7,7 +7,7 @@ Mesh-based Monte Carlo (MMC) - SSE4 and OpenCL
 -   Version: 2.0.0 (v2023, Moon Cake)
 -   URL: <http://mcx.space/mmc>
 
-[![Build Status](https://travis-ci.com/fangq/mmc.svg?branch=master)](https://travis-ci.com/fangq/mmc)
+![Mex and Binaries](https://github.com/fangq/mcxcl/actions/workflows/build_all.yml/badge.svg)\
 
 Table of Content:
 
@@ -41,7 +41,7 @@ iMMC algorithm, developed by Yaoshen Yuan, are described in his recent paper
 [Yuan2021]. Briefly, iMMC permits one to associate cylindrical inclusions, 
 spherical inclusions, and thin-membrane with the edges, vertices and faces, 
 respectively, in a tetrahedral mesh. Currently, this feature is only supported
-on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`). 
+on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`).
 
 In 2020, we have also merged the `mmc-trinity` branch to the main code tree.
 The "trinity" version of MMC simultaneously supports CPU/SSE4, OpenCL and CUDA
@@ -54,12 +54,14 @@ Github commit history: <https://github.com/fangq/mmc/commits/master>
 
 To highlight a few most important updates:
 
--   Support iMMC (edge-, node- and face-based implicit structures), CPU only (by Yaoshen Yuan)
+-   Support iMMC (edge-, node- and face-based implicit structures), **CPU only** (by Yaoshen Yuan)
 -   Added MMCLAB examples for iMMC, including a large dense vessel network (by Yaoshen Yuan)
--   Added C++Builder (Community Edition) project file for compilation on Windows
--   Added Windows GNU Octave mex file for MMCLAB
+-   About 30%-40% faster OpenCL based simulations on NVIDIA GPUs using PTX-based atomic operations
+-   Provide mmc-trinity binaries with simultaneous SSE/OpenCL/CUDA backend support
+-   Added GNU Octave mex file for MMCLAB on Linux/MacOS/Windows
 -   Photon-sharing is now supported in the GPU code (by Shijie Yan)
 -   Several critical bug fixes (by Shijie Yan) 
+-   Github Action based continuous integration (CI) system for automated building/packaging/testing
 
 Please file bug reports to <https://github.com/fangq/mmc/issues>
 
@@ -123,7 +125,7 @@ Plücker coordinates,” Biomed. Opt. Express 1, 165-175 (2010) URL:
 While the original MMC paper was based on the Plücker coordinates, a number of 
 more efficient SIMD-based ray-tracers, namely, Havel SSE4 ray-tracer, Badouel 
 SSE ray-tracer and branchless-Badouel SSE ray-tracer (fastest) have been added 
-since 2011. These methods can be selected by the -M flag. The details of these 
+since 2011. These methods can be selected by the `-M` flag. The details of these 
 methods can be found in the below paper
 
 > Qianqian Fang and David R. Kaeli, “Accelerating mesh-based Monte Carlo method 
@@ -198,34 +200,32 @@ For Mac OS X users, you need to install the mp-gcc4.x or newer gcc from
 MacPorts or Homebrew and use the instructions below to compile the 
 MMC source code.
 
-To compile the program, you should first navigate into the mmc/src folder, and 
+To compile the program, you should first navigate into the `mmc/src` folder, and 
 type
 
       make
 
 this will create a fully optimized OpenCL based mmc executable, located under 
-the mmc/src/bin/ folder.
+the `mmc/bin/` folder. The binary also supports SSE4 on the CPU.
 
 Other compilation options include
 
-      make ssemath  # this uses SSE4 for both vector operations and math functions
+      make ssemath  # this is the same as make, building mmc binary with SSE4+OpenMP+OpenCL
+      make cuda     # this compiles the "Trinity" version of mmc, supports SSE4+OpenMP+OpenCL+CUDA
       make omp      # this compiles a multi-threaded binary using OpenMP
       make release  # create a single-threaded optimized binary
       make prof     # this makes a binary to produce profiling info for gprof
       make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
 
-if you want to generate a portable binary that does not require external 
-library files, you may use (only works for Linux and Windows with gcc)
-
-      make EXTRALIB="-static -lm" # similar to "make", except the binary includes all libraries
-
 if you wish to build the mmc mex file to be used in matlab, you should run
 
       make mex      # this produces mmc.mex* under mmc/mmclab/ folder
+      make cudamex  # this produces a "Trinity" version of mmc.mex* that supports SSE+OpenCL+CUDA
 
 similarly, if you wish to build the mex file for GNU Octave, you should run
 
       make oct      # this produces mmc.mex* under mmc/mmclab/ folder
+      make cudaoct  # this produces a "Trinity" version of mmc.mex* that supports SSE+OpenCL+CUDA
 
 If you append `-f makefile_sfmt` at the end of any of the above make 
 commands, you will get an executable named `mmc_sfmt`, which uses a fast 
@@ -241,20 +241,21 @@ simply append `CC=compiler_exe` to the above make commands. If you see any
 error messages, please google and fix your compiler settings or install the 
 missing libraries.
 
-A special note for Mac OS users: you need to install `mp-gcc4{4,5,6}` from 
-MacPorts in order to compile MMC. The default gcc (4.2) installed by Xcode 3.x 
-does not support thread-local storage. Once downloaded and installed MacPorts 
-from www.macports.org, you can install gcc by
+A special note for Mac OS users: you can you use both gcc (installed by MacPorts
+or brew) or the default clang gcc provided by the default Xcode compiler to build
+mmc. MMC requires OpenMP for multi-threading based parallel computing. If one uses
+the clang compiler, one must first install `libomp` package in order to compile mmc.
 
-      sudo port install mp-gcc44
+      brew install libomp
+      brew link --force libomp
 
-Then add `/opt/local/bin` to your `$PATH` variable. A example compilation command 
-for MMC looks like
+One can switch to other compilers by setting the `CC`, `CXX` and `AR` environment
+variables, for example
 
-      make ssemath CC=gcc-mp-4.4
+      make CC=gcc-mp-10 CXX=g++-mp-10 AR=g++-mp-10
 
 After compilation, you may add the path to the `mmc` binary (typically, 
-`mmc/src/bin`) to your search path. To do so, you should modify your `$PATH` 
+`mmc/bin`) to your search path. To do so, you should modify your `$PATH` 
 environment variable. Detailed instructions can be found at [5].
 
 You can also compile MMC using Intel's C++ compiler - `icc`. To do this, you run
@@ -295,15 +296,19 @@ The full command line options of MMC include the following:
 ```
 ###############################################################################
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
-#          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          #
-#                            http://mcx.space/#mmc                            #
+#          Copyright (c) 2010-2023 Qianqian Fang <q.fang at neu.edu>          #
+#              https://mcx.space/#mmc  &  https://neurojson.org/              #
 #                                                                             #
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #
-#                                                                             #
-#                Research funded by NIH/NIGMS grant R01-GM114365              #
 ###############################################################################
-$Rev::646b41$ v2020 $Date::2020-08-15 22:22:09 -07$ by $Author::Qianqian Fang $
+#    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #
+###############################################################################
+#  Open-source codes and reusable scientific data are essential for research, #
+# MCX proudly developed human-readable JSON-based data formats for easy reuse,#
+#  Please consider using JSON (https://neurojson.org/) for your research data #
+###############################################################################
+$Rev::77411c$ v2023  $Date::2022-10-01 17:34:27 -04$ by $Author::Qianqian Fang$
 ###############################################################################
 
 usage: mmc <param1> <param2> ...
@@ -337,6 +342,8 @@ where possible parameters include (the first item in [] is the default value)
 
 == GPU options ==
  -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable
+ -c [opencl,sse,cuda](--compute) select compute backend (default to opencl)
+                               can also use 0: sse, 1: opencl, 2: cuda
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto
       or
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)
@@ -345,7 +352,7 @@ where possible parameters include (the first item in [] is the default value)
 
 == Output options ==
  -s sessionid  (--session)     a string used to tag all output file names
- -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy deposit
+ -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy density
                                J - Jacobian, L - weighted path length, P -
                                weighted scattering count (J,L,P: replay mode)
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
@@ -364,8 +371,36 @@ where possible parameters include (the first item in [] is the default value)
 			       by faces=faceneighbors(cfg.elem,'rowmajor');
                                where 'faceneighbors' is part of Iso2Mesh.
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
- -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) 
+ -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double) 
                                'hdr' (Analyze) or 'nii' (nifti, double)
+                               mc2 - MCX mc2 format (binary 32bit float)
+                               jnii - JNIfTI format (https://neurojson.org)
+                               bnii - Binary JNIfTI (https://neurojson.org)
+                               nii - NIfTI format
+                               hdr - Analyze 7.5 hdr/img format
+	the bnii/jnii formats support compression (-Z) and generate small files
+	load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:
+	  MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, 
+	  MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, 
+	  Python:        PyJData:         https://pypi.org/project/jdata
+	  JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata
+ -Z [zlib|...] (--zip)         set compression method if -F jnii or --dumpjson
+                               is used (when saving data to JSON/JNIfTI format)
+			       0 zlib: zip format (moderate compression,fast) 
+			       1 gzip: gzip format (compatible with *.gz)
+			       2 base64: base64 encoding with no compression
+			       3 lzip: lzip format (high compression,very slow)
+			       4 lzma: lzma format (high compression,very slow)
+			       5 lz4: LZ4 format (low compression,extrem. fast)
+			       6 lz4hc: LZ4HC format (moderate compression,fast)
+ --dumpjson [-,2,'file.json']  export all settings, including volume data using
+                               JSON/JData (https://neurojson.org) format for 
+			       easy sharing; can be reused using -f
+			       if followed by nothing or '-', mcx will print
+			       the JSON to the console; write to a file if file
+			       name is specified; by default, prints settings
+			       after pre-processing; '--dumpjson 2' prints 
+			       raw inputs before pre-processing
 
 == User IO options ==
  -h            (--help)        print this message
@@ -443,7 +478,7 @@ To run a simulation, you should execute the `run_test.sh` bash script in
 this folder. If you want to run mmc directly from the command line, you can do 
 so by typing
 
-`../../src/bin/mmc -n 20 -f onecube.inp -s onecube `
+`../../bin/mmc -n 20 -f onecube.inp -s onecube `
 
 where `-n` specifies the total photon number to be simulated, `-f` specifies the 
 input file, and `-s` gives the output file name. To see all the supported 
@@ -544,7 +579,7 @@ To invoke the JSON-formatted input file in your simulations, you can use the
 `-f` command line option with MMC, just like using an `.inp` file. For 
 example:
 
-      ../../src/bin/mmc -n 20 -f onecube.json -s onecubejson -D M
+      ../../bin/mmc -n 20 -f onecube.json -s onecubejson -D M
 
 The input file must have a `.json` suffix in order for MMC to recognize. If 
 the input information is set in both command line, and input file, the command 
@@ -646,7 +681,7 @@ Known issues and TODOs
 -------------------------
 
 -   MMC only supports linear tetrahedral elements at this point. 
- Quadratic elements will be added later`
+ Quadratic elements will be added later
 -   Currently, this code only supports element-based optical properties; 
  nodal-based optical properties (for continuously varying media) will be
  added in a future release
@@ -688,6 +723,39 @@ Acknowledgement
 ------------------
 
 MMC uses the following open-source libraries:
+
+
+### ZMat data compression unit
+
+- Files: src/zmat/*
+- Copyright: 2019-2020 Qianqian Fang
+- URL: https://github.com/fangq/zmat
+- License: GPL version 3 or later, https://github.com/fangq/zmat/blob/master/LICENSE.txt
+
+### LZ4 data compression library
+
+- Files: src/zmat/lz4/*
+- Copyright: 2011-2020, Yann Collet
+- URL: https://github.com/lz4/lz4
+- License: BSD-2-clause, https://github.com/lz4/lz4/blob/dev/lib/LICENSE
+
+### LZMA/Easylzma data compression library
+
+- Files: src/zmat/easylzma/*
+- Copyright: 2009, Lloyd Hilaiel, 2008, Igor Pavlov
+- License: public-domain
+- Comment:
+ All the cruft you find here is public domain.  You don't have to
+ credit anyone to use this code, but my personal request is that you mention
+ Igor Pavlov for his hard, high quality work.
+
+### LZ4 data compression library
+
+- Files: src/zmat/miniz/*
+- Copyright 2013-2014 RAD Game Tools and Valve Software
+- Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+- URL: https://github.com/richgel999/miniz
+- License: MIT-license, https://github.com/richgel999/miniz/blob/master/LICENSE
 
 ### SSE Math library by Julien Pommier
 
