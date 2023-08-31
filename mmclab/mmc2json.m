@@ -101,13 +101,29 @@ Session=copycfg(cfg,'issaveexit',Session,'DoSaveExit');
 Session=copycfg(cfg,'issaveseed',Session,'DoSaveSeed');
 Session=copycfg(cfg,'isnormalize',Session,'DoNormalize');
 Session=copycfg(cfg,'ismomentum',Session,'DoDCS');
-Session=copycfg(cfg,'DoSpecular',Session,'DoSpecular');
+Session=copycfg(cfg,'isspecular',Session,'DoSpecular');
 Session=copycfg(cfg,'outputformat',Session,'OutputFormat');
-Session=copycfg(cfg,'outputtype',Session,'OutputType');
 Session=copycfg(cfg,'debuglevel',Session,'DebugFlag');
 Session=copycfg(cfg,'autopilot',Session,'DoAutoThread');
 Session=copycfg(cfg,'basisorder',Session,'BasisOrder');
-Session=copycfg(cfg,'method',Session,'RayTracer');
+
+if(isfield(cfg,'method'))
+    methodmap=struct('plucker', 'p', 'havel', 'h', 'badouel', 'b', 'elem', 's', 'grid', 'g');
+    if(isfield(methodmap, cfg.method))
+        Session.RayTracer=methodmap.(cfg.method);
+    else
+        error('cfg.method is invalid')
+    end
+end
+
+if(isfield(cfg,'outputtype'))
+    outputtypemap=struct('flux', 'x', 'fluence', 'f', 'energy', 'e', 'jacobian', 'j', 'wl', 'l', 'wp', 'p');
+    if(isfield(outputtypemap, cfg.outputtype))
+        Session.OutputType=outputtypemap.(cfg.outputtype);
+    else
+        error('cfg.outputtype is invalid')
+    end
+end
 
 if(isfield(cfg,'seed') && numel(cfg.seed)==1)
     Session.RNGSeed=cfg.seed;
