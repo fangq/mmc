@@ -56,7 +56,7 @@ ISCLANG = $(shell $(CC) --version | grep clang)
 
 MEXLINKOPT +=$(OPENMPLIB)
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' LINKLIBS="$(MEXLINKLIBS) $(MEXLINKOPT)" COMPFLAGS='' DEFINES='' CXXLIBS='$$CXXLIBS $(MEXLINKOPT) $(LIBOPENCL) $(LIBCUDART)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' $(FASTMATH) -cxx -outdir $(BINDIR)
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' LINKLIBS="$(MEXLINKLIBS) $(MEXLINKOPT)" COMPFLAGS='' DEFINES='' CXXLIBS='$$CXXLIBS $(MEXLINKOPT) $(LIBOPENCL) $(LIBCUDART)' CXXFLAGS='$$CXXFLAGS $(CCFLAGS) $(USERCCFLAGS)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile -v
 
 DLLFLAG=-fPIC
@@ -146,6 +146,10 @@ endif
 ifeq ($(CC),clang)
         OPENMP   := -Xpreprocessor -fopenmp
         OPENMPLIB:= -lomp
+endif
+
+ifneq (,$(filter mex,$(MAKECMDGOALS)))
+        CCFLAGS+=-DMATLAB_MEX_FILE
 endif
 
 ARFLAGS    := 
