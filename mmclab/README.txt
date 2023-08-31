@@ -130,6 +130,7 @@ the verbose command line options in MMC.
  
  == Source-detector parameters ==
        cfg.detpos:      an N by 4 array, each row specifying a detector: [x,y,z,radius]
+       cfg.maxdetphoton:   maximum number of photons saved by the detectors [1000000]
        cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
                        'pencil' - default, pencil beam, no param needed
                        'isotropic' - isotropic source, no param needed
