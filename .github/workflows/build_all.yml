@@ -26,7 +26,11 @@ jobs:
           submodules: 'recursive'
       - name: Install dependencies (Linux only)
         if: ${{ runner.os == 'Linux' }}
-        run: sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
+        run: |
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
+          sudo apt-get install gcc-7
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
       - name: Install dependencies (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
