@@ -29,8 +29,8 @@ jobs:
         run: |
           sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
           sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7
-          [ -f /usr/bin/gcc-7 ] && sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
-          [ -f /usr/bin/g++-7 ] && sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
       - name: Install dependencies (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
@@ -71,7 +71,9 @@ jobs:
           gcc -v
           mkoctfile --version
           if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 9
             make oct MEXLINKOPT="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lm -lpthread -Wl,-Bdynamic"
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
             ldd ../mmclab/mmc.mex
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             make oct CC=gcc-11 CXX=g++-11 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
