@@ -63,7 +63,7 @@
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
-#define ID_UNDEFINED  0xFFFFFFFF
+#define ID_UNDEFINED  0x7FFFFFFF
 
 #define R_RAND_MAX (1.f/RAND_MAX)
 #define TWO_PI     (M_PI*2.0)

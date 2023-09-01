@@ -244,7 +244,7 @@ inline __device__ __host__ float4 convert_float4_rte(float4 v) {
 #define NO_LAUNCH          9999                    //when fail to launch, for debug
 
 #ifndef __NVCC__
-    #define ID_UNDEFINED       0xFFFFFFFFU              /**< flag indicating the index is outside of the volume */
+    #define ID_UNDEFINED       0x7FFFFFFFU              /**< flag indicating the index is outside of the volume */
     #define TWO_PI             6.28318530717959f       //2*pi
     #define EPS                FLT_EPSILON             //round-off limit
     #define VERY_BIG           (1.f/FLT_EPSILON)       //a big number
