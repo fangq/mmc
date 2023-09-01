@@ -977,9 +977,11 @@ __device__ float mc_next_scatter(float g, float3* dir, __private RandType* ran, 
         pmom[0] += (1.f - ctheta);
     }
 
-    dir->x = p.x;
-    dir->y = p.y;
-    dir->z = p.z;
+    tmp0 = MCX_MATHFUN(rsqrt)(p.x * p.x + p.y * p.y + p.z * p.z);
+
+    dir->x = p.x * tmp0;
+    dir->y = p.y * tmp0;
+    dir->z = p.z * tmp0;
     return nextslen;
 }
 
@@ -1072,14 +1074,10 @@ __device__ void launchphoton(__constant MCXParam* gcfg, ray* r, __global float3*
 #endif
         float rx = rand_uniform01(ran);
         float ry = rand_uniform01(ran);
-        float4 v2 = gcfg->srcparam1;
-        v2.w *= MCX_MATHFUN(rsqrt)(gcfg->srcparam1.x * gcfg->srcparam1.x + gcfg->srcparam1.y * gcfg->srcparam1.y + gcfg->srcparam1.z * gcfg->srcparam1.z);
-        v2.x = v2.w * (gcfg->srcdir.y * gcfg->srcparam1.z - gcfg->srcdir.z * gcfg->srcparam1.y);
-        v2.y = v2.w * (gcfg->srcdir.z * gcfg->srcparam1.x - gcfg->srcdir.x * gcfg->srcparam1.z);
-        v2.z = v2.w * (gcfg->srcdir.x * gcfg->srcparam1.y - gcfg->srcdir.y * gcfg->srcparam1.x);
-        r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x + ry * v2.x;
-        r->p0.y = gcfg->srcpos.y + rx * gcfg->srcparam1.y + ry * v2.y;
-        r->p0.z = gcfg->srcpos.z + rx * gcfg->srcparam1.z + ry * v2.z;
+        ry *= gcfg->srcparam1.w * MCX_MATHFUN(rsqrt)(gcfg->srcparam1.x * gcfg->srcparam1.x + gcfg->srcparam1.y * gcfg->srcparam1.y + gcfg->srcparam1.z * gcfg->srcparam1.z);
+        r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x + ry * (gcfg->srcdir.y * gcfg->srcparam1.z - gcfg->srcdir.z * gcfg->srcparam1.y);
+        r->p0.y = gcfg->srcpos.y + rx * gcfg->srcparam1.y + ry * (gcfg->srcdir.z * gcfg->srcparam1.x - gcfg->srcdir.x * gcfg->srcparam1.z);
+        r->p0.z = gcfg->srcpos.z + rx * gcfg->srcparam1.z + ry * (gcfg->srcdir.x * gcfg->srcparam1.y - gcfg->srcdir.y * gcfg->srcparam1.x);
 #if defined(__NVCC__) || defined(MCX_SRC_FOURIERX2D)
 #ifdef __NVCC__
 
