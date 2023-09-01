@@ -1,6 +1,6 @@
 Change Log
 
-== MMC 2.0.0 (v2023, Moon Cake), Qianqian Fang <q.fang at neu.edu> ==
+== MMC 2.0.0 (v2023, Mochi), Qianqian Fang <q.fang at neu.edu> ==
 
  2023-03-04 [465ef20] implement github ci
  2023-01-03 [3ddff2b] force flushing in terminal and matlab

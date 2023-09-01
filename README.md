@@ -4,10 +4,10 @@ Mesh-based Monte Carlo (MMC) - SSE4 and OpenCL
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
 -   License: GNU General Public License version 3 (GPL v3), see License.txt
--   Version: 2.0.0 (v2023, Moon Cake)
+-   Version: 2.0.0 (v2023, Mochi)
 -   URL: <http://mcx.space/mmc>
 
-![Mex and Binaries](https://github.com/fangq/mcxcl/actions/workflows/build_all.yml/badge.svg)\
+![Mex and Binaries](https://github.com/fangq/mcxcl/actions/workflows/build_all.yml/badge.svg)
 
 Table of Content:
 
