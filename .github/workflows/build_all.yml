@@ -27,9 +27,10 @@ jobs:
       - name: Install dependencies (Linux only)
         if: ${{ runner.os == 'Linux' }}
         run: |
-          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev
-          ls  /usr/bin/gcc*
-          ls  /usr/bin/g++*
+          sudo echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe" >> /etc/apt/sources.list
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7
+          [ -f /usr/bin/gcc-7 ] && sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
+          [ -f /usr/bin/g++-7 ] && sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
       - name: Install dependencies (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
