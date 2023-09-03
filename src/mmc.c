@@ -57,24 +57,24 @@ int main(int argc, char** argv) {
     raytracer tracer;      /** tracer: structure to store  */
 
     /**
-       To start an MMC simulation, we first create a simulation configuration,
-    initialize all elements to its default settings, and then set user-specified
-    settings via command line or input files.
+     * To start an MMC simulation, we first create a simulation configuration,
+     * initialize all elements to its default settings, and then set user-specified
+     * settings via command line or input files.
      */
     mmc_init_from_cmd(&cfg, &mesh, &tracer, argc, argv);
 
     /**
-           In the second step, we pre-compute all needed mesh and ray-tracing data
-       and get ready for launching photon simulations.
-        */
+     * In the second step, we pre-compute all needed mesh and ray-tracing data
+     * and get ready for launching photon simulations.
+     */
     if (cfg.isgpuinfo == 0) {
         mmc_prep(&cfg, &mesh, &tracer);
     }
 
     /**
-           The core simulation loop is executed in the mmc_run_mp() function where
-       multiple threads are executed to simulate all photons.
-         */
+     * The core simulation loop is executed in the mmc_run_mp() function where
+     * multiple threads are executed to simulate all photons.
+     */
     if (cfg.compute == cbSSE || cfg.gpuid > MAX_DEVICE) {
         mmc_run_mp(&cfg, &mesh, &tracer, mcx_progressbar, &cfg);
     }
@@ -93,9 +93,9 @@ int main(int argc, char** argv) {
 #endif
 
     /**
-           Once all photon simulations are complete, we clean up all allocated memory
-       and finish the execution.
-         */
+     * Once all photon simulations are complete, we clean up all allocated memory
+     * and finish the execution.
+     */
     mmc_cleanup(&cfg, &mesh, &tracer);
 
     return 0;

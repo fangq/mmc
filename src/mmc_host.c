@@ -135,7 +135,7 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 }
 
 /**
- * \brief Main function to launch MMC photon simulation
+ * \brief Main function to launch CPU based MMC photon simulation
  *
  * This is the main loop of the Monte Carlo photon simulation. This function
  * run a complete photon simulation session based on one set of user input.
@@ -143,6 +143,8 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
  * \param[out] cfg: the simulation configuration structure
  * \param[out] mesh: the mesh data structure
  * \param[out] tracer: the ray-tracer data structure
+ * \param[in] progressfun: function pointer to progress-bar update function
+ * \param[in] handle: progress-bar update function handle parameter
  */
 
 int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
