@@ -345,7 +345,7 @@ where possible parameters include (the first item in [] is the default value)
  -c [opencl,sse,cuda](--compute) select compute backend (default to opencl)
                                can also use 0: sse, 1: opencl, 2: cuda
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto
-      or
+      or                       if set to -1, CPU-based SSE mmc will be used
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)
  -W '50,30,20' (--workload)    workload for active devices; normalized by sum
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones
@@ -508,32 +508,32 @@ same file, `onecube.json`, is also shown below:
 
     {
         "Domain": {
-        "MeshID": "onecube",
-        "InitElem": 3
+            "MeshID": "onecube",
+            "InitElem": 3
         },
         "Session": {
-        "Photons":  100,
-        "Seed":     17182818,
-        "ID":       "onecube"
+            "Photons":  100,
+            "Seed":     17182818,
+            "ID":       "onecube"
         },
         "Forward": {
-        "T0": 0.0e+00,
-        "T1": 5.0e-09,
-        "Dt": 5.0e-10
+            "T0": 0.0e+00,
+            "T1": 5.0e-09,
+            "Dt": 5.0e-10
         },
         "Optode": {
-        "Source": {
+            "Source": {
                 "Type": "pencil",
-            "Pos": [2.0, 8.0, 0.0],
-            "Dir": [0.0, 0.0, 1.0],
+                "Pos": [2.0, 8.0, 0.0],
+                "Dir": [0.0, 0.0, 1.0],
                 "Param1": [0.0, 0.0, 0.0, 0.0],
                 "Param2": [0.0, 0.0, 0.0, 0.0]
-        },
-        "Detector": [
-            {
-            "Pos": [2.0, 6.0, 0.0],
-            "R": 1.0
             },
+            "Detector": [
+                {
+                    "Pos": [2.0, 6.0, 0.0],
+                    "R": 1.0
+                },
                 {
                     "Pos": [2.0, 4.0, 0.0],
                     "R": 1.0
@@ -542,7 +542,7 @@ same file, `onecube.json`, is also shown below:
                     "Pos": [2.0, 2.0, 0.0],
                     "R": 1.0
                 }
-        ]
+            ]
         }
     }
 
@@ -646,7 +646,7 @@ To read the mesh files (tetrahedral elements and nodes) into matlab, one can
 use `readmmcnode` and `readmmcelem` function under the mmc/matlab directory. 
 Plotting non-structural meshes in matlab is possible with interpolation 
 functions such as griddata3. However, it is very time-consuming for large 
-meshes. In iso2mesh, a fast mesh slicing & plotting function, qmeshcut, is very 
+meshes. In iso2mesh, a fast mesh slicing & plotting function, `qmeshcut`, is very 
 efficient in making 3D plots of mesh or cross-sections. More details can be 
 found at this webpage [7], or `help qmeshcut` in matlab. Another useful 
 function is plotmesh in iso2mesh toolbox. It has very flexible syntax to allow 

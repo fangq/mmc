@@ -3039,7 +3039,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -c [opencl,sse,cuda](--compute) select compute backend (default to opencl)\n\
                                can also use 0: sse, 1: opencl, 2: cuda\n\
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto\n\
-      or\n\
+      or                       if set to -1, CPU-based SSE mmc will be used\n\
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\
  -W '50,30,20' (--workload)    workload for active devices; normalized by sum\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
