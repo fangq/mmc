@@ -80,6 +80,28 @@ const int facemap[] = {2, 0, 1, 3};
 const int ifacemap[] = {1, 2, 0, 3};
 
 /**
+ * \brief Index mapping from the i-th face-neighbors (facenb) to the face defined in nc[][]
+ *
+ * facenb[i] <-> nc[faceorder[i]]
+ * the 1st tet neighbor shares the 2nd face of this tet, i.e. nc[1]={3,1,2}
+ * the 2nd tet neighbor shares the 4th face of this tet, i.e. nc[3]={1,0,2}
+ * etc.
+ */
+
+const int faceorder[] = {1, 3, 2, 0, -1};
+
+/**
+ * \brief Index mapping from the i-th face defined in nc[][] to the face-neighbor (facenb) face orders
+ *
+ * nc[ifaceorder[i]] <-> facenb[i]
+ * nc[0], made of nodes {3,0,1}, is the face connecting to the 4th neighbor (facenb[3]),
+ * nc[1], made of nodes {3,1,2}, is the face connecting to the 1st neighbor (facenb[0]),
+ * etc.
+ */
+
+const int ifaceorder[] = {3, 0, 2, 1};
+
+/**
  * @brief Initializing the mesh data structure with default values
  *
  * Constructor of the mesh object, initializing all field to default values
@@ -170,7 +192,7 @@ void mesh_error(const char* msg, const char* file, const int linenum) {
  * @param[in] cfg: the simulation configuration structure
  */
 
-void mesh_filenames(const char format[64], char* foutput, mcconfig* cfg) {
+void mesh_filenames(const char* format, char* foutput, mcconfig* cfg) {
     char filename[MAX_PATH_LENGTH];
     sprintf(filename, format, cfg->meshtag);
 
@@ -750,6 +772,45 @@ void mesh_clear(tetmesh* mesh) {
     }
 }
 
+/**
+ * @brief Compute the effective reflection coefficient Reff
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ * @param[in] pmesh: the mesh object
+ * @param[in] methodid: the ray-tracing algorithm to be used
+ */
+
+float mesh_getreff(double n_in, double n_out) {
+    double oc = asin(1.0 / n_in); // critical angle
+    const double count = 1000.0;
+    const double ostep = (M_PI / (2.0 * count));
+    double r_phi = 0.0, r_j = 0.0;
+    double o, cosop, coso, r_fres, tmp;
+
+    for (int i = 0; i < count; i++) {
+        o = i * ostep;
+        coso = cos(o);
+
+        if (o < oc) {
+            cosop = n_in * sin(o);
+            cosop = sqrt(1. - cosop * cosop);
+            tmp = (n_in * cosop - n_out * coso) / (n_in * cosop + n_out * coso);
+            r_fres = 0.5 * tmp * tmp;
+            tmp = (n_in * coso - n_out * cosop) / (n_in * coso + n_out * cosop);
+            r_fres += 0.5 * tmp * tmp;
+        } else {
+            r_fres = 1.f;
+        }
+
+        r_phi += 2.0 * sin(o) * coso * r_fres;
+        r_j += 3.0 * sin(o) * coso * coso * r_fres;
+    }
+
+    r_phi *= ostep;
+    r_j *= ostep;
+    return (r_phi + r_j) / (2.0 - r_phi + r_j);
+}
+
 
 /**
  * @brief Initialize a data structure storing all pre-computed ray-tracing related data
@@ -828,6 +889,49 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
 
         for (i = 0; i < 4; i++) {
             bary[i] /= s;
+        }
+    }
+
+    // TODO: this is a partial fix to the normalization bug described in https://github.com/fangq/mmc/issues/82
+    // basically, mmc surface node fluence is about 2x higher than expected, due to the division to the nodal-volume
+    // of surface nodes that is roughtly half of that in an interior node.
+    // To more carefully handle this, one should calculate the solid-angle S of any surface nodes and use the
+    // ratio (4*Pi/S) to scale nvol. Here, we simply multiply surface node nvol by 2x. Should work fine for
+    // flat surfaces, but will not be accurate for edge or corner nodes.
+    // one can disable this fix (i.e. restore to the old behavior) by setting cfg.isnormalized to 2
+
+    if (cfg->isnormalized == 1 && cfg->method != rtBLBadouelGrid && cfg->basisorder) {
+        float Reff = -1.f;
+
+        for (i = 0; i < ne; i++) {
+            int* elems = tracer->mesh->elem + i * tracer->mesh->elemlen;   // element node indices
+            int* enb = tracer->mesh->facenb + i * tracer->mesh->elemlen;   // check facenb, find surface faces
+
+            for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
+                if (enb[j] == 0) {                        // 0-valued face neighbor indicates an exterior triangle
+                    if (Reff < 0.f) {
+                        if (cfg->isreflect) {
+                            Reff = mesh_getreff(tracer->mesh->med[tracer->mesh->type[i]].n, tracer->mesh->med[0].n);
+                        } else {
+                            Reff = 0.f;
+                        }
+                    }
+
+                    for (int k = 0; k < 3; k++) {
+                        int nid = elems[out[ifaceorder[j]][k]] - 1;
+
+                        if (tracer->mesh->nvol[nid] > 0.f) {  // change sign to prevent it from changing again
+                            tracer->mesh->nvol[nid] *= -(2.f / (1.0 + Reff)); // 2 accounts for the missing half of the solid angle, Reff is the effective reflection coeff
+                        }
+                    }
+                }
+            }
+        }
+
+        for (i = 0; i < tracer->mesh->nn; i++) {
+            if (tracer->mesh->nvol[i] < 0.f) {
+                tracer->mesh->nvol[i] = -tracer->mesh->nvol[i];
+            }
         }
     }
 

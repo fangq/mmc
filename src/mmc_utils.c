@@ -795,13 +795,13 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
 
     sprintf(fname, "%s.jnii", name);
 
-    fp = fopen(fname, "wt");
+    fp = fopen(fname, "wb");
 
     if (fp == NULL) {
         MMC_ERROR(-1, "error opening file to write");
     }
 
-    fprintf(fp, "%s\n", jsonstr);
+    fwrite(jsonstr, strlen(jsonstr), 1, fp);
     fclose(fp);
 
     if (jsonstr) {

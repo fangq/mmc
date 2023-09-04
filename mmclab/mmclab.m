@@ -403,8 +403,10 @@ if(nargout>=3)
 end
 
 if(useopencl==1)
-    if(isfield(cfg,'gpuid') && ~ischar(cfg.gpuid) && cfg.gpuid<-1)
-	    cfg.gpuid=1;
+    for i=1:length(cfg)
+        if(isfield(cfg(i),'gpuid') && ~ischar(cfg(i).gpuid) && cfg(i).gpuid<-1)
+	    cfg(i).gpuid=1;
+        end
     end
     [varargout{1:mmcout}]=mmc(cfg);
 elseif(length(varargin)<2)

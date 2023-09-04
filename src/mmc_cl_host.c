@@ -100,7 +100,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     cl_uint*   Pseed = NULL;
     float*     Pdet = NULL;
     RandType*  Pphotonseed = NULL;
-    char opt[MAX_PATH_LENGTH] = {'\0'};
+    char opt[MAX_PATH_LENGTH + 1] = {'\0'};
     cl_uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop + (cfg->issaveexit > 0) * 6 + 1;
     cl_uint hostdetreclen = detreclen + 1;
     GPUInfo* gpu = NULL;
