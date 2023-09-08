@@ -45,6 +45,7 @@ set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(RESOURCE_COMPILER xxd)
 set(RESOURCE_INPUT "mmc_core.cl")
@@ -120,26 +121,33 @@ add_dependencies(mmc clheader)
 add_dependencies(mmc-exe clheader)
 
 if(BUILD_CUDA)
+    # Create mmc library
+    cuda_add_library(mmc-cuda STATIC
+        mmc_cu_host.cu
+        mmc_cu_host.h
+        mmc_utils.c
+        mmc_utils.h
+        )
+
   # Create mmc-trinity binary
   cuda_add_executable(
       mmc-trinity
-      mmc_cu_host.cu
-      mmc_cu_host.h
       mmc.c
       )
   # Link options
   target_link_libraries(
       mmc-trinity
-      mmc OpenMP::OpenMP_CXX
+      mmc mmc-cuda OpenMP::OpenMP_CXX
       zmat
       m
       OpenCL::OpenCL
       )
 
-  add_dependencies(mmc-trinity mmc)
+  target_compile_definitions(mmc-trinity PUBLIC USE_CUDA)
+  add_dependencies(mmc-trinity mmc mmc-cuda)
 
   set_target_properties(mmc-trinity
-        PROPERTIES OUTPUT_NAME mmc-trinity)
+        PROPERTIES OUTPUT_NAME mmciii)
 endif()
 
 # Build mex file
@@ -176,21 +184,45 @@ if(BUILD_MEX AND Matlab_FOUND)
             matlab_add_mex(
               NAME mmclab
               SRC mmclab.cpp
-              LINK_TO mmc-matlab OpenCL::OpenCL
+              LINK_TO zmat mmc-matlab OpenCL::OpenCL
             )
     else()
             matlab_add_mex(
               NAME mmclab
               SRC mmclab.cpp
               NO_IMPLICIT_LINK_TO_MATLAB_LIBRARIES
-              LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} mmc-matlab OpenCL::OpenCL
+              LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} zmat mmc-matlab OpenCL::OpenCL
             )
     endif()
 
     target_compile_definitions(mmclab PUBLIC MCX_CONTAINER MATLAB_MEX_FILE)
 
     set_target_properties(mmclab
-            PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmc)
+            PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmciii)
     add_dependencies(mmclab clheader)
+
+    if(BUILD_CUDA)
+        if(${CMAKE_VERSION} VERSION_LESS "3.24.0")
+                matlab_add_mex(
+                  NAME mmclab-trinity
+                  SRC mmclab.cpp
+                  LINK_TO zmat mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL
+                )
+        else()
+                matlab_add_mex(
+                  NAME mmclab-trinity
+                  SRC mmclab.cpp
+                  NO_IMPLICIT_LINK_TO_MATLAB_LIBRARIES
+                  LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} zmat mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL
+                )
+        endif()
+
+        target_compile_definitions(mmclab-trinity PUBLIC MCX_CONTAINER MATLAB_MEX_FILE USE_CUDA)
+
+        set_target_properties(mmclab-trinity
+                PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmc-trinity)
+        add_dependencies(mmclab-trinity clheader)
+    endif()
+
 
 endif()
