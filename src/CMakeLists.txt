@@ -184,21 +184,21 @@ if(BUILD_MEX AND Matlab_FOUND)
             matlab_add_mex(
               NAME mmclab
               SRC mmclab.cpp
-              LINK_TO zmat mmc-matlab OpenCL::OpenCL
+              LINK_TO mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
             )
     else()
             matlab_add_mex(
               NAME mmclab
               SRC mmclab.cpp
               NO_IMPLICIT_LINK_TO_MATLAB_LIBRARIES
-              LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} zmat mmc-matlab OpenCL::OpenCL
+              LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
             )
     endif()
 
     target_compile_definitions(mmclab PUBLIC MCX_CONTAINER MATLAB_MEX_FILE)
 
     set_target_properties(mmclab
-            PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmciii)
+            PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmc)
     add_dependencies(mmclab clheader)
 
     if(BUILD_CUDA)
@@ -206,21 +206,21 @@ if(BUILD_MEX AND Matlab_FOUND)
                 matlab_add_mex(
                   NAME mmclab-trinity
                   SRC mmclab.cpp
-                  LINK_TO zmat mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL
+                  LINK_TO mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
                 )
         else()
                 matlab_add_mex(
                   NAME mmclab-trinity
                   SRC mmclab.cpp
                   NO_IMPLICIT_LINK_TO_MATLAB_LIBRARIES
-                  LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} zmat mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL
+                  LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
                 )
         endif()
 
         target_compile_definitions(mmclab-trinity PUBLIC MCX_CONTAINER MATLAB_MEX_FILE USE_CUDA)
 
         set_target_properties(mmclab-trinity
-                PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmc-trinity)
+                PROPERTIES OUTPUT_NAME ${CMAKE_SOURCE_DIR}/../mmclab/mmciii)
         add_dependencies(mmclab-trinity clheader)
     endif()
 
