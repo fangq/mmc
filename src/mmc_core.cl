@@ -1074,10 +1074,10 @@ __device__ void launchphoton(__constant MCXParam* gcfg, ray* r, __global float3*
 #endif
         float rx = rand_uniform01(ran);
         float ry = rand_uniform01(ran);
-        ry *= gcfg->srcparam1.w * MCX_MATHFUN(rsqrt)(gcfg->srcparam1.x * gcfg->srcparam1.x + gcfg->srcparam1.y * gcfg->srcparam1.y + gcfg->srcparam1.z * gcfg->srcparam1.z);
-        r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x + ry * (gcfg->srcdir.y * gcfg->srcparam1.z - gcfg->srcdir.z * gcfg->srcparam1.y);
-        r->p0.y = gcfg->srcpos.y + rx * gcfg->srcparam1.y + ry * (gcfg->srcdir.z * gcfg->srcparam1.x - gcfg->srcdir.x * gcfg->srcparam1.z);
-        r->p0.z = gcfg->srcpos.z + rx * gcfg->srcparam1.z + ry * (gcfg->srcdir.x * gcfg->srcparam1.y - gcfg->srcdir.y * gcfg->srcparam1.x);
+        float tmp = gcfg->srcparam1.w * MCX_MATHFUN(rsqrt)(gcfg->srcparam1.x * gcfg->srcparam1.x + gcfg->srcparam1.y * gcfg->srcparam1.y + gcfg->srcparam1.z * gcfg->srcparam1.z);
+        r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x + ry * tmp * (gcfg->srcdir.y * gcfg->srcparam1.z - gcfg->srcdir.z * gcfg->srcparam1.y);
+        r->p0.y = gcfg->srcpos.y + rx * gcfg->srcparam1.y + ry * tmp * (gcfg->srcdir.z * gcfg->srcparam1.x - gcfg->srcdir.x * gcfg->srcparam1.z);
+        r->p0.z = gcfg->srcpos.z + rx * gcfg->srcparam1.z + ry * tmp * (gcfg->srcdir.x * gcfg->srcparam1.y - gcfg->srcdir.y * gcfg->srcparam1.x);
 #if defined(__NVCC__) || defined(MCX_SRC_FOURIERX2D)
 #ifdef __NVCC__
 
@@ -1093,9 +1093,9 @@ __device__ void launchphoton(__constant MCXParam* gcfg, ray* r, __global float3*
             r->weight = (MCX_MATHFUN(cos)((gcfg->srcparam2.x * rx + gcfg->srcparam2.y * ry + gcfg->srcparam2.z) * TWO_PI) * (1.f - gcfg->srcparam2.w) + 1.f) * 0.5f; //between 0 and 1
 
 #endif
-        origin.x += (gcfg->srcparam1.x + v2.x) * 0.5f;
-        origin.y += (gcfg->srcparam1.y + v2.y) * 0.5f;
-        origin.z += (gcfg->srcparam1.z + v2.z) * 0.5f;
+        origin.x += (gcfg->srcparam1.x + tmp * (gcfg->srcdir.y * gcfg->srcparam1.z - gcfg->srcdir.z * gcfg->srcparam1.y)) * 0.5f;
+        origin.y += (gcfg->srcparam1.y + tmp * (gcfg->srcdir.z * gcfg->srcparam1.x - gcfg->srcdir.x * gcfg->srcparam1.z)) * 0.5f;
+        origin.z += (gcfg->srcparam1.z + tmp * (gcfg->srcdir.x * gcfg->srcparam1.y - gcfg->srcdir.y * gcfg->srcparam1.x)) * 0.5f;
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_DISK) || defined(MCX_SRC_GAUSSIAN) // uniform disk distribution or Gaussian-beam
 #ifdef __NVCC__

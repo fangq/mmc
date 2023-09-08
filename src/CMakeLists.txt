@@ -17,14 +17,13 @@ project(mmc)
 
 cmake_policy(SET CMP0074 NEW)  # to make -DOPENCL_ROOT= work with newer CMake versions as well
 
-find_package(CUDA QUIET REQUIRED)
-
 find_package(OpenMP REQUIRED)
 find_package(OpenCL REQUIRED)
 
 add_subdirectory(zmat)
 
 option(BUILD_MEX "Build mex" ON)
+option(BUILD_CUDA "Build cuda" OFF)
 
 if(BUILD_PYTHON)
     add_subdirectory(pybind11)
@@ -34,6 +33,10 @@ endif()
 
 if(BUILD_MEX)
     find_package(Matlab)
+endif()
+
+if(BUILD_CUDA)
+  find_package(CUDA QUIET REQUIRED)
 endif()
 
 # C Options
@@ -53,6 +56,15 @@ add_custom_target(
     comment "Compiling ${RESOURCE_INPUT} to ${RESOURCE_OUTPUT}"
     VERBATIM
 )
+
+if(BUILD_CUDA)
+  # NVC# NVCC Options
+  set(
+      CUDA_NVCC_FLAGS
+      ${CUDA_NVCC_FLAGS};
+      -g -lineinfo -DUSE_ATOMIC -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC -use_fast_math -Xptxas -O3,-v -Xcompiler -Wall -Xcompiler "${OpenMP_CXX_FLAGS}"
+      )
+endif()
 
 # Add include directories
 include_directories(cjson ubj zmat zmat/easylzma)
@@ -106,6 +118,29 @@ target_link_libraries(
 
 add_dependencies(mmc clheader)
 add_dependencies(mmc-exe clheader)
+
+if(BUILD_CUDA)
+  # Create mmc-trinity binary
+  cuda_add_executable(
+      mmc-trinity
+      mmc_cu_host.cu
+      mmc_cu_host.h
+      mmc.c
+      )
+  # Link options
+  target_link_libraries(
+      mmc-trinity
+      mmc OpenMP::OpenMP_CXX
+      zmat
+      m
+      OpenCL::OpenCL
+      )
+
+  add_dependencies(mmc-trinity mmc)
+
+  set_target_properties(mmc-trinity
+        PROPERTIES OUTPUT_NAME mmc-trinity)
+endif()
 
 # Build mex file
 if(BUILD_MEX AND Matlab_FOUND)
