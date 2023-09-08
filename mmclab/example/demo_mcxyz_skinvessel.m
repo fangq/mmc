@@ -27,7 +27,7 @@ seeds=[ones(4,2)*100, c0];  % define the regions by index
 cfg.unitinmm=0.005;
 cfg.method='elem';
 
-figure; 
+figure;
 subplot(121);
 plotmesh(cfg.node,cfg.elem);
 
@@ -78,18 +78,18 @@ cfg.isreflect=0;
 
 flux=mmclab(cfg);
 flux=flux.data;
-fluxcw=sum(flux,2)*cfg.tstep*100;
+fluxcw=sum(flux,2)*cfg.tstep*100; % multiplying 100 converts 1/mm^2 to 1/cm^2 to match mcxyz output
 
 %% plot simulated photon profiles
 
 subplot(122);
 hold on;
-qmeshcut(cfg.elem(cfg.elemprop>0,1:4),cfg.node*cfg.unitinmm,log10(fluxcw),'x=0.5','linestyle','none'); 
+qmeshcut(cfg.elem(cfg.elemprop>0,1:4),cfg.node*cfg.unitinmm,log10(fluxcw),'x=0.5','linestyle','none');
 view([1 0 0]);
 set(gca,'zlim',[0 1],'ylim',[0 1],'zdir','reverse')
 
 box on;
 axis equal
-title('MMC fluence rate (W/mm^2) per W simulated')
+title('MMC fluence rate (W/cm^2) per W simulated')
 colorbar;
 colormap(jet)
