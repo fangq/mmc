@@ -786,8 +786,9 @@ float mesh_getreff(double n_in, double n_out) {
     const double ostep = (M_PI / (2.0 * count));
     double r_phi = 0.0, r_j = 0.0;
     double o, cosop, coso, r_fres, tmp;
+    int i;
 
-    for (int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         o = i * ostep;
         coso = cos(o);
 
@@ -845,7 +846,7 @@ void tracer_init(raytracer* tracer, tetmesh* pmesh, char methodid) {
  */
 
 void tracer_prep(raytracer* tracer, mcconfig* cfg) {
-    int i, j, ne = tracer->mesh->ne;
+    int i, j, k, ne = tracer->mesh->ne;
 
     if (tracer->n == NULL && tracer->m == NULL && tracer->d == NULL) {
         if (tracer->mesh != NULL) {
@@ -917,7 +918,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                         }
                     }
 
-                    for (int k = 0; k < 3; k++) {
+                    for (k = 0; k < 3; k++) {
                         int nid = elems[out[ifaceorder[j]][k]] - 1;
 
                         if (tracer->mesh->nvol[nid] > 0.f) {  // change sign to prevent it from changing again
