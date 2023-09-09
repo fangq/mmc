@@ -157,6 +157,8 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
 void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg);
 void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadroi(tetmesh* mesh, mcconfig* cfg);
+double mesh_getreff_approx(double n_in, double n_out);
+double mesh_getreff(double n_in, double n_out);
 
 void tracer_init(raytracer* tracer, tetmesh* mesh, char methodid);
 void tracer_build(raytracer* tracer);

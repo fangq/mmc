@@ -773,47 +773,6 @@ void mesh_clear(tetmesh* mesh) {
 }
 
 /**
- * @brief Compute the effective reflection coefficient Reff
- *
- * @param[out] tracer: the ray-tracer data structure
- * @param[in] pmesh: the mesh object
- * @param[in] methodid: the ray-tracing algorithm to be used
- */
-
-float mesh_getreff(double n_in, double n_out) {
-    double oc = asin(1.0 / n_in); // critical angle
-    const double count = 1000.0;
-    const double ostep = (M_PI / (2.0 * count));
-    double r_phi = 0.0, r_j = 0.0;
-    double o, cosop, coso, r_fres, tmp;
-    int i;
-
-    for (i = 0; i < count; i++) {
-        o = i * ostep;
-        coso = cos(o);
-
-        if (o < oc) {
-            cosop = n_in * sin(o);
-            cosop = sqrt(1. - cosop * cosop);
-            tmp = (n_in * cosop - n_out * coso) / (n_in * cosop + n_out * coso);
-            r_fres = 0.5 * tmp * tmp;
-            tmp = (n_in * coso - n_out * cosop) / (n_in * coso + n_out * cosop);
-            r_fres += 0.5 * tmp * tmp;
-        } else {
-            r_fres = 1.f;
-        }
-
-        r_phi += 2.0 * sin(o) * coso * r_fres;
-        r_j += 3.0 * sin(o) * coso * coso * r_fres;
-    }
-
-    r_phi *= ostep;
-    r_j *= ostep;
-    return (r_phi + r_j) / (2.0 - r_phi + r_j);
-}
-
-
-/**
  * @brief Initialize a data structure storing all pre-computed ray-tracing related data
  *
  * the pre-computed ray-tracing data include
@@ -902,7 +861,22 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
     // one can disable this fix (i.e. restore to the old behavior) by setting cfg.isnormalized to 2
 
     if (cfg->isnormalized == 1 && cfg->method != rtBLBadouelGrid && cfg->basisorder) {
-        float Reff = -1.f;
+        float* Reff = (float*)calloc(tracer->mesh->prop + 1, sizeof(float));
+
+        if (cfg->isreflect) {
+            for (i = 1; i <= tracer->mesh->prop; i++) { // precompute the Reff for each non-zero label
+                for (j = 1; j < i; j++) {
+                    if (tracer->mesh->med[j].n == tracer->mesh->med[i].n) { // if such reflective index has been computed, copy the value
+                        Reff[i] = Reff[j];
+                        break;
+                    }
+                }
+
+                if (Reff[i] == 0.f) {
+                    Reff[i] = mesh_getreff(tracer->mesh->med[i].n, tracer->mesh->med[0].n);
+                }
+            }
+        }
 
         for (i = 0; i < ne; i++) {
             int* elems = tracer->mesh->elem + i * tracer->mesh->elemlen;   // element node indices
@@ -910,24 +884,18 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
 
             for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
                 if (enb[j] == 0) {                        // 0-valued face neighbor indicates an exterior triangle
-                    if (Reff < 0.f) {
-                        if (cfg->isreflect) {
-                            Reff = mesh_getreff(tracer->mesh->med[tracer->mesh->type[i]].n, tracer->mesh->med[0].n);
-                        } else {
-                            Reff = 0.f;
-                        }
-                    }
-
                     for (k = 0; k < 3; k++) {
                         int nid = elems[out[ifaceorder[j]][k]] - 1;
 
-                        if (tracer->mesh->nvol[nid] > 0.f) {  // change sign to prevent it from changing again
-                            tracer->mesh->nvol[nid] *= -(2.f / (1.0 + Reff)); // 2 accounts for the missing half of the solid angle, Reff is the effective reflection coeff
+                        if (tracer->mesh->nvol[nid] > 0.f && tracer->mesh->type[i] >= 0) {  // change sign to prevent it from changing again
+                            tracer->mesh->nvol[nid] *= -(2.f / (1.0 + Reff[tracer->mesh->type[i]])); // 2 accounts for the missing half of the solid angle, Reff is the effective reflection coeff
                         }
                     }
                 }
             }
         }
+
+        free(Reff);
 
         for (i = 0; i < tracer->mesh->nn; i++) {
             if (tracer->mesh->nvol[i] < 0.f) {
@@ -1601,4 +1569,60 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
         }
 
     return normalizor;
+}
+
+
+/**
+ * @brief Compute the effective reflection coefficient Reff using approximated formula
+ *
+ * accuracy is limited
+ * see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4482362/
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ * @param[in] pmesh: the mesh object
+ * @param[in] methodid: the ray-tracing algorithm to be used
+ */
+
+double mesh_getreff_approx(double n_in, double n_out) {
+    double nn = n_in / n_out;
+    return -1.440 / (nn * nn) + 0.710 / nn + 0.668 + 0.0636 * nn;
+}
+
+/**
+ * @brief Compute the effective reflection coefficient Reff
+ *
+ * @param[in] n_in: refractive index of the diffusive medium
+ * @param[in] n_out: refractive index of the non-diffusive medium
+ */
+
+double mesh_getreff(double n_in, double n_out) {
+    double oc = asin(1.0 / n_in); // critical angle
+    const double count = 1000.0;
+    const double ostep = (M_PI / (2.0 * count));
+    double r_phi = 0.0, r_j = 0.0;
+    double o, cosop, coso, r_fres, tmp;
+    int i;
+
+    for (i = 0; i < count; i++) {
+        o = i * ostep;
+        coso = cos(o);
+
+        if (o < oc) {
+            cosop = n_in * sin(o);
+            cosop = sqrt(1. - cosop * cosop);
+            tmp = (n_in * cosop - n_out * coso) / (n_in * cosop + n_out * coso);
+            r_fres = 0.5 * tmp * tmp;
+            tmp = (n_in * coso - n_out * cosop) / (n_in * coso + n_out * cosop);
+            r_fres += 0.5 * tmp * tmp;
+        } else {
+            r_fres = 1.f;
+        }
+
+        r_phi += 2.0 * sin(o) * coso * r_fres;
+        r_j += 3.0 * sin(o) * coso * coso * r_fres;
+    }
+
+    r_phi *= ostep;
+    r_j *= ostep;
+    return (r_phi + r_j) / (2.0 - r_phi + r_j);
 }
