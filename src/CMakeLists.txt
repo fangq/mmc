@@ -120,6 +120,15 @@ target_link_libraries(
 add_dependencies(mmc clheader)
 add_dependencies(mmc-exe clheader)
 
+#static link libraries
+set_target_properties(mmc-exe PROPERTIES LINK_SEARCH_START_STATIC 1)
+set_target_properties(mmc-exe PROPERTIES LINK_SEARCH_END_STATIC 1)
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+endif()
+
 if(BUILD_CUDA)
     # Create mmc library
     cuda_add_library(mmc-cuda STATIC
@@ -148,6 +157,9 @@ if(BUILD_CUDA)
 
   set_target_properties(mmc-trinity
         PROPERTIES OUTPUT_NAME mmciii)
+  #static link libraries
+  set_target_properties(mmc-trinity PROPERTIES LINK_SEARCH_START_STATIC 1)
+  set_target_properties(mmc-trinity PROPERTIES LINK_SEARCH_END_STATIC 1)
 endif()
 
 # Build mex file
