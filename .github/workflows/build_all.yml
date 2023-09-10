@@ -83,7 +83,7 @@ jobs:
             g++ --version
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose' LFLAGS='-static-libgcc -static-libstdc++'
             objdump -p ../mmclab/mmc.mex | grep "DLL Name:"
-            rm -rf zmat/miniz/*.o
+            make clean
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
