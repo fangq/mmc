@@ -51,7 +51,6 @@ To highlight a few most important updates:
 * Provide mmc-trinity binaries with simultaneous SSE/OpenCL/CUDA backend support
 * CMake based portable compilation system
 * Added GNU Octave mex file for MMCLAB on Linux/MacOS/Windows
-* Photon-sharing is now supported in the GPU code (by Shijie Yan)
 * Several critical bug fixes (by Shijie Yan) 
 * Github Action based continuous integration (CI) system for automated building/packaging/testing
 

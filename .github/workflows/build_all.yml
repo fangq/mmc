@@ -78,12 +78,12 @@ jobs:
             make oct CC=gcc-11 CXX=g++-11 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
             otool -L ../mmclab/mmc.mex
           else
-            export PATH='/c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin':$PATH
+            PATH='/c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin':$PATH
             which g++
             g++ --version
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose' LFLAGS='-static-libgcc -static-libstdc++'
             objdump -p ../mmclab/mmc.mex | grep "DLL Name:"
-            make clean
+            make -C zmat clean
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
@@ -91,8 +91,10 @@ jobs:
         run: |
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
+            g++ --v
             make mex LDFLAGS="-static lib/libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib-v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
+            ldd ../mmclab/mmc.mexw*
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
             make mex CC=gcc-11 CXX=g++-11 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
