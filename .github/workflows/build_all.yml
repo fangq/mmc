@@ -83,7 +83,7 @@ jobs:
             g++ --version
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose' LFLAGS='-static-libgcc -static-libstdc++'
             objdump -p ../mmclab/mmc.mex | grep "DLL Name:"
-            make -C zmat clean
+            rm -rf zmat/miniz/*.o
           fi
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
           octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
@@ -91,7 +91,7 @@ jobs:
         run: |
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            g++ -v
+            cc -v
             ls -lt zmat
             make mex LDFLAGS="-static lib/libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
