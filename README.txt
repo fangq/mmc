@@ -29,21 +29,31 @@ on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`).
 
 In 2020, we have also merged the `mmc-trinity` branch to the main code tree.
 The "trinity" version of MMC simultaneously supports CPU/SSE4, OpenCL and CUDA
-as the compute-backend, and can be selected using `--compute opencl|sse|cuda`
+as the compute-backend, and can be selected using `-c/--compute opencl|sse|cuda`
 command line flag. By default, we do not compile the CUDA editor in the binary.
-However, users can compile the "trinity" binary by `make cuda`.
+However, users can compile the "trinity" binary by `make cuda` or `cmake -DBUILD_CUDA=on`.
+
+Finally, in the release, we upgraded the normalization formula for nodal-based
+MMC simulation on the mesh surface nodes to correct for an observed deviation
+from MCX and DMMC outputs. This update only affects outputs on the exterior
+surface nodes, and does not impact DMMC (`-M G`, default for GPU based MMC)
+or element based (`-M S`) MMC.
 
 A detailed (long) list of updates can be found in the ChangeLog.txt or the 
 Github commit history: <https://github.com/fangq/mmc/commits/master>
 
 To highlight a few most important updates:
 
-* Support iMMC (edge-, node- and face-based implicit structures), CPU only (by Yaoshen Yuan)
+* Support iMMC (edge-, node- and face-based implicit structures), '''CPU only''' (by Yaoshen Yuan)
 * Added MMCLAB examples for iMMC, including a large dense vessel network (by Yaoshen Yuan)
-* Added C++Builder (Community Edition) project file for compilation on Windows
-* Added Windows GNU Octave mex file for MMCLAB
+* About 30%-40% faster OpenCL based simulations on NVIDIA GPUs using PTX-based atomic operations
+* More accurate normalization of nodal-based MMC simulation on the exterior surface
+* Provide mmc-trinity binaries with simultaneous SSE/OpenCL/CUDA backend support
+* CMake based portable compilation system
+* Added GNU Octave mex file for MMCLAB on Linux/MacOS/Windows
 * Photon-sharing is now supported in the GPU code (by Shijie Yan)
 * Several critical bug fixes (by Shijie Yan) 
+* Github Action based continuous integration (CI) system for automated building/packaging/testing
 
 Please file bug reports to <https://github.com/fangq/mmc/issues>
 
@@ -70,7 +80,7 @@ state-of-the-art ray-tracing techniques to simulate photon propagation in
 a mesh space. It has been extensively optimized for excellent computational
 efficiency and portability. MMC currently supports multi-threaded 
 parallel computing via OpenMP, Single Instruction Multiple Data (SIMD) 
-parallism via SSE and, starting from v2019.10, OpenCL to support a wide
+parallelism via SSE and, starting from v2019.10, OpenCL to support a wide
 range of CPUs/GPUs from nearly all vendors.
 
 To run an MMC simulation, one has to prepare an FE mesh first to
@@ -172,20 +182,54 @@ command:
 To compile the software, you need to install GNU gcc compiler toolchain
 on your system. For Debian/Ubuntu based GNU/Linux systems, you can type
 
-  sudo apt-get install gcc
+  sudo apt-get install build-essential
 
 and for Fedora/Redhat based GNU/Linux systems, you can type
 
-  su -c 'yum install gcc'
+  sudo dnf install make automake gcc gcc-c++
  
 To compile the binary with multi-threaded computing via OpenMP, 
-your gcc version should be at least 4.0. To compile the binary 
+your `gcc` version should be at least 4.0. To compile the binary 
 supporting SSE4 instructions, gcc version should be at least 
-4.3.4. For windows users, you should install Cygwin64 [3] or MSYS2. During the 
-installation, please select mingw64-x86_64-gcc and make packages.
-For Mac OS X users, you need to install the mp-gcc4.x or newer gcc from 
-MacPorts or Homebrew and use the instructions below to compile the 
+4.3.4. For windows users, you should install MSYS2 or Cygwin64 [3]. During the 
+installation, please select `mingw64-x86_64-gcc` and `make` packages.
+For Mac OS users, you need to install gcc from 
+Homebrew or MacPorts and use the instructions below to compile the 
 MMC source code.
+
+=== # Building MMC using CMake ===
+
+One can choose one of the two methods to build mmc binaries. The first
+approach is to use CMake. CMake is a portable system creating compilation
+and linking commands automatically adapted to your operating system and 
+installed compiler. It can run on Linux, MacOS and Windows.
+
+To use CMake, you will have to first run `sudo apt-get install cmake`
+or `sudo dnf install cmake` to install cmake first. To build MMC binaries,
+you should first navigate to the `mmc/src` folder, and run
+
+  mkdir -p build
+  cd build
+  cmake .. && make
+
+if cmake complains that any required library is missing, you will need
+to install those dependencies, removing all files inside the build folder,
+and run the cmake command above again.
+
+The above command builds the `mmc` executable inside `mmc/bin` folder. If
+your system has MATLAB installed, the above command also builds mmclab mex
+file as `mmc/mmclab/mmc.mex*` where the mex suffix depends on your OS.
+
+If you want to build the "Trinity" version of mmc to support CUDA on NVIDIA
+GPUs, you will have to first install CUDA toolkit, and replace the above cmake
+command by 
+
+  cmake .. -DBUILD_CUDA=on && make
+
+the executable will be build as `mmc/bin/mmciii` and the mex file is `mmc/mmclab/mmciii.mex*`.
+
+
+=== # Building MMC using GNU Make ===
 
 To compile the program, you should first navigate into the mmc/src folder,
 and type
@@ -196,29 +240,26 @@ this will create a fully optimized OpenCL based mmc executable,
 located under the mmc/src/bin/ folder.
 
 Other compilation options include
-<pre>
-  make ssemath  # this uses SSE4 for both vector operations and math functions
+
+  make ssemath  # this is the same as make, building mmc binary with SSE4+OpenMP+OpenCL
+  make cuda     # this compiles the "Trinity" version of mmc, supports SSE4+OpenMP+OpenCL+CUDA
   make omp      # this compiles a multi-threaded binary using OpenMP
   make release  # create a single-threaded optimized binary
   make prof     # this makes a binary to produce profiling info for gprof
   make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
-</pre>
-
-if you want to generate a portable binary that does not require external 
-library files, you may use (only works for Linux and Windows with gcc)
-
-  make EXTRALIB="-static -lm" # similar to "make", except the binary includes all libraries
 
 if you wish to build the mmc mex file to be used in matlab, you should run
 
-  make mex      # this produces mmc.mex* under mmc/mmclab/ folder
+  make mex      # this produces mmc.mex* under mmc/mmclab/ folder
+  make cudamex  # this produces a "Trinity" version of mmc.mex* that supports SSE+OpenCL+CUDA
 
 similarly, if you wish to build the mex file for GNU Octave, you should run
 
-  make oct      # this produces mmc.mex* under mmc/mmclab/ folder
+  make oct      # this produces mmc.mex* under mmc/mmclab/ folder
+  make cudaoct  # this produces a "Trinity" version of mmc.mex* that supports SSE+OpenCL+CUDA
 
-If you append "-f makefile_sfmt" at the end of any of the above 
-make commands, you will get an executable named "mmc_sfmt", which uses a 
+If you append `-f makefile_sfmt` at the end of any of the above 
+make commands, you will get an executable named `mmc_sfmt`, which uses a 
 fast MT19937 random-number-generator (RNG) instead of the default GLIBC 
 48bit RNG. If your CPU supports SSE4, the fastest binary can be obtained
 by running the following command:
@@ -227,21 +268,22 @@ by running the following command:
 
 You should be able to compile the code with an Intel C++ compiler,
 an AMD C compiler or LLVM compiler without any difficulty. To use other
-compilers, you simply append "CC=compiler_exe" to the above make 
+compilers, you simply append `CC=compiler_exe` to the above make 
 commands. If you see any error messages, please google and fix 
 your compiler settings or install the missing libraries.
 
-A special note for Mac OS users: you need to install mp-gcc4{4,5,6}
-from MacPorts in order to compile MMC. The default gcc (4.2) installed
-by Xcode 3.x does not support thread-local storage. Once downloaded
-and installed MacPorts from www.macports.org, you can install gcc by
+A special note for Mac OS users: you can you use both gcc (installed by MacPorts
+or brew) or the default clang gcc provided by the default Xcode compiler to build
+mmc. MMC requires OpenMP for multi-threading based parallel computing. If one uses
+the clang compiler, one must first install `libomp` package in order to compile mmc.
 
-  sudo port install mp-gcc44
+  brew install libomp
+  brew link --force libomp
 
-Then add /opt/local/bin to your $PATH variable. A example compilation 
-command for MMC looks like
+One can switch to other compilers by setting the `CC`, `CXX` and `AR` environment
+variables, for example
 
-  make ssemath CC=gcc-mp-4.4
+  make CC=gcc-mp-10 CXX=g++-mp-10 AR=g++-mp-10
 
 After compilation, you may add the path to the "mmc" binary (typically,
 mmc/src/bin) to your search path. To do so, you should modify your 
@@ -251,9 +293,9 @@ You can also compile MMC using Intel's C++ compiler - icc. To do this, you run
 
   make CC=icc
 
-you must enable icc related environment variables by source the compilervars.sh 
-file. The speed of icc-generated mmc binary is generally faster than those compiled by 
-gcc.
+you must enable `icc` related environment variables by source the `compilervars.sh`
+file. The speed of icc-generated mmc binary is generally faster for CPU/SSE based
+MMC simulation than those compiled by `gcc`.
 
 -------------------------------------------------------------------------------
 
@@ -397,6 +439,10 @@ where possible parameters include (the first item in [] is the default value)
 
 
 === Input files ===
+
+It is highly recommended to use the JSON-formatted input file described in the following
+section. The legacy input file format `.inp` is depreciated and may be removed in
+future releases.
 
 The simplest example can be found under the "example/onecube" 
 folder. Please run "createmesh.m" first from Matlab/Octave to 
@@ -673,7 +719,7 @@ work is also licensed under the GPLv3 license).
 
 If you already made a change to the source code to fix a bug you encountered 
 in your research, we are appreciated if you can share your changes (as 
-"git diff" outputs) with the developers. We will patch the code as soon 
+`git diff` outputs) with the developers. We will patch the code as soon 
 as we fully test the changes (we will acknowledge your contribution in 
 the MMC documentation). 
 
@@ -700,6 +746,38 @@ found from this link:
 == # Acknowledgement ==
 
 MMC uses the following open-source libraries:
+
+=== ZMat data compression unit ===
+
+* Files: src/zmat/*
+* Copyright: 2019-2020 Qianqian Fang
+* URL: https://github.com/fangq/zmat
+* License: GPL version 3 or later, https://github.com/fangq/zmat/blob/master/LICENSE.txt
+
+=== LZ4 data compression library ===
+
+* Files: src/zmat/lz4/*
+* Copyright: 2011-2020, Yann Collet
+* URL: https://github.com/lz4/lz4
+* License: BSD-2-clause, https://github.com/lz4/lz4/blob/dev/lib/LICENSE
+
+=== LZMA/Easylzma data compression library ===
+
+* Files: src/zmat/easylzma/*
+* Copyright: 2009, Lloyd Hilaiel, 2008, Igor Pavlov
+* License: public-domain
+* Comment: \
+ All the cruft you find here is public domain.  You don't have to \
+ credit anyone to use this code, but my personal request is that you mention \
+ Igor Pavlov for his hard, high quality work.
+
+=== Miniz compression library ===
+
+- Files: src/zmat/miniz/*
+- Copyright 2013-2014 RAD Game Tools and Valve Software
+- Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+- URL: https://github.com/richgel999/miniz
+- License: MIT-license, https://github.com/richgel999/miniz/blob/master/LICENSE
 
 === SSE Math library by Julien Pommier ===
 

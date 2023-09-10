@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -76,18 +76,18 @@ int main(int argc, char** argv) {
      * multiple threads are executed to simulate all photons.
      */
     if (cfg.compute == cbSSE || cfg.gpuid > MAX_DEVICE) {
-        mmc_run_mp(&cfg, &mesh, &tracer, mcx_progressbar, &cfg);
+        mmc_run_mp(&cfg, &mesh, &tracer);
     }
 
 #ifdef USE_CUDA
     else if (cfg.compute == cbCUDA) {
-        mmc_run_cu(&cfg, &mesh, &tracer, mcx_progressbar, &cfg);
+        mmc_run_cu(&cfg, &mesh, &tracer);
     }
 
 #endif
 #ifdef USE_OPENCL
     else {
-        mmc_run_cl(&cfg, &mesh, &tracer, mcx_progressbar, &cfg);
+        mmc_run_cl(&cfg, &mesh, &tracer);
     }
 
 #endif

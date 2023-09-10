@@ -187,7 +187,7 @@ int mcx_list_cu_gpu(mcconfig* cfg, GPUInfo** info) {
 #endif
 }
 
-void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu, void (*progressfun)(float, void*), void* handle) {
+void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu) {
     uint i, j;
     float t, twindow0, twindow1;
     float fullload = 0.f;
@@ -275,9 +275,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     MCXReporter reporter = {0.f};
 
-    if (progressfun == NULL) {
-        cfg->debuglevel = cfg->debuglevel & (~MCX_DEBUG_PROGRESS);
-    }
 
 #ifdef _OPENMP
     threadid = omp_get_thread_num();
@@ -592,21 +589,20 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                 if ((cfg->debuglevel & MCX_DEBUG_PROGRESS)) {
                     int p0 = 0, ndone = -1;
 
-                    progressfun(-0.f, handle);
+                    mcx_progressbar(-0.f);
 
                     do {
                         ndone = *progress;
 
                         if (ndone > p0) {
-                            progressfun((float)ndone / gpu[0].autothread,
-                                        handle);
+                            mcx_progressbar((float)ndone / gpu[0].autothread);
                             p0 = ndone;
                         }
 
                         sleep_ms(100);
                     } while (p0 < (int)gpu[0].autothread);
 
-                    progressfun(1.f, handle);
+                    mcx_progressbar(1.f);
                     MMC_FPRINTF(cfg->flog, "\n");
                 }
             }
@@ -864,7 +860,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     free(dref);
 }
 
-void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
+void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     GPUInfo* gpuinfo = NULL;      /** gpuinfo: structure to store GPU information */
     unsigned int activedev = 0;   /** activedev: count of total active GPUs to be used */
 
@@ -884,7 +880,7 @@ void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         /**
             This line runs the main MCX simulation for each GPU inside each thread
          */
-        mmc_run_simulation(cfg, mesh, tracer, gpuinfo, progressfun, handle);
+        mmc_run_simulation(cfg, mesh, tracer, gpuinfo);
 
 #ifdef _OPENMP
     }

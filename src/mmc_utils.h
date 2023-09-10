@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -308,7 +308,7 @@ int  mcx_remap(char* opt);
 int  mcx_lookupindex(char* key, const char* index);
 int  mcx_keylookup(char* key, const char* table[]);
 int  mcx_parsedebugopt(char* debugopt);
-void mcx_progressbar(float percent, void* cfg);
+void mcx_progressbar(float percent);
 int  mcx_loadjson(cJSON* root, mcconfig* cfg);
 void mcx_version(mcconfig* cfg);
 int  mcx_loadfromjson(char* jbuf, mcconfig* cfg);

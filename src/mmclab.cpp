@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -56,7 +56,6 @@
 #endif
 #include "mmc_tictoc.h"
 #include "mmc_raytrace.h"
-#include "waitmex/waitmex.c"
 
 //! Macro to read the 1st scalar cfg member
 #define GET_1ST_FIELD(x,y)  if(strcmp(name,#y)==0) {double *val=mxGetPr(item);x->y=val[0];printf("mmc.%s=%g;\n",#y,(float)(x->y));}
@@ -105,9 +104,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
     int        ifield, jstruct;
     int        ncfg, nfields;
     dimtype     fielddim[5];
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-    int        usewaitbar = 1;
-#endif
     int        errorflag = 0;
     cl_uint    workdev;
 
@@ -117,12 +113,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                                       "constmem", "sharedmem", "regcount", "clock", "sm", "core",
                                       "autoblock", "autothread", "maxgate"
                                      };
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-    waitbar*    hprop = NULL;
-    void (*progressfun)(float, void*) = mcx_progressbar;
-#else
-    void (*progressfun)(float, void*) = mcx_progressbar;
-#endif
 
     /**
      * If no input is given for this function, it prints help information and return.
@@ -216,16 +206,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         plhs[2] = mxCreateStructMatrix(ncfg, 1, 1, outputtag);
     }
 
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-
-    if (mexEvalString("mmclab_waitbar_handle=figure('visible','off');")) { // waitbar is not supported with nojvm after matlab R2013a
-        usewaitbar = 0;
-    } else {
-        mexEvalString("close(mmclab_waitbar_handle);");
-    }
-
-#endif
-
     /**
      * Loop over each element of the struct if it is an array, each element is a simulation
      */
@@ -274,30 +254,23 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             dt = GetTimeMillis();
             MMCDEBUG(&cfg, dlTime, (cfg.flog, "\tdone\t%d\nsimulating ... \n", dt - t0));
 
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-
-            if (cfg.debuglevel & dlProgress && progressfun == waitbar_update_c && usewaitbar) {
-                hprop = waitbar_create (0, NULL);
-            }
-
-#endif
 
             /** \subsection ssimu Parallel photon transport simulation */
 
             try {
                 if (cfg.compute == cbSSE || cfg.gpuid > MAX_DEVICE) {
-                    mmc_run_mp(&cfg, &mesh, &tracer, progressfun, (void*)hprop);
+                    mmc_run_mp(&cfg, &mesh, &tracer);
                 }
 
 #ifdef USE_CUDA
                 else if (cfg.compute == cbCUDA) {
-                    mmc_run_cu(&cfg, &mesh, &tracer, progressfun, (void*)hprop);
+                    mmc_run_cu(&cfg, &mesh, &tracer);
                 }
 
 #endif
 #ifdef USE_OPENCL
                 else {
-                    mmc_run_cl(&cfg, &mesh, &tracer, progressfun, (void*)hprop);
+                    mmc_run_cl(&cfg, &mesh, &tracer);
                 }
 
 #endif
@@ -314,28 +287,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
 
             /** \subsection sreport Post simulation */
 
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-
-            if (cfg.debuglevel & dlProgress) {
-                if (usewaitbar) {
-                    waitbar_update (1.0, hprop, NULL);
-                } else {
-                    mcx_progressbar(1.f, &cfg);
-                }
-            }
-
-#endif
             dt = GetTimeMillis() - dt;
 
             /** Clear up simulation data structures by calling the destructors */
 
-#if defined(MATLAB_MEX_FILE) || defined(MCX_CONTAINER)
-
-            if (cfg.debuglevel & dlProgress && usewaitbar) {
-                waitbar_destroy (hprop) ;
-            }
-
-#endif
             tracer_clear(&tracer);
             MMCDEBUG(&cfg, dlTime, (cfg.flog, "\tdone\t%d\n", GetTimeMillis() - t0));
 

@@ -45,9 +45,15 @@ on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`).
 
 In 2020, we have also merged the `mmc-trinity` branch to the main code tree.
 The "trinity" version of MMC simultaneously supports CPU/SSE4, OpenCL and CUDA
-as the compute-backend, and can be selected using `--compute opencl|sse|cuda`
-command line flag. By default, we do not compile the CUDA editor in the binary.
-However, users can compile the "trinity" binary by `make cuda`.
+as the compute-backend, and can be selected using `-c/--compute opencl|sse|cuda`
+command line flag. By default, we do not compile the CUDA version in the binary.
+However, users can compile the "trinity" binary by `make cuda` or `cmake -DBUILD_CUDA=on`.
+
+Finally, in the release, we upgraded the normalization formula for nodal-based
+MMC simulation on the mesh surface nodes to correct for an observed deviation
+from MCX and DMMC outputs. This update only affects outputs on the exterior
+surface nodes, and does not impact DMMC (`-M G`, default for GPU based MMC)
+or element based (`-M S`) MMC.
 
 A detailed (long) list of updates can be found in the ChangeLog.txt or the 
 Github commit history: <https://github.com/fangq/mmc/commits/master>
@@ -57,7 +63,9 @@ To highlight a few most important updates:
 -   Support iMMC (edge-, node- and face-based implicit structures), **CPU only** (by Yaoshen Yuan)
 -   Added MMCLAB examples for iMMC, including a large dense vessel network (by Yaoshen Yuan)
 -   About 30%-40% faster OpenCL based simulations on NVIDIA GPUs using PTX-based atomic operations
+-   More accurate normalization of nodal-based MMC simulation on the exterior surface
 -   Provide mmc-trinity binaries with simultaneous SSE/OpenCL/CUDA backend support
+-   CMake based portable compilation system
 -   Added GNU Octave mex file for MMCLAB on Linux/MacOS/Windows
 -   Photon-sharing is now supported in the GPU code (by Shijie Yan)
 -   Several critical bug fixes (by Shijie Yan) 
@@ -87,7 +95,7 @@ memory efficient. MMC uses the state-of-the-art ray-tracing techniques to
 simulate photon propagation in a mesh space. It has been extensively optimized 
 for excellent computational efficiency and portability. MMC currently supports 
 multi-threaded parallel computing via OpenMP, Single Instruction Multiple Data 
-(SIMD) parallism via SSE and, starting from v2019.10, OpenCL to support a wide 
+(SIMD) parallelism via SSE and, starting from v2019.10, OpenCL to support a wide 
 range of CPUs/GPUs from nearly all vendors.
 
 To run an MMC simulation, one has to prepare an FE mesh first to discretize the 
@@ -185,27 +193,62 @@ the Git source code, you should use the following command:
 To compile the software, you need to install GNU gcc compiler toolchain on your 
 system. For Debian/Ubuntu based GNU/Linux systems, you can type
 
-      sudo apt-get install gcc
+      sudo apt-get install build-essential
 
 and for Fedora/Redhat based GNU/Linux systems, you can type
 
-      su -c 'yum install gcc'
+      sudo dnf install make automake gcc gcc-c++
 
 To compile the binary with multi-threaded computing via OpenMP, 
-your gcc version should be at least 4.0. To compile the binary 
+your `gcc` version should be at least 4.0. To compile the binary 
 supporting SSE4 instructions, gcc version should be at least 
-4.3.4. For windows users, you should install Cygwin64 [3] or MSYS2. During the 
-installation, please select mingw64-x86_64-gcc and make packages.
-For Mac OS X users, you need to install the mp-gcc4.x or newer gcc from 
-MacPorts or Homebrew and use the instructions below to compile the 
+4.3.4. For windows users, you should install MSYS2 or Cygwin64 [3]. During the 
+installation, please select `mingw64-x86_64-gcc` and `make` packages.
+For MacOS users, you need to install the newer gcc from 
+Homebrew or MacPorts and use the instructions below to compile the 
 MMC source code.
 
-To compile the program, you should first navigate into the `mmc/src` folder, and 
-type
+## Building MMC using CMake
+
+One can choose one of the two methods to build mmc binaries. The first
+approach is to use CMake. CMake is a portable system creating compilation
+and linking commands automatically adapted to your operating system and 
+installed compiler. It can run on Linux, MacOS and Windows.
+
+To use CMake, you will have to first run `sudo apt-get install cmake`
+or `sudo dnf install cmake` to install cmake first. To build MMC binaries,
+you should first navigate to the `mmc/src` folder, and run
+
+      mkdir -p build
+      cd build
+      cmake .. && make
+
+if cmake complains that any required library is missing, you will need
+to install those dependencies, removing all files inside the build folder,
+and run the cmake command above again.
+
+The above command builds the `mmc` executable inside `mmc/bin` folder. If
+your system has MATLAB installed, the above command also builds mmclab mex
+file as `mmc/mmclab/mmc.mex*` where the mex suffix depends on your OS.
+
+If you want to build the "Trinity" version of mmc to support CUDA on NVIDIA
+GPUs, you will have to first install CUDA toolkit, and replace the above cmake
+command by 
+
+      cmake .. -DBUILD_CUDA=on && make
+
+the executable will be build as `mmc/bin/mmciii` and the mex file is `mmc/mmclab/mmciii.mex*`.
+
+
+## Building MMC using GNU Make
+
+A more traditional, and fine-grained, approach to build MMC is to use the provided
+`Makefile` using GNU make. Similarly, you will need to open a terminal, navigate to
+the `mmc/src` folder, and type
 
       make
 
-this will create a fully optimized OpenCL based mmc executable, located under 
+this should create a fully optimized OpenCL based mmc executable, located under 
 the `mmc/bin/` folder. The binary also supports SSE4 on the CPU.
 
 Other compilation options include
@@ -262,9 +305,9 @@ You can also compile MMC using Intel's C++ compiler - `icc`. To do this, you run
 
       make CC=icc
 
-you must enable icc related environment variables by source the `compilervars.sh` 
-file. The speed of icc-generated mmc binary is generally faster than those 
-compiled by gcc.
+you must enable `icc` related environment variables by source the `compilervars.sh`
+file. The speed of icc-generated mmc binary is generally faster for CPU/SSE based
+MMC simulation than those compiled by `gcc`.
 
 
 Running Simulations
@@ -438,6 +481,10 @@ where possible parameters include (the first item in [] is the default value)
 
 ### Input files
 
+It is highly recommended to use the JSON-formatted input file described in the following
+section. The legacy input file format `.inp` is depreciated and may be removed in
+future releases.
+
 The simplest example can be found under the `example/onecube` folder. 
 Please run `createmesh.m` first from Matlab/Octave to create all the mesh 
 files, which include
@@ -478,7 +525,7 @@ To run a simulation, you should execute the `run_test.sh` bash script in
 this folder. If you want to run mmc directly from the command line, you can do 
 so by typing
 
-`../../bin/mmc -n 20 -f onecube.inp -s onecube `
+`../../bin/mmc -n 20 -f onecube.inp -s onecube`
 
 where `-n` specifies the total photon number to be simulated, `-f` specifies the 
 input file, and `-s` gives the output file name. To see all the supported 
@@ -749,7 +796,7 @@ MMC uses the following open-source libraries:
  credit anyone to use this code, but my personal request is that you mention
  Igor Pavlov for his hard, high quality work.
 
-### LZ4 data compression library
+### Miniz compression library
 
 - Files: src/zmat/miniz/*
 - Copyright 2013-2014 RAD Game Tools and Valve Software

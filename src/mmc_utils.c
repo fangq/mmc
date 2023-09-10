@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -2228,7 +2228,7 @@ void mcx_fflush(FILE* out) {
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_progressbar(float percent, void* cfg) {
+void mcx_progressbar(float percent) {
     unsigned int percentage, j, colwidth = 79;
     static unsigned int oldmarker = 0xFFFFFFFF;
 

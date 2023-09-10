@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -107,7 +107,7 @@ typedef struct POST_ALIGN(32) GPU_reporter {
     float  raytet;
 } MCXReporter  POST_ALIGN(32);
 
-void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle);
+void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer);
 
 #ifdef  __cplusplus
 }

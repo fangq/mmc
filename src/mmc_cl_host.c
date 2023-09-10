@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -65,7 +65,7 @@ extern cl_event kernelevent;
    master driver code to run MC simulations
 */
 
-void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
+void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     cl_uint i, j, iter;
     cl_float t, twindow0, twindow1;
@@ -129,10 +129,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
 
     MCXReporter reporter = {0.f};
     platform = mcx_list_cl_gpu(cfg, &workdev, devices, &gpu);
-
-    if (progressfun == NULL) {
-        cfg->debuglevel = cfg->debuglevel & (~MCX_DEBUG_PROGRESS);
-    }
 
     if (workdev > MAX_DEVICE) {
         workdev = MAX_DEVICE;
@@ -569,20 +565,20 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
             if ((cfg->debuglevel & MCX_DEBUG_PROGRESS)) {
                 int p0 = 0, ndone = -1;
 
-                progressfun(-0.f, handle);
+                mcx_progressbar(-0.f);
 
                 do {
                     ndone = *progress;
 
                     if (ndone > p0) {
-                        progressfun((float)ndone / gpu[0].autothread, handle);
+                        mcx_progressbar((float)ndone / gpu[0].autothread);
                         p0 = ndone;
                     }
 
                     sleep_ms(100);
                 } while (p0 < gpu[0].autothread);
 
-                progressfun(cfg->nphoton, handle);
+                mcx_progressbar(cfg->nphoton);
                 MMC_FPRINTF(cfg->flog, "\n");
             }
 

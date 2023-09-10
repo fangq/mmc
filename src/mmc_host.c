@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2023
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -143,11 +143,9 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
  * \param[out] cfg: the simulation configuration structure
  * \param[out] mesh: the mesh data structure
  * \param[out] tracer: the ray-tracer data structure
- * \param[in] progressfun: function pointer to progress-bar update function
- * \param[in] handle: progress-bar update function handle parameter
  */
 
-int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
+int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
     RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
     unsigned int i, j;
@@ -155,10 +153,6 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     unsigned int threadid = 0, ncomplete = 0, t0, dt, debuglevel = 0;
     visitor master = {0.f, 0.f, 0.f, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL};
     visitor_init(cfg, &master);
-
-    if (progressfun == NULL) {
-        cfg->debuglevel = cfg->debuglevel & (~dlProgress);
-    }
 
     t0 = StartTimer();
 
@@ -231,7 +225,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
         rng_init(ran0, ran1, seeds, threadid);
 
         if ((cfg->debuglevel & dlProgress) && threadid == 0) {
-            progressfun(-0.f, handle);
+            mcx_progressbar(-0.f);
         }
 
         /*launch photons*/
@@ -262,7 +256,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
             ncomplete++;
 
             if ((cfg->debuglevel & dlProgress) && threadid == 0) {
-                progressfun((float)ncomplete / cfg->nphoton, handle);
+                mcx_progressbar((float)ncomplete / cfg->nphoton);
             }
         }
 
@@ -319,7 +313,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     /** \subsection sreport Post simulation */
 
     if ((cfg->debuglevel & dlProgress)) {
-        progressfun(1.f, handle);
+        mcx_progressbar(1.f);
     }
 
     dt = GetTimeMillis() - dt;

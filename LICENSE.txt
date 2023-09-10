@@ -1,9 +1,9 @@
 ===============================================================================
 =                       Mesh-based Monte Carlo (MMC)                          =
-=           Supporting both OpenCL and Multi-threading with SSE4              =
+=           Supporting Multi-threading with SSE4, OpenCL and CUDA             =
 ===============================================================================
 
-Copyright (C) 2010-2021  Qianqian Fang <q.fang at neu.edu>
+Copyright (C) 2010-2023  Qianqian Fang <q.fang at neu.edu>
 
 -------------------------------------------------------------------------------
 
