@@ -149,7 +149,7 @@ jobs:
       - name: Zip mmc
         run: |
           cd .. && pwd
-          upx -9 mmc/bin/*
+          upx -9 mmc/bin/* || true
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             7z a -tzip mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -xr!mmc/packages
           else
