@@ -126,13 +126,13 @@ jobs:
         run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
       - name: Zip mmclab
         run: |
-          upx -9 mmclab/mmc.mex*
+          upx -9 mmclab/mmc.mex* || true
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp /c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin/libgomp-1.dll mmclab/octave/${{ env.OCTAVE_ARCH }}
             cp /c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin/libwinpthread-1.dll mmclab/octave/${{ env.OCTAVE_ARCH }}
             cp /c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin/liboctinterp-11.dll mmclab/octave/${{ env.OCTAVE_ARCH }}
-            upx -9 mmclab/octave/${{ env.OCTAVE_ARCH }}/*
+            upx -9 mmclab/octave/${{ env.OCTAVE_ARCH }}/* || true
             7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
           else
             zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
