@@ -73,7 +73,7 @@ jobs:
           mkoctfile --version
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 9
-            make oct MEXLINKOPT="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lm -lpthread -Wl,-Bdynamic"
+            make oct MEXLINKOPT="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lc -lm -lstdc++ -lpthread -lgomp -Wl,-Bdynamic"
             sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
             ldd ../mmclab/mmc.mex
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
@@ -101,7 +101,7 @@ jobs:
             make mex CC=gcc-11 CXX=g++-11 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
             otool -L ../mmclab/mmc.mex*
           else
-            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v"
+            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -Wl,-Bstatic -lstdc++ -lpthread -lgomp -Wl,-Bdynamic" EXTRALIB="-v"
             ldd ../mmclab/mmc.mex*
           fi
       - name: Build binary
@@ -109,7 +109,7 @@ jobs:
           cd src
           make clean
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lm"
+            make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lc -lm -lstdc++ -lpthread -fopenmp -lgomp"
             ldd ../bin/mmc
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             make CC=gcc-11 CXX=g++-11
