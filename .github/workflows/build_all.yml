@@ -92,7 +92,8 @@ jobs:
           cd src
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             g++ -v
-            make mex LDFLAGS="-static lib/libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib-v"
+            ls -lt zmat
+            make mex LDFLAGS="-static lib/libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
             ldd ../mmclab/mmc.mexw*
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
