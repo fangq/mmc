@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.3)
 
 project(mmc)
 
-if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.12.0")
+if(${CMAKE_VERSION} VERSION_GREATER "3.11.20")
     cmake_policy(SET CMP0074 NEW)  # to make -DOPENCL_ROOT= work with newer CMake versions as well
 endif()
 

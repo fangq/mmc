@@ -28,13 +28,14 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
-          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7 upx-ucl
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
       - name: Install dependencies (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
           brew install octave
+          brew install upx
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
@@ -43,6 +44,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           choco install octave.portable --version=8.3.0
+          choco install upx
           echo 'C:\ProgramData\chocolatey\lib\octave.portable\tools\octave\mingw64\bin' >> $GITHUB_PATH
           echo 'C:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\bin\' >> $GITHUB_PATH
           echo 'MW_MINGW64_LOC=/c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/' >> $GITHUB_ENV
@@ -94,7 +96,6 @@ jobs:
             alias cc=gcc
             make mex CC=gcc CXX=g++ LDFLAGS="-static lib/libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -v"
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
-            ldd ../mmclab/mmc.mexw*
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
             make mex CC=gcc-11 CXX=g++-11 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
@@ -125,10 +126,13 @@ jobs:
         run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
       - name: Zip mmclab
         run: |
+          upx -9 mmclab/mmc.mex*
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp /c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin/libgomp-1.dll mmclab/octave/${{ env.OCTAVE_ARCH }}
             cp /c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin/libwinpthread-1.dll mmclab/octave/${{ env.OCTAVE_ARCH }}
+            cp /c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin/liboctinterp-11.dll mmclab/octave/${{ env.OCTAVE_ARCH }}
+            upx -9 mmclab/octave/${{ env.OCTAVE_ARCH }}/*
             7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
           else
             zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
@@ -145,6 +149,7 @@ jobs:
       - name: Zip mmc
         run: |
           cd .. && pwd
+          upx -9 mmc/bin/*
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             7z a -tzip mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -xr!mmc/packages
           else
