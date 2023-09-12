@@ -1132,3 +1132,5 @@ extern "C" void mcx_matlab_flush() {
     mexEvalString("fflush(stdout);");
 #endif
 }
+
+int main(void) {return 1;}
