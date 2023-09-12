@@ -1133,4 +1133,13 @@ extern "C" void mcx_matlab_flush() {
 #endif
 }
 
-int main(void) {return 1;}
+#if defined(__APPLE__)
+/**
+ * @brief Phantom main function to let macos to build mmclab
+ */
+
+int main(void) {
+    return 1;
+}
+
+#endif

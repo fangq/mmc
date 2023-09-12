@@ -134,7 +134,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         workdev = MAX_DEVICE;
     }
 
-    if (devices == NULL || workdev == 0) {
+    if (workdev == 0) {
         mcx_error(-99, (char*)("Unable to find devices!"), __FILE__, __LINE__);
     }
 
