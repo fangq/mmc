@@ -50,6 +50,9 @@ necessary data structures. This include the command line options (cfg),
 tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 *******************************************************************************/
 
+#ifndef MCX_CONTAINER
+
+
 /**
  * \brief Initialize simulation configuration structure cfg using command line options
  *
@@ -88,6 +91,8 @@ int mmc_init_from_json(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, char* jc
     tracer_init(tracer, mesh, cfg->method);
     return 0;
 }
+
+#endif
 
 /**
  * \brief Rest simulation related data structures
@@ -338,7 +343,9 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
     }
 
-    if (cfg->issave2pt) {
+#ifndef MCX_CONTAINER
+
+    if (cfg->issave2pt && cfg->parentid == mpStandalone) {
         switch (cfg->outputtype) {
             case otFlux:
                 MMCDEBUG(cfg, dlTime, (cfg->flog, "saving flux ..."));
@@ -356,17 +363,25 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mesh_saveweight(mesh, cfg, 0);
     }
 
-    if (cfg->issavedet) {
+#endif
+
+    if (cfg->issavedet && cfg->parentid == mpStandalone) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving detected photons ..."));
+
+#ifndef MCX_CONTAINER
 
         if (cfg->issaveexit) {
             mesh_savedetphoton(master.partialpath, master.photonseed, master.bufpos, (sizeof(RandType)*RAND_BUF_LEN), cfg);
         }
 
+#endif
+
         if (cfg->issaveexit == 2) {
             float* detimage = (float*)calloc(cfg->detparam1.w * cfg->detparam2.w * cfg->maxgate, sizeof(float));
             mesh_getdetimage(detimage, master.partialpath, master.bufpos, cfg, mesh);
+#ifndef MCX_CONTAINER
             mesh_savedetimage(detimage, cfg);
+#endif
             free(detimage);
         }
 
@@ -379,10 +394,14 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         }
     }
 
+#ifndef MCX_CONTAINER
+
     if (cfg->issaveref) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving surface diffuse reflectance ..."));
         mesh_saveweight(mesh, cfg, 1);
     }
+
+#endif
 
     MMCDEBUG(cfg, dlTime, (cfg->flog, "\tdone\t%d\n", GetTimeMillis() - t0));
     visitor_clear(&master);

@@ -742,6 +742,8 @@ is more than what your have specified (%d), please use the -H option to specify 
         mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
     }
 
+#ifndef MCX_CONTAINER
+
     if (cfg->issave2pt && cfg->parentid == mpStandalone) {
         MMC_FPRINTF(cfg->flog, "saving data to file ...\t");
         mesh_saveweight(mesh, cfg, 0);
@@ -760,6 +762,8 @@ is more than what your have specified (%d), please use the -H option to specify 
         MMC_FPRINTF(cfg->flog, "saving surface diffuse reflectance ...");
         mesh_saveweight(mesh, cfg, 1);
     }
+
+#endif
 
     // total energy here equals total simulated photons+unfinished photons for all threads
     MMC_FPRINTF(cfg->flog, "simulated %zu photons (%zu) with %d devices (ray-tet %.0f)\nMCX simulation speed: %.2f photon/ms\n",

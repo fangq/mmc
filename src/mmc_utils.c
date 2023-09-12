@@ -415,6 +415,9 @@ void mcx_cleargpuinfo(GPUInfo** gpuinfo) {
     }
 }
 
+
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Save volumetric output (fluence etc) to an Nifty format binary file
  *
@@ -1056,6 +1059,8 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
     }
 }
 
+#endif
+
 /**
  * @brief Print a message to the console or a log file
  *
@@ -1125,6 +1130,8 @@ void mcx_assert(const int ret, const char* file, const int linenum) {
         mcx_error(ret, "input error", file, linenum);
     }
 }
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Read simulation settings from a configuration file (.inp or .json)
@@ -1947,6 +1954,7 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     }
 }
 
+#endif
 
 /**
  * @brief Convert a column-major (MATLAB/FORTRAN) array to a row-major (C/C++) array
@@ -2011,6 +2019,7 @@ void  mcx_convertcol2row4d(unsigned int** vol, uint4* dim) {
     *vol = newvol;
 }
 
+#ifndef MCX_CONTAINER
 
 
 /**
@@ -2176,6 +2185,7 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
     return ret;
 }
 
+#endif
 
 /**
  * @brief Parse the debug flag in the letter format
@@ -2276,6 +2286,8 @@ void mcx_progressbar(float percent) {
     }
 }
 
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Function to read a single parameter value followed by a command line option
  *
@@ -2344,6 +2356,7 @@ int mcx_readarg(int argc, char* argv[], int id, void* output, const char* type) 
     return id + 1;
 }
 
+#endif
 
 /**
  * @brief Test if a long command line option is supported
@@ -2537,6 +2550,8 @@ void mcx_prep(mcconfig* cfg) {
         cfg->savedetflag = SET_SAVE_VEXIT(cfg->savedetflag);
     }
 }
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Main function to read user command line options
@@ -2960,6 +2975,9 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
     fwrite(ppath, sizeof(float), count * cfg->his.colcount, fp);
     fclose(fp);
 }
+
+#endif
+
 /**
  * @brief Print MCX software version
  *

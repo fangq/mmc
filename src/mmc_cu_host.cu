@@ -769,6 +769,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
         }
 
+#ifndef MCX_CONTAINER
+
         if (cfg->issave2pt && cfg->parentid == mpStandalone) {
             MMC_FPRINTF(cfg->flog, "saving data to file ...\t");
             mesh_saveweight(mesh, cfg, 0);
@@ -790,6 +792,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             MMC_FPRINTF(cfg->flog, "saving surface diffuse reflectance ...");
             mesh_saveweight(mesh, cfg, 1);
         }
+
+#endif
 
         // total energy here equals total simulated photons+unfinished photons for
         // all threads

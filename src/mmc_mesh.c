@@ -142,6 +142,8 @@ void mesh_init(tetmesh* mesh) {
     mesh->nmax.w = 1.f;
 }
 
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Loading user-specified mesh data
  *
@@ -166,6 +168,8 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
         mesh_loadseedfile(mesh, cfg);
     }
 }
+
+#endif
 
 /**
  * @brief Error-handling in mesh operations
@@ -203,6 +207,90 @@ void mesh_filenames(const char* format, char* foutput, mcconfig* cfg) {
     }
 }
 
+
+void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg) {
+    int i;
+    mesh->nmin.x = VERY_BIG;
+    mesh->nmin.y = VERY_BIG;
+    mesh->nmin.z = VERY_BIG;
+    mesh->nmax.x = -VERY_BIG;
+    mesh->nmax.y = -VERY_BIG;
+    mesh->nmax.z = -VERY_BIG;
+
+    for (i = 0; i < mesh->nn; i++) {
+        mesh->nmin.x = MIN(mesh->node[i].x, mesh->nmin.x);
+        mesh->nmin.y = MIN(mesh->node[i].y, mesh->nmin.y);
+        mesh->nmin.z = MIN(mesh->node[i].z, mesh->nmin.z);
+        mesh->nmax.x = MAX(mesh->node[i].x, mesh->nmax.x);
+        mesh->nmax.y = MAX(mesh->node[i].y, mesh->nmax.y);
+        mesh->nmax.z = MAX(mesh->node[i].z, mesh->nmax.z);
+    }
+
+    mesh->nmin.x -= EPS;
+    mesh->nmin.y -= EPS;
+    mesh->nmin.z -= EPS;
+    mesh->nmax.x += EPS;
+    mesh->nmax.y += EPS;
+    mesh->nmax.z += EPS;
+
+    cfg->dim.x = (int)((mesh->nmax.x - mesh->nmin.x) / cfg->steps.x) + 1;
+    cfg->dim.y = (int)((mesh->nmax.y - mesh->nmin.y) / cfg->steps.y) + 1;
+    cfg->dim.z = (int)((mesh->nmax.z - mesh->nmin.z) / cfg->steps.z) + 1;
+
+    cfg->crop0.x = cfg->dim.x;
+    cfg->crop0.y = cfg->dim.y * cfg->dim.x;
+    cfg->crop0.z = cfg->dim.y * cfg->dim.x * cfg->dim.z;
+}
+
+/**
+ * @brief Identify wide-field source and detector-related elements (type=-1 for source, type=-2 for det)
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
+    int i;
+
+    mesh->srcelemlen = 0;
+    mesh->detelemlen = 0;
+
+    for (i = 0; i < mesh->ne; i++) {
+        if (mesh->type[i] == -1) { /*number of elements in the initial candidate list*/
+            mesh->srcelemlen++;
+            cfg->e0 = (cfg->e0 == 0) ? i + 1 : cfg->e0;
+        }
+
+        if (mesh->type[i] == -2) { /*number of elements in the initial candidate list*/
+            mesh->detelemlen++;
+            cfg->isextdet = 1;
+            cfg->detnum = 0; // when detecting wide-field detectors, suppress point detectors
+        }
+    }
+
+    /*Record the index of inital elements to initiate source search*/
+    /*Then change the type of initial elements back to 0 to continue propogation*/
+    if (mesh->srcelemlen > 0 ||  mesh->detelemlen > 0) {
+        int is = 0, id = 0;
+        mesh->srcelem = (int*)calloc(mesh->srcelemlen, sizeof(int));
+        mesh->detelem = (int*)calloc(mesh->detelemlen, sizeof(int));
+
+        for (i = 0; i < mesh->ne; i++) {
+            if (mesh->type[i] < 0) {
+                if (mesh->type[i] == -1) {
+                    mesh->srcelem[is++] = i + 1;
+                    mesh->type[i] = 0;
+                } else if (mesh->type[i] == -2) { /*keep -2, will be replaced to medianum+1 in loadmedia*/
+                    mesh->detelem[id++] = i + 1;
+                }
+            }
+        }
+    }
+}
+
+
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Load node file and initialize the related mesh properties
  *
@@ -239,40 +327,6 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
     if (cfg->method == rtBLBadouelGrid) {
         mesh_createdualmesh(mesh, cfg);
     }
-}
-
-void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg) {
-    int i;
-    mesh->nmin.x = VERY_BIG;
-    mesh->nmin.y = VERY_BIG;
-    mesh->nmin.z = VERY_BIG;
-    mesh->nmax.x = -VERY_BIG;
-    mesh->nmax.y = -VERY_BIG;
-    mesh->nmax.z = -VERY_BIG;
-
-    for (i = 0; i < mesh->nn; i++) {
-        mesh->nmin.x = MIN(mesh->node[i].x, mesh->nmin.x);
-        mesh->nmin.y = MIN(mesh->node[i].y, mesh->nmin.y);
-        mesh->nmin.z = MIN(mesh->node[i].z, mesh->nmin.z);
-        mesh->nmax.x = MAX(mesh->node[i].x, mesh->nmax.x);
-        mesh->nmax.y = MAX(mesh->node[i].y, mesh->nmax.y);
-        mesh->nmax.z = MAX(mesh->node[i].z, mesh->nmax.z);
-    }
-
-    mesh->nmin.x -= EPS;
-    mesh->nmin.y -= EPS;
-    mesh->nmin.z -= EPS;
-    mesh->nmax.x += EPS;
-    mesh->nmax.y += EPS;
-    mesh->nmax.z += EPS;
-
-    cfg->dim.x = (int)((mesh->nmax.x - mesh->nmin.x) / cfg->steps.x) + 1;
-    cfg->dim.y = (int)((mesh->nmax.y - mesh->nmin.y) / cfg->steps.y) + 1;
-    cfg->dim.z = (int)((mesh->nmax.z - mesh->nmin.z) / cfg->steps.z) + 1;
-
-    cfg->crop0.x = cfg->dim.x;
-    cfg->crop0.y = cfg->dim.y * cfg->dim.x;
-    cfg->crop0.z = cfg->dim.y * cfg->dim.x * cfg->dim.z;
 }
 
 /**
@@ -452,51 +506,6 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
     mesh_srcdetelem(mesh, cfg);
 }
 
-/**
- * @brief Identify wide-field source and detector-related elements (type=-1 for source, type=-2 for det)
- *
- * @param[in] mesh: the mesh object
- * @param[in] cfg: the simulation configuration structure
- */
-
-void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
-    int i;
-
-    mesh->srcelemlen = 0;
-    mesh->detelemlen = 0;
-
-    for (i = 0; i < mesh->ne; i++) {
-        if (mesh->type[i] == -1) { /*number of elements in the initial candidate list*/
-            mesh->srcelemlen++;
-            cfg->e0 = (cfg->e0 == 0) ? i + 1 : cfg->e0;
-        }
-
-        if (mesh->type[i] == -2) { /*number of elements in the initial candidate list*/
-            mesh->detelemlen++;
-            cfg->isextdet = 1;
-            cfg->detnum = 0; // when detecting wide-field detectors, suppress point detectors
-        }
-    }
-
-    /*Record the index of inital elements to initiate source search*/
-    /*Then change the type of initial elements back to 0 to continue propogation*/
-    if (mesh->srcelemlen > 0 ||  mesh->detelemlen > 0) {
-        int is = 0, id = 0;
-        mesh->srcelem = (int*)calloc(mesh->srcelemlen, sizeof(int));
-        mesh->detelem = (int*)calloc(mesh->detelemlen, sizeof(int));
-
-        for (i = 0; i < mesh->ne; i++) {
-            if (mesh->type[i] < 0) {
-                if (mesh->type[i] == -1) {
-                    mesh->srcelem[is++] = i + 1;
-                    mesh->type[i] = 0;
-                } else if (mesh->type[i] == -2) { /*keep -2, will be replaced to medianum+1 in loadmedia*/
-                    mesh->detelem[id++] = i + 1;
-                }
-            }
-        }
-    }
-}
 
 /**
  * @brief Load tet element volume file and initialize the related mesh properties
@@ -676,6 +685,8 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
 
     fclose(fp);
 }
+
+#endif
 
 /**
  * @brief Clearing the mesh data structure
@@ -1214,6 +1225,8 @@ float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mccon
     return nextslen;
 }
 
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Save the fluence output to a file
  *
@@ -1340,6 +1353,7 @@ void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcco
     fclose(fp);
 }
 
+#endif
 
 /**
  * @brief Save binned detected photon data over an area-detector as time-resolved 2D images
@@ -1403,6 +1417,8 @@ void mesh_getdetimage(float* detmap, float* ppath, int count, mcconfig* cfg, tet
     }
 }
 
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Save binned detected photon data over an area-detector
  *
@@ -1430,6 +1446,8 @@ void mesh_savedetimage(float* detmap, mcconfig* cfg) {
     fwrite(detmap, sizeof(float), cfg->detparam1.w * cfg->detparam2.w * cfg->maxgate, fp);
     fclose(fp);
 }
+
+#endif
 
 /**
  * @brief Recompute the detected photon weight from the partial-pathlengths
