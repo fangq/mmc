@@ -71,10 +71,10 @@ fp=fopen('mmc_core.clh','wb');
 fwrite(fp, clhex, 'char');
 fclose(fp);
 
-cflags='-c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -fopenmp  -DUSE_OS_TIMER -DUSE_OPENCL';
+cflags='-c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -fopenmp  -DUSE_OS_TIMER -DUSE_OPENCL -DMCX_CONTAINER';
 
 filelist={'mmc_rand_xorshift128p.c','mmc_mesh.c','mmc_raytrace.c',...
-    'mmc_utils.c','mmc_tictoc.c','cjson/cJSON.c','mmc_host.c',...
+    'mmc_utils.c','mmc_tictoc.c','mmc_host.c',...
     'mmc_highorder.cpp','mmc_cl_utils.c','mmc_cl_host.c','mmclab.cpp'};
 if(isfield(opt,'filelist'))
     filelist=opt.filelist;
@@ -88,10 +88,10 @@ if(ispc)
     linkflags=[linkflags ' ''C:\Windows\System32\OpenCL.dll'' '];
     linkvar='LINKLIBS';
 else
-    linkflags='\$CLIBS -fopenmp -static-libgcc -static-libstdc++';
+    linkflags='\$LINKLIBS -fopenmp -static-libgcc -static-libstdc++';
     cflags=[cflags ' -fPIC '];
     linkflags=[linkflags ' -lOpenCL '];
-    linkvar='CLIBS';
+    linkvar='LINKLIBS';
 end
 if(~exist('OCTAVE_VERSION','builtin'))
     for i=1:length(filelist)

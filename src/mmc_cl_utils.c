@@ -333,7 +333,7 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
                             MMC_FPRINTF(cfg->flog, "============ %s device ID %d [%d of %d]: %s  ============\n", devname[j], cuid, k + 1, devnum, cuinfo.name);
                             MMC_FPRINTF(cfg->flog, " Device %d of %d:\t\t%s\n", cuid + 1, devnum, cuinfo.name);
                             MMC_FPRINTF(cfg->flog, " Compute units   :\t%d core(s)\n", (uint)cuinfo.sm);
-                            MMC_FPRINTF(cfg->flog, " Global memory   :\t%ld B\n", (unsigned long)cuinfo.globalmem);
+                            MMC_FPRINTF(cfg->flog, " Global memory   :\t%.0f B\n", (double)cuinfo.globalmem);
                             MMC_FPRINTF(cfg->flog, " Local memory    :\t%ld B\n", (unsigned long)cuinfo.sharedmem);
                             MMC_FPRINTF(cfg->flog, " Constant memory :\t%ld B\n", (unsigned long)cuinfo.constmem);
                             MMC_FPRINTF(cfg->flog, " Clock speed     :\t%d MHz\n", cuinfo.clock);

@@ -102,7 +102,7 @@ else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
     ifeq ($(ISCLANG),)
-        OPENMPLIB=-static-libgcc -static-libstdc++ /usr/local/lib/libgomp.a
+        OPENMPLIB=-static-libgcc -static-libstdc++ $(shell $(CC) --print-file-name=libgomp.a)
         OPENMP=-fopenmp
     else
         OPENMPLIB=/usr/local/lib/libomp.a
