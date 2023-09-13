@@ -211,3 +211,31 @@ void sleep_ms(int milliseconds) {
     usleep(milliseconds * 1000);
 #endif
 }
+
+
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+
+int EnableVTMode() {
+    // Set output mode to handle virtual terminal sequences
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    if (hOut == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    DWORD dwMode = 0;
+
+    if (!GetConsoleMode(hOut, &dwMode)) {
+        return 0;
+    }
+
+    dwMode |= ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+    if (!SetConsoleMode(hOut, dwMode)) {
+        return 0;
+    }
+
+    return 1;
+}
+
+#endif

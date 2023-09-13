@@ -50,6 +50,10 @@
 #include "zmat/zmatlib.h"
 #include "ubj/ubj.h"
 
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+    #include "mmc_tictoc.h"
+#endif
+
 #ifdef MCX_EMBED_CL
     #include "mmc_core.clh"
 #endif
@@ -2569,6 +2573,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
     char logfile[MAX_PATH_LENGTH] = {0};
     float np = 0.f;
 
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+    EnableVTMode();
+#endif
+
     if (argc <= 1) {
         mcx_usage(argv[0], cfg);
         exit(0);
@@ -2865,7 +2873,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         } else {
                             MMC_FPRINTF(cfg->flog, "Built-in benchmarks:\n");
 
-                            for (i = 0; i < sizeof(benchname) / sizeof(char*) -1; i++) {
+                            for (i = 0; i < sizeof(benchname) / sizeof(char*) - 1; i++) {
                                 MMC_FPRINTF(cfg->flog, "\t%s\n", benchname[i]);
                             }
 
