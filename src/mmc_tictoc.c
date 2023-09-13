@@ -215,6 +215,10 @@ void sleep_ms(int milliseconds) {
 
 #if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
 
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+
 int EnableVTMode() {
     // Set output mode to handle virtual terminal sequences
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
