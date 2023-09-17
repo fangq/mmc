@@ -7,19 +7,25 @@
 #  by Qianqian Fang <q.fang at neu.edu>
 #
 #  Format:
-#     ./buildmmc.sh <releasetag>
+#     ./buildmmc.sh <releasetag> <branchname>
 #                   releasetag defaults to "nightly" if not given
+#                   branchname defaults to the default main branch
 #
 #  Dependency:
 #   - To compile mmc binary, mmclab for octave
 #
-#     sudo apt-get install gcc liboctave-dev
+#     for Linux:
+#         sudo apt-get install gcc liboctave-dev upx-ucl vim-common ocl-icd-opencl-dev
 #
 #   - To compile mmclab for MATLAB, one must install MATLAB first, also search
 #     and replace R20xx in this script to match your system's MATLAB version
 #   - For Windows, first install Cygwin64, and install x86_64-w64-mingw32-gcc/g++
+#     or install MSYS2 with mingw64 based gcc compilers
 #
 ###############################################################################
+
+
+## setting up environment
 
 BUILD='nightly'
 if [ ! -z "$1" ]; then
@@ -42,18 +48,24 @@ fi
 
 TAG=${OS}-${MACHINE}-${BUILD}
 
-SERVER=
-REMOTEPATH=
-
 if [ "$BUILD" == "nightly" ]; then
 	TAG=${OS}-${MACHINE}-${BUILD}build
 fi
+
+## setting up upload server (blank if no need to upload)
+
+SERVER=
+REMOTEPATH=
+
+## checking out latest github code
 
 mkdir -p $BUILDROOT
 cd $BUILDROOT
 
 rm -rf mmc
 git clone https://github.com/fangq/mmc.git
+
+## automatically update revision/version number
 
 cat <<EOF >>mmc/.git/config
 [filter "rcs-keywords"]
@@ -69,11 +81,15 @@ rm -rf *
 git checkout *
 rm -rf .git
 
+## zip and upload source code package
+
 cd ..
 zip -FSr $BUILDROOT/mmc-src-${BUILD}.zip mmc
 if [ "$OS" == "linux" ] && [ ! -z "$SERVER" ]; then
 	scp $BUILDROOT/mmc-src-${BUILD}.zip $SERVER:$REMOTEPATH/src/
 fi
+
+## build matlab mex file
 
 cd mmc/src
 
@@ -87,17 +103,21 @@ else
 	make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" &>../mmclab/AUTO_BUILD_${DATE}.log
 fi
 
+## build octave mex file
+
 make clean
 if [ "$OS" == "macos" ]; then
 	make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" >>../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 elif [ "$OS" == "win" ]; then
 	OLDPATH="$PATH"
-	export PATH="C:\Octave\Octave-8.2.0\mingw64\bin":$PATH
+	export PATH="C:\Octave\Octave-8.2.1\mingw64\bin":$PATH
 	make oct CC=gcc MEXLINKOPT='"C:\tools\msys64\mingw64\lib\gcc\x86_64-w64-mingw32\10.3.0\libgomp.a" "C:\cygwin64\usr\x86_64-w64-mingw32\sys-root\mingw\lib\libwinpthread.a" -static-libgcc -static-libstdc++' >>../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 	export PATH="$OLDPATH"
 else
 	make oct MEXLINKOPT="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lm -lpthread -Wl,-Bdynamic" >>../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 fi
+
+## test mex file dependencies
 
 mexfile=(../mmclab/mmc.mex*)
 
@@ -114,28 +134,35 @@ else
 	echo "Build Octave MMCLAB Failed" >>../mmclab/AUTO_BUILD_${DATE}.log
 fi
 
+## compress mex files with upx
+
+upx -9 ../mmclab/mmc.mex* || true
+
+## zip and upload mex package
+
 if [ "$BUILD" != "nightly" ]; then
 	rm -rf ../mmclab/AUTO_BUILD_${DATE}.log
 fi
 
-#cp $BUILDROOT/dlls/*.dll ../mmclab
+cp $BUILDROOT/dlls/*.dll ../mmclab
 cd ..
 zip -FSr $BUILDROOT/mmclab-${TAG}.zip mmclab
 cd src
 [ ! -z "$SERVER" ] && scp $BUILDROOT/mmclab-${TAG}.zip $SERVER:$REMOTEPATH/${OS}64/
+
+## compile standalone binary/executable
 
 make clean
 
 if [ "$OS" == "macos" ]; then
 	make &>$BUILDROOT/mmc_buildlog_${DATE}.log
 elif [ "$OS" == "win" ]; then
-	OLDPATH="$PATH"
-	export PATH="C:\Octave\Octave-8.2.0\mingw64\bin":$PATH
-	make USERARFLAGS="libzmat.a -lz" &>$BUILDROOT/mmc_buildlog_${DATE}.log
-	export PATH="$OLDPATH"
+	make &>$BUILDROOT/mmc_buildlog_${DATE}.log
 else
 	make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -lOpenCL -lm" &>$BUILDROOT/mmc_buildlog_${DATE}.log
 fi
+
+## test binary dependencies
 
 if [ -f "../bin/mmc" ]; then
 	if [ "$OS" == "macos" ]; then
@@ -151,11 +178,15 @@ else
 	exit 1
 fi
 
-#upx -9 ../bin/mmc
+## compress binary with upx
+
+upx -9 ../bin/mmc* || true
+
+## zip and upload binary package
 
 cd ../
 rm -rf .git* .travis* mmclab webmmc commons win32 pmcxcl deploy
-cp $BUILDROOT/dlls/*.dll bin
+#cp $BUILDROOT/dlls/*.dll bin
 rm -rf src .git_filters .gitattributes
 cd ../
 
