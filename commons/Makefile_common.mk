@@ -98,7 +98,7 @@ else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     DLLFLAG     =
     MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
+    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers -I/usr/local/include
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
     ifeq ($(ISCLANG),)
