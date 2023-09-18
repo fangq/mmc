@@ -2,6 +2,117 @@ Change Log
 
 == MMC 2.0.0 (v2023, Mochi), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2023-09-17 [6569f48] add comments to nightly build script for deployment
+ 2023-09-16 [c242cf7] update deploy script after reformat
+ 2023-09-13 [d3f25c6] avoid error on old windows sdk
+ 2023-09-13 [8a59cf0] support ASCII escape code in Windows terminals
+ 2023-09-12 [29480d5] only build main function in mmclab for apple
+ 2023-09-12 [86d5658] get around macos make oct error
+ 2023-09-12 [2bada1e] remove some warnings
+ 2023-09-12 [130570b] remove all file IO functions from mex and oct files
+ 2023-09-11 [4ca899f] remove liboctinterp-11, the output is only compatible to octave 8
+ 2023-09-10 [eb14b10] add fopenmp back for mex
+ 2023-09-10 [e20d718] leave out libgomp
+ 2023-09-10 [ee11269] try to statically link libpthread
+ 2023-09-10 [a42553b] fix build error
+ 2023-09-10 [75240d5] use upx compression
+ 2023-09-10 [7264068] clean make oct output before make mex
+ 2023-09-10 [06bcb39] test win matlab mex build
+ 2023-09-10 [dc5ad09] debug windows matlab mex
+ 2023-09-10 [fe21a6b] fix typo, add dll to package
+ 2023-09-10 [a902077] test windows matlab build
+ 2023-09-10 [c25420d] use octave 8 bundled gcc
+ 2023-09-10 [a5203e5] try octave 8.3 for windows build
+ 2023-09-10 [bb1aada] remove matlab gui waitbar, update README and docs
+ 2023-09-09 [13f3760] compute Reff for every medium for normalization
+ 2023-09-09 [1758504] fix gcc error on gcc 4.8
+ 2023-09-09 [7426c8d] guard CMP0074 cmake policy with version
+ 2023-09-08 [1455fbb] enable static linking with gcc with cmake
+ 2023-09-08 [4829e35] fix mex file missing symbol error, thanks to @ShijieYan
+ 2023-09-08 [03e36cd] support building cuda/trinity mex file
+ 2023-09-08 [d38e7e5] add missing zmat cmake file, add mmc-trinity cuda support in cmake
+ 2023-09-08 [74a3035] add the cmake file that was forgot to add
+ 2023-09-08 [1f2ef63] fix incorrect unit in the figure title
+ 2023-09-04 [6e41cfe] fix normalization bug on the exterior surface, close #82
+ 2023-09-03 [20e4dd8] reformat comments in mmc.c with doxygen
+ 2023-09-03 [260e6c0] update documentation
+ 2023-09-01 [a453381] -ffile-prefix-map is only supported in gcc-8 see https://github.com/pandas-dev/pandas/issues/40997
+ 2023-09-01 [b80e801] add apt source to install gcc-7
+ 2023-09-01 [397b7d6] use gcc-7 to build mmc on Linux
+ 2023-09-01 [fe125ad] renormalize dir vector after each scattering, suggested by @ShijieYan
+ 2023-08-31 [f4fc140] update v2023 code name
+ 2023-08-31 [1da18ff] comparing r.eid with signed integer constant, fix #77
+ 2023-08-31 [bfcde02] add the missing maxdetphoton input field in the help info
+ 2023-08-30 [ce80a04] update mmc2json
+ 2023-08-30 [e6f6075] fix progress bar printing issue after makefile update
+ 2023-08-30 [289781f] update documentation
+ 2023-08-30 [bb187a4] allow nightly build on macos
+ 2023-08-29 [7949825] fix ci error again
+ 2023-08-29 [11b1c33] update zmatlib, replace zlib by miniz, update cmake, update version
+ 2023-05-19 [01ed20b] remove ubuntu-18.04 from github action
+ 2023-05-18 [aac1f65] remove macos-10.15 as github retires it, upgrade gcc on the mac
+ 2023-03-27 [c84a303] make mmcraytrace able to handle surface input
+ 2023-03-14 [4162880] fix macos error
+ 2023-03-14 [cc126b6] try static as much as possible to link oct mex
+ 2023-03-14 [0472818] add -static to oct mex
+ 2023-03-14 [07438c6] try -static on octave based mmclab
+ 2023-03-14 [64f8503] add path to libz
+ 2023-03-14 [9d6509e] add libz.a path
+ 2023-03-14 [b1b1e6e] use LDFLAGS
+ 2023-03-14 [4c6f392] link libzmat
+ 2023-03-14 [2e3894b] finally found the culprit in the Makefile, matlab-actions/setup-matlab#60
+ 2023-03-14 [1394602] put env at the end, tlab-actions/setup-matlab#60
+ 2023-03-14 [8ef68b2] use env to set MW_MINGW64_LOC, matlab-actions/setup-matlab#60
+ 2023-03-14 [03274d7] add more include paths
+ 2023-03-14 [d760692] revert back to the link mingw gcc to msys
+ 2023-03-13 [0890cea] change msys2 package name
+ 2023-03-13 [e55ab10] use ucrt gcc
+ 2023-03-13 [2e961cf] install msys2 gcc
+ 2023-03-13 [ee7b8ef] add library link
+ 2023-03-13 [db99b15] create links
+ 2023-03-13 [70acd74] hacking msys2 env variable not inherient issue
+ 2023-03-13 [7780543] forcing MW_MINGW64_LOC
+ 2023-03-13 [9248b65] try another way to define MW_MINGW64_LOC,matlab-actions/setup-matlab#60
+ 2023-03-13 [9122715] define MW_MINGW64_LOC with pwsh syntax, matlab-actions/setup-matlab#60
+ 2023-03-13 [0ae6352] define MW_MINGW64_LOC to make mexopts work, matlab-actions/setup-matlab#60
+ 2023-03-13 [60d5331] debug mex compilation issue on windows, matlab-actions/setup-matlab#60
+ 2023-03-13 [afa6f89] debug mex file on windows
+ 2023-03-13 [b76de50] build matlab mex on windows
+ 2023-03-13 [5458312] revert to setup-matlab@v1
+ 2023-03-12 [aedc145] use objdump for windows to list dlls
+ 2023-03-12 [8d6fb98] try ldd on windows again
+ 2023-03-12 [18ad85f] disable windows setup-matlab again, matlab-actions/setup-matlab#60
+ 2023-03-12 [c23aecc] make macos octave path more robust
+ 2023-03-12 [a9c7cdd] use mexopt for gcc on mac
+ 2023-03-12 [13119d5] test gcc on mac again
+ 2023-03-12 [f1cc618] remove gcc library
+ 2023-03-12 [f91638e] fix yaml error
+ 2023-03-12 [0f49ccb] exclude windows for matlab build
+ 2023-03-12 [9026ac6] add libomp header path
+ 2023-03-12 [654ab24] set CC to clang
+ 2023-03-11 [aaa10d7] print PATH on mac
+ 2023-03-11 [41c58c3] let's locate and link gcc to cc
+ 2023-03-11 [37ad5e4] add libomp for mac
+ 2023-03-11 [b7a60b7] use gcc-10 on macOS for matlab mex
+ 2023-03-11 [22dcb61] force mac mex to use gcc
+ 2023-03-11 [f1bca2c] setup matlab R2020a is too slow
+ 2023-03-11 [6eb2c1d] use setup-matlab@v2-beta
+ 2023-03-11 [3a6719a] debug mmclab merging
+ 2023-03-11 [780f84f] build matlab mex
+ 2023-03-11 [9502ce1] test matlab setup
+ 2023-03-11 [4afd98e] try links
+ 2023-03-11 [073184c] avoid unzipping warning
+ 2023-03-11 [1faa998] use computer arch tag for octave
+ 2023-03-11 [4d04f44] add mmc.mex to arch specific folder
+ 2023-03-11 [7afb2c3] move PKG_ADD to the mmclab folder
+ 2023-03-11 [1df52df] try another way to zip mmc package
+ 2023-03-11 [4cded48] create all-in-one octave package
+ 2023-03-11 [1674054] remove tabs
+ 2023-03-11 [c8ddacd] merge all actions
+ 2023-03-11 [6c8573f] prepare to merge all
+ 2023-03-11 [d27776c] fix windows zip missing error
+ 2023-03-11 [ed784d5] remove tab
+ 2023-03-11 [720b781] use switch to Linux runner to upload to server
  2023-03-04 [465ef20] implement github ci
  2023-01-03 [3ddff2b] force flushing in terminal and matlab
  2023-01-02 [849d09a] bump up version number
