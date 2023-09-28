@@ -214,12 +214,10 @@ int mcx_nv_corecount(int v1, int v2) {
         return 48;
     } else if (v < 50) {
         return 192;
-    } else if (v < 60) {
+    } else if (v < 60 || v == 61) {
         return 128;
-    } else if (v < 61) {
-        return 64;
     } else {
-        return 128;
+        return 64;
     }
 }
 
