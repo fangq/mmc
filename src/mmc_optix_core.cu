@@ -16,7 +16,7 @@ enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // heuristic to ensure ray cut through triangle
-constexpr float DOUBLE_SAFETY_DISTANCE = 0.0002f;
+constexpr float DOUBLE_SAFETY_DISTANCE = SAFETY_DISTANCE * 2.0f;
 
 // simulation configuration and medium optical properties
 extern "C" {
