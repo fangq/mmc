@@ -71,6 +71,7 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     MMC_FPRINTF(cfg->flog, "lauching OptiX for time window [%.1fns %.1fns] ...\n",
         cfg->tstart * 1e9, cfg->tend * 1e9);
     fflush(cfg->flog);
+    uint kernel_start_time = GetTimeMillis();
     OPTIX_CHECK(optixLaunch(/*! pipeline we're launching launch: */
                         optixcfg.pipeline,
                         optixcfg.stream,
@@ -81,8 +82,11 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
                         /*! dimensions of the launch: */
                         optixcfg.launchWidth, 1, 1));
     CUDA_ASSERT(cudaDeviceSynchronize());
+    uint kernel_runtime = GetTimeMillis() - kernel_start_time;
     MMC_FPRINTF(cfg->flog, "kernel complete:  \t%d ms\nretrieving flux ... \t",
         GetTimeMillis() - tic0);
+    MMC_FPRINTF(cfg->flog, "simulated %zu photons (%zu) with 1 devices \nMMC simulation speed: %.2f photon/ms\n",
+        cfg->nphoton, cfg->nphoton, (double)cfg->nphoton / kernel_runtime);
     fflush(cfg->flog);
 
     // ==================================================================
