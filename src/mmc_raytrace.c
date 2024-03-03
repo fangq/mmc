@@ -983,40 +983,45 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
  */
 void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], float3 p2d[2], int* hitstatus) {
     float3 u, OP;
-    float r2;
+    float r2, d1, d2;
 
-    p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1];
-    p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]] - 1];
+    p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1]; // end id of the edge, E1
+    p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]] - 1]; // start id of the edge, E0
 
-    vec_diff(p2d + 1, p2d, &u);
-    r2 = dist(p2d + 1, p2d); // get coordinates and compute distance between two nodes
+    vec_diff(p2d + 1, p2d, &u); // vector of the edge u = <E0 -> E1>
+    r2 = dist(p2d + 1, p2d); // get coordinates and compute edge length between E0-E1
     r2 = 1.0f / r2;
-    vec_mult(&u, r2, &u); // normalized vector of the edge
+    vec_mult(&u, r2, &u); // normalized vector of the edge as u
 
-    vec_diff(p2d + 1, &r->p0, &OP);
-    r2 = vec_dot(&OP, &u);
-    vec_mult(&u, r2, p2d);
-    vec_diff(p2d, &OP, p2d);    // PP0: P0 projection on plane
-    d2d[0] = vec_dot(p2d, p2d);
+    vec_diff(p2d + 1, &r->p0, &OP); // edge-end to ray-start, OP= <P0 -> E1>
+    d1 = vec_dot(&OP, &u);      // projection of OP to u
+    vec_mult(&u, d1, p2d);      // p2d now stores the vector starts with edge-start, ends with the orthogonal projection of ray-start P0
+    vec_diff(p2d, &OP, p2d);    // PP0: P0 projection on plane, computed by OP - p2d
+    d2d[0] = vec_dot(p2d, p2d); // ray-start (P0) distance to the edge squared
+
+    d1 = !(d1 < 0.f || d1 * r2 > 1.f);
 
     vec_mult(&r->vec, r->Lmove, &OP);
-    vec_add(&r->p0, &OP, &OP);      // P1
+    vec_add(&r->p0, &OP, &OP);      // P1, ray-end
     vec_diff(p2d + 1, &OP, &OP);
-    r2 = vec_dot(&OP, &u);
-    vec_mult(&u, r2, p2d + 1);
+    d2 = vec_dot(&OP, &u);
+    vec_mult(&u, d2, p2d + 1);
     vec_diff(p2d + 1, &OP, p2d + 1); // PP1: P1 projection on plane
-    d2d[1] = vec_dot(p2d + 1, p2d + 1);
+    d2d[1] = vec_dot(p2d + 1, p2d + 1); // ray-end (P1) distance to the edge squared
 
-    r2 = r->roisize[edgeid] * r->roisize[edgeid];
+    d2 = !(d2 < 0.f || d2 * r2 > 1.f);
+
+    r2 = r->roisize[edgeid] * r->roisize[edgeid]; // squared radius of the edge-roi
+
     *hitstatus = htNone;
 
-    if (d2d[0] > r2 + EPS2 && d2d[1] < r2 - EPS2) {
+    if (d2d[0] > r2 + EPS2 && d2d[1] < r2 - EPS2 && d2) {
         *hitstatus = htOutIn;
-    } else if (d2d[0] < r2 - EPS2 && d2d[1] > r2 + EPS2) {
+    } else if (d2d[0] < r2 - EPS2 && d1 && d2d[1] > r2 + EPS2) {
         *hitstatus = htInOut;
     } else if (d2d[1] > r2 + EPS2) {
         *hitstatus = htNoHitOut;
-    } else if (d2d[1] < r2 - EPS2) {
+    } else if (d2d[1] < r2 - EPS2 && d2) {
         *hitstatus = htNoHitIn;
     }
 }
@@ -1197,29 +1202,29 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
             float distdata[2];
             float3 projdata[2];
 
-            for (i = 0; i < 6; i++) { /** loop over each edge in current element */
+            for (i = 0; i < 6; i++) { /** loop over each edge in current element, find the closest hit */
                 if (r->roisize[i] > 0.f) {
                     /** decide if photon is in the roi or not */
                     compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
 
                     /**
-                       hitstatus has 4 possible outputs:
-                       htInOut: photon path intersects with cylinder, moving from in to out
-                       htOutIn: photon path intersects with cylinder, moving from out to in
-                       htNoHitIn: both ends of photon path are inside cylinder, no intersection
-                       htNoHitOut: both ends of photon path are outside cylinder, no intersection
-                       htNone: unexpected, should never happen
+                     *  hitstatus has 4 possible outputs:
+                     *  htInOut: photon path intersects with cylinder, moving from in to out
+                     *  htOutIn: photon path intersects with cylinder, moving from out to in
+                     *  htNoHitIn: both ends of photon path are inside cylinder, no intersection
+                     *  htNoHitOut: both ends of photon path are outside cylinder, no intersection
+                     *  htNone: unexpected, should never happen
                      */
                     if (doinit) {
-                        r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn);
+                        r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn); /** start position is in ROI - initialize state */
                     } else {
                         if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
                             /** calculate the first intersection distance normalied by path seg length */
                             float lratio = ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
 
-                            if (lratio < minratio) {
+                            if (lratio < minratio) { /** find the closest hit */
                                 minratio = lratio;
-                                firsthit = hitstatus;
+                                firsthit = hitstatus; /** closest hit status  */
                                 r->roiidx = i;
                             }
                         } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
@@ -1781,6 +1786,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
     const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
     int_coef = _mm_load_ps(int_coef_arr);
 
+    /** retrieve the iMMC ROI size and ray location at initial launch */
     if (cfg->implicit) {
         updateroi(cfg->implicit, &r, tracer->mesh);
         traceroi(&r, tracer, cfg->implicit, 1);
@@ -2544,6 +2550,16 @@ void visitor_clear(visitor* visit) {
     free(visit->kahanc1);
     visit->kahanc1 = NULL;
 }
+
+/**
+ * @brief Retrieve the roisize (radius of node or edge or thickness of face) if present in the current element
+ *
+ * This function returns ROI size for iMMC simulations
+ *
+ * \param[in] immctype: cfg->implicit = 1: node or edge iMMC, 2: face iMMC
+ * \param[in,out] r: the current ray, r->roisize is the output
+ * \param[in] mesh: the mesh data structure
+ */
 
 void updateroi(int immctype, ray* r, tetmesh* mesh) {
     if (immctype == 1 && mesh->edgeroi) {
