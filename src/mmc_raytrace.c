@@ -975,15 +975,15 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
 
 /**
- * \brief Compute distances to edge (cylindrical) ROIs in the element
+ * \brief Compute distances to edge (infinite cylindrical) ROIs in the element
  *
- * Commpute the distance between P0 and the labeled edge
- * and the distance between P1 and the labeled edge.
+ * Commpute the distance between P0 (ray-start) and the labeled edge
+ * and the distance between P1 (ray-end) and the labeled edge.
  * P0 is the entry point and P1 is the exit point
  */
 void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], float3 p2d[2], int* hitstatus) {
     float3 u, OP;
-    float r2, d1, d2;
+    float r2, d1;
 
     p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1]; // end id of the edge, E1
     p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]] - 1]; // start id of the edge, E0
@@ -991,37 +991,33 @@ void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, f
     vec_diff(p2d + 1, p2d, &u); // vector of the edge u = <E0 -> E1>
     r2 = dist(p2d + 1, p2d); // get coordinates and compute edge length between E0-E1
     r2 = 1.0f / r2;
-    vec_mult(&u, r2, &u); // normalized vector of the edge as u
+    vec_mult(&u, r2, &u); // normalized vector of the edge, u is now unitary
 
-    vec_diff(p2d + 1, &r->p0, &OP); // edge-end to ray-start, OP= <P0 -> E1>
+    vec_diff(p2d + 1, &r->p0, &OP); // ray-start to edge-end, OP = <P0 -> E1>
     d1 = vec_dot(&OP, &u);      // projection of OP to u
-    vec_mult(&u, d1, p2d);      // p2d now stores the vector starts with edge-start, ends with the orthogonal projection of ray-start P0
+    vec_mult(&u, d1, p2d);      // p2d now stores the vector starts with edge-start, ends with the orthogonal projection of vector OP=<P0->E1>
     vec_diff(p2d, &OP, p2d);    // PP0: P0 projection on plane, computed by OP - p2d
     d2d[0] = vec_dot(p2d, p2d); // ray-start (P0) distance to the edge squared
 
-    d1 = !(d1 < 0.f || d1 * r2 > 1.f);
-
     vec_mult(&r->vec, r->Lmove, &OP);
     vec_add(&r->p0, &OP, &OP);      // P1, ray-end
-    vec_diff(p2d + 1, &OP, &OP);
-    d2 = vec_dot(&OP, &u);
-    vec_mult(&u, d2, p2d + 1);
+    vec_diff(p2d + 1, &OP, &OP);    // OP = <P1 -> E1> vector from ray-end to edge-end
+    d1 = vec_dot(&OP, &u);
+    vec_mult(&u, d1, p2d + 1);
     vec_diff(p2d + 1, &OP, p2d + 1); // PP1: P1 projection on plane
     d2d[1] = vec_dot(p2d + 1, p2d + 1); // ray-end (P1) distance to the edge squared
-
-    d2 = !(d2 < 0.f || d2 * r2 > 1.f);
 
     r2 = r->roisize[edgeid] * r->roisize[edgeid]; // squared radius of the edge-roi
 
     *hitstatus = htNone;
 
-    if (d2d[0] > r2 + EPS2 && d2d[1] < r2 - EPS2 && d2) {
+    if (d2d[0] > r2 + EPS2 && d2d[1] < r2 - EPS2) {
         *hitstatus = htOutIn;
-    } else if (d2d[0] < r2 - EPS2 && d1 && d2d[1] > r2 + EPS2) {
+    } else if (d2d[0] < r2 - EPS2 && d2d[1] > r2 + EPS2) {
         *hitstatus = htInOut;
     } else if (d2d[1] > r2 + EPS2) {
         *hitstatus = htNoHitOut;
-    } else if (d2d[1] < r2 - EPS2 && d2) {
+    } else if (d2d[1] < r2 - EPS2) {
         *hitstatus = htNoHitIn;
     }
 }
@@ -1192,7 +1188,9 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
     int eid = r->eid - 1;
     int* ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
 
-    if (roitype == 1) { /** edge and node immc - edge also depends on node */
+    if (roitype == 1) { /** edge and node immc - edge also depends on node, only test intersection with an infinite cylinder */
+        int neweid = -1;
+        int* newee;
         int i;
         float minratio = 1.f;
         int hitstatus = htNone, firsthit = htNone, firstinout = htNone;
@@ -1202,48 +1200,63 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
             float distdata[2];
             float3 projdata[2];
 
-            for (i = 0; i < 6; i++) { /** loop over each edge in current element, find the closest hit */
-                if (r->roisize[i] > 0.f) {
-                    /** decide if photon is in the roi or not */
-                    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
+            if (r->roisize[0] != 0.f) {
+                // test if this is a reference element, indicated by a negative radius
+                if (r->roisize[0] < -6.f) {
+                    neweid = (int)(-r->roisize[0]) - 6;
+                    r->refeid = neweid;
+                    newee = (int*)(tracer->mesh->elem + (neweid - 1) * tracer->mesh->elemlen);
+                    r->roisize = (float*)(tracer->mesh->edgeroi + (neweid - 1) * 6); // update r->roisize array to the referenced element
+                }
 
-                    /**
-                     *  hitstatus has 4 possible outputs:
-                     *  htInOut: photon path intersects with cylinder, moving from in to out
-                     *  htOutIn: photon path intersects with cylinder, moving from out to in
-                     *  htNoHitIn: both ends of photon path are inside cylinder, no intersection
-                     *  htNoHitOut: both ends of photon path are outside cylinder, no intersection
-                     *  htNone: unexpected, should never happen
-                     */
-                    if (doinit) {
-                        r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn); /** start position is in ROI - initialize state */
-                    } else {
-                        if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
-                            /** calculate the first intersection distance normalied by path seg length */
-                            float lratio = ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
+                for (i = 0; i < 6; i++) { /** loop over each edge in current element, find the closest hit */
+                    if (r->roisize[i] > 0.f) {
+                        /** decide if photon is in the roi or not */
+                        if (neweid < 0) {
+                            compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
+                        } else {
+                            compute_distances_to_edge(r, tracer, newee, i, distdata, projdata, &hitstatus);
+                        }
 
-                            if (lratio < minratio) { /** find the closest hit */
-                                minratio = lratio;
-                                firsthit = hitstatus; /** closest hit status  */
-                                r->roiidx = i;
+
+                        /**
+                         *  hitstatus has 4 possible outputs:
+                         *  htInOut: photon path intersects with cylinder, moving from in to out
+                         *  htOutIn: photon path intersects with cylinder, moving from out to in
+                         *  htNoHitIn: both ends of photon path are inside cylinder, no intersection
+                         *  htNoHitOut: both ends of photon path are outside cylinder, no intersection
+                         *  htNone: unexpected, should never happen
+                         */
+                        if (doinit) {
+                            r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn); /** start position is in ROI - initialize state */
+                        } else {
+                            if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
+                                /** calculate the first intersection distance normalied by path seg length */
+                                float lratio = ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
+
+                                if (lratio < minratio) { /** find the closest hit */
+                                    minratio = lratio;
+                                    firsthit = hitstatus; /** closest hit status  */
+                                    r->roiidx = i;
+                                }
+                            } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
+                                firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
                             }
-                        } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
-                            firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
                         }
                     }
                 }
-            }
 
-            if (minratio < 1.f) {
-                r->Lmove *= minratio;
-            }
+                if (minratio < 1.f) {
+                    r->Lmove *= minratio;
+                }
 
-            if (!doinit) {
-                r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
-                r->inroi = (firsthit == htNone && firstinout == htNone) ? 0 : r->inroi;
-            }
+                if (!doinit) {
+                    r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
+                    r->inroi = (firsthit == htNone && firstinout == htNone) ? 0 : r->inroi;
+                }
 
-            r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
+                r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
+            }
         }
 
         if (firsthit == htNone && firstinout != htNoHitIn && tracer->mesh->noderoi) {

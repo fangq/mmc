@@ -930,6 +930,38 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                 tracer->mesh->edgeroi[i * 6] = -count;    // number -1 to -6 indicates how many faces have ROIs
             }
         }
+
+        for (i = 0; i < ne; i++) {
+            if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
+                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
+                    int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
+
+                    if (id > 0 && fabs(tracer->mesh->edgeroi[(id - 1) * 6]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
+                        tracer->mesh->edgeroi[i * 6] = -id - 6;
+                        break;
+                    }
+                }
+            }
+
+            if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
+                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
+                    int firstnbid = tracer->mesh->facenb[i * tracer->mesh->elemlen + j] - 1; // loop over neighboring elements
+
+                    if (firstnbid < 0) {
+                        continue;
+                    }
+
+                    for (k = 0; k < tracer->mesh->elemlen; k++) { // loop over my j-th neighbor's neighbors
+                        int id = tracer->mesh->facenb[firstnbid * tracer->mesh->elemlen + k]; // loop over 2nd order neighboring elements
+
+                        if (id > 0 && fabs(tracer->mesh->edgeroi[(id - 1) * 6]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
+                            tracer->mesh->edgeroi[i * 6] = -id - 6;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // build acceleration data structure to speed up first-neighbor immc face-roi calculation
@@ -953,7 +985,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                 for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
                     int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
 
-                    if (id > 0 && tracer->mesh->faceroi[(id - 1) << 2] < 0.f) { // if I don't have roi, but neighbor has, set ref id as -elemid-4, only handle 1 roi neighbor case
+                    if (id > 0 && fabs(tracer->mesh->faceroi[(id - 1) << 2]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-4, only handle 1 roi neighbor case
                         tracer->mesh->faceroi[i << 2] = -id - 4;
                         break;
                     }

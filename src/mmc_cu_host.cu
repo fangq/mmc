@@ -451,7 +451,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         Pseed[j] = rand();
     }
 
-    CUDA_ASSERT(cudaMalloc((void**)&gseed, sizeof(uint) * gpu[gpuid].autothread *
+    CUDA_ASSERT(cudaMalloc((void**)&gseed, sizeof(uint) * gpu[gpuid].autothread*
                            RAND_SEED_WORD_LEN));
     CUDA_ASSERT(cudaMemcpy(
                     gseed, Pseed, sizeof(uint) * gpu[gpuid].autothread * RAND_SEED_WORD_LEN,
@@ -492,10 +492,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                                cudaMemcpyHostToDevice));
     } else if (cfg->srctype == MCX_SRC_PATTERN3D) {
         CUDA_ASSERT(cudaMalloc((void**)&gsrcpattern,
-                               sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y *
+                               sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y*
                                        cfg->srcparam1.z)));
         CUDA_ASSERT(cudaMemcpy(gsrcpattern, cfg->srcpattern,
-                               sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y *
+                               sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y*
                                        cfg->srcparam1.z),
                                cudaMemcpyHostToDevice));
     } else {
@@ -655,7 +655,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                             cfg->exportdetected, (cfg->detectedcount + detected) *
                             hostdetreclen * sizeof(float));
                         memcpy(cfg->exportdetected + cfg->detectedcount * (hostdetreclen),
-                        Pdet, detected * (hostdetreclen) * sizeof(float));
+                               Pdet, detected * (hostdetreclen) * sizeof(float));
 
                         if (cfg->issaveseed) {
                             cfg->exportseed = (unsigned char*)realloc(cfg->exportseed, (cfg->detectedcount + detected) * (sizeof(RandType) * RAND_BUF_LEN));
@@ -722,7 +722,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                 }
 
                 CUDA_ASSERT(cudaMemcpy(gseed, Pseed,
-                                       sizeof(uint) * gpu[gpuid].autothread *
+                                       sizeof(uint) * gpu[gpuid].autothread*
                                        RAND_SEED_WORD_LEN,
                                        cudaMemcpyHostToDevice));
                 free(Pseed);
