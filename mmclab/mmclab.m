@@ -474,7 +474,7 @@ if(mmcout>=2)
     end
 end
 
-if (mmcout >= 3 || (~isempty(cfg) && isstruct(cfg) && isfield(cfg, 'debuglevel') && ~isempty(regexp(cfg(1).debuglevel, '[sS]', 'once'))))
+if (mmcout > 3 || (~isempty(cfg) && isstruct(cfg) && isfield(cfg, 'debuglevel') && ~isempty(regexp(cfg(1).debuglevel, '[sS]', 'once'))))
     for i = 1:length(varargout{4})
         data = varargout{4}.data;
         if (isempty(data))
