@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2023
+**  \copyright Qianqian Fang, 2010-2024
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -32,9 +32,9 @@
 #ifndef _MCEXTREME_CONSTANT_H
 #define _MCEXTREME_CONSTANT_H
 
-#define MMC_VERSION        "v2023"
+#define MMC_VERSION        "v2024.2"
 #define MMC_VERSION_MAJOR  2
-#define MMC_VERSION_MINOR  0
+#define MMC_VERSION_MINOR  2
 #define MMC_VERSION_PATCH  0
 
 #define DET_MASK           0xFFFF0000

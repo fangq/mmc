@@ -2,8 +2,8 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 1.9, v2020
-*URL: http://mcx.space/wiki/?Learn#mmc
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 2.2, v2024.2
+*URL: https://mcx.space/wiki/?Learn#mmc
 
 <toc>
 
@@ -53,24 +53,30 @@ the verbose command line options in MMC.
 
 <pre>
  #############################################################################%
-          MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
-           Copyright (c) 2010-2019 Qianqian Fang <q.fang at neu.edu>          %
-                             http://mcx.space/#mmc                            %
+                      Mesh-based Monte Carlo (MMC) - OpenCL                   %
+           Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          %
+               https://mcx.space/#mmc  &  https://neurojson.io/               %
                                                                               %
-  Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
-             Department of Bioengineering, Northeastern University            %
-                                                                              %
-                Research funded by NIH/NIGMS grant R01-GM114365               %
+ Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
+    Department of Bioengineering, Northeastern University, Boston, MA, USA    %
  #############################################################################%
- $Rev::c38804$2019.4$Date::Qianqian Fang          $ by $Author::Qianqian Fang$%
+     The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      %
+ #############################################################################%
+   Open-source codes and reusable scientific data are essential for research, %
+  MCX proudly developed human-readable JSON-based data formats for easy reuse.%
+                                                                              %
+ Please visit our free scientific data sharing portal at https://neurojson.io/%
+  and consider sharing your public datasets in standardized JSON/JData format %
+ #############################################################################%
+ $Rev::4ca899$v2024.2$Date::2023-09-11 17:37:07 -04$ by $Author::Qianqian Fang%
  #############################################################################%
  
   Format:
-     [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
+     [fluence,detphoton,ncfg,seeds,traj]=mmclab(cfg);
            or
      fluence=mmclab(cfg);
      newcfg=mmclab(cfg,'prep');
-     [fluence,detphoton,ncfg,seeds]=mmclab(cfg, options);
+     [fluence,detphoton,ncfg,seeds,traj]=mmclab(cfg, options);
  
   Input:
      cfg: a struct, or struct array. Each element in cfg defines 
@@ -178,7 +184,6 @@ the verbose command line options in MMC.
                        source, see cfg.srctype='pattern' for details
                        Example <demo_photon_sharing.m>
        cfg.replaydet:  only works when cfg.outputtype is 'jacobian', 'wl', 'nscat', or 'wp' and cfg.seed is an array
-                       -1 replay all detectors and save in separate volumes (output has 5 dimensions)
                         0 replay all detectors and sum all Jacobians into one volume
                         a positive number: the index of the detector to replay and obtain Jacobians
        cfg.voidtime:   for wide-field sources, [1]-start timer at launch, 0-when entering
@@ -219,6 +224,9 @@ the verbose command line options in MMC.
                         'wp'- weighted scattering counts to build mus Jacobian (replay mode)
        cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space
        cfg.debugphoton: print the photon movement debug info only for a specified photon ID
+       cfg.maxjumpdebug: [10000000|int] when trajectory is requested in the output,
+                      use this parameter to set the maximum position stored. By default,
+                      only the first 1e6 positions are stored.
  
        fields marked with * are required; options in [] are the default values
        fields marked with - are calculated if not given (can be faster if precomputed)
@@ -235,8 +243,6 @@ the verbose command line options in MMC.
              or [size(cfg.elem,1), total-time-gates] if cfg.basisorder=0. 
              The content of the array is the normalized fluence-rate (or others 
              depending on cfg.outputtype) at each mesh node and time-gate.
-             In the "replay" mode, if cfg.replaydet is set to -1 and multiple 
-             detectors exist, fluence.data will add a 5th dimension for the detector number.
  
              If cfg.issaveref is set to 1, fluence(i).dref is not empty, and stores
              the surface diffuse reflectance (normalized by default). The surface mesh
@@ -260,6 +266,14 @@ the verbose command line options in MMC.
        seeds: (optional), if give, mmclab returns the seeds, in the form of
              a byte array (uint8) for each detected photon. The column number
              of seed equals that of detphoton.
+       trajectory: (optional), if given, mmclab returns the trajectory data for
+             each simulated photon. The output has 6 rows, the meanings are
+                id:  1:    index of the photon packet
+                pos: 2-4:  x/y/z/ of each trajectory position
+                     5:    current photon packet weight
+                     6:    enclosing element's ID
+             By default, mcxlab only records the first 1e7 positions along all
+             simulated photons; change cfg.maxjumpdebug to define a different limit.
  
   Example:
        cfg.nphoton=1e5;

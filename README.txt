@@ -6,7 +6,7 @@
 
 *Author:  Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPL v3), see License.txt
-*Version: 2.0.0 (v2023, Mochi)
+*Version: 2.2.0 (v2024.2, Nougat)
 *URL:     http://mcx.space/mmc
 
 ---------------------------------------------------------------------

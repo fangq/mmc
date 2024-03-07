@@ -1,16 +1,22 @@
 function varargout=mmclab(varargin)
 %
 %#############################################################################%
-%         MMCLAB - Mesh-based Monte Carlo (MMC) for MATLAB/GNU Octave         %
-%          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          %
-%                            http://mcx.space/#mmc                            %
+%                     Mesh-based Monte Carlo (MMC) - OpenCL                   %
+%          Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          %
+%              https://mcx.space/#mmc  &  https://neurojson.io/               %
 %                                                                             %
-% Computational Optics & Translational Imaging (COTI) Lab- http://fanglab.org %
-%            Department of Bioengineering, Northeastern University            %
-%                                                                             %
-%               Research funded by NIH/NIGMS grant R01-GM114365               %
+%Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
+%   Department of Bioengineering, Northeastern University, Boston, MA, USA    %
 %#############################################################################%
-%$Rev::      $v2020 $Date::                       $ by $Author::             $%
+%    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      %
+%#############################################################################%
+%  Open-source codes and reusable scientific data are essential for research, %
+% MCX proudly developed human-readable JSON-based data formats for easy reuse.%
+%                                                                             %
+%Please visit our free scientific data sharing portal at https://neurojson.io/%
+% and consider sharing your public datasets in standardized JSON/JData format %
+%#############################################################################%
+%$Rev::      $v2024.2$Date::                       $ by $Author::Qianqian Fang%
 %#############################################################################%
 %
 % Format:

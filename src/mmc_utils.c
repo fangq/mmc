@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2023
+**  \copyright Qianqian Fang, 2010-2024
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -3015,8 +3015,8 @@ void mcx_printheader(mcconfig* cfg) {
     MMC_FPRINTF(cfg->flog, S_YELLOW "\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
-#          Copyright (c) 2010-2023 Qianqian Fang <q.fang at neu.edu>          #\n\
-#" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.org/              " S_YELLOW "#\n\
+#          Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          #\n\
+#" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.io/               " S_YELLOW "#\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #\n\
@@ -3024,10 +3024,12 @@ void mcx_printheader(mcconfig* cfg) {
 #    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #\n\
 ###############################################################################\n\
 #  Open-source codes and reusable scientific data are essential for research, #\n\
-# MCX proudly developed human-readable JSON-based data formats for easy reuse,#\n\
-#  Please consider using JSON (" S_BLUE "https://neurojson.org/" S_YELLOW ") for your research data #\n\
+# MCX proudly developed human-readable JSON-based data formats for easy reuse.#\n\
+#                                                                             #\n\
+#Please visit our free scientific data sharing portal at " S_BLUE "https://neurojson.io/" S_YELLOW "#\n\
+# and consider sharing your public datasets in standardized JSON/JData format #\n\
 ###############################################################################\n\
-$Rev::      $ " S_GREEN MMC_VERSION S_YELLOW "  $Date::                       $ by $Author::             $\n\
+$Rev::      $" S_GREEN MMC_VERSION S_YELLOW " $Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 

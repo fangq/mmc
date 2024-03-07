@@ -1,5 +1,10 @@
 Change Log
 
+== MMC 2.2.0 (v2024.2, Nougat), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2024-03-07 [ebefe98] [feat] return trajectories data if -M S or cfg.debuglevel contains S
+ 2024-03-05 [10ea5ea] [bug] search 1st and 2nd nearest neighbors for edge-immc to reduce artifact
+
 == MMC 2.0.0 (v2023, Mochi), Qianqian Fang <q.fang at neu.edu> ==
 
  2023-09-17 [6569f48] add comments to nightly build script for deployment
