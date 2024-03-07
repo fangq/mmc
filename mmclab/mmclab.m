@@ -14,11 +14,11 @@ function varargout=mmclab(varargin)
 %#############################################################################%
 %
 % Format:
-%    [fluence,detphoton,ncfg,seeds]=mmclab(cfg);
+%    [fluence,detphoton,ncfg,seeds,traj]=mmclab(cfg);
 %          or
 %    fluence=mmclab(cfg);
 %    newcfg=mmclab(cfg,'prep');
-%    [fluence,detphoton,ncfg,seeds]=mmclab(cfg, options);
+%    [fluence,detphoton,ncfg,seeds,traj]=mmclab(cfg, options);
 %
 % Input:
 %    cfg: a struct, or struct array. Each element in cfg defines 
@@ -166,6 +166,9 @@ function varargout=mmclab(varargin)
 %                       'wp'- weighted scattering counts to build mus Jacobian (replay mode)
 %      cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space
 %      cfg.debugphoton: print the photon movement debug info only for a specified photon ID
+%      cfg.maxjumpdebug: [10000000|int] when trajectory is requested in the output,
+%                     use this parameter to set the maximum position stored. By default,
+%                     only the first 1e6 positions are stored.
 %
 %      fields marked with * are required; options in [] are the default values
 %      fields marked with - are calculated if not given (can be faster if precomputed)
@@ -205,6 +208,14 @@ function varargout=mmclab(varargin)
 %      seeds: (optional), if give, mmclab returns the seeds, in the form of
 %            a byte array (uint8) for each detected photon. The column number
 %            of seed equals that of detphoton.
+%      trajectory: (optional), if given, mmclab returns the trajectory data for
+%            each simulated photon. The output has 6 rows, the meanings are
+%               id:  1:    index of the photon packet
+%               pos: 2-4:  x/y/z/ of each trajectory position
+%                    5:    current photon packet weight
+%                    6:    enclosing element's ID
+%            By default, mcxlab only records the first 1e7 positions along all
+%            simulated photons; change cfg.maxjumpdebug to define a different limit.
 %
 % Example:
 %      cfg.nphoton=1e5;
@@ -457,7 +468,25 @@ if(mmcout>=2)
     end
 end
 
+if (mmcout >= 3 || (~isempty(cfg) && isstruct(cfg) && isfield(cfg, 'debuglevel') && ~isempty(regexp(cfg(1).debuglevel, '[sS]', 'once'))))
+    for i = 1:length(varargout{4})
+        data = varargout{4}.data;
+        if (isempty(data))
+            continue
+        end
+        traj.pos = data(2:4, :).';
+        traj.id = typecast(data(1, :), 'uint32').';
+        [traj.id, idx] = sort(traj.id);
+        traj.pos = traj.pos(idx, :);
+        traj.eid = typecast(data(6, :), 'uint32').';
+        traj.data = [single(traj.id)'; data(2:end, idx)];
+        newtraj(i) = traj;
+    end
+    if (exist('newtraj', 'var'))
+        varargout{4} = newtraj;
+    end
+end
+
 if(nargout>=4)
     [varargout{3:end}]=deal(varargout{[end 3:end-1]});
 end
-

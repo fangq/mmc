@@ -1336,27 +1336,26 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
 
 void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcconfig* cfg) {
     FILE* fp;
-    char fhistory[MAX_FULL_PATH];
+    char fhistory[MAX_FULL_PATH], filetag;
+
+    filetag = ((cfg->his.detected == 0  && cfg->his.savedphoton) ? 't' : 'h');
 
     if (cfg->rootpath[0]) {
-        sprintf(fhistory, "%s%c%s.mch", cfg->rootpath, pathsep, cfg->session);
+        sprintf(fhistory, "%s%c%s.mc%c", cfg->rootpath, pathsep, cfg->session, filetag);
     } else {
-        sprintf(fhistory, "%s.mch", cfg->session);
+        sprintf(fhistory, "%s.mc%c", cfg->session, filetag);
     }
 
     if ((fp = fopen(fhistory, "wb")) == NULL) {
         MESH_ERROR("can not open history file to write");
     }
 
-    cfg->his.totalphoton = cfg->nphoton;
     cfg->his.unitinmm = 1.f;
 
     if (cfg->method != rtBLBadouelGrid) {
         cfg->his.unitinmm = cfg->unitinmm;
     }
 
-    cfg->his.detected = count;
-    cfg->his.savedphoton = count;
     cfg->his.srcnum = cfg->srcnum;
     cfg->his.detnum = cfg->detnum;
 
@@ -1364,17 +1363,16 @@ void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcco
         cfg->his.seedbyte = seedbyte;
     }
 
-    cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /*column count=maxmedia+3*/
+    /*
+        if (count > 0 && cfg->exportdetected == NULL) {
+            cfg->detectedcount = count;
+            cfg->exportdetected = (float*)malloc(cfg->his.colcount * cfg->detectedcount * sizeof(float));
+        }
 
-    if (count > 0 && cfg->exportdetected == NULL) {
-        cfg->detectedcount = count;
-        cfg->exportdetected = (float*)malloc(cfg->his.colcount * cfg->detectedcount * sizeof(float));
-    }
-
-    if (cfg->exportdetected != ppath) {
-        memcpy(cfg->exportdetected, ppath, count * cfg->his.colcount * sizeof(float));
-    }
-
+        if (cfg->exportdetected != ppath) {
+            memcpy(cfg->exportdetected, ppath, count * cfg->his.colcount * sizeof(float));
+        }
+    */
     fwrite(&(cfg->his), sizeof(history), 1, fp);
     fwrite(ppath, sizeof(float), count * cfg->his.colcount, fp);
 

@@ -195,7 +195,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     uint detected = 0;
     int gpuid, threadid = 0;
-    uint tic, tic0, tic1, toc = 0, fieldlen;
+    uint tic, tic0, tic1, toc = 0, fieldlen, debuglen = MCX_DEBUG_REC_LEN;
     int threadphoton, oddphotons;
     dim3 mcgrid, mcblock;
 
@@ -205,7 +205,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     int* gtype, *gsrcelem;
     uint* gseed, *gdetected;
     volatile int* progress, *gprogress;
-    float* gweight, *gdref, *gdetphoton, *genergy, *gsrcpattern;
+    float* gweight, *gdref, *gdetphoton, *genergy, *gsrcpattern, *gdebugdata;
     RandType* gphotonseed = NULL, *greplayseed = NULL;
     float*  greplayweight = NULL, *greplaytime = NULL;
 
@@ -270,10 +270,11 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                       (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
                       (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
                       cfg->issaveseed,
-                      cfg->seed
+                      cfg->seed,
+                      cfg->maxjumpdebug
                      };
 
-    MCXReporter reporter = {0.f};
+    MCXReporter reporter = {0.f, 0};
 
 
 #ifdef _OPENMP
@@ -335,9 +336,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         gpu[gpuid].maxgate = cfg->maxgate;
     }
 
-    if (gpu[gpuid].autothread % gpu[gpuid].autoblock)
+    if (gpu[gpuid].autothread % gpu[gpuid].autoblock) {
         gpu[gpuid].autothread =
             (gpu[gpuid].autothread / gpu[gpuid].autoblock) * gpu[gpuid].autoblock;
+    }
 
     param.maxgate = gpu[gpuid].maxgate;
 
@@ -359,13 +361,13 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     #pragma omp barrier
     fullload = 0.f;
 
-    for (i = 0; cfg->deviceid[i]; i++)
+    for (i = 0; cfg->deviceid[i]; i++) {
         if (cfg->workload[i] > 0.f) {
             fullload += cfg->workload[i];
         } else {
             mcx_error(-1, "workload was unspecified for an active device", __FILE__, __LINE__);
         }
-
+    }
 
     threadphoton = (int)(cfg->nphoton * cfg->workload[gpuid] /
                          (fullload * gpu[gpuid].autothread * cfg->respin));
@@ -507,6 +509,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         CUDA_ASSERT(cudaMalloc((void**)&gphotonseed, cfg->maxdetphoton * (sizeof(RandType)*RAND_BUF_LEN)));
     }
 
+    if (cfg->debuglevel & dlTraj) {
+        CUDA_ASSERT(cudaMalloc((void**) &gdebugdata, sizeof(float) * (debuglen * cfg->maxjumpdebug)));
+    }
+
     if (cfg->seed == SEED_FROM_FILE) {
         CUDA_ASSERT(cudaMalloc((void**)&greplayweight, sizeof(float)*cfg->nphoton));
         CUDA_ASSERT(cudaMemcpy(greplayweight, cfg->replayweight, sizeof(float)*cfg->nphoton, cudaMemcpyHostToDevice));
@@ -582,7 +588,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                 threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
                 gtype, (int*)gfacenb, gsrcelem, gnormal,
                 gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
-                gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed);
+                gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata);
 
             #pragma omp master
             {
@@ -623,6 +629,32 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             CUDA_ASSERT(cudaMemcpy(&rep, greporter, sizeof(MCXReporter),
                                    cudaMemcpyDeviceToHost));
             reporter.raytet += rep.raytet;
+            reporter.jumpdebug += rep.jumpdebug;
+
+            /**
+             * If '-D M' is specified, we retrieve photon trajectory data and store those to \c cfg.exportdebugdata and \c cfg.debugdatalen
+             */
+            if (cfg->debuglevel & dlTraj) {
+                uint debugrec = reporter.jumpdebug;
+
+                #pragma omp critical
+                {
+                    if (debugrec > 0) {
+                        if (debugrec > cfg->maxjumpdebug) {
+                            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
+are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
+                                        , debugrec, cfg->maxjumpdebug);
+                        } else {
+                            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", debugrec, cfg->debugdatalen + debugrec);
+                        }
+
+                        debugrec = min(debugrec, cfg->maxjumpdebug);
+                        cfg->exportdebugdata = (float*)realloc(cfg->exportdebugdata, (cfg->debugdatalen + debugrec) * debuglen * sizeof(float));
+                        CUDA_ASSERT(cudaMemcpy(cfg->exportdebugdata + cfg->debugdatalen, gdebugdata, sizeof(float)*debuglen * debugrec, cudaMemcpyDeviceToHost));
+                        cfg->debugdatalen += debugrec;
+                    }
+                }
+            }
 
             if (cfg->issavedet) {
                 CUDA_ASSERT(cudaMemcpy(&detected, gdetected, sizeof(uint), cudaMemcpyDeviceToHost));
@@ -781,11 +813,26 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
         if (cfg->issavedet && cfg->parentid == mpStandalone &&
                 cfg->exportdetected) {
+            cfg->his.totalphoton = cfg->nphoton;
             cfg->his.unitinmm = cfg->unitinmm;
             cfg->his.savedphoton = cfg->detectedcount;
             cfg->his.detected = cfg->detectedcount;
+            cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /*column count=maxmedia+3*/
             mesh_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount,
                                (sizeof(uint64_t) * RAND_BUF_LEN), cfg);
+        }
+
+        /**
+         * If not running as a mex file, we need to save photon trajectory data, if enabled, as
+         * a file, either as a .mct file, or a .jdat/.jbat file
+         */
+
+        if ((cfg->debuglevel & dlTraj) && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+            cfg->his.colcount = MCX_DEBUG_REC_LEN;
+            cfg->his.savedphoton = cfg->debugdatalen;
+            cfg->his.totalphoton = cfg->nphoton;
+            cfg->his.detected = 0;
+            mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
         }
 
         if (cfg->issaveref) {
@@ -841,6 +888,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     if (gphotonseed) {
         CUDA_ASSERT(cudaFree(gphotonseed));
+    }
+
+    if (cfg->debuglevel & dlTraj) {
+        CUDA_ASSERT(cudaFree(gdebugdata));
     }
 
     CUDA_ASSERT(cudaFree(greporter));

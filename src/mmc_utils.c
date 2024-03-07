@@ -136,7 +136,7 @@ extern char pathsep;
  * P: show progress bar
  */
 
-const char debugflag[] = {'M', 'C', 'B', 'W', 'D', 'I', 'O', 'X', 'A', 'T', 'R', 'P', 'E', '\0'};
+const char debugflag[] = {'M', 'C', 'B', 'W', 'D', 'I', 'O', 'X', 'A', 'T', 'R', 'P', 'E', 'S', '\0'};
 
 /**
  * Selecting mesh-based ray-tracing algorithm:
@@ -328,6 +328,9 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->autopilot = 1;
     cfg->nbuffer = 0;
     cfg->gpuid = 0;
+    cfg->maxjumpdebug = 10000000;
+    cfg->exportdebugdata = NULL;
+    cfg->debugdatalen = 0;
 
 #ifdef MCX_EMBED_CL
     cfg->clsource = (char*)mmc_core_cl;
@@ -386,6 +389,10 @@ void mcx_clearcfg(mcconfig* cfg) {
 
     if (cfg->exportdetected) {
         free(cfg->exportdetected);
+    }
+
+    if (cfg->exportdebugdata) {
+        free(cfg->exportdebugdata);
     }
 
     if (cfg->flog && cfg->flog != stdout && cfg->flog != stderr) {
@@ -2881,6 +2888,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         }
                     } else if (strcmp(argv[i] + 2, "debugphoton") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->debugphoton), "int");
+                    } else if (strcmp(argv[i] + 2, "maxjumpdebug") == 0) {
+                        i = mcx_readarg(argc, argv, i, &(cfg->maxjumpdebug), "int");
                     } else if (strcmp(argv[i] + 2, "buffer") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->nbuffer), "int");
                     } else if (strcmp(argv[i] + 2, "gridsize") == 0) {
@@ -3144,6 +3153,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
                             4096 E  exit photon info\n\
+                            8192 S  return photon trajectories\n\
       combine multiple items by using a string, or add selected numbers together\n\
  --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
                                a single photon, followed by its index (start 0)\n\
@@ -3151,6 +3161,9 @@ where possible parameters include (the first item in [] is the default value)\n\
 == Additional options ==\n"S_RESET"\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
  --gridsize     [1|float]      if -M G is used, this sets the grid size in mm\n\
+ --maxjumpdebug [10000000|int] when trajectory is requested (i.e. -D S),\n\
+                               use this parameter to set the maximum positions\n\
+                               stored (default: 1e7)\n\
 \n"S_BOLD S_CYAN"\
 == Example ==\n"S_RESET"\
        %s -n 1000000 -f input.json -s test -b 0 -D TP -G -1\n", exename,

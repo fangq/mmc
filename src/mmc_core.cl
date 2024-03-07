@@ -261,6 +261,8 @@ inline __device__ __host__ float4 convert_float4_rte(float4 v) {
 #define MCX_DEBUG_MOVE      1
 #define MCX_DEBUG_PROGRESS  2048
 
+#define MCX_DEBUG_REC_LEN   6  /**<  number of floating points per position saved when -D M is used for trajectory */
+
 #define MMC_UNDEFINED      (3.40282347e+38F)
 #define SEED_FROM_FILE      -999                         /**< special flag indicating to load seeds from history file */
 
@@ -318,7 +320,7 @@ typedef struct MMC_Parameter {
     float  nout;
     float  roulettesize;
     int    srcnum;
-    uint4   crop0;
+    uint4  crop0;
     int    srcelemlen;
     float4 bary0;
     int    e0;
@@ -329,10 +331,12 @@ typedef struct MMC_Parameter {
     uint   normbuf;
     int    issaveseed;
     int    seed;
+    uint   maxjumpdebug;         /**< max number of positions to be saved to save photon trajectory when -D M is used */
 } MCXParam __attribute__ ((aligned (16)));
 
 typedef struct MMC_Reporter {
     float  raytet;
+    uint   jumpdebug;
 } MCXReporter  __attribute__ ((aligned (16)));
 
 typedef struct MCX_medium {
@@ -372,7 +376,7 @@ __constant__ int ifacemap[] = {1, 2, 0, 3};
 #ifndef __NVCC__
 enum TDebugLevel {dlMove = 1, dlTracing = 2, dlBary = 4, dlWeight = 8, dlDist = 16, dlTracingEnter = 32,
                   dlTracingExit = 64, dlEdge = 128, dlAccum = 256, dlTime = 512, dlReflect = 1024,
-                  dlProgress = 2048, dlExit = 4096
+                  dlProgress = 2048, dlExit = 4096, dlTraj = 8192
                  };
 
 enum TRTMethod {rtPlucker, rtHavel, rtBadouel, rtBLBadouel, rtBLBadouelGrid};
@@ -560,6 +564,27 @@ __device__ void savedetphoton(__global float* n_det, __global uint* detectedphot
     }
 }
 #endif
+
+/**
+ * @brief Saving photon trajectory data for debugging purposes
+ * @param[in] p: the position/weight of the current photon packet
+ * @param[in] id: the global index of the photon
+ * @param[in] gdebugdata: pointer to the global-memory buffer to store the trajectory info
+ */
+
+__device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, __global float* gdebugdata, __constant MCXParam* gcfg) {
+    uint pos = atomic_inc(&reporter->jumpdebug);
+
+    if (pos < GPU_PARAM(gcfg, maxjumpdebug)) {
+        pos *= MCX_DEBUG_REC_LEN;
+        ((uint*)gdebugdata)[pos++] = id;
+        gdebugdata[pos++] = r->p0.x;
+        gdebugdata[pos++] = r->p0.y;
+        gdebugdata[pos++] = r->p0.z;
+        gdebugdata[pos++] = r->weight;
+        ((uint*)gdebugdata)[pos++] = r->eid;
+    }
+}
 
 /**
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
@@ -1342,7 +1367,7 @@ __device__ void launchphoton(__constant MCXParam* gcfg, ray* r, __global float3*
 __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXParam* gcfg, __global float3* node, __global int* elem, __global float* weight, __global float* dref,
                           __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal, __constant Medium* gmed,
                           __global float* n_det, __global uint* detectedphoton, float* energytot, float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
-                          __global float* replayweight, __global float* replaytime, __global RandType* photonseed) {
+                          __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata) {
 
     int oldeid, fixcount = 0;
     ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f};
@@ -1371,6 +1396,11 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     }
 
 #endif
+
+    if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
+        savedebugdata(&r, id, reporter, gdebugdata, gcfg);
+    }
+
     /*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 
@@ -1555,9 +1585,18 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             }
         }
 
+        if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
+            savedebugdata(&r, id, reporter, gdebugdata, gcfg);
+        }
+
         float mom = 0.f;
         r.slen0 = mc_next_scatter(gmed[type[r.eid - 1]].g, &r.vec, ran, gcfg, &mom);
         r.slen = r.slen0;
+
+        if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
+            savedebugdata(&r, id, reporter, gdebugdata, gcfg);
+        }
+
 #ifdef MCX_SAVE_DETECTORS
 
         if (GPU_PARAM(gcfg, issavedet)) {
@@ -1573,6 +1612,10 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
     }
 
+    if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
+        savedebugdata(&r, id, reporter, gdebugdata, gcfg);
+    }
+
     *energyesc += r.weight;
 }
 
@@ -1583,7 +1626,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
                             __global float3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
                             __global float* n_det, __global uint* detectedphoton,
                             __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
-                            __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed) {
+                            __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata) {
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
@@ -1607,7 +1650,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
 
         onephoton(idx * nphoton + MIN(idx, ophoton) + i, sharedmem + get_local_id(0)*GPU_PARAM(gcfg, reclen), gcfg, node, elem,
                   weight, dref, type, facenb, srcelem, normal, gmed, n_det, detectedphoton, &energytot, &energyesc, t, &raytet,
-                  srcpattern, replayweight, replaytime, photonseed);
+                  srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata);
     }
 
     energy[idx << 1] = energyesc;

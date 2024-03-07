@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mmc_raytrace.h"
+#include "mmc_const.h"
 
 /**<  Macro to enable SSE4 based ray-tracers */
 
@@ -1716,6 +1717,33 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
 #endif
 
 /**
+ * @brief Saving photon trajectory data for debugging purposes
+ * @param[in] p: the position/weight of the current photon packet
+ * @param[in] id: the global index of the photon
+ * @param[in] gdebugdata: pointer to the global-memory buffer to store the trajectory info
+ */
+
+void savedebugdata(ray* r, unsigned int id, mcconfig* cfg) {
+    unsigned int pos;
+    float* gdebugdata = cfg->exportdebugdata;
+
+    #pragma omp critical
+    {
+        pos = cfg->debugdatalen++;
+    }
+
+    if (pos < cfg->maxjumpdebug) {
+        pos *= MCX_DEBUG_REC_LEN;
+        ((unsigned int*)gdebugdata)[pos++] = id;
+        gdebugdata[pos++] = r->p0.x;
+        gdebugdata[pos++] = r->p0.y;
+        gdebugdata[pos++] = r->p0.z;
+        gdebugdata[pos++] = r->weight;
+        ((unsigned int*)gdebugdata)[pos++] = r->eid;
+    }
+}
+
+/**
  * @brief The core Monte Carlo function simulating a single photon (!!!Important!!!)
  *
  * This is the core Monte Carlo simulation function. It simulates the life-time
@@ -1762,6 +1790,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
     /*initialize the photon parameters*/
     launchphoton(cfg, &r, mesh, ran, ran0);
     r.partialpath[visit->reclen - 2] = r.weight; /*last record in partialpath is the initial photon weight*/
+
+    if (cfg->debuglevel & dlTraj) {
+        savedebugdata(&r, (unsigned int)id, cfg);
+    }
 
     /*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
@@ -1998,6 +2030,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         r.slen0 = mc_next_scatter(mesh->med[mesh->type[r.eid - 1]].g, &r.vec, ran, ran0, cfg, &mom);
         r.slen = r.slen0;
 
+        if (cfg->debuglevel & dlTraj) {
+            savedebugdata(&r, (unsigned int)id, cfg);
+        }
+
         if (cfg->mcmethod != mmMCX) {
             albedoweight(&r, mesh, cfg, visit);
         }
@@ -2036,6 +2072,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 
     if (r.photonseed) {
         free(r.photonseed);
+    }
+
+    if (cfg->debuglevel & dlTraj) {
+        savedebugdata(&r, (unsigned int)id, cfg);
     }
 
     if (cfg->srctype != stPattern) {

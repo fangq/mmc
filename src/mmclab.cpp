@@ -206,6 +206,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         plhs[2] = mxCreateStructMatrix(ncfg, 1, 1, outputtag);
     }
 
+    if (nlhs >= 4) {
+        plhs[3] = mxCreateStructMatrix(ncfg, 1, 1, outputtag);
+    }
+
     /**
      * Loop over each element of the struct if it is an array, each element is a simulation
      */
@@ -238,6 +242,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             cfg.issave2pt = (nlhs >= 1); /** save fluence rate to the 1st output if present */
             cfg.issavedet = (nlhs >= 2); /** save detected photon data to the 2nd output if present */
             cfg.issaveseed = (nlhs >= 3); /** save detected photon seeds to the 3rd output if present */
+
+            if (nlhs >= 4) {
+                cfg.exportdebugdata = (float*)malloc(cfg.maxjumpdebug * sizeof(float) * MCX_DEBUG_REC_LEN);
+                cfg.debuglevel |= dlTraj;
+            }
 
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
             cfg.issaveseed = 0;
@@ -294,6 +303,39 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             tracer_clear(&tracer);
             MMCDEBUG(&cfg, dlTime, (cfg.flog, "\tdone\t%d\n", GetTimeMillis() - t0));
 
+            /** if 5th output presents, output the photon trajectory data */
+            if (nlhs >= 4) {
+                int outputidx = 3;
+                fielddim[0] = MCX_DEBUG_REC_LEN;
+                fielddim[1] = cfg.debugdatalen; // his.savedphoton is for one repetition, should correct
+                fielddim[2] = 0;
+                fielddim[3] = 0;
+                mxSetFieldByNumber(plhs[outputidx], jstruct, 0, mxCreateNumericArray(2, fielddim, mxSINGLE_CLASS, mxREAL));
+
+                if ((cfg.debuglevel & dlTraj) && cfg.exportdebugdata) {
+                    memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[outputidx], jstruct, 0)), cfg.exportdebugdata, fielddim[0]*fielddim[1]*sizeof(float));
+                }
+            }
+
+            if (cfg.exportdebugdata) {
+                free(cfg.exportdebugdata);
+                cfg.exportdebugdata = NULL;
+            }
+
+            if (nlhs >= 3) {
+                fielddim[0] = (sizeof(RandType) * RAND_BUF_LEN);
+                fielddim[1] = cfg.detectedcount;
+                fielddim[2] = 0;
+                fielddim[3] = 0;
+                mxSetFieldByNumber(plhs[2], jstruct, 0, mxCreateNumericArray(2, fielddim, mxUINT8_CLASS, mxREAL));
+                memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2], jstruct, 0)), cfg.exportseed, fielddim[0]*fielddim[1]);
+            }
+
+            if (cfg.exportseed) {
+                free(cfg.exportseed);
+                cfg.exportseed = NULL;
+            }
+
             /** if the 2nd output presents, output the detected photon partialpath data */
             if (nlhs >= 2) {
                 if (cfg.issaveexit != 2) {
@@ -318,21 +360,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     memset(detmap, cfg.detparam1.w * cfg.detparam2.w * cfg.maxgate, sizeof(float));
                     mesh_getdetimage(detmap, cfg.exportdetected, cfg.detectedcount, &cfg, &mesh);
                 }
+            }
 
+            if (cfg.exportdetected) {
                 free(cfg.exportdetected);
                 cfg.exportdetected = NULL;
-
-                if (nlhs >= 3 && cfg.issaveseed && cfg.exportseed) {
-                    fielddim[0] = (sizeof(RandType) * RAND_BUF_LEN);
-                    fielddim[1] = cfg.detectedcount;
-                    fielddim[2] = 0;
-                    fielddim[3] = 0;
-                    mxSetFieldByNumber(plhs[2], jstruct, 0, mxCreateNumericArray(2, fielddim, mxUINT8_CLASS, mxREAL));
-                    memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2], jstruct, 0)), cfg.exportseed, fielddim[0]*fielddim[1]);
-                }
-
-                free(cfg.exportseed);
-                cfg.exportseed = NULL;
             }
 
             if (nlhs >= 1) {
@@ -445,6 +477,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
     GET_ONE_FIELD(cfg, voidtime)
     GET_ONE_FIELD(cfg, mcmethod)
     GET_ONE_FIELD(cfg, maxdetphoton)
+    GET_ONE_FIELD(cfg, maxjumpdebug)
     GET_VEC3_FIELD(cfg, srcpos)
     GET_VEC34_FIELD(cfg, srcdir)
     GET_VEC3_FIELD(cfg, steps)

@@ -39,6 +39,7 @@
 #include <string.h>
 #include "mmc_host.h"
 #include "mmc_tictoc.h"
+#include "mmc_const.h"
 
 #ifdef _OPENMP
     #include <omp.h>
@@ -179,6 +180,14 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     unsigned int* seeds = NULL;
 
+    if (cfg->debuglevel & dlTraj) {
+        if (cfg->exportdebugdata == NULL) {
+            cfg->exportdebugdata = (float*)malloc(sizeof(float) * MCX_DEBUG_REC_LEN * cfg->maxjumpdebug);
+        }
+
+        cfg->debugdatalen = 0;
+    }
+
     /***************************************************************************//**
     The master thread then spawn multiple work-threads depending on your
     OpenMP settings. By default, the total thread number (master + work) is
@@ -297,6 +306,8 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
                 master.bufpos += visit.bufpos;
             }
+            #pragma omp master
+            cfg->detectedcount = master.detcount;
         }
 
         #pragma omp barrier
@@ -327,7 +338,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     MMCDEBUG(cfg, dlTime, (cfg->flog, "speed ...\t"S_BOLD""S_BLUE"%.2f photon/ms"S_RESET", %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n", (double)cfg->nphoton / dt, raytri, raytri0, raytri / dt));
 
     if (cfg->issavedet) {
-        MMC_FPRINTF(cfg->flog, "detected %d photons\n", master.detcount);
+        MMC_FPRINTF(cfg->flog, "detected %d photons\n", cfg->detectedcount);
     }
 
     if (cfg->isnormalized) {
@@ -365,32 +376,34 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
 #endif
 
+    if (cfg->exportdetected == NULL) {
+        cfg->exportdetected = master.partialpath;
+    }
+
+    if (cfg->issaveseed && master.photonseed) {
+        cfg->exportseed = (unsigned char*)malloc(cfg->detectedcount * sizeof(RandType) * RAND_BUF_LEN);
+        memcpy(cfg->exportseed, master.photonseed, cfg->detectedcount * sizeof(RandType)*RAND_BUF_LEN);
+        free(master.photonseed);
+    }
+
     if (cfg->issavedet && cfg->parentid == mpStandalone) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving detected photons ..."));
 
 #ifndef MCX_CONTAINER
 
         if (cfg->issaveexit) {
-            mesh_savedetphoton(master.partialpath, master.photonseed, master.bufpos, (sizeof(RandType)*RAND_BUF_LEN), cfg);
+            mesh_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount, (sizeof(RandType)*RAND_BUF_LEN), cfg);
         }
 
 #endif
 
         if (cfg->issaveexit == 2) {
             float* detimage = (float*)calloc(cfg->detparam1.w * cfg->detparam2.w * cfg->maxgate, sizeof(float));
-            mesh_getdetimage(detimage, master.partialpath, master.bufpos, cfg, mesh);
+            mesh_getdetimage(detimage, cfg->exportdetected, cfg->detectedcount, cfg, mesh);
 #ifndef MCX_CONTAINER
             mesh_savedetimage(detimage, cfg);
 #endif
             free(detimage);
-        }
-
-        free(master.partialpath);
-
-        if (cfg->issaveseed && master.photonseed) {
-            cfg->exportseed = (unsigned char*)malloc(cfg->detectedcount * sizeof(RandType) * RAND_BUF_LEN);
-            memcpy(cfg->exportseed, master.photonseed, cfg->detectedcount * sizeof(RandType)*RAND_BUF_LEN);
-            free(master.photonseed);
         }
     }
 

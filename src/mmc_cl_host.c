@@ -74,7 +74,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_uint* progress = NULL;
     cl_uint detected = 0, workdev;
 
-    cl_uint tic, tic0, tic1, toc = 0, fieldlen;
+    cl_uint tic, tic0, tic1, toc = 0, fieldlen, debuglen = MCX_DEBUG_REC_LEN;
 
     cl_context mcxcontext;                 // compute mcxcontext
     cl_command_queue* mcxqueue;          // compute command queue
@@ -89,7 +89,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_uint  devid = 0;
     cl_mem* gnode = NULL, *gelem = NULL, *gtype = NULL, *gfacenb = NULL, *gsrcelem = NULL, *gnormal = NULL;
     cl_mem* gproperty = NULL, *gparam = NULL, *gsrcpattern = NULL, *greplayweight = NULL, *greplaytime = NULL, *greplayseed = NULL; /*read-only buffers*/
-    cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter;     /*read-write buffers*/
+    cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter, *gdebugdata;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
     cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) << cfg->nbuffer; // use 4 copies to reduce racing
@@ -124,10 +124,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mesh->srcelemlen, {{cfg->bary0.x, cfg->bary0.y, cfg->bary0.z, cfg->bary0.w}},
         cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
-        cfg->issaveseed, cfg->seed
+        cfg->issaveseed, cfg->seed, cfg->maxjumpdebug
     };
 
-    MCXReporter reporter = {0.f};
+    MCXReporter reporter = {0.f, 0};
     platform = mcx_list_cl_gpu(cfg, &workdev, devices, &gpu);
 
     if (workdev > MAX_DEVICE) {
@@ -155,6 +155,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     gdetected = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     gphotonseed = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     greporter = (cl_mem*)malloc(workdev * sizeof(cl_mem));
+    gdebugdata = (cl_mem*)malloc(workdev * sizeof(cl_mem));
 
     gnode = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     gelem = (cl_mem*)malloc(workdev * sizeof(cl_mem));
@@ -251,6 +252,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         srand(time(0));
     }
 
+    if (cfg->debuglevel & dlTraj && cfg->exportdebugdata == NULL) {
+        cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
+    }
+
     cl_mem (*clCreateBufferNV)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*) = (cl_mem (*)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*)) clGetExtensionFunctionAddressForPlatform(platform, "clCreateBufferNV");
 
     if (clCreateBufferNV == NULL) {
@@ -308,6 +313,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             OCL_ASSERT(((gphotonseed[i] = clCreateBuffer(mcxcontext, RW_MEM, cfg->maxdetphoton * (sizeof(RandType) * RAND_BUF_LEN), Pphotonseed, &status), status)));
         } else {
             gphotonseed[i] = NULL;
+        }
+
+        if (cfg->debuglevel & dlTraj) {
+            OCL_ASSERT(((gdebugdata[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (debuglen * cfg->maxjumpdebug), cfg->exportdebugdata, &status), status)));
         }
 
         OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1), energy, &status), status)));
@@ -427,6 +436,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         IPARAM_TO_MACRO(opt, param, issaveref);
         IPARAM_TO_MACRO(opt, param, isspecular);
         IPARAM_TO_MACRO(opt, param, maxdetphoton);
+        IPARAM_TO_MACRO(opt, param, maxjumpdebug);
         IPARAM_TO_MACRO(opt, param, maxmedia);
         IPARAM_TO_MACRO(opt, param, maxgate);
         IPARAM_TO_MACRO(opt, param, maxpropdet);
@@ -508,6 +518,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 21, sizeof(cl_mem), (void*)(greplaytime + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 22, sizeof(cl_mem), (void*)(greplayseed + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 23, sizeof(cl_mem), (void*)(gphotonseed + i))));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 24, sizeof(cl_mem), ((cfg->debuglevel & dlTraj) ? (void*)(gdebugdata + i) : NULL) )));
     }
 
     MMC_FPRINTF(cfg->flog, "set kernel arguments complete : %d ms %d\n", GetTimeMillis() - tic, param.method);
@@ -523,6 +534,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     if (cfg->issaveseed && cfg->exportseed == NULL) {
         cfg->exportseed = (unsigned char*)malloc(cfg->maxdetphoton * (sizeof(RandType) * RAND_BUF_LEN));
+    }
+
+    if (cfg->debuglevel & dlTraj && cfg->exportdebugdata == NULL) {
+        cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
     }
 
     cfg->energytot = 0.f;
@@ -603,6 +618,27 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], greporter[devid], CL_TRUE, 0, sizeof(MCXReporter),
                                                 &rep, 0, NULL, waittoread + devid)));
                 reporter.raytet += rep.raytet;
+                reporter.jumpdebug += rep.jumpdebug;
+
+                if (cfg->debuglevel & dlTraj) {
+                    uint debugrec = reporter.jumpdebug;
+
+                    if (debugrec > 0) {
+                        if (debugrec > cfg->maxdetphoton) {
+                            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
+  are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
+                                        , debugrec, cfg->maxjumpdebug);
+                        } else {
+                            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", debugrec, cfg->maxjumpdebug + debugrec);
+                        }
+
+                        debugrec = MIN(debugrec, cfg->maxjumpdebug);
+                        cfg->exportdebugdata = (float*)realloc(cfg->exportdebugdata, (cfg->debugdatalen + debugrec) * debuglen * sizeof(float));
+                        OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdebugdata[devid], CL_FALSE, 0, sizeof(float)*debuglen * debugrec,
+                                                        cfg->exportdebugdata + cfg->debugdatalen, 0, NULL, waittoread + devid)));
+                        cfg->debugdatalen += debugrec;
+                    }
+                }
 
                 if (cfg->issavedet) {
                     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdetected[devid], CL_FALSE, 0, sizeof(uint),
@@ -752,10 +788,20 @@ is more than what your have specified (%d), please use the -H option to specify 
     }
 
     if (cfg->issavedet && cfg->parentid == mpStandalone && cfg->exportdetected) {
+        cfg->his.totalphoton = cfg->nphoton;
         cfg->his.unitinmm = cfg->unitinmm;
         cfg->his.savedphoton = cfg->detectedcount;
         cfg->his.detected = cfg->detectedcount;
+        cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /*column count=maxmedia+3*/
         mesh_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount, (sizeof(RandType)*RAND_BUF_LEN), cfg);
+    }
+
+    if ((cfg->debuglevel & dlTraj) && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+        cfg->his.colcount = MCX_DEBUG_REC_LEN;
+        cfg->his.savedphoton = cfg->debugdatalen;
+        cfg->his.totalphoton = cfg->nphoton;
+        cfg->his.detected = 0;
+        mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
     }
 
     if (cfg->issaveref) {
@@ -805,6 +851,10 @@ is more than what your have specified (%d), please use the -H option to specify 
             OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
         }
 
+        if (cfg->debuglevel & dlTraj) {
+            OCL_ASSERT(clReleaseMemObject(gdebugdata[i]));
+        }
+
         if (greplayweight[i]) {
             OCL_ASSERT(clReleaseMemObject(greplayweight[i]));
         }
@@ -828,6 +878,7 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(gprogress);
     free(gdetected);
     free(gphotonseed);
+    free(gdebugdata);
     free(greporter);
 
     free(gnode);

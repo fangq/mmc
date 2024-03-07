@@ -101,10 +101,12 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_uint   normbuf;
     cl_int    issaveseed;
     cl_uint   seed;
+    cl_uint   maxjumpdebug;         /**< max number of positions to be saved to save photon trajectory when -D M is used */
 } MCXParam POST_ALIGN(32);
 
 typedef struct POST_ALIGN(32) GPU_reporter {
-    float  raytet;
+    float     raytet;
+    cl_uint   jumpdebug;
 } MCXReporter  POST_ALIGN(32);
 
 void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer);
