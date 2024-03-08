@@ -33,8 +33,13 @@
 #define _MCEXTREME_LOGISTIC_RAND_H
 
 #ifdef __cplusplus
-    extern "C"
+extern "C" {
 #endif
 void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg);
+void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

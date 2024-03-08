@@ -127,7 +127,6 @@ void mesh_init(tetmesh* mesh) {
     mesh->facenb = NULL;
     mesh->type = NULL;
     mesh->med = NULL;
-    mesh->atte = NULL;
     mesh->weight = NULL;
     mesh->evol = NULL;
     mesh->nvol = NULL;
@@ -159,9 +158,9 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
         mesh_10nodetet(mesh, cfg);
     }
 
+    mesh_loadelemvol(mesh, cfg);
     mesh_loadfaceneighbor(mesh, cfg);
     mesh_loadmedia(mesh, cfg);
-    mesh_loadelemvol(mesh, cfg);
     mesh_loadroi(mesh, cfg);
 
     if (cfg->seed == SEED_FROM_FILE && cfg->seedfile[0]) {
@@ -302,6 +301,17 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
     FILE* fp;
     int tmp, len, i;
     char fnode[MAX_FULL_PATH];
+
+    if (cfg->node && cfg->nodenum > 0) {
+        mesh->node = cfg->node;
+        mesh->nn = cfg->nodenum;
+
+        if (cfg->method == rtBLBadouelGrid) {
+            mesh_createdualmesh(mesh, cfg);
+        }
+        return;
+    }
+
     mesh_filenames("node_%s.dat", fnode, cfg);
 
     if ((fp = fopen(fnode, "rt")) == NULL) {
@@ -337,24 +347,28 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
  */
 
 void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg) {
-    FILE* fp;
+    FILE* fp = NULL;
     int tmp, len, i;
     char fmed[MAX_FULL_PATH];
-    mesh_filenames("prop_%s.dat", fmed, cfg);
 
-    if ((fp = fopen(fmed, "rt")) == NULL) {
-        MESH_ERROR("can not open media property file");
-    }
+    if (cfg->medianum == 0) {
+        mesh_filenames("prop_%s.dat", fmed, cfg);
 
-    len = fscanf(fp, "%d %d", &tmp, &(mesh->prop));
+        if ((fp = fopen(fmed, "rt")) == NULL) {
+            MESH_ERROR("can not open media property file");
+        }
 
-    if (len != 2 || mesh->prop <= 0) {
-        MESH_ERROR("property file has wrong format");
+        len = fscanf(fp, "%d %d", &tmp, &(mesh->prop));
+
+        if (len != 2 || mesh->prop <= 0) {
+            MESH_ERROR("property file has wrong format");
+        }
+    } else {
+        mesh->prop = cfg->medianum - 1;
     }
 
     /*when there is an external detector, reindex the property to medianum+1*/
     mesh->med = (medium*)calloc(sizeof(medium), mesh->prop + 1 + cfg->isextdet);
-    mesh->atte = (float*)calloc(sizeof(float), mesh->prop + 1 + cfg->isextdet);
 
     mesh->med[0].mua = 0.f;
     mesh->med[0].mus = 0.f;
@@ -372,16 +386,18 @@ void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg) {
         }
     }
 
-    for (i = 1; i <= mesh->prop; i++) {
-        if (fscanf(fp, "%d %f %f %f %f", &tmp, &(mesh->med[i].mua), &(mesh->med[i].mus),
-                   &(mesh->med[i].g), &(mesh->med[i].n)) != 5) {
-            MESH_ERROR("property file has wrong format");
+    if (cfg->medianum == 0) {
+        for (i = 1; i <= mesh->prop; i++) {
+            if (fscanf(fp, "%d %f %f %f %f", &tmp, &(mesh->med[i].mua), &(mesh->med[i].mus),
+                       &(mesh->med[i].g), &(mesh->med[i].n)) != 5) {
+                MESH_ERROR("property file has wrong format");
+            }
         }
 
-        /*mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
+        fclose(fp);
+    } else {
+        memcpy(mesh->med, cfg->prop, sizeof(medium) * cfg->medianum);
     }
-
-    fclose(fp);
 
     if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
         for (i = 1; i <= mesh->prop; i++) {
@@ -458,6 +474,28 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
     int* pe;
     char felem[MAX_FULL_PATH];
 
+    if (cfg->node && cfg->nodenum > 0) {
+        mesh->ne = cfg->elemnum;
+        mesh->elemlen = cfg->elemlen;
+
+        mesh->elem = (int*)malloc(sizeof(int) * mesh->elemlen * mesh->ne);
+        mesh->type = (int*)malloc(sizeof(int ) * mesh->ne);
+
+        datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+        mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * cfg->srcnum);
+
+        for (i = 0; i < mesh->ne; i++) {
+            for (j = 0; j < mesh->elemlen; j++) {
+                mesh->elem[i * mesh->elemlen + j] = cfg->elem[i * (mesh->elemlen + 1) + j];
+            }
+
+            mesh->type[i] = cfg->elem[i * (mesh->elemlen + 1) + mesh->elemlen];
+        }
+
+        mesh_srcdetelem(mesh, cfg);
+        return;
+    }
+
     mesh_filenames("elem_%s.dat", felem, cfg);
 
     if ((fp = fopen(felem, "rt")) == NULL) {
@@ -506,6 +544,53 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
     mesh_srcdetelem(mesh, cfg);
 }
 
+/**
+ * @brief Compute the tetrahedron and nodal volumes if not provided
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+
+void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
+    float dx, dy, dz;
+    int i, j;
+
+    mesh->evol = (float*)calloc(sizeof(float), mesh->ne);
+    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
+
+    for (i = 0; i < mesh->ne; i++) {
+        int* ee = (int*)(mesh->elem + i * mesh->elemlen);
+
+        dx = mesh->node[ee[2] - 1].x - mesh->node[ee[3] - 1].x;
+        dy = mesh->node[ee[2] - 1].y - mesh->node[ee[3] - 1].y;
+        dz = mesh->node[ee[2] - 1].z - mesh->node[ee[3] - 1].z;
+
+        mesh->evol[i] = mesh->node[ee[1] - 1].x * (mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y)
+                        - mesh->node[ee[1] - 1].y * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x)
+                        + mesh->node[ee[1] - 1].z * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x);
+        mesh->evol[i] += -mesh->node[ee[0] - 1].x * ((mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y) + mesh->node[ee[1] - 1].y * dz - mesh->node[ee[1] - 1].z * dy);
+        mesh->evol[i] += +mesh->node[ee[0] - 1].y * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dz - mesh->node[ee[1] - 1].z * dx);
+        mesh->evol[i] += -mesh->node[ee[0] - 1].z * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dy - mesh->node[ee[1] - 1].y * dx);
+        mesh->evol[i] = -mesh->evol[i];
+
+        if (mesh->evol[i] < 0.f) {
+            int e1 = ee[3];
+            ee[3] = ee [2];
+            ee[2] = e1;
+        }
+
+        mesh->evol[i] *= (1.f / 6.f);
+
+        if (mesh->type[i] == 0) {
+            continue;
+        }
+
+        for (j = 0; j < mesh->elemlen; j++) {
+            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
+        }
+    }
+}
 
 /**
  * @brief Load tet element volume file and initialize the related mesh properties
@@ -518,6 +603,12 @@ void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg) {
     FILE* fp;
     int tmp, len, i, j, *ee;
     char fvelem[MAX_FULL_PATH];
+
+    if (cfg->elem && cfg->elemnum && cfg->node && cfg->nodenum) {
+        mesh_getvolume(mesh, cfg);
+        return;
+    }
+
     mesh_filenames("velem_%s.dat", fvelem, cfg);
 
     if ((fp = fopen(fvelem, "rt")) == NULL) {
@@ -552,6 +643,7 @@ void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg) {
     fclose(fp);
 }
 
+
 /**
  * @brief Load face-neightbor element list and initialize the related mesh properties
  *
@@ -564,6 +656,12 @@ void mesh_loadfaceneighbor(tetmesh* mesh, mcconfig* cfg) {
     int len, i, j;
     int* pe;
     char ffacenb[MAX_FULL_PATH];
+
+    if (cfg->elem && cfg->elemnum) {
+        mesh_getfacenb(mesh, cfg);
+        return;
+    }
+
     mesh_filenames("facenb_%s.dat", ffacenb, cfg);
 
     if ((fp = fopen(ffacenb, "rt")) == NULL) {
@@ -695,14 +793,14 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
  */
 
 
-void mesh_clear(tetmesh* mesh) {
+void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
     mesh->nn = 0;
     mesh->ne = 0;
     mesh->nf = 0;
     mesh->srcelemlen = 0;
     mesh->detelemlen = 0;
 
-    if (mesh->node) {
+    if (mesh->node && cfg->node == NULL) {
         free(mesh->node);
         mesh->node = NULL;
     }
@@ -735,11 +833,6 @@ void mesh_clear(tetmesh* mesh) {
     if (mesh->med) {
         free(mesh->med);
         mesh->med = NULL;
-    }
-
-    if (mesh->atte) {
-        free(mesh->atte);
-        mesh->atte = NULL;
     }
 
     if (mesh->weight) {

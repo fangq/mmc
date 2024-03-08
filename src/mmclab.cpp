@@ -418,7 +418,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         }
 
         /** \subsection sclean End the simulation */
-        mesh_clear(&mesh);
+        mesh_clear(&mesh, &cfg);
         mcx_clearcfg(&cfg);
     }
 
@@ -703,12 +703,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
             free(mesh->med);
         }
 
-        if (mesh->atte) {
-            free(mesh->atte);
-        }
-
         mesh->med = (medium*)calloc(sizeof(medium), mesh->prop + 1);
-        mesh->atte = (float*)calloc(sizeof(float), mesh->prop + 1);
 
         for (j = 0; j < 4; j++)
             for (i = 0; i <= mesh->prop; i++) {

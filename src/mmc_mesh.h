@@ -106,7 +106,6 @@ typedef struct MMC_mesh {
     int*  type;            /**< element-based media index */
     int*  facenb;          /**< face neighbors, idx of the element sharing a face */
     medium* med;           /**< optical property of different media */
-    float* atte;           /**< precomputed attenuation for each media */
     double* weight;        /**< volumetric fluence for all nodes at all time-gates */
     double* dref;          /**< surface diffuse reflectance */
     float* evol;           /**< volume of an element */
@@ -144,7 +143,7 @@ void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg);
 
-void mesh_clear(tetmesh* mesh);
+void mesh_clear(tetmesh* mesh, mcconfig* cfg);
 float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, int pair);
 void mesh_build(tetmesh* mesh);
 void mesh_error(const char* msg, const char* file, const int linenum);

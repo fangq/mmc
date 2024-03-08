@@ -64,8 +64,8 @@
     #define S_BLUE    "\x1b[34m"
     #define S_MAGENTA "\x1b[35m"
     #define S_CYAN    "\x1b[36m"
-    #define S_BOLD     "\x1b[1m"
-    #define S_ITALIC   "\x1b[3m"
+    #define S_BOLD    "\x1b[1m"
+    #define S_ITALIC  "\x1b[3m"
     #define S_RESET   "\x1b[0m"
 #else
     #define S_RED
@@ -170,7 +170,7 @@ typedef struct MCXGPUInfo {
     int sm, core;
     size_t autoblock, autothread;
     int maxgate;
-    int maxmpthread;  /**< maximum thread number per multi-processor */
+    int maxmpthread;               /**< maximum thread number per multi-processor */
     enum TDeviceVendor vendor;
 } GPUInfo;
 
@@ -190,10 +190,10 @@ typedef struct MMC_config {
     float3 srcpos;                 /**<src position in mm*/
     float4 srcdir;                 /**<src normal direction*/
     int srctype;                   /**<src type: 0 - pencil beam, 1 - isotropic ... */
-    float4 srcparam1;          /**<source parameters set 1*/
-    float4 srcparam2;          /**<source parameters set 2*/
-    float* srcpattern;         /**<source pattern*/
-    int voidtime;
+    float4 srcparam1;              /**<source parameters set 1*/
+    float4 srcparam2;              /**<source parameters set 2*/
+    float* srcpattern;             /**<source pattern*/
+    int voidtime;                  /**<1 start counting photon time when moves inside 0 voxels; 0: count time only after enters non-zero voxel*/
     float4 bary0;                  /**<initial bary centric coordinates of the source*/
     float tstart;                  /**<start time in second*/
     float tstep;                   /**<time step in second*/
@@ -203,23 +203,23 @@ typedef struct MMC_config {
     uint4 crop0;                   /**<sub-volume for cache*/
     uint4 crop1;                   /**<the other end of the caching box*/
     int medianum;                  /**<total types of media*/
-    int srcnum;            /**<total number of sources, could be larger than 1 only with pattern illumination*/
+    int srcnum;                    /**<total number of sources, could be larger than 1 only with pattern illumination*/
     int detnum;                    /**<total detector numbers*/
     float detradius;               /**<detector radius*/
     float sradius;                 /**<source region radius: if set to non-zero, accumulation \
-                                           will not perform for dist<sradius; this can reduce \
-                                           normalization error when using non-atomic write*/
+                                       will not perform for dist<sradius; this can reduce \
+                                       normalization error when using non-atomic write*/
     medium* prop;                  /**<optical property mapping table*/
     float4* detpos;                /**<detector positions and radius, overwrite detradius*/
-    float4 detparam1;          /**<parameters set 1 for wide-field detector*/
-    float4 detparam2;          /**<parameters set 2 for wide-feild detector*/
-    float* detpattern;         /**<detector pattern*/
+    float4 detparam1;              /**<parameters set 1 for wide-field detector*/
+    float4 detparam2;              /**<parameters set 2 for wide-feild detector*/
+    float* detpattern;             /**<detector pattern*/
     float  minstep;                /**<accumulation step size*/
     int maxgate;                   /**<simultaneous recording gates*/
     int respin;                    /**<number of repeatitions*/
     int printnum;                  /**<number of printed threads (for debugging)*/
-    int replaydet;                 /**<the detector id for which to replay the detected photons, start from 1
-                           0 for wide-field detection pattern*/
+    int replaydet;                 /**<the detector id for which to replay the detected photons, start from 1 \
+                                       0 for wide-field detection pattern*/
     unsigned char* vol;            /**<pointer to the volume*/
     char session[MAX_SESSION_LENGTH];/**<session id, a string*/
     char meshtag[MAX_SESSION_LENGTH];/**<a string to tag all input mesh files*/
@@ -238,7 +238,7 @@ typedef struct MMC_config {
     char issaveref;                /**<1 to save diffuse reflectance on surface, 0 no save*/
     char isatomic;                 /**<1 use atomic operations for weight accumulation, 0 do not use*/
     char method;                   /**<0-Plucker 1-Havel, 2-Badouel, 3-branchless Badouel*/
-    int implicit;              /**<1 for edge- or node-based implicit MMC, 2 for face-based implicit MMC*/
+    int implicit;                  /**<1 for edge- or node-based implicit MMC, 2 for face-based implicit MMC*/
     char basisorder;               /**<0 to use piece-wise-constant basis for fluence, 1, linear*/
     char outputtype;               /**<'X' output is flux, 'F' output is fluence, 'E' energy deposit*/
     char outputformat;             /**<'ascii' output is text, 'bin': binary, 'json': regular json, 'ubjson': universal binary json*/
@@ -265,26 +265,31 @@ typedef struct MMC_config {
     char* clsource;
     int parentid;
     int optlevel;
-    unsigned int maxdetphoton; /*anticipated maximum detected photons*/
-    unsigned int maxjumpdebug;   /**<num of  photon scattering events to save when saving photon trajectory is enabled*/
-    unsigned int debugdatalen;   /**<max number of photon trajectory position length*/
-    double* exportfield;     /*memory buffer when returning the flux to external programs such as matlab*/
+    unsigned int maxdetphoton;     /*anticipated maximum detected photons*/
+    unsigned int maxjumpdebug;     /**<num of  photon scattering events to save when saving photon trajectory is enabled*/
+    unsigned int debugdatalen;     /**<max number of photon trajectory position length*/
+    double* exportfield;           /*memory buffer when returning the flux to external programs such as matlab*/
     unsigned char* exportseed;     /*memory buffer when returning the RNG seed to matlab*/
-    float* exportdetected;  /*memory buffer when returning the partial length info to external programs such as matlab*/
-    float* exportdebugdata;      /**<pointer to the buffer where the photon trajectory data are stored*/
+    float* exportdetected;         /*memory buffer when returning the partial length info to external programs such as matlab*/
+    float* exportdebugdata;        /**<pointer to the buffer where the photon trajectory data are stored*/
     double energytot, energyabs, energyesc;
-    unsigned int detectedcount; /**<total number of detected photons*/
-    unsigned int runtime;
-    char autopilot;     /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
-    float normalizer;            /**<normalization factor*/
-    unsigned int nbuffer;        /**<2^nbuffer is the number of buffers for accummulation*/
+    unsigned int detectedcount;    /**<total number of detected photons*/
+    unsigned int runtime;          /**<total simulation runtime in ms*/
+    char autopilot;                /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
+    float normalizer;              /**<normalization factor*/
+    unsigned int nbuffer;          /**<2^nbuffer is the number of buffers for accummulation*/
     unsigned int gpuid;
     int compute;
-    char isdumpjson;             /**<1 to save json */
-    int  zipid;                  /**<data zip method "zlib","gzip","base64","lzip","lzma","lz4","lz4hc"*/
-    unsigned int savedetflag;    /**<a flag to control the output fields of detected photon data*/
+    char isdumpjson;               /**<1 to save json */
+    int  zipid;                    /**<data zip method "zlib","gzip","base64","lzip","lzma","lz4","lz4hc"*/
+    unsigned int savedetflag;      /**<a flag to control the output fields of detected photon data*/
     uint mediabyte;
-    char* shapedata;    /**<a pointer points to a string defining the JSON-formatted shape data*/
+    char* shapedata;               /**<a pointer points to a string defining the JSON-formatted shape data*/
+    float3* node;                  /**<node x/y/z data loaded from json input*/
+    unsigned int nodenum;          /**<total number of nodes*/
+    int* elem;                     /**<tetrahedron node indices from json input*/
+    unsigned int elemnum;          /**<total number of elem*/
+    unsigned int elemlen;          /**<number of nodes per elem*/
     char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
 } mcconfig;
 
@@ -321,10 +326,10 @@ void mcx_cleargpuinfo(GPUInfo** gpuinfo);
 void mcx_convertcol2row(unsigned int** vol, uint3* dim);
 void mcx_convertcol2row4d(unsigned int** vol, uint4* dim);
 void mcx_savejdata(char* filename, mcconfig* cfg);
-int  mcx_jdataencode(void* vol,  int ndim, uint* dims, char* type, int byte, int zipid, void* obj, int isubj, mcconfig* cfg);
+int  mcx_jdataencode(void* vol,  int ndim, uint* dims, char* type, int byte, int zipid, void* obj, int isubj, int iscol, mcconfig* cfg);
 int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type, cJSON* obj, mcconfig* cfg);
-void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, mcconfig* cfg);
-void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, mcconfig* cfg);
+void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
+void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
 void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);
 void mcx_fflush(FILE* out);
 

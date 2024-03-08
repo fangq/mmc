@@ -31,8 +31,11 @@
 
 #include <set>
 #include <list>
+#include <vector>
+#include <map>
 #include <algorithm>
 #include <string.h>
+
 #include "mmc_mesh.h"
 #include "mmc_highorder.h"
 #include "mmc_utils.h"
@@ -40,6 +43,8 @@
 #define TETEDGE 6
 
 const int edgepair[TETEDGE][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+
+const int facelist[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
 
 #ifdef __cplusplus
     extern "C"
@@ -97,5 +102,54 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
         }
 
         pos++;
+    }
+}
+
+std::string face_to_string(int a, int b, int c) {
+    int ar[3];
+    ar[0] = MIN(MIN(a, b), c);
+    ar[2] = MAX(MAX(a, b), c);
+    ar[1] = - ar[0] - ar[2] + a + b + c;
+
+    return std::to_string(ar[0]) + "," + std::to_string(ar[1]) + "," + std::to_string(ar[2]);
+}
+
+#ifdef __cplusplus
+    extern "C"
+#endif
+void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg) {
+    std::vector<std::string> faces;
+    std::map<std::string, std::pair<unsigned int, unsigned int>> facenb;
+
+    faces.reserve(mesh->ne << 2);
+
+    for (int i = 0; i < mesh->ne; i++) {
+        int* ee = mesh->elem + i * mesh->elemlen;
+
+        for (int j = 0; j < 4; j++) {
+            faces.push_back(face_to_string(ee[facelist[j][0]], ee[facelist[j][1]], ee[facelist[j][2]]));
+        }
+    }
+
+    for (unsigned int i = 0; i < faces.size(); i++) {
+        if (facenb.count(faces[i])) {
+            facenb[faces[i]].second = (i >> 2) + 1;
+        } else {
+            facenb[faces[i]] = std::make_pair((i >> 2) + 1, 0);
+        }
+    }
+
+    if (mesh->facenb) {
+        free(mesh->facenb);
+    }
+
+    mesh->facenb = (int*)calloc(sizeof(int) * mesh->elemlen, mesh->ne);
+
+    for (unsigned int i = 0; i < faces.size(); i++) {
+        std::pair<unsigned int, unsigned int> item = facenb[faces[i]];
+
+        if (item.second != 0) {
+            mesh->facenb[i] = ((i >> 2) + 1 == item.first ? item.second : item.first);
+        }
     }
 }

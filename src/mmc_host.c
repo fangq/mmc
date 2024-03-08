@@ -120,7 +120,7 @@ int mmc_reset(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
 int mmc_cleanup(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     tracer_clear(tracer);
-    mesh_clear(mesh);
+    mesh_clear(mesh, cfg);
     mcx_clearcfg(cfg);
     return 0;
 }
