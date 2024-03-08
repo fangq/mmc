@@ -34,6 +34,7 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <string>
 #include <string.h>
 
 #include "mmc_mesh.h"
