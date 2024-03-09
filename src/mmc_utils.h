@@ -290,6 +290,8 @@ typedef struct MMC_config {
     int* elem;                     /**<tetrahedron node indices from json input*/
     unsigned int elemnum;          /**<total number of elem*/
     unsigned int elemlen;          /**<number of nodes per elem*/
+    char roitype;                  /**<mesh roi type: 0: unknown, 1: edge-roi, 2: node-roi, 3: face-roi */
+    float* roidata;                /**<mesh roi (edge/node/face) data*/
     char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
 } mcconfig;
 

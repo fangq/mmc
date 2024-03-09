@@ -336,6 +336,8 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->elemlen = 0;
     cfg->node = NULL;
     cfg->elem = NULL;
+    cfg->roitype = 0;
+    cfg->roidata = NULL;
 
 #ifdef MCX_EMBED_CL
     cfg->clsource = (char*)mmc_core_cl;
@@ -414,6 +416,10 @@ void mcx_clearcfg(mcconfig* cfg) {
 
     if (cfg->elem) {
         free(cfg->elem);
+    }
+
+    if (cfg->roidata) {
+        free(cfg->roidata);
     }
 
 #ifndef MCX_EMBED_CL
@@ -1261,7 +1267,10 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
         if (subitem) {
             strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID", "Mesh.MeshID", Mesh, (MMC_ERROR(-1, "You must specify mesh files"), ""), valuestring), MAX_SESSION_LENGTH - 1);
-        } else {
+        }
+
+        //< reading mesh node and elem mesh data from JSON file
+        {
             int ndim;
             uint dims[3] = {1, 1, 1};
             char* type = NULL;
@@ -1290,7 +1299,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         subitem = subitem->next;
                     }
                 } else {
-                    mcx_jdatadecode((void**)&cfg->node, &ndim, dims, 3, &type, subitem, cfg);
+                    mcx_jdatadecode((void**)&cfg->node, &ndim, dims, 2, &type, subitem, cfg);
 
                     if (strcmp(type, "single") || ndim != 2 || (ndim >= 2 && dims[1] != 3)) {
                         if (cfg->node) {
@@ -1302,8 +1311,6 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         cfg->nodenum = dims[0];
                     }
                 }
-            } else {
-                MMC_ERROR(-1, "MeshNode must be provided if MeshID is missing");
             }
 
             subitem = FIND_JSON_OBJ("MeshElem", "Mesh.MeshElem", Mesh);
@@ -1322,7 +1329,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                     for (int i = 0; i < cfg->elemnum; i++) {
                         if (cJSON_GetArraySize(subitem) != 5) {
-                            MMC_ERROR(-1, "Each element in MeshElem must have 3 numbers");
+                            MMC_ERROR(-1, "Each element in MeshElem must have 5 integers");
                         }
 
                         tmp = subitem->child;
@@ -1335,11 +1342,11 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         subitem = subitem->next;
                     }
 
-                    cfg->elemlen--;
+                    cfg->elemlen--; // to make cfg->elemlen and mesh->elemlen the same - cfg->elem contains 1 extra column for mesh->type
                 } else {
-                    mcx_jdatadecode((void**)&cfg->elem, &ndim, dims, 3, &type, subitem, cfg);
+                    mcx_jdatadecode((void**)&cfg->elem, &ndim, dims, 2, &type, subitem, cfg);
 
-                    if (strstr(type, "int32") || ndim != 2 || (ndim >= 2 && dims[1] != 5 && dims[1] != 11)) {
+                    if (!strstr(type, "int32") || ndim != 2 || (ndim >= 2 && dims[1] != 5 && dims[1] != 11)) {
                         if (cfg->elem) {
                             free(cfg->elem);
                         }
@@ -1350,9 +1357,54 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         cfg->elemlen = dims[1] - 1;
                     }
                 }
+            }
 
-            } else {
-                MMC_ERROR(-1, "MeshNode must be provided if MeshID is missing");
+            subitem = FIND_JSON_OBJ("MeshROI", "Mesh.MeshROI", Mesh);
+
+            if (subitem) {
+                if (cfg->roidata) {
+                    free(cfg->roidata);
+                    cfg->roidata = NULL;
+                }
+
+                if (cJSON_IsArray(subitem)) {
+                    int collen, rowlen = cJSON_GetArraySize(subitem);
+                    subitem = subitem->child;
+
+                    if (cJSON_IsArray(subitem)) {
+                        collen = cJSON_GetArraySize(subitem);
+                    } else {
+                        collen = rowlen;
+                        rowlen = 1;
+                    }
+
+                    cfg->roitype = (collen == 6) ? rtEdge : ((collen == 1 || rowlen == 1) ? rtNode : (collen == 4 ? rtFace : rtNone));
+                    cfg->roidata = (float*)malloc(sizeof(float) * rowlen * collen);
+
+                    for (int i = 0; i < rowlen; i++) {
+                        if (cJSON_GetArraySize(subitem) != collen) {
+                            MMC_ERROR(-1, "Each element in MeshROI must have the same length");
+                        }
+
+                        tmp = subitem->child;
+
+                        for (int j = 0; j < collen; j++) {
+                            cfg->roidata[ i * collen + j ] = tmp->valuedouble;
+                            tmp = tmp->next;
+                        }
+
+                        subitem = subitem->next;
+                    }
+                } else {
+                    mcx_jdatadecode((void**)&cfg->roidata, &ndim, dims, 2, &type, subitem, cfg);
+
+                    if (strcmp(type, "single") || ndim > 2 || (ndim >= 2 && dims[1] != 6 && dims[1] != 4)) {
+                        free(cfg->roidata);
+                        MMC_ERROR(-1, "Mesh.MeshROI JData-annotated array must be in the 'single' format");
+                    } else {
+                        cfg->roitype = (dims[1] == 6) ? rtEdge : ((ndim == 1 || dims[0] == 1 || dims[1] == 1) ? rtNode : (dims[1] == 4 ? rtFace : rtNone));
+                    }
+                }
             }
         }
 
