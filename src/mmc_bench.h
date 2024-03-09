@@ -30,127 +30,16 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    mcx_bench.h
+\file    mmc_bench.h
 
-@brief   MCX builtin benchmarks
+@brief   MMC builtin benchmarks
 *******************************************************************************/
                                                                                          
 #ifndef _MCEXTREME_BENCHMARK_H
 #define _MCEXTREME_BENCHMARK_H
 
-#define MSTR(...) #__VA_ARGS__
-
-const char *benchname[]={"d-cube60","d-cube60b",""};
-const char *benchjson[]={
-MSTR(
-{
-    "Session": {
-	"ID":       "d-cube60",
-	"Photons":  1e6,
-	"RNGSeed":  1648335518,
-	"DoMismatch": 0
-    },
-    "Domain": {
-        "Dim":    [60,60,60],
-        "OriginType": 1,
-        "Media": [
-             {"mua": 0, "mus": 0, "g": 1, "n": 1},
-             {"mua": 0.005,"mus": 1.0, "g": 0.01, "n": 1.37},
-             {"mua": 0.002,"mus": 5, "g": 0.90, "n": 1}
-        ]
-    },
-    "Shapes": [
-        {"Name":     "cubic60"},
-        {"Origin":   [0,0,0]},
-        {"Grid":     {"Tag":1, "Size":[60,60,60]}}
-    ],
-    "Forward": {
-	"T0": 0.0e+00,
-	"T1": 5.0e-09,
-	"Dt": 5.0e-09
-    },
-    "Optode": {
-	"Source": {
-	    "Type":"pencil",
-	    "Pos": [29.0, 29.0, 0.0],
-	    "Dir": [0.0, 0.0, 1.0]
-	},
-	"Detector": [
-	    {
-		"Pos": [29.0,  19.0,  0.0],
-		"R": 1.0
-	    },
-            {
-                "Pos": [29.0,  39.0,  0.0],
-                "R": 1.0
-            },
-            {
-                "Pos": [19.0,  29.0,  0.0],
-                "R": 1.0
-            },
-            {
-                "Pos": [39.0,  29.0,  0.0],
-                "R": 1.0
-            }
-	]
-    }
-}),
-
-
-MSTR(
-{
-    "Session": {
-	"ID":       "d-cube60b",
-	"Photons":  1e6,
-	"RNGSeed":  1648335518,
-	"DoMismatch": true
-    },
-    "Domain": {
-        "Dim":    [60,60,60],
-        "OriginType": 1,
-        "Media": [
-             {"mua": 0.00, "mus": 0.0, "g": 1.00, "n": 1.0},
-             {"mua": 0.005,"mus": 1.0, "g": 0.01, "n": 1.37},
-             {"mua": 0.002,"mus": 5.0, "g": 0.90, "n": 1.0}
-        ]
-    },
-    "Shapes": [
-        {"Name":     "cube60b"},
-        {"Origin":   [0,0,0]},
-        {"Grid":     {"Tag":1, "Size":[60,60,60]}}
-    ],
-    "Forward": {
-	"T0": 0.0e+00,
-	"T1": 5.0e-09,
-	"Dt": 5.0e-09
-    },
-    "Optode": {
-	"Source": {
-	    "Type":"pencil",
-	    "Pos": [29.0, 29.0, 0.0],
-	    "Dir": [0.0, 0.0, 1.0]
-	},
-	"Detector": [
-	    {
-		"Pos": [29.0,  19.0,  0.0],
-		"R": 1.0
-	    },
-            {
-                "Pos": [29.0,  39.0,  0.0],
-                "R": 1.0
-            },
-            {
-                "Pos": [19.0,  29.0,  0.0],
-                "R": 1.0
-            },
-            {
-                "Pos": [39.0,  29.0,  0.0],
-                "R": 1.0
-            }
-	]
-    }
-})
-
-};
+#define MAX_MCX_BENCH  3                           /**< Total number of built-in benchmarks */
+extern const char* benchname[MAX_MCX_BENCH];       /**< String list defining the names of each built-in benchmark */
+extern const char* benchjson[MAX_MCX_BENCH];       /**< JSON-formatted input configuration for each built-in benchmark */
 
 #endif

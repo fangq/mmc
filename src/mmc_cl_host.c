@@ -281,7 +281,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     memcpy(propdet + param.maxpropdet, tracer->n, (param.normbuf << 2)*sizeof(float4));
 
     for (i = 0; i < workdev; i++) {
-        OCL_ASSERT(((gnode[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float3) * (mesh->nn), mesh->node, &status), status)));
+        OCL_ASSERT(((gnode[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(FLOAT3) * (mesh->nn), mesh->node, &status), status)));
         OCL_ASSERT(((gelem[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int4) * (mesh->ne), mesh->elem, &status), status)));
         OCL_ASSERT(((gtype[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int) * (mesh->ne), mesh->type, &status), status)));
         OCL_ASSERT(((gfacenb[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int4) * (mesh->ne), mesh->facenb, &status), status)));

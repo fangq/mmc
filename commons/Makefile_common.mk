@@ -306,7 +306,7 @@ pretty:
 	    --suffix=none \
 	    --formatted \
 	    --break-blocks \
-	    --exclude=mmc_bench.h \
+	    --exclude=mmc_bench.c \
 	   "*.c" "*.h" "*.cpp" "*.cu" "*.cl"
 
 .PHONY: regression clean arch makedirs dep $(SUBDIRS)

@@ -46,6 +46,10 @@
     #include <omp.h>
 #endif
 
+#ifdef __NVCC__
+    #define FLOAT3 float3
+#endif
+
 #define MAX_FULL_PATH       2048                         /**< max characters in a full file name string */
 #define MAX_PATH_LENGTH     1024                         /**< max characters in a full file name string */
 #define MAX_SESSION_LENGTH  64                           /**< max session name length */
@@ -229,8 +233,8 @@ typedef struct MMC_config {
     char isnormalized;             /**<1 to normalize the fluence, 0 for raw fluence*/
     char issavedet;                /**<1 to count all photons hits the detectors*/
     char ismomentum;               /**<1 to save momentum transfer for detected photons, implies issavedet=1*/
-    char issaveexit;               /**<1 to save the exit position and vector of a detected photon, implies issavedet=1*/
-    /**<2 to save accumulated photon weight in frames of images*/
+    char issaveexit;               /**<1 to save the exit position and vector of a detected photon, implies issavedet=1 \
+                                       2 to save accumulated photon weight in frames of images*/
     char issave2pt;                /**<1 to save the 2-point distribution, 0 do not save*/
     char isgpuinfo;                /**<1 to print gpu info when attach, 0 do not print*/
     char isspecular;               /**<1 calculate the initial specular ref if outside the mesh, 0 do not calculate*/
@@ -285,12 +289,12 @@ typedef struct MMC_config {
     unsigned int savedetflag;      /**<a flag to control the output fields of detected photon data*/
     uint mediabyte;
     char* shapedata;               /**<a pointer points to a string defining the JSON-formatted shape data*/
-    float3* node;                  /**<node x/y/z data loaded from json input*/
+    FLOAT3* node;                  /**<node x/y/z data loaded from json input*/
     unsigned int nodenum;          /**<total number of nodes*/
     int* elem;                     /**<tetrahedron node indices from json input*/
     unsigned int elemnum;          /**<total number of elem*/
     unsigned int elemlen;          /**<number of nodes per elem*/
-    char roitype;                  /**<mesh roi type: 0: unknown, 1: edge-roi, 2: node-roi, 3: face-roi */
+    enum TROIType roitype;         /**<mesh roi type: rtNone: unknown, rtEdge: edge-roi, rtNode: node-roi, rtFace: face-roi */
     float* roidata;                /**<mesh roi (edge/node/face) data*/
     char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
 } mcconfig;

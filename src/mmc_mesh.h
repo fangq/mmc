@@ -93,7 +93,7 @@ typedef struct MMC_mesh {
     int nf;                /**< number of surface triangles */
     int prop;              /**< number of media */
     int elemlen;           /**< number of nodes per element */
-    float3* node;          /**< node coordinates */
+    FLOAT3* node;          /**< node coordinates */
     int*  elem;            /**< element indices */
     int*  elem2;           /**< element indices */
     float* edgeroi;        /**< immc: vessel edge radii */
@@ -218,7 +218,8 @@ static inline void mmc_sincosf(float x, float* sine, float* cosine) {
 //#ifndef MMC_USE_SSE
 static inline float vec_dot(float3* a, float3* b) {
     return a->x * b->x + a->y * b->y + a->z * b->z;
-}/*
+}
+/*
 #else
 
 #ifndef __SSE4_1__
@@ -262,6 +263,51 @@ static inline float dist(float3* p0, float3* p1) {
 
 static inline float dist2d2(float* p0, float* p1) {
     return (p1[0] - p0[0]) * (p1[0] - p0[0]) + (p1[1] - p0[1]) * (p1[1] - p0[1]);
+}
+
+/**
+ *  vector functions that strictly accept only 3-element vectors
+ */
+static inline void vec_add3(FLOAT3* a, FLOAT3* b, FLOAT3* res) {
+    res->x = a->x + b->x;
+    res->y = a->y + b->y;
+    res->z = a->z + b->z;
+}
+
+static inline void vec_diff3(FLOAT3* a, FLOAT3* b, FLOAT3* res) {
+    res->x = b->x - a->x;
+    res->y = b->y - a->y;
+    res->z = b->z - a->z;
+}
+
+static inline void vec_mult3(FLOAT3* a, float sa, FLOAT3* res) {
+    res->x = sa * a->x;
+    res->y = sa * a->y;
+    res->z = sa * a->z;
+}
+
+static inline void vec_mult_add3(FLOAT3* a, FLOAT3* b, float sa, float sb, FLOAT3* res) {
+    res->x = sb * b->x + sa * a->x;
+    res->y = sb * b->y + sa * a->y;
+    res->z = sb * b->z + sa * a->z;
+}
+
+static inline void vec_cross3(FLOAT3* a, FLOAT3* b, FLOAT3* res) {
+    res->x = a->y * b->z - a->z * b->y;
+    res->y = a->z * b->x - a->x * b->z;
+    res->z = a->x * b->y - a->y * b->x;
+}
+
+static inline float vec_dot3(FLOAT3* a, FLOAT3* b) {
+    return a->x * b->x + a->y * b->y + a->z * b->z;
+}
+
+static inline float dist2_3(FLOAT3* p0, FLOAT3* p1) {
+    return (p1->x - p0->x) * (p1->x - p0->x) + (p1->y - p0->y) * (p1->y - p0->y) + (p1->z - p0->z) * (p1->z - p0->z);
+}
+
+static inline float dist_3(FLOAT3* p0, FLOAT3* p1) {
+    return sqrtf(dist2_3(p0, p1));
 }
 
 static inline float mmc_rsqrtf(float a) {

@@ -141,6 +141,98 @@ void mesh_init(tetmesh* mesh) {
     mesh->nmax.w = 1.f;
 }
 
+
+/**
+ * @brief Clearing the mesh data structure
+ *
+ * Destructor of the mesh data structure, delete all dynamically allocated members
+ */
+
+
+void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
+    mesh->nn = 0;
+    mesh->ne = 0;
+    mesh->nf = 0;
+    mesh->srcelemlen = 0;
+    mesh->detelemlen = 0;
+
+    if (mesh->node && cfg->node == NULL) {
+        free(mesh->node);
+        mesh->node = NULL;
+    }
+
+    if (mesh->elem) {
+        free(mesh->elem);
+        mesh->elem = NULL;
+    }
+
+    if (mesh->elem2) {
+        free(mesh->elem2);
+        mesh->elem2 = NULL;
+    }
+
+    if (mesh->facenb) {
+        free(mesh->facenb);
+        mesh->facenb = NULL;
+    }
+
+    if (mesh->dref) {
+        free(mesh->dref);
+        mesh->dref = NULL;
+    }
+
+    if (mesh->type) {
+        free(mesh->type);
+        mesh->type = NULL;
+    }
+
+    if (mesh->med) {
+        free(mesh->med);
+        mesh->med = NULL;
+    }
+
+    if (mesh->weight) {
+        free(mesh->weight);
+        mesh->weight = NULL;
+    }
+
+    if (mesh->evol) {
+        free(mesh->evol);
+        mesh->evol = NULL;
+    }
+
+    if (mesh->nvol) {
+        free(mesh->nvol);
+        mesh->nvol = NULL;
+    }
+
+    if (mesh->srcelem) {
+        free(mesh->srcelem);
+        mesh->srcelem = NULL;
+    }
+
+    if (mesh->detelem) {
+        free(mesh->detelem);
+        mesh->detelem = NULL;
+    }
+
+    if (mesh->noderoi && cfg->roitype != rtNode) {
+        free(mesh->noderoi);
+        mesh->noderoi = NULL;
+    }
+
+    if (mesh->edgeroi && cfg->roitype != rtEdge) {
+        free(mesh->edgeroi);
+        mesh->edgeroi = NULL;
+    }
+
+    if (mesh->faceroi && cfg->roitype != rtFace) {
+        free(mesh->faceroi);
+        mesh->faceroi = NULL;
+    }
+}
+
+
 #ifndef MCX_CONTAINER
 
 /**
@@ -325,7 +417,7 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
         MESH_ERROR("node file has wrong format");
     }
 
-    mesh->node = (float3*)calloc(sizeof(float3), mesh->nn);
+    mesh->node = (FLOAT3*)calloc(sizeof(FLOAT3), mesh->nn);
 
     for (i = 0; i < mesh->nn; i++) {
         if (fscanf(fp, "%d %f %f %f", &tmp, &(mesh->node[i].x), &(mesh->node[i].y), &(mesh->node[i].z)) != 4) {
@@ -422,6 +514,29 @@ void mesh_loadroi(tetmesh* mesh, mcconfig* cfg) {
     int len, i, j, row, col;
     float* pe = NULL;
     char froi[MAX_FULL_PATH];
+
+    if (cfg->roidata && cfg->roitype != rtNone) {
+        if (cfg->roitype == rtEdge) {
+            row = mesh->ne;
+            col = 6;
+            mesh->edgeroi = (float*)malloc(sizeof(float) * row * col);
+            pe = mesh->edgeroi;
+        } else if (cfg->roitype == rtNode) {
+            row = mesh->nn;
+            col = 1;
+            mesh->noderoi = (float*)malloc(sizeof(float) * row * col);
+            pe = mesh->noderoi;
+        } else {
+            row = mesh->ne;
+            col = 4;
+            mesh->faceroi = (float*)malloc(sizeof(float) * row * col);
+            pe = mesh->faceroi;
+        }
+
+        memcpy(pe, cfg->roidata, sizeof(float) * row * col);
+
+        return;
+    }
 
     mesh_filenames("roi_%s.dat", froi, cfg);
 
@@ -788,96 +903,6 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
 #endif
 
 /**
- * @brief Clearing the mesh data structure
- *
- * Destructor of the mesh data structure, delete all dynamically allocated members
- */
-
-
-void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
-    mesh->nn = 0;
-    mesh->ne = 0;
-    mesh->nf = 0;
-    mesh->srcelemlen = 0;
-    mesh->detelemlen = 0;
-
-    if (mesh->node && cfg->node == NULL) {
-        free(mesh->node);
-        mesh->node = NULL;
-    }
-
-    if (mesh->elem) {
-        free(mesh->elem);
-        mesh->elem = NULL;
-    }
-
-    if (mesh->elem2) {
-        free(mesh->elem2);
-        mesh->elem2 = NULL;
-    }
-
-    if (mesh->facenb) {
-        free(mesh->facenb);
-        mesh->facenb = NULL;
-    }
-
-    if (mesh->dref) {
-        free(mesh->dref);
-        mesh->dref = NULL;
-    }
-
-    if (mesh->type) {
-        free(mesh->type);
-        mesh->type = NULL;
-    }
-
-    if (mesh->med) {
-        free(mesh->med);
-        mesh->med = NULL;
-    }
-
-    if (mesh->weight) {
-        free(mesh->weight);
-        mesh->weight = NULL;
-    }
-
-    if (mesh->evol) {
-        free(mesh->evol);
-        mesh->evol = NULL;
-    }
-
-    if (mesh->nvol) {
-        free(mesh->nvol);
-        mesh->nvol = NULL;
-    }
-
-    if (mesh->srcelem) {
-        free(mesh->srcelem);
-        mesh->srcelem = NULL;
-    }
-
-    if (mesh->detelem) {
-        free(mesh->detelem);
-        mesh->detelem = NULL;
-    }
-
-    if (mesh->noderoi) {
-        free(mesh->noderoi);
-        mesh->noderoi = NULL;
-    }
-
-    if (mesh->edgeroi) {
-        free(mesh->edgeroi);
-        mesh->edgeroi = NULL;
-    }
-
-    if (mesh->faceroi) {
-        free(mesh->faceroi);
-        mesh->faceroi = NULL;
-    }
-}
-
-/**
  * @brief Initialize a data structure storing all pre-computed ray-tracing related data
  *
  * the pre-computed ray-tracing data include
@@ -920,7 +945,8 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         }
     } else if ( (cfg->srctype == stPencil || cfg->srctype == stIsotropic || cfg->srctype == stCone || cfg->srctype == stArcSin)  && cfg->e0 > 0) {
         int eid = cfg->e0 - 1;
-        float3 vecS = {0.f}, *nodes = tracer->mesh->node, vecAB, vecAC, vecN;
+        FLOAT3 vecS = {0.f}, vecAB, vecAC, vecN;
+        FLOAT3* nodes = tracer->mesh->node;
         int ea, eb, ec;
         float s = 0.f, *bary = &(cfg->bary0.x);
         int* elems = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen); // convert int4* to int*
@@ -933,11 +959,11 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
             ea = elems[out[i][0]] - 1;
             eb = elems[out[i][1]] - 1;
             ec = elems[out[i][2]] - 1;
-            vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-            vec_diff(&nodes[ea], &nodes[ec], &vecAC);
-            vec_diff(&nodes[ea], &(cfg->srcpos), &vecS);
-            vec_cross(&vecAB, &vecAC, &vecN);
-            bary[facemap[i]] = -vec_dot(&vecS, &vecN);
+            vec_diff3(&nodes[ea], &nodes[eb], &vecAB);
+            vec_diff3(&nodes[ea], &nodes[ec], &vecAC);
+            vec_diff3(&nodes[ea], (FLOAT3*) & (cfg->srcpos), &vecS);
+            vec_cross3(&vecAB, &vecAC, &vecN);
+            bary[facemap[i]] = -vec_dot3(&vecS, &vecN);
         }
 
         if (cfg->debuglevel & dlWeight)
@@ -1122,7 +1148,7 @@ void tracer_build(raytracer* tracer) {
     int ne, i, j;
     const int pairs[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 
-    float3* nodes;
+    FLOAT3* nodes;
     int* elems, ebase;
     int e1, e0;
     float Rn2;
@@ -1142,7 +1168,7 @@ void tracer_build(raytracer* tracer) {
 
     if (tracer->method == rtPlucker) {
         int ea, eb, ec;
-        float3 vecAB = {0.f}, vecAC = {0.f};
+        FLOAT3 vecAB = {0.f}, vecAC = {0.f};
 
         tracer->d = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
         tracer->m = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
@@ -1154,17 +1180,17 @@ void tracer_build(raytracer* tracer) {
             for (j = 0; j < 6; j++) {
                 e1 = elems[ebase + pairs[j][1]] - 1;
                 e0 = elems[ebase + pairs[j][0]] - 1;
-                vec_diff(&nodes[e0], &nodes[e1], tracer->d + i * 6 + j);
-                vec_cross(&nodes[e0], &nodes[e1], tracer->m + i * 6 + j);
+                vec_diff3(&nodes[e0], &nodes[e1], (FLOAT3*)(tracer->d + i * 6 + j));
+                vec_cross3(&nodes[e0], &nodes[e1], (FLOAT3*)(tracer->m + i * 6 + j));
             }
 
             for (j = 0; j < 4; j++) {
                 ea = elems[ebase + out[j][0]] - 1;
                 eb = elems[ebase + out[j][1]] - 1;
                 ec = elems[ebase + out[j][2]] - 1;
-                vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff(&nodes[ea], &nodes[ec], &vecAC);
-                vec_cross(&vecAB, &vecAC, tracer->n + ebase + j);
+                vec_diff3(&nodes[ea], &nodes[eb], &vecAB);
+                vec_diff3(&nodes[ea], &nodes[ec], &vecAC);
+                vec_cross3(&vecAB, &vecAC, (FLOAT3*)(tracer->n + ebase + j));
                 Rn2 = 1.f / sqrt(vec_dot(tracer->n + ebase + j, tracer->n + ebase + j));
                 vec_mult(tracer->n + ebase + j, Rn2, tracer->n + ebase + j);
             }
@@ -1185,8 +1211,8 @@ void tracer_build(raytracer* tracer) {
                 ea = elems[ebase + out[j][0]] - 1;
                 eb = elems[ebase + out[j][1]] - 1;
                 ec = elems[ebase + out[j][2]] - 1;
-                vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff(&nodes[ea], &nodes[ec], &vecAC);
+                vec_diff3(&nodes[ea], &nodes[eb], (FLOAT3*)&vecAB);
+                vec_diff3(&nodes[ea], &nodes[ec], (FLOAT3*)&vecAC);
                 vec_cross(&vecAB, &vecAC, vecN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
                 vec_cross(&vecAC, vecN, vecN + 1);
                 vec_cross(vecN, &vecAB, vecN + 2);
@@ -1199,9 +1225,9 @@ void tracer_build(raytracer* tracer) {
                 vec_mult(vecN + 1, Rn2, vecN + 1);
                 vec_mult(vecN + 2, Rn2, vecN + 2);
 #if defined(MMC_USE_SSE) || defined(USE_OPENCL)
-                vecN->w    = vec_dot(vecN,  &nodes[ea]);
-                (vecN + 1)->w = -vec_dot(vecN + 1, &nodes[ea]);
-                (vecN + 2)->w = -vec_dot(vecN + 2, &nodes[ea]);
+                vecN->w    = vec_dot3((FLOAT3*)vecN,  &nodes[ea]);
+                (vecN + 1)->w = -vec_dot3((FLOAT3*)(vecN + 1), &nodes[ea]);
+                (vecN + 2)->w = -vec_dot3((FLOAT3*)(vecN + 2), &nodes[ea]);
 #endif
             }
         }
@@ -1220,8 +1246,8 @@ void tracer_build(raytracer* tracer) {
                 ea = elems[ebase + out[j][0]] - 1;
                 eb = elems[ebase + out[j][1]] - 1;
                 ec = elems[ebase + out[j][2]] - 1;
-                vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff(&nodes[ea], &nodes[ec], &vecAC);
+                vec_diff3(&nodes[ea], &nodes[eb], (FLOAT3*)&vecAB);
+                vec_diff3(&nodes[ea], &nodes[ec], (FLOAT3*)&vecAC);
 
                 vec_cross(&vecAB, &vecAC, &vN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
 
@@ -1231,7 +1257,7 @@ void tracer_build(raytracer* tracer) {
                 vecN[j + 4] = vN.y;
                 vecN[j + 8] = vN.z;
 #if defined(MMC_USE_SSE) || defined(USE_OPENCL)
-                vecN[j + 12]    = vec_dot(&vN, &nodes[ea]);
+                vecN[j + 12]    = vec_dot3((FLOAT3*)&vN, &nodes[ea]);
 #endif
             }
         }

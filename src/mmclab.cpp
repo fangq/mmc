@@ -503,7 +503,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
             free(mesh->node);
         }
 
-        mesh->node = (float3*)calloc(sizeof(float3), mesh->nn);
+        mesh->node = (FLOAT3*)calloc(sizeof(FLOAT3), mesh->nn);
 
         for (j = 0; j < 3; j++)
             for (i = 0; i < mesh->nn; i++) {

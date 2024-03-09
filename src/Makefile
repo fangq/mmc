@@ -1,7 +1,7 @@
 ROOTDIR = ..
 BINARY=mmc
 
-FILES=mmc_rand_xorshift128p mmc_mesh mmc_raytrace mmc_utils mmc_tictoc mmc_host mmc_highorder mmc_cl_utils mmc_cl_host
+FILES=mmc_rand_xorshift128p mmc_mesh mmc_raytrace mmc_utils mmc_tictoc mmc_host mmc_highorder mmc_bench mmc_cl_utils mmc_cl_host
 CLPROGRAM=mmc_core
 
 ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)

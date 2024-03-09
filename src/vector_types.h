@@ -69,10 +69,14 @@ typedef struct PRE_ALIGN(16) MMC_float4 {
 
 #if defined(MMC_USE_SSE) || defined(USE_OPENCL)
 typedef struct MMC_float4 float3;
+typedef struct MMC_float3 {
+    float x, y, z;
+} FLOAT3;
 #else
 typedef struct MMC_float3 {
     float x, y, z;
 } float3;
+typedef struct MMC_float3 FLOAT3;
 #endif
 
 /**
