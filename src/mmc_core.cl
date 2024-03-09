@@ -199,7 +199,6 @@ inline __device__ __host__ float4 convert_float4_rte(float4 v) {
     #define NULL 0
 #endif
 
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 #ifdef MCX_USE_NATIVE
     #define MCX_MATHFUN(fun)              native_##fun
@@ -577,12 +576,12 @@ __device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, _
 
     if (pos < GPU_PARAM(gcfg, maxjumpdebug)) {
         pos *= MCX_DEBUG_REC_LEN;
-        ((uint*)gdebugdata)[pos++] = id;
+        ((__global uint*)gdebugdata)[pos++] = id;
         gdebugdata[pos++] = r->p0.x;
         gdebugdata[pos++] = r->p0.y;
         gdebugdata[pos++] = r->p0.z;
         gdebugdata[pos++] = r->weight;
-        ((uint*)gdebugdata)[pos++] = r->eid;
+        ((__global uint*)gdebugdata)[pos++] = r->eid;
     }
 }
 
