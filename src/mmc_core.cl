@@ -1585,10 +1585,6 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             }
         }
 
-        if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
-            savedebugdata(&r, id, reporter, gdebugdata, gcfg);
-        }
-
         float mom = 0.f;
         r.slen0 = mc_next_scatter(gmed[type[r.eid - 1]].g, &r.vec, ran, gcfg, &mom);
         r.slen = r.slen0;

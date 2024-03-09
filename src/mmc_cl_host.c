@@ -621,15 +621,15 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 reporter.jumpdebug += rep.jumpdebug;
 
                 if (cfg->debuglevel & dlTraj) {
-                    uint debugrec = reporter.jumpdebug;
+                    uint debugrec = rep.jumpdebug;
 
                     if (debugrec > 0) {
-                        if (debugrec > cfg->maxdetphoton) {
+                        if (debugrec > cfg->maxjumpdebug) {
                             MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
   are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
                                         , debugrec, cfg->maxjumpdebug);
                         } else {
-                            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", debugrec, cfg->maxjumpdebug + debugrec);
+                            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", debugrec, cfg->debugdatalen + debugrec);
                         }
 
                         debugrec = MIN(debugrec, cfg->maxjumpdebug);

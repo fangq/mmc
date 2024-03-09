@@ -407,11 +407,30 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         }
     }
 
+    if ((cfg->debuglevel & dlTraj) && cfg->exportdebugdata) {
+        if (cfg->debugdatalen > cfg->maxjumpdebug) {
+            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
+  are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
+                        , cfg->debugdatalen, cfg->maxjumpdebug);
+            cfg->debugdatalen = cfg->maxjumpdebug;
+        } else {
+            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", cfg->debugdatalen, cfg->debugdatalen);
+        }
+    }
+
 #ifndef MCX_CONTAINER
 
     if (cfg->issaveref) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving surface diffuse reflectance ..."));
         mesh_saveweight(mesh, cfg, 1);
+    }
+
+    if ((cfg->debuglevel & dlTraj) && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+        cfg->his.colcount = MCX_DEBUG_REC_LEN;
+        cfg->his.savedphoton = cfg->debugdatalen;
+        cfg->his.totalphoton = cfg->nphoton;
+        cfg->his.detected = 0;  // this flag tells mcx_savedetphoton that the data is trajectory
+        mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
     }
 
 #endif

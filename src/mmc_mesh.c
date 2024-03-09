@@ -309,6 +309,7 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
         if (cfg->method == rtBLBadouelGrid) {
             mesh_createdualmesh(mesh, cfg);
         }
+
         return;
     }
 
