@@ -1381,6 +1381,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                     cfg->roitype = (collen == 6) ? rtEdge : ((collen == 1 || rowlen == 1) ? rtNode : (collen == 4 ? rtFace : rtNone));
                     cfg->roidata = (float*)malloc(sizeof(float) * rowlen * collen);
+                    cfg->implicit = (cfg->roitype != rtNone) + (cfg->roitype == rtFace);
 
                     for (int i = 0; i < rowlen; i++) {
                         if (cJSON_GetArraySize(subitem) != collen) {
@@ -2828,6 +2829,14 @@ void mcx_validatecfg(mcconfig* cfg) {
 
     if (cfg->method == rtBLBadouelGrid) {
         cfg->basisorder = 0;
+    }
+
+    if (cfg->implicit && (int)(cfg->gpuid) >= 0) {
+        MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
+    }
+
+    if (cfg->srcnum > 1 && (int)(cfg->gpuid) >= 0) {
+        MMC_ERROR(-2, "Photon-sharing MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
     }
 
     for (i = 0; i < MAX_DEVICE; i++)

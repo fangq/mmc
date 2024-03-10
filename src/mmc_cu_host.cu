@@ -51,6 +51,18 @@ and the ray tracer precomputed data (tracer).
 ******************************************************************************/
 #define CUDA_ASSERT(a)                                                         \
     mcx_cu_assess((a), __FILE__, __LINE__) ///< macro to report CUDA error
+
+/**
+ * @brief Utility function to calculate the GPU stream processors (cores) per SM
+ *
+ * Obtain GPU core number per MP, this replaces
+ * ConvertSMVer2Cores() in libcudautils to avoid
+ * extra dependency.
+ *
+ * @param[in] v1: the major version of an NVIDIA GPU
+ * @param[in] v2: the minor version of an NVIDIA GPU
+ */
+
 int mcx_corecount(int v1, int v2) {
     int v = v1 * 10 + v2;
 
@@ -62,8 +74,10 @@ int mcx_corecount(int v1, int v2) {
         return 48;
     } else if (v < 50) {
         return 192;
-    } else {
+    } else if (v < 60 || v == 61 || v >= 89) {
         return 128;
+    } else {
+        return 64;
     }
 }
 

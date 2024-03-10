@@ -280,7 +280,7 @@ MSTR(
          "DoMismatch":1,
          "DebugFlag":"TP",
          "RayTracer":"g",
-        "OutputFormat": "bin",
+         "OutputFormat": "bin",
          "Photons":1e6
      },
      "Domain":{
@@ -365,7 +365,7 @@ MSTR(
          "DoMismatch":1,
          "DebugFlag":"TP",
          "RayTracer":"g",
-        "OutputFormat": "bin",
+         "OutputFormat": "bin",
          "Photons":1e6
      },
      "Domain":{
