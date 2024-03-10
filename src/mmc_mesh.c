@@ -521,16 +521,19 @@ void mesh_loadroi(tetmesh* mesh, mcconfig* cfg) {
             col = 6;
             mesh->edgeroi = (float*)malloc(sizeof(float) * row * col);
             pe = mesh->edgeroi;
+            cfg->implicit = 1;
         } else if (cfg->roitype == rtNode) {
             row = mesh->nn;
             col = 1;
             mesh->noderoi = (float*)malloc(sizeof(float) * row * col);
             pe = mesh->noderoi;
+            cfg->implicit = 1;
         } else {
             row = mesh->ne;
             col = 4;
             mesh->faceroi = (float*)malloc(sizeof(float) * row * col);
             pe = mesh->faceroi;
+            cfg->implicit = 2;
         }
 
         memcpy(pe, cfg->roidata, sizeof(float) * row * col);
@@ -553,12 +556,15 @@ void mesh_loadroi(tetmesh* mesh, mcconfig* cfg) {
     if (col == 6) {
         mesh->edgeroi = (float*)malloc(sizeof(float) * 6 * mesh->ne);
         pe = mesh->edgeroi;
+        cfg->implicit = 1;
     } else if (col == 1) {
         mesh->noderoi = (float*)malloc(sizeof(float) * mesh->nn);
         pe = mesh->noderoi;
+        cfg->implicit = 1;
     } else if (col == 4) {
         mesh->faceroi = (float*)malloc(sizeof(float) * 4 * mesh->ne);
         pe = mesh->faceroi;
+        cfg->implicit = 2;
     }
 
     for (i = 0; i < row; i++) {

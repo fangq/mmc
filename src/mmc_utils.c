@@ -1417,7 +1417,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
     }
 
     if (Domain) {
-        cJSON* meds = FIND_JSON_OBJ("Media", "Domain.Media", Domain);
+        cJSON* val, *meds = FIND_JSON_OBJ("Media", "Domain.Media", Domain);
 
         if (meds) {
             cJSON* med = meds->child;
@@ -1433,7 +1433,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                 for (i = 0; i < cfg->medianum; i++) {
                     if (cJSON_IsObject(med)) {
-                        cJSON* val = FIND_JSON_OBJ("mua", (MMC_ERROR(-1, "You must specify absorption coeff, default in 1/mm"), ""), med);
+                        val = FIND_JSON_OBJ("mua", (MMC_ERROR(-1, "You must specify absorption coeff, default in 1/mm"), ""), med);
 
                         if (val) {
                             cfg->prop[i].mua = val->valuedouble;
@@ -1471,6 +1471,18 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         break;
                     }
                 }
+            }
+        }
+
+        val = FIND_JSON_OBJ("Step", "Domain.Step", Domain);
+
+        if (val) {
+            if (cJSON_GetArraySize(val) >= 1) {
+                cfg->steps.x = val->child->valuedouble;
+                cfg->steps.y = cfg->steps.x;
+                cfg->steps.z = cfg->steps.x;
+            } else {
+                MMC_ERROR(-1, "Domain::Step has incorrect element numbers");
             }
         }
 
@@ -3185,7 +3197,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     } else if (strcmp(argv[i] + 2, "buffer") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->nbuffer), "int");
                     } else if (strcmp(argv[i] + 2, "gridsize") == 0) {
-                        i = mcx_readarg(argc, argv, i, &(cfg->steps.x), "int");
+                        i = mcx_readarg(argc, argv, i, &(cfg->steps.x), "float");
                         cfg->steps.y = cfg->steps.x;
                         cfg->steps.z = cfg->steps.x;
                     } else {

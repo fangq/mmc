@@ -1,4 +1,4 @@
-function mmc2json(cfg,filestub)
+function varargout = mmc2json(cfg,filestub, varargin)
 %
 % Format:
 %    mmc2json(cfg,filestub)
@@ -27,8 +27,12 @@ function mmc2json(cfg,filestub)
 % License: GNU General Public License version 3, please read LICENSE.txt for details
 %
 
-[fpath, fname, fext]=fileparts(filestub);
-filestub=fullfile(fpath,fname);
+singlefile = (nargin ==1 || ~isempty(regexp(filestub,'\.json$', 'once')));
+
+if(nargin > 1)
+    [fpath, fname, fext]=fileparts(filestub);
+    filestub=fullfile(fpath,fname);
+end
 
 %% define the optodes: sources and detectors
 
@@ -51,17 +55,19 @@ if(isfield(cfg,'srcpattern') && ~isempty(cfg.srcpattern))
     Optode.Source.Pattern.Nx=size(cfg.srcpattern,1);
     Optode.Source.Pattern.Ny=size(cfg.srcpattern,2);
     Optode.Source.Pattern.Nz=size(cfg.srcpattern,3);
-    Optode.Source.Pattern.Data=[filestub '_pattern.bin'];
-    fid=fopen(Optode.Source.Pattern.Data,'wb');
-    fwrite(fid,cfg.srcpattern,'float32');
-    fclose(fid);
+    Optode.Source.Pattern.Data=single(cfg.srcpattern);
+    if(~singlefile)
+        Optode.Source.Pattern.Data=[filestub '_pattern.bin'];
+        fid=fopen(Optode.Source.Pattern.Data,'wb');
+        fwrite(fid,cfg.srcpattern,'float32');
+        fclose(fid);
+    end
 end
 
 %% define the domain and optical properties
 
 Mesh=struct();
 Mesh=copycfg(cfg,'unitinmm',Mesh,'LengthUnit');
-Mesh.MeshID=fname;
 
 if(isfield(cfg,'node') && ~isempty(cfg.node) && isfield(cfg,'elem') && ~isempty(cfg.elem))
     node=cfg.node;
@@ -69,7 +75,19 @@ if(isfield(cfg,'node') && ~isempty(cfg.node) && isfield(cfg,'elem') && ~isempty(
     if(isfield(cfg,'elemprop') && size(elem,2)==4)
         elem=[elem, cfg.elemprop];
     end
-    savemmcmesh(fname,node,elem);
+    if(~singlefile)
+        savemmcmesh(fname,node,elem);
+    else
+        Mesh.MeshNode=single(node);
+        Mesh.MeshElem=uint32(elem);
+        if(isfield(cfg, 'edgeroi'))
+            Mesh.MeshROI=single(cfg.edgeroi);
+        elseif(isfield(cfg,'noderoi'))
+            Mesh.MeshROI=single(cfg.noderoi);
+        elseif(isfield(cfg,'faceroi'))
+            Mesh.MeshROI=single(cfg.faceroi);
+        end
+    end
 
     if(~isfield(cfg,'e0'))
         cfg.e0=tsearchn(node,elem(:,1:4),cfg.srcpos);
@@ -77,15 +95,22 @@ if(isfield(cfg,'node') && ~isempty(cfg.node) && isfield(cfg,'elem') && ~isempty(
     Mesh=copycfg(cfg,'e0',Mesh,'InitElem');
 
 else
+    Mesh.MeshID=fname;
     warning('mesh is missing!')
 end
 
+Domain=struct();
+Domain=copycfg(cfg,'steps',Domain,'Step');
 if(isfield(cfg,'prop'))
     prop=[(1:size(cfg.prop,1)-1)' cfg.prop(2:end,:)];
-    fid=fopen(['prop_',fname,'.dat'],'wt');
-    fprintf(fid,'1 %d\n',size(prop,1));
-    fprintf(fid,'%d %e %e %e %e\n',prop');
-    fclose(fid);
+    if(~singlefile)
+        fid=fopen(['prop_',fname,'.dat'],'wt');
+        fprintf(fid,'1 %d\n',size(prop,1));
+        fprintf(fid,'%d %e %e %e %e\n',prop');
+        fclose(fid);
+    else
+        Domain.Media = cell2struct(num2cell(cfg.prop), {'mua', 'mus', 'g', 'n'}, 2)';
+    end
 else
     warning('prop is missing');
 end
@@ -93,7 +118,11 @@ end
 %% define the simulation session flags
 
 Session=struct();
-Session.ID=fname;
+if(exist('fname', 'var'))
+    Session.ID=fname;
+else
+    Session.ID=inputname(1);
+end
 Session=copycfg(cfg,'isreflect',Session,'DoMismatch');
 Session=copycfg(cfg,'issave2pt',Session,'DoSaveVolume');
 Session=copycfg(cfg,'issavedet',Session,'DoPartialPath');
@@ -140,12 +169,14 @@ Forward=copycfg(cfg,'nout',Forward,'N0');
 
 %% assemble the complete input, save to a JSON or UBJSON input file
 
-mmcsession=struct('Session', Session, 'Mesh', Mesh, 'Forward', Forward, 'Optode',Optode);
+mmcsession=struct('Session', Session, 'Domain', Domain, 'Mesh', Mesh, 'Forward', Forward, 'Optode',Optode);
 
-if(strcmp(fext,'ubj'))
-    saveubjson('',mmcsession,[filestub,'.ubj']);
+if(nargin == 1)
+    [varargout{1:nargout}] = savejson('',mmcsession, varargin{:});
+elseif(strcmp(fext,'ubj'))
+    [varargout{1:nargout}] = saveubjson('',mmcsession,'filename',[filestub,'.ubj'], varargin{:});
 else
-    savejson('',mmcsession,[filestub,'.json']);
+    [varargout{1:nargout}] = savejson('',mmcsession,'filename', [filestub,'.json'], varargin{:});
 end
 
 

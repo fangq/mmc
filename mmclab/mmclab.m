@@ -77,6 +77,9 @@ function varargout=mmclab(varargin)
 %      cfg.nout:        [1.0] refractive index for medium type 0 (background)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
 %      cfg.roulettesize:[10] size of Russian roulette
+%      cfg.steps:       [dx, dy, dz], defines the DMMC grid voxel size,
+%                       must be isostropic, i.e. dx=dy=dz, only used when
+%                       cfg.method = 'grid', by default dx=dy=dz=1
 %      cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions 
 %                       the default value is 1.0 (mm). For example, if the mesh node length unit is 
 %                       in cm, one should set unitinmm to 10.
