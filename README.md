@@ -35,50 +35,17 @@ Table of Content:
 What's New
 -------------
 
-MMC v2023 (2.0.0) includes a major feature upgrade - implicit MMC (iMMC) - to
-enable simulations of highly complex anatomical structures. The details of the
-iMMC algorithm, developed by Yaoshen Yuan, are described in his recent paper 
-[Yuan2021]. Briefly, iMMC permits one to associate cylindrical inclusions, 
-spherical inclusions, and thin-membrane with the edges, vertices and faces, 
-respectively, in a tetrahedral mesh. Currently, this feature is only supported
-on the CPU (must be used with `-G -1` or `cfg.gpuid=-1`).
+MMC v2024.2 (2.2.0) adds the below key features
 
-In 2020, we have also merged the `mmc-trinity` branch to the main code tree.
-The "trinity" version of MMC simultaneously supports CPU/SSE4, OpenCL and CUDA
-as the compute-backend, and can be selected using `-c/--compute opencl|sse|cuda`
-command line flag. By default, we do not compile the CUDA version in the binary.
-However, users can compile the "trinity" binary by `make cuda` or `cmake -DBUILD_CUDA=on`.
+-   support saving photon trajectories (`-D S` or `cfg.debuglevel='S'`)
+-   allow to use a single JSON input file to store mesh node, element and iMMC ROI data, along with other simulation settings
+-   compute element face-neighbours (`facenb`) and volumes (`evol`) in C code, avoid needing preprocessing
+-   support built-in benchmarks, use `--bench` to list and `--bench name` to run
+-   accept pattern data in the JSON input file
 
-Finally, in the release, we upgraded the normalization formula for nodal-based
-MMC simulation on the mesh surface nodes to correct for an observed deviation
-from MCX and DMMC outputs. This update only affects outputs on the exterior
-surface nodes, and does not impact DMMC (`-M G`, default for GPU based MMC)
-or element based (`-M S`) MMC.
-
-A detailed (long) list of updates can be found in the ChangeLog.txt or the 
-Github commit history: <https://github.com/fangq/mmc/commits/master>
-
-To highlight a few most important updates:
-
--   Support iMMC (edge-, node- and face-based implicit structures), **CPU only** (by Yaoshen Yuan)
--   Added MMCLAB examples for iMMC, including a large dense vessel network (by Yaoshen Yuan)
--   About 30%-40% faster OpenCL based simulations on NVIDIA GPUs using PTX-based atomic operations
--   More accurate normalization of nodal-based MMC simulation on the exterior surface
--   Provide mmc-trinity binaries with simultaneous SSE/OpenCL/CUDA backend support
--   CMake based portable compilation system
--   Added GNU Octave mex file for MMCLAB on Linux/MacOS/Windows
--   Several critical bug fixes (by Shijie Yan) 
--   Github Action based continuous integration (CI) system for automated building/packaging/testing
-
-Please file bug reports to <https://github.com/fangq/mmc/issues>
-
-
-Reference:
-
->**[Yuan2021]** Yaoshen Yuan, Shijie Yan, and Qianqian Fang*, 
-"Light transport modeling in highly complex tissues using the implicit 
-mesh-based Monte Carlo algorithm," Biomed. Optics Express, 12(1), 
-147-161, (2021), URL: https://www.osapublishing.org/boe/fulltext.cfm?uri=boe-12-1-147
+Aside from these added new features, we have also fixed a number of bugs. All
+MATLAB scripts have been automatically formatted using `miss_hit`. The binary JSON
+library was also updated to the latest version.
 
 
 Introduction

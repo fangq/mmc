@@ -2,6 +2,18 @@ Change Log
 
 == MMC 2.2.0 (v2024.2, Nougat), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2024-03-10 [237713b] [test] further testing of buit-in immc benchmarks
+ 2024-03-09 [c4a7c91] [format] complete reformat all matlab scripts with miss_hit
+ 2024-03-09 [674044f] [feat] add edgeimmc, nodeimmc, faceimmc benchmarks, update mmc2json
+ 2024-03-09 [e86cd34] [feat] upgrade ubj library to the latest version
+ 2024-03-09 [0dce38e] [bug] remove errors and warnings on Intel and AMD GPUs
+ 2024-03-09 [efc4101] [feat] test zipped mesh in json, migrate from float3 to FLOAT3, add benchmark
+ 2024-03-09 [cc3f362] [feat] accept MeshROI for immc in the JSON input
+ 2024-03-08 [dd9b4d5] [bug] fix CPU host fails to save trajectory, fix GPU traj duplicate use omp atomic instead of critical in savedebugdata
+ 2024-03-08 [b0f9cfe] [ci] fix ci error on macos
+ 2024-03-08 [242ce05] [feat] use self-contained json input including mesh data
+ 2024-03-07 [10edc27] [bug] fix incorrect condition to postprocess traj data
+ 2024-03-07 [2d4e355] [doc] update documentation for v2024.2
  2024-03-07 [ebefe98] [feat] return trajectories data if -M S or cfg.debuglevel contains S
  2024-03-05 [10ea5ea] [bug] search 1st and 2nd nearest neighbors for edge-immc to reduce artifact
 

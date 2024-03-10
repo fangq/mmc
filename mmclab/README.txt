@@ -79,8 +79,8 @@ the verbose command line options in MMC.
      [fluence,detphoton,ncfg,seeds,traj]=mmclab(cfg, options);
  
   Input:
-     cfg: a struct, or struct array. Each element in cfg defines 
-          a set of parameters for a simulation. 
+     cfg: a struct, or struct array. Each element in cfg defines
+          a set of parameters for a simulation.
  
      option: (optional), options is a string, specifying additional options
           option='preview': this plots the domain configuration using mcxpreview(cfg)
@@ -90,10 +90,10 @@ the verbose command line options in MMC.
  
      cfg may contain the following fields:
  
- == Required ==
+  == Required ==
       *cfg.nphoton:     the total number of photons to be simulated (integer)
       *cfg.prop:        an N by 4 array, each row specifies [mua, mus, g, n] in order.
-                        the first row corresponds to medium type 0 which is 
+                        the first row corresponds to medium type 0 which is
                         typically [0 0 1 1]. The second row is type 1, and so on.
       *cfg.node:        node array for the input tetrahedral mesh, 3 columns: (x,y,z)
       *cfg.elem:        element array for the input tetrahedral mesh, 4 columns
@@ -104,17 +104,17 @@ the verbose command line options in MMC.
       *cfg.srcpos:      a 1 by 3 vector, the position of the source in mesh node length unit
       *cfg.srcdir:      if defined as [vx, vy, vy], it specifies the incident vector
                         if defined as [vx, vy, vy, focus], the first 3 elements define
-                        the incident vector; focus controls the convergence or 
+                        the incident vector; focus controls the convergence or
                         divergence of the beam:
                         focus=0: collimated beam
                         focus<0: diverging beam from an imaginary src at c0-|focus|*[vx vy vz]
                         focus>0: converging beam, focusing to a point at c0+|focus|*[vx vy vz]
-                        where c0 is the centroid of the source domain. Setting focus does 
+                        where c0 is the centroid of the source domain. Setting focus does
                         not impact pencil/isotropic/cone sources.
  
- == MC simulation settings ==
+  == MC simulation settings ==
        cfg.seed:        seed for the random number generator (integer)
-                        if set to a uint8 array, the binary data in each column is used 
+                        if set to a uint8 array, the binary data in each column is used
                         to seed a photon (i.e. the "replay" mode), default value: 1648335518
        cfg.isreflect:   [1]-consider refractive index mismatch, 0-matched index
                         2 - total absorption on exterior surface
@@ -123,39 +123,42 @@ the verbose command line options in MMC.
        cfg.isspecular:  [1]-calculate specular reflection if source is outside
        cfg.ismomentum:  [0]-save momentum transfer for each detected photon
        cfg.method:      ray-tracing method, ["plucker"]:Plucker, "havel": Havel (SSE4),
-                        "badouel": partial Badouel, "elem": branchless Badouel (SSE), 
+                        "badouel": partial Badouel, "elem": branchless Badouel (SSE),
                         "grid": dual-grid MMC
        cfg.mcmethod:    0 use MCX-styled MC method, 1 use MCML style MC
        cfg.nout:        [1.0] refractive index for medium type 0 (background)
        cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
        cfg.roulettesize:[10] size of Russian roulette
-       cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions 
-                        the default value is 1.0 (mm). For example, if the mesh node length unit is 
+       cfg.steps:       [dx, dy, dz], defines the DMMC grid voxel size,
+                        must be isostropic, i.e. dx=dy=dz, only used when
+                        cfg.method = 'grid', by default dx=dy=dz=1
+       cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions
+                        the default value is 1.0 (mm). For example, if the mesh node length unit is
                         in cm, one should set unitinmm to 10.
        cfg.basisorder:  [1]-linear basis, 0-piece-wise constant basis
  
- == Source-detector parameters ==
+  == Source-detector parameters ==
        cfg.detpos:      an N by 4 array, each row specifying a detector: [x,y,z,radius]
        cfg.maxdetphoton:   maximum number of photons saved by the detectors [1000000]
        cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
                        'pencil' - default, pencil beam, no param needed
                        'isotropic' - isotropic source, no param needed
                        'cone' - uniform cone beam, srcparam1(1) is the half-angle in radian
-                       'gaussian' - a gaussian beam, srcparam1(1) specifies the waist radius 
+                       'gaussian' - a gaussian beam, srcparam1(1) specifies the waist radius
                                  (in default length unit); if one specifies a non-zero focal length
-                                 using cfg.srcdir, the gaussian beam can be converging to or 
+                                 using cfg.srcdir, the gaussian beam can be converging to or
                                  diverging from the waist center, which is located at srcpos+focus*srcdir;
-                                 optionally, one can specify the wavelength lambda (in cfg.unitinmm mm), 
-                                 using srcparam1(2). This will rescale the Gaussian profile according 
-                                 to w(z)=w0*sqrt(1-(z/z0)^2), where w0 is the waist radius, z is the 
-                                 distance (in mm) to the waist center (focus), and z0 is the Rayleigh 
+                                 optionally, one can specify the wavelength lambda (in cfg.unitinmm mm),
+                                 using srcparam1(2). This will rescale the Gaussian profile according
+                                 to w(z)=w0*sqrt(1-(z/z0)^2), where w0 is the waist radius, z is the
+                                 distance (in mm) to the waist center (focus), and z0 is the Rayleigh
                                  range (in mm), and z0 is related to w0 by z0=w0^2*pi/lambda
-                       'planar' - a 3D quadrilateral uniform planar source, with three corners specified 
+                       'planar' - a 3D quadrilateral uniform planar source, with three corners specified
                                  by srcpos, srcpos+srcparam1(1:3) and srcpos+srcparam2(1:3)
                        'pattern' - a 3D quadrilateral pattern illumination, same as above, except
                                  srcparam1(4) and srcparam2(4) specify the pattern array x/y dimensions,
-                                 and srcpattern is a floating-point pattern array, with values between [0-1]. 
-                                 if cfg.srcnum>1, srcpattern must be a floating-point array with 
+                                 and srcpattern is a floating-point pattern array, with values between [0-1].
+                                 if cfg.srcnum>1, srcpattern must be a floating-point array with
                                  a dimension of [srcnum srcparam1(4) srcparam2(4)]
                                  Example: <demo_photon_sharing.m>
                        'fourier' - spatial frequency domain source, similar to 'planar', except
@@ -166,16 +169,16 @@ the verbose command line options in MMC.
                                      S=0.5*[1+M*cos(2*pi*(fx*x+fy*y)+phi0)], (0<=x,y,M<=1)
                        'arcsine' - similar to isotropic, except the zenith angle is uniform
                                  distribution, rather than a sine distribution.
-                       'disk' - a uniform disk source pointing along srcdir; the radius is 
+                       'disk' - a uniform disk source pointing along srcdir; the radius is
                                 set by srcparam1(1) (in default length unit)
-                       'fourierx' - a general Fourier source, the parameters are 
+                       'fourierx' - a general Fourier source, the parameters are
                                 srcparam1: [v1x,v1y,v1z,|v2|], srcparam2: [kx,ky,phi0,M]
                                 normalized vectors satisfy: srcdir cross v1=v2
                                 the phase shift is phi0*2*pi
                        'fourierx2d' - a general 2D Fourier basis, parameters
                                 srcparam1: [v1x,v1y,v1z,|v2|], srcparam2: [kx,ky,phix,phiy]
                                 the phase shift is phi{x,y}*2*pi
-                       'zgaussian' - an angular gaussian beam, srcparam1(1) specifies the variance in  
+                       'zgaussian' - an angular gaussian beam, srcparam1(1) specifies the variance in
                                 the zenith angle
        cfg.{srcparam1,srcparam2}: 1x4 vectors, see cfg.srctype for details
        cfg.srcpattern: see cfg.srctype for details
@@ -193,7 +196,7 @@ the verbose command line options in MMC.
        if the mesh coordinates/source positions are not in mm unit, one needs to define
        cfg.unitinmm  (in mm) to specify the actual length unit.
  
- == Optional mesh data ==
+  == Optional mesh data ==
       -cfg.facenb:      element face neighbohood list (calculated by faceneighbors())
       -cfg.evol:        element volume (calculated by elemvolume() with iso2mesh)
       -cfg.e0:          the element ID enclosing the source, if not defined,
@@ -205,7 +208,7 @@ the verbose command line options in MMC.
                         '<': search along the backward direction
                         '-': search both directions
  
- == Output control ==
+  == Output control ==
        cfg.issaveexit: [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
        cfg.issaveref:  [0]-save diffuse reflectance/transmittance on the exterior surfaces.
                        The output is stored as flux.dref in a 2D array of size [#Nf,  #time_gate]
@@ -217,8 +220,8 @@ the verbose command line options in MMC.
        cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
        cfg.isatomic:    [1]-use atomic operations for saving fluence, 0-no atomic operations
        cfg.outputtype:  'flux' - output fluence-rate
-                        'fluence' - fluence, 
-                        'energy' - energy deposit, 
+                        'fluence' - fluence,
+                        'energy' - energy deposit,
                         'jacobian' - mua Jacobian (replay mode)
                         'wl'- weighted path lengths to build mua Jacobian (replay mode)
                         'wp'- weighted scattering counts to build mus Jacobian (replay mode)
@@ -233,15 +236,15 @@ the verbose command line options in MMC.
  
  
      type: omit or 'omp' for multi-threading version; 'sse' for the SSE4 MMC,
-           the SSE4 version is about 25% faster, but requires newer CPUs; 
+           the SSE4 version is about 25% faster, but requires newer CPUs;
            if type='prep' with a single output, mmclab returns ncfg only.
  
   Output:
        fluence: a struct array, with a length equals to that of cfg.
              For each element of fluence, fluence(i).data is a 2D array with
              dimensions [size(cfg.node,1), total-time-gates] if cfg.basisorder=1,
-             or [size(cfg.elem,1), total-time-gates] if cfg.basisorder=0. 
-             The content of the array is the normalized fluence-rate (or others 
+             or [size(cfg.elem,1), total-time-gates] if cfg.basisorder=0.
+             The content of the array is the normalized fluence-rate (or others
              depending on cfg.outputtype) at each mesh node and time-gate.
  
              If cfg.issaveref is set to 1, fluence(i).dref is not empty, and stores
@@ -259,7 +262,7 @@ the verbose command line options in MMC.
                detphoton.prop: optical properties, a copy of cfg.prop
                detphoton.data: a concatenated and transposed array in the order of
                      [detid nscat ppath mom p v w0]'
-               "data" is the is the only subfield in all MMCLAB before 2016.5
+               "data" is the is the only subfield in all mmclab before 2016.5
        ncfg: (optional), if given, mmclab returns the preprocessed cfg structure,
              including the calculated subfields (marked by "-"). This can be
              used in the subsequent simulations to avoid repetitive preprocessing.
