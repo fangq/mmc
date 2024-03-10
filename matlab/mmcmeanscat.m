@@ -1,4 +1,4 @@
-function avgnscat=mmcmeanscat(detp,prop)
+function avgnscat = mmcmeanscat(detp, prop)
 %
 % avgnscat=mmcmeanscat(detp,prop)
 %
@@ -11,12 +11,12 @@ function avgnscat=mmcmeanscat(detp,prop)
 %     prop: optical property list, as defined in the cfg.prop field of mmclab's input
 %
 % output:
-%     avgnscat: the average scattering event count for each tissue type 
+%     avgnscat: the average scattering event count for each tissue type
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-detw=mmcdetweight(detp,prop);
-avgnscat=sum(detp.nscat.*repmat(detw(:),1,size(detp.ppath,2))) / sum(detw(:));
+detw = mmcdetweight(detp, prop);
+avgnscat = sum(detp.nscat .* repmat(detw(:), 1, size(detp.ppath, 2))) / sum(detw(:));

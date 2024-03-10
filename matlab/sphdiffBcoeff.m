@@ -1,4 +1,4 @@
-function B=sphdiffBcoeff(m,l,cfg)
+function B = sphdiffBcoeff(m, l, cfg)
 %
 % B=sphdiffBcoeff(m,l,cfg)
 %
@@ -22,4 +22,4 @@ function B=sphdiffBcoeff(m,l,cfg)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-B=i*sphdiffAcoeff(m,l,cfg);
+B = i * sphdiffAcoeff(m, l, cfg);

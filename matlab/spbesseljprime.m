@@ -1,4 +1,4 @@
-function jp=spbesseljprime(n,z)
+function jp = spbesseljprime(n, z)
 %
 % jp=spbesseljprime(n,z)
 %
@@ -21,4 +21,4 @@ function jp=spbesseljprime(n,z)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-jp=besseljprime(n+1/2,z).*sqrt(pi/(2*z))-sqrt(pi/2)*besselj(n+1/2,z)./(2*z.*sqrt(z));
+jp = besseljprime(n + 1 / 2, z) .* sqrt(pi / (2 * z)) - sqrt(pi / 2) * besselj(n + 1 / 2, z) ./ (2 * z .* sqrt(z));

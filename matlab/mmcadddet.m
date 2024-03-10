@@ -1,4 +1,4 @@
-function varargout=mmcadddet(varargin)
+function varargout = mmcadddet(varargin)
 %
 % [newnode,newelem]=mmcadddet(node,elem,det,opt)
 %   or
@@ -37,5 +37,4 @@ function varargout=mmcadddet(varargin)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-[varargout{1:nargout}]=mmcaddsrc(varargin{:},'extcorelabel',-2,'KeepShape',1,'Expansion',1.0);
-
+[varargout{1:nargout}] = mmcaddsrc(varargin{:}, 'extcorelabel', -2, 'KeepShape', 1, 'Expansion', 1.0);

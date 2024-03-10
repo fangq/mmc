@@ -1,4 +1,4 @@
-function face=readmmcface(filename)
+function face = readmmcface(filename)
 %
 % face=readmmcface(filename)
 %
@@ -10,7 +10,7 @@ function face=readmmcface(filename)
 %     filename: the file name to the surface element data file
 %
 % output:
-%     face: the surface triangle element list 
+%     face: the surface triangle element list
 %
 % example:
 %     face=readmmcface('face_sph1.dat');
@@ -20,10 +20,10 @@ function face=readmmcface(filename)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-fid=fopen(filename,'rt');
-[header,c]=fscanf(fid,'%d',2);
-face=fscanf(fid,'%d',[5 header(2)]);
+fid = fopen(filename, 'rt');
+[header, c] = fscanf(fid, '%d', 2);
+face = fscanf(fid, '%d', [5 header(2)]);
 fclose(fid);
 
-face=face';
-face=face(:,2:4);
+face = face';
+face = face(:, 2:4);

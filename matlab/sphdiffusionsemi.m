@@ -1,15 +1,15 @@
-function [res,xi,yi,zi] = sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
+function [res, xi, yi, zi] = sphdiffusionsemi(Reff, xrange, yrange, zrange, cfg)
 %
 % [res,xi,yi,zi]= sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 %
-% diffusion solution for a sphere inside a semi-infinite homogeneous medium 
+% diffusion solution for a sphere inside a semi-infinite homogeneous medium
 %
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     Reff:  the effective reflection coeff.
 %     xrange,yrange,zrange: a vector from where a grid will be created
-%       		    and the phi values will be calculated
+%                   and the phi values will be calculated
 %     cfg: domain structure for internal/external parameters
 %          cfg.v: speed of light in vacuum (mm/s)
 %          cfg.a: sphere radius (mm)
@@ -34,66 +34,65 @@ function [res,xi,yi,zi] = sphdiffusionsemi(Reff,xrange,yrange,zrange,cfg)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-
-if(nargin<5)
-	cfg.v=299792458000;  % mm/s
-	cfg.a=10;            % radius, mm
-	cfg.omua=0.002;      % outside mua 1/mm
-	cfg.omusp=0.990;     % outside mus' 1/mm
-	cfg.imua=0.050;
-	cfg.imusp=0.500;
-% 	cfg.imua=0.002;
-% 	cfg.imusp=0.990;
-	cfg.src=[30,pi,0];
-	cfg.maxl=20;
-	cfg.omega=0;
+if (nargin < 5)
+    cfg.v = 299792458000;  % mm/s
+    cfg.a = 10;            % radius, mm
+    cfg.omua = 0.002;      % outside mua 1/mm
+    cfg.omusp = 0.990;     % outside mus' 1/mm
+    cfg.imua = 0.050;
+    cfg.imusp = 0.500;
+    %   cfg.imua=0.002;
+    %   cfg.imusp=0.990;
+    cfg.src = [30, pi, 0];
+    cfg.maxl = 20;
+    cfg.omega = 0;
 end
-cfg.Din=cfg.v/(3*cfg.imusp);
-cfg.Dout=cfg.v/(3*cfg.omusp);
-cfg.kin=sqrt((-cfg.v*cfg.imua+i*cfg.omega)/cfg.Din);
-cfg.kout=sqrt((-cfg.v*cfg.omua+i*cfg.omega)/cfg.Dout);
-D = 1/(3*(cfg.omua+cfg.omusp));
+cfg.Din = cfg.v / (3 * cfg.imusp);
+cfg.Dout = cfg.v / (3 * cfg.omusp);
+cfg.kin = sqrt((-cfg.v * cfg.imua + i * cfg.omega) / cfg.Din);
+cfg.kout = sqrt((-cfg.v * cfg.omua + i * cfg.omega) / cfg.Dout);
+D = 1 / (3 * (cfg.omua + cfg.omusp));
 
-zb = (1+Reff)/(1-Reff)*2*D;
+zb = (1 + Reff) / (1 - Reff) * 2 * D;
 
-z0 = 1/(cfg.omusp+cfg.omua);
+z0 = 1 / (cfg.omusp + cfg.omua);
 
-src0=cfg.src;
-cfg.src(1)=src0(1)-z0;
+src0 = cfg.src;
+cfg.src(1) = src0(1) - z0;
 
 % real source full field for the real sphere
-[res,xi,yi,zi]=sphdiffusioninfinite(xrange,yrange,zrange,cfg); % S1,O1
+[res, xi, yi, zi] = sphdiffusioninfinite(xrange, yrange, zrange, cfg); % S1,O1
 
-cfg.src=src0;
-cfg.src(2)=pi;
-cfg.src(1)=src0(1)+z0+2*zb;
+cfg.src = src0;
+cfg.src(2) = pi;
+cfg.src(1) = src0(1) + z0 + 2 * zb;
 % image source full field for the real sphere
-res2=sphdiffusioninfinite(xrange,yrange,zrange,cfg); % S2,O1
+res2 = sphdiffusioninfinite(xrange, yrange, zrange, cfg); % S2,O1
 
-res=res-res2;
+res = res - res2;
 
-[P,T,R]=cart2sph(xi(:),yi(:),zi(:)); 
-T=pi/2-T;  % matlab's theta and phi are defined differently
-idx=find(R>cfg.a);
+[P, T, R] = cart2sph(xi(:), yi(:), zi(:));
+T = pi / 2 - T;  % matlab's theta and phi are defined differently
+idx = find(R > cfg.a);
 
-zrange=zrange+2*(src0(1)+zb);
+zrange = zrange + 2 * (src0(1) + zb);
 
-cfg.src=src0;
-cfg.src(2)=0;
-cfg.src(1)=src0(1)+z0+2*zb;
+cfg.src = src0;
+cfg.src(2) = 0;
+cfg.src(1) = src0(1) + z0 + 2 * zb;
 % real source scattered field for the imaged sphere outside the real sphere
-res2=sphdiffusionscatteronly(xrange,yrange,zrange,cfg); % S1,O2
+res2 = sphdiffusionscatteronly(xrange, yrange, zrange, cfg); % S1,O2
 
-res(idx)=res(idx)+res2(idx);
+res(idx) = res(idx) + res2(idx);
 
-cfg.src=src0;
-cfg.src(2)=0;
-cfg.src(1)=src0(1)-z0;
+cfg.src = src0;
+cfg.src(2) = 0;
+cfg.src(1) = src0(1) - z0;
 % image source scattered field for the imaged sphere outside the real
 % sphere
-res2=sphdiffusionscatteronly(xrange,yrange,zrange,cfg); % S2,O2
+res2 = sphdiffusionscatteronly(xrange, yrange, zrange, cfg); % S2,O2
 
-res(idx)=res(idx)-res2(idx);
+res(idx) = res(idx) - res2(idx);
 
 % high order terms are ignored, for example, the Phi(S2,O2) scattered by
 % real sphere O1, or Phi(S1,O1) scatted by the mirrored sphere O2 etc
@@ -129,4 +128,3 @@ res(idx)=res(idx)-res2(idx);
 %                    `......'
 %
 %
-

@@ -1,14 +1,14 @@
-function res=sphdiffscatter(r,theta,phi,cfg)
+function res = sphdiffscatter(r, theta, phi, cfg)
 %
 % res=sphdiffscatter(r,theta,phi,cfg)
 %
-% sphere exterior scattered field 
+% sphere exterior scattered field
 %
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
 %     r,theta,phi: source position in spherical coordinates.
-%     cfg: the problem domain setup: 
+%     cfg: the problem domain setup:
 %          cfg.v: speed of light in vacuum (mm/s)
 %          cfg.a: sphere radius (mm)
 %          cfg.omua: background (outside) mua (1/mm)
@@ -30,13 +30,13 @@ function res=sphdiffscatter(r,theta,phi,cfg)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-%if(cfg.src(2)<pi/2)
+% if(cfg.src(2)<pi/2)
 %        theta=pi-theta; % mirror up-to-down
-%end
-res=zeros(size(r));
-for l=0:cfg.maxl
-  for m=-l:l
-     res=res+(sphdiffAcoeff(m,l,cfg)*spbesselj(l,cfg.kout*r)+sphdiffBcoeff(m,l,cfg)...
-        *spbessely(l,cfg.kout*r)).*spharmonic(l,m,theta,phi);
-  end
+% end
+res = zeros(size(r));
+for l = 0:cfg.maxl
+    for m = -l:l
+        res = res + (sphdiffAcoeff(m, l, cfg) * spbesselj(l, cfg.kout * r) + sphdiffBcoeff(m, l, cfg) * ...
+                     spbessely(l, cfg.kout * r)) .* spharmonic(l, m, theta, phi);
+    end
 end

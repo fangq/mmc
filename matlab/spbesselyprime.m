@@ -1,8 +1,8 @@
-function yp=spbesselyprime(n,z)
+function yp = spbesselyprime(n, z)
 %
 % yp=spbesselyprime(n,z)
 %
-% spherical Neumann function first order derivative 
+% spherical Neumann function first order derivative
 %
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
@@ -11,7 +11,7 @@ function yp=spbesselyprime(n,z)
 %     z: input variable
 %
 % output:
-%     yp:  spherical Neumann function first order derivative 
+%     yp:  spherical Neumann function first order derivative
 %
 % example:
 %     yp=spbesselyprime(0,1)
@@ -21,4 +21,4 @@ function yp=spbesselyprime(n,z)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-yp=besselyprime(n+1/2,z).*sqrt(pi/(2*z))-sqrt(pi/2)*bessely(n+1/2,z)./(2*z.*sqrt(z));
+yp = besselyprime(n + 1 / 2, z) .* sqrt(pi / (2 * z)) - sqrt(pi / 2) * bessely(n + 1 / 2, z) ./ (2 * z .* sqrt(z));

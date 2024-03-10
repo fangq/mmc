@@ -1,8 +1,8 @@
-function jp=besseljprime(n,z)
+function jp = besseljprime(n, z)
 %
 % jp=besseljprime(n,z)
 %
-% Bessel function (Bessel first kind) first order derivative 
+% Bessel function (Bessel first kind) first order derivative
 %
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
@@ -21,4 +21,4 @@ function jp=besseljprime(n,z)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-jp=besselj(n-1,z)-n/z.*besselj(n,z);
+jp = besselj(n - 1, z) - n / z .* besselj(n, z);

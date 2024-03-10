@@ -1,4 +1,4 @@
-function jn=spbesselj(n,z)
+function jn = spbesselj(n, z)
 %
 % jn=spbesselj(n,z)
 %
@@ -21,4 +21,4 @@ function jn=spbesselj(n,z)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-jn=besselj(n+1/2,z).*sqrt(pi./(2*z));
+jn = besselj(n + 1 / 2, z) .* sqrt(pi ./ (2 * z));

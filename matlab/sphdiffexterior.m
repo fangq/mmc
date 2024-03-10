@@ -1,4 +1,4 @@
-function res=sphdiffexterior(r,theta,phi,cfg)
+function res = sphdiffexterior(r, theta, phi, cfg)
 %
 % res=sphdiffexterior(r,theta,phi,cfg)
 %
@@ -8,7 +8,7 @@ function res=sphdiffexterior(r,theta,phi,cfg)
 %
 % input:
 %     r,theta,phi: source position in spherical coordinates.
-%     cfg: the problem domain setup: 
+%     cfg: the problem domain setup:
 %          cfg.v: speed of light in vacuum (mm/s)
 %          cfg.a: sphere radius (mm)
 %          cfg.omua: background (outside) mua (1/mm)
@@ -30,4 +30,4 @@ function res=sphdiffexterior(r,theta,phi,cfg)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-res=sphdiffincident(r,theta,phi,cfg)+sphdiffscatter(r,theta,phi,cfg);
+res = sphdiffincident(r, theta, phi, cfg) + sphdiffscatter(r, theta, phi, cfg);
