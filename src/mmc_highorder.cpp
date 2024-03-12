@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <string>
 #include <string.h>
+#include <sstream>
 
 #include "mmc_mesh.h"
 #include "mmc_highorder.h"
@@ -112,7 +113,10 @@ std::string face_to_string(int a, int b, int c) {
     ar[2] = MAX(MAX(a, b), c);
     ar[1] = - ar[0] - ar[2] + a + b + c;
 
-    return std::to_string(ar[0]) + "," + std::to_string(ar[1]) + "," + std::to_string(ar[2]);
+    std::ostringstream strkey;
+    strkey << ar[0] << "," << ar[1] << "," << ar[2];
+
+    return std::string(strkey.str());
 }
 
 #ifdef __cplusplus
