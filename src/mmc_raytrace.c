@@ -1728,10 +1728,7 @@ void savedebugdata(ray* r, unsigned int id, mcconfig* cfg) {
     float* gdebugdata = cfg->exportdebugdata;
 
     #pragma omp atomic capture
-    {
-        pos = cfg->debugdatalen;
-        cfg->debugdatalen++;
-    }
+    pos = cfg->debugdatalen++;
 
     if (pos < cfg->maxjumpdebug) {
         pos *= MCX_DEBUG_REC_LEN;

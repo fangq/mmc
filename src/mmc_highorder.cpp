@@ -124,7 +124,7 @@ std::string face_to_string(int a, int b, int c) {
 #endif
 void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg) {
     std::vector<std::string> faces;
-    std::map<std::string, std::pair<unsigned int, unsigned int>> facenb;
+    std::map< std::string, std::pair<unsigned int, unsigned int> > facenb;
 
     faces.reserve(mesh->ne << 2);
 
