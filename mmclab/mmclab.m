@@ -461,7 +461,7 @@ if (mmcout >= 2)
                 newdetp.v = detp(end - 3:end - 1, :)';      % columns 4-2 from the right store the exit dirs*/
             end
             newdetp.w0 = detp(end, :)';  % last column is the initial packet weight
-            if (isfield(cfg.srcpattern) && ndims(cfg.srcpattern) == 3)
+            if (isfield(cfg(i), 'srcpattern') && ndims(cfg.srcpattern) == 3)
                 newdetp.w0 = typecast(newdetp.w0, 'uint32');
             end
             newdetp.prop = cfg(i).prop;
