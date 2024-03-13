@@ -108,6 +108,10 @@ jobs:
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
+            if [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+              perl -pi -e 's/maci64/maca64/g' mexopts_maci64_gcc.xml
+              perl -pi -e 's/MACI64/MACA64/g' mexopts_maci64_gcc.xml
+            fi
             make mex${{ env.OMPONLY }} CC=gcc-11 CXX=g++-11 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
             otool -L ../mmclab/mmc.mex*
           else
