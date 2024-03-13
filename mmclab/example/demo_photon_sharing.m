@@ -34,7 +34,7 @@ cfg.srcpattern = pat;
 
 %% run the simulation
 
-flux = mmclab(cfg);
+[flux, detp] = mmclab(cfg);
 
 %% plot results (same as in the mmc example)
 
