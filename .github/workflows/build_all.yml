@@ -36,6 +36,9 @@ jobs:
         run: |
           brew install octave
           brew install upx
+          if [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+            echo 'OMPONLY=omp' >> $GITHUB_ENV
+          fi
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' && matrix.os != 'macos-14' }}
         run: |
@@ -84,7 +87,7 @@ jobs:
             sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
             ldd ../mmclab/mmc.mex
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            make oct CC=gcc-11 CXX=g++-11 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
+            make oct${{ env.OMPONLY }} CC=gcc-11 CXX=g++-11 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
             otool -L ../mmclab/mmc.mex
           else
             PATH='/c/ProgramData/chocolatey/lib/octave.portable/tools/octave/mingw64/bin':$PATH
@@ -105,7 +108,7 @@ jobs:
             objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             which mex
-            make mex CC=gcc-11 CXX=g++-11 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
+            make mex${{ env.OMPONLY }} CC=gcc-11 CXX=g++-11 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
             otool -L ../mmclab/mmc.mex*
           else
             make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -Wl,-Bstatic -lstdc++ -lpthread -fopenmp -Wl,-Bdynamic" EXTRALIB="-v"
@@ -119,7 +122,7 @@ jobs:
             make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lc -lm -lstdc++ -lpthread -fopenmp"
             ldd ../bin/mmc
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            make CC=gcc-11 CXX=g++-11
+            make ${{ env.OMPONLY }} CC=gcc-11 CXX=g++-11
             otool -L ../bin/mmc
           else
             make CC=gcc CXX=g++ USERARFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic lib/libzmat.a -Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib"
