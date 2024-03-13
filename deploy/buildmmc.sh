@@ -97,7 +97,7 @@ rm -rf ../mmclab/AUTO_BUILD_*
 make clean
 if [ "$OS" == "win" ]; then
 	make mex &> ../mmclab/AUTO_BUILD_${DATE}.log
-elif [ "$OS" == "osx" ]; then
+elif [ "$OS" == "macos" ]; then
 	make mex &> ../mmclab/AUTO_BUILD_${DATE}.log
 else
 	make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" &>../mmclab/AUTO_BUILD_${DATE}.log
@@ -107,7 +107,7 @@ fi
 
 make clean
 if [ "$OS" == "macos" ]; then
-	make oct USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'" >>../mmclab/AUTO_BUILD_${DATE}.log 2>&1
+	make oct >>../mmclab/AUTO_BUILD_${DATE}.log 2>&1
 elif [ "$OS" == "win" ]; then
 	OLDPATH="$PATH"
 	export PATH="C:\Octave\Octave-8.2.1\mingw64\bin":$PATH
@@ -181,6 +181,14 @@ fi
 ## compress binary with upx
 
 upx -9 ../bin/mmc* || true
+
+if [ "$OS" == "macos" ]; then
+        cat <<EOF >../MAC_USER_PLEASE_RUN_THIS_FIRST.sh
+#/bin/sh
+xattr -dr com.apple.quarantine *
+EOF
+        chmod +x ../MAC_USER_PLEASE_RUN_THIS_FIRST.sh
+fi
 
 ## zip and upload binary package
 
