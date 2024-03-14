@@ -37,11 +37,13 @@ What's New
 
 MMC v2024.2 (2.2.0) adds the below key features
 
--   support saving photon trajectories (`-D S` or `cfg.debuglevel='S'`)
+-   support saving photon trajectories (`-D M` or `cfg.debuglevel='M'`)
 -   allow to use a single JSON input file to store mesh node, element and iMMC ROI data, along with other simulation settings
 -   compute element face-neighbours (`facenb`) and volumes (`evol`) in C code, avoid needing preprocessing
 -   support built-in benchmarks, use `--bench` to list and `--bench name` to run
 -   accept pattern data in the JSON input file
+-   store pattern pixel index for each photon in photon sharing
+-   provide native Apple M1 binaries
 
 Aside from these added new features, we have also fixed a number of bugs. All
 MATLAB scripts have been automatically formatted using `miss_hit`. The binary JSON
@@ -305,8 +307,8 @@ The full command line options of MMC include the following:
 ```
 ###############################################################################
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
-#          Copyright (c) 2010-2023 Qianqian Fang <q.fang at neu.edu>          #
-#              https://mcx.space/#mmc  &  https://neurojson.org/              #
+#          Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          #
+#              https://mcx.space/#mmc  &  https://neurojson.io/               #
 #                                                                             #
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #
@@ -314,17 +316,19 @@ The full command line options of MMC include the following:
 #    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #
 ###############################################################################
 #  Open-source codes and reusable scientific data are essential for research, #
-# MCX proudly developed human-readable JSON-based data formats for easy reuse,#
-#  Please consider using JSON (https://neurojson.org/) for your research data #
+# MCX proudly developed human-readable JSON-based data formats for easy reuse.#
+#                                                                             #
+#Please visit our free scientific data sharing portal at https://neurojson.io/#
+# and consider sharing your public datasets in standardized JSON/JData format #
 ###############################################################################
-$Rev::77411c$ v2023  $Date::2022-10-01 17:34:27 -04$ by $Author::Qianqian Fang$
+$Rev::      $v2024.2 $Date::                       $ by $Author::             $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...
 where possible parameters include (the first item in [] is the default value)
 
 == Required option ==
- -f config     (--input)       read an input file in .inp or .json format
+ -f config     (--input)       read an input file in .json or inp format
 
 == MC options ==
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1
@@ -339,12 +343,12 @@ where possible parameters include (the first item in [] is the default value)
                                to calculate the mua/mus Jacobian matrices
  -P [0|int]    (--replaydet)   replay only the detected photons from a given 
                                detector (det ID starts from 1), use with -E 
- -M [G|SG] (--method)      choose ray-tracing algorithm (only use 1 letter)
+ -M [G|SG]    (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
-			       H - Havel's SSE4 ray-tracing algorithm
-			       B - partial Badouel's method (used by TIM-OS)
-			       S - branch-less Badouel's method with SSE
-			       G - dual-grid MMC (DMMC) with voxel data output
+                               H - Havel's SSE4 ray-tracing algorithm
+                               B - partial Badouel's method (used by TIM-OS)
+                               S - branch-less Badouel's method with SSE
+                               G - dual-grid MMC (DMMC) with voxel data output
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
@@ -372,55 +376,55 @@ where possible parameters include (the first item in [] is the default value)
  -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the 
                                exterior surface. The output is stored in a 
                                file named *_dref.dat, and the 2nd column of 
-			       the data is resized to [#Nf, #time_gate] where
-			       #Nf is the number of triangles on the surface; 
-			       #time_gate is the number of total time gates. 
-			       To plot the surface diffuse reflectance, the 
-			       output triangle surface mesh can be extracted
-			       by faces=faceneighbors(cfg.elem,'rowmajor');
+                               the data is resized to [#Nf, #time_gate] where
+                               #Nf is the number of triangles on the surface; 
+                               #time_gate is the number of total time gates. 
+                               To plot the surface diffuse reflectance, the 
+                               output triangle surface mesh can be extracted
+                               by faces=faceneighbors(cfg.elem,'rowmajor');
                                where 'faceneighbors' is part of Iso2Mesh.
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
  -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double) 
                                'hdr' (Analyze) or 'nii' (nifti, double)
-                               mc2 - MCX mc2 format (binary 32bit float)
+                               mc2 - MCX mc2 format (binary 64bit float)
                                jnii - JNIfTI format (https://neurojson.org)
                                bnii - Binary JNIfTI (https://neurojson.org)
                                nii - NIfTI format
                                hdr - Analyze 7.5 hdr/img format
-	the bnii/jnii formats support compression (-Z) and generate small files
-	load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:
-	  MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, 
-	  MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, 
-	  Python:        PyJData:         https://pypi.org/project/jdata
-	  JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata
- -Z [zlib|...] (--zip)         set compression method if -F jnii or --dumpjson
-                               is used (when saving data to JSON/JNIfTI format)
-			       0 zlib: zip format (moderate compression,fast) 
-			       1 gzip: gzip format (compatible with *.gz)
-			       2 base64: base64 encoding with no compression
-			       3 lzip: lzip format (high compression,very slow)
-			       4 lzma: lzma format (high compression,very slow)
-			       5 lz4: LZ4 format (low compression,extrem. fast)
-			       6 lz4hc: LZ4HC format (moderate compression,fast)
- --dumpjson [-,2,'file.json']  export all settings, including volume data using
-                               JSON/JData (https://neurojson.org) format for 
-			       easy sharing; can be reused using -f
-			       if followed by nothing or '-', mcx will print
-			       the JSON to the console; write to a file if file
-			       name is specified; by default, prints settings
-			       after pre-processing; '--dumpjson 2' prints 
-			       raw inputs before pre-processing
+    the bnii/jnii formats support compression (-Z) and generate small files
+    load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:
+      MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, 
+      MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, 
+      Python:        PyJData:         https://pypi.org/project/jdata
+      JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata
+ -Z [zlib|...] (--zip)      set compression method if -F jnii or --dumpjson
+                            is used (when saving data to JSON/JNIfTI format)
+                            0 zlib: zip format (moderate compression,fast) 
+                            1 gzip: gzip format (compatible with *.gz)
+                            2 base64: base64 encoding with no compression
+                            3 lzip: lzip format (high compression,very slow)
+                            4 lzma: lzma format (high compression,very slow)
+                            5 lz4: LZ4 format (low compression,extrem. fast)
+                            6 lz4hc: LZ4HC format (moderate compression,fast)
+ --dumpjson [-,2,'file.json'] export all settings, including volume data using
+                          JSON/JData (https://neurojson.org) format for 
+                          easy sharing; can be reused using -f
+                          if followed by nothing or '-', mmc will print
+                          the JSON to the console; write to a file if file
+                          name is specified; by default, prints settings
+                          after pre-processing; '--dumpjson 2' prints 
+                          raw inputs before pre-processing
 
 == User IO options ==
  -h            (--help)        print this message
  -v            (--version)     print MMC version information
  -l            (--log)         print messages to a log file instead
- -i 	       (--interactive) interactive mode
+ -i            (--interactive) interactive mode
 
 == Debug options ==
  -D [0|int]    (--debug)       print debug information (you can use an integer
   or                           or a string by combining the following flags)
- -D [''|MCBWDIOXATRPE]         1 M  photon movement info
+ -D [''|SCBWDIOXATRPEM]        1 S  photon movement info
                                2 C  print ray-polygon testing details
                                4 B  print Bary-centric coordinates
                                8 W  print photon weight changes
@@ -433,6 +437,7 @@ where possible parameters include (the first item in [] is the default value)
                             1024 R  debugging reflection
                             2048 P  show progress bar
                             4096 E  exit photon info
+                            8192 M  return photon trajectories
       combine multiple items by using a string, or add selected numbers together
  --debugphoton [-1|int]        to print the debug info specified by -D only for
                                a single photon, followed by its index (start 0)
@@ -440,6 +445,9 @@ where possible parameters include (the first item in [] is the default value)
 == Additional options ==
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save
  --gridsize     [1|float]      if -M G is used, this sets the grid size in mm
+ --maxjumpdebug [10000000|int] when trajectory is requested (i.e. -D S),
+                               use this parameter to set the maximum positions
+                               stored (default: 1e7)
 
 == Example ==
        mmc -n 1000000 -f input.json -s test -b 0 -D TP -G -1

@@ -136,7 +136,7 @@ extern char pathsep;
  * P: show progress bar
  */
 
-const char debugflag[] = {'M', 'C', 'B', 'W', 'D', 'I', 'O', 'X', 'A', 'T', 'R', 'P', 'E', 'S', '\0'};
+const char debugflag[] = {'S', 'C', 'B', 'W', 'D', 'I', 'O', 'X', 'A', 'T', 'R', 'P', 'E', 'M', '\0'};
 
 /**
  * Selecting mesh-based ray-tracing algorithm:
@@ -3367,7 +3367,7 @@ usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
 \n"S_BOLD S_CYAN"\
 == Required option ==\n"S_RESET"\
- -f config     (--input)       read an input file in .inp or .json format\n\
+ -f config     (--input)       read an input file in .json or inp format\n\
 \n"S_BOLD S_CYAN"\
 == MC options ==\n"S_RESET"\
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
@@ -3382,12 +3382,12 @@ where possible parameters include (the first item in [] is the default value)\n\
                                to calculate the mua/mus Jacobian matrices\n\
  -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
                                detector (det ID starts from 1), use with -E \n\
- -M [%c|SG] (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+ -M [%c|SG]    (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
-			       H - Havel's SSE4 ray-tracing algorithm\n\
-			       B - partial Badouel's method (used by TIM-OS)\n\
-			       S - branch-less Badouel's method with SSE\n\
-			       G - dual-grid MMC (DMMC) with voxel data output\n\
+                               H - Havel's SSE4 ray-tracing algorithm\n\
+                               B - partial Badouel's method (used by TIM-OS)\n\
+                               S - branch-less Badouel's method with SSE\n\
+                               G - dual-grid MMC (DMMC) with voxel data output\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
@@ -3415,55 +3415,55 @@ where possible parameters include (the first item in [] is the default value)\n\
  -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the \n\
                                exterior surface. The output is stored in a \n\
                                file named *_dref.dat, and the 2nd column of \n\
-			       the data is resized to [#Nf, #time_gate] where\n\
-			       #Nf is the number of triangles on the surface; \n\
-			       #time_gate is the number of total time gates. \n\
-			       To plot the surface diffuse reflectance, the \n\
-			       output triangle surface mesh can be extracted\n\
-			       by faces=faceneighbors(cfg.elem,'rowmajor');\n\
+                               the data is resized to [#Nf, #time_gate] where\n\
+                               #Nf is the number of triangles on the surface; \n\
+                               #time_gate is the number of total time gates. \n\
+                               To plot the surface diffuse reflectance, the \n\
+                               output triangle surface mesh can be extracted\n\
+                               by faces=faceneighbors(cfg.elem,'rowmajor');\n\
                                where 'faceneighbors' is part of Iso2Mesh.\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
  -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
                                'hdr' (Analyze) or 'nii' (nifti, double)\n\
-                               mc2 - MCX mc2 format (binary 32bit float)\n\
+                               mc2 - MCX mc2 format (binary 64bit float)\n\
                                jnii - JNIfTI format (https://neurojson.org)\n\
                                bnii - Binary JNIfTI (https://neurojson.org)\n\
                                nii - NIfTI format\n\
                                hdr - Analyze 7.5 hdr/img format\n\
-	the bnii/jnii formats support compression (-Z) and generate small files\n\
-	load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:\n\
-	  MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, \n\
-	  MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, \n\
-	  Python:        PyJData:         https://pypi.org/project/jdata\n\
-	  JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata\n\
- -Z [zlib|...] (--zip)         set compression method if -F jnii or --dumpjson\n\
-                               is used (when saving data to JSON/JNIfTI format)\n\
-			       0 zlib: zip format (moderate compression,fast) \n\
-			       1 gzip: gzip format (compatible with *.gz)\n\
-			       2 base64: base64 encoding with no compression\n\
-			       3 lzip: lzip format (high compression,very slow)\n\
-			       4 lzma: lzma format (high compression,very slow)\n\
-			       5 lz4: LZ4 format (low compression,extrem. fast)\n\
-			       6 lz4hc: LZ4HC format (moderate compression,fast)\n\
- --dumpjson [-,2,'file.json']  export all settings, including volume data using\n\
-                               JSON/JData (https://neurojson.org) format for \n\
-			       easy sharing; can be reused using -f\n\
-			       if followed by nothing or '-', mcx will print\n\
-			       the JSON to the console; write to a file if file\n\
-			       name is specified; by default, prints settings\n\
-			       after pre-processing; '--dumpjson 2' prints \n\
-			       raw inputs before pre-processing\n\
+    the bnii/jnii formats support compression (-Z) and generate small files\n\
+    load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:\n\
+      MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, \n\
+      MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, \n\
+      Python:        PyJData:         https://pypi.org/project/jdata\n\
+      JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata\n\
+ -Z [zlib|...] (--zip)      set compression method if -F jnii or --dumpjson\n\
+                            is used (when saving data to JSON/JNIfTI format)\n\
+                            0 zlib: zip format (moderate compression,fast) \n\
+                            1 gzip: gzip format (compatible with *.gz)\n\
+                            2 base64: base64 encoding with no compression\n\
+                            3 lzip: lzip format (high compression,very slow)\n\
+                            4 lzma: lzma format (high compression,very slow)\n\
+                            5 lz4: LZ4 format (low compression,extrem. fast)\n\
+                            6 lz4hc: LZ4HC format (moderate compression,fast)\n\
+ --dumpjson [-,2,'file.json'] export all settings, including volume data using\n\
+                          JSON/JData (https://neurojson.org) format for \n\
+                          easy sharing; can be reused using -f\n\
+                          if followed by nothing or '-', mmc will print\n\
+                          the JSON to the console; write to a file if file\n\
+                          name is specified; by default, prints settings\n\
+                          after pre-processing; '--dumpjson 2' prints \n\
+                          raw inputs before pre-processing\n\
 \n"S_BOLD S_CYAN"\
 == User IO options ==\n"S_RESET"\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
- -i 	       (--interactive) interactive mode\n\
+ -i            (--interactive) interactive mode\n\
 \n"S_BOLD S_CYAN"\
 == Debug options ==\n"S_RESET"\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
- -D [''|MCBWDIOXATRPE]         1 M  photon movement info\n\
+ -D [''|SCBWDIOXATRPEM]        1 S  photon movement info\n\
                                2 C  print ray-polygon testing details\n\
                                4 B  print Bary-centric coordinates\n\
                                8 W  print photon weight changes\n\
@@ -3476,7 +3476,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
                             4096 E  exit photon info\n\
-                            8192 S  return photon trajectories\n\
+                            8192 M  return photon trajectories\n\
       combine multiple items by using a string, or add selected numbers together\n\
  --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
                                a single photon, followed by its index (start 0)\n\

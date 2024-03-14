@@ -173,7 +173,7 @@ function varargout = mmclab(varargin)
 %                       'jacobian' - mua Jacobian (replay mode)
 %                       'wl'- weighted path lengths to build mua Jacobian (replay mode)
 %                       'wp'- weighted scattering counts to build mus Jacobian (replay mode)
-%      cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space
+%      cfg.debuglevel:  debug flag string, a subset of [SCBWDIOXATRPEM], no space
 %      cfg.debugphoton: print the photon movement debug info only for a specified photon ID
 %      cfg.maxjumpdebug: [10000000|int] when trajectory is requested in the output,
 %                     use this parameter to set the maximum position stored. By default,

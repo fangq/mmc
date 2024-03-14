@@ -2,6 +2,12 @@ Change Log
 
 == MMC 2.2.0 (v2024.2, Nougat), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2024-03-14 [58aa18c] [ci] fix macos-14 test under make omp
+ 2024-03-14 [739dbbe] [bug] only enable Plucker ray tracer if gpuid=-1
+ 2024-03-13 [a751e79] [bug] still report total energy when issave2pt is 0
+ 2024-03-13 [2166cc9] [ci] make mexopts file compatible with arm64 mac
+ 2024-03-13 [ef6891c] [ci] use omp only on macos-14 as M1 does not have SSE
+ 2024-03-13 [da6d04e] [feat] store pattern pixel index for each photon in photon sharing
  2024-03-10 [237713b] [test] further testing of buit-in immc benchmarks
  2024-03-09 [c4a7c91] [format] complete reformat all matlab scripts with miss_hit
  2024-03-09 [674044f] [feat] add edgeimmc, nodeimmc, faceimmc benchmarks, update mmc2json
@@ -14,7 +20,7 @@ Change Log
  2024-03-08 [242ce05] [feat] use self-contained json input including mesh data
  2024-03-07 [10edc27] [bug] fix incorrect condition to postprocess traj data
  2024-03-07 [2d4e355] [doc] update documentation for v2024.2
- 2024-03-07 [ebefe98] [feat] return trajectories data if -M S or cfg.debuglevel contains S
+ 2024-03-07 [ebefe98] [feat] return trajectories data if -D M or cfg.debuglevel contains M
  2024-03-05 [10ea5ea] [bug] search 1st and 2nd nearest neighbors for edge-immc to reduce artifact
 
 == MMC 2.0.0 (v2023, Mochi), Qianqian Fang <q.fang at neu.edu> ==
