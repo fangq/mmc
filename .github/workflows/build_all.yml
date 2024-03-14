@@ -135,6 +135,7 @@ jobs:
       - name: Build binary
         run: |
           cd bin
+          ./mmc -L
           ./mmc --bench
           ./mmc --bench dmmc-cube60 -S 0 -D T -G -1
           ./mmc --bench dmmc-cube60b -S 0 -D T -G -1

@@ -2827,6 +2827,14 @@ void mcx_validatecfg(mcconfig* cfg) {
         cfg->method = rtBLBadouel;
     }
 
+#ifndef MMC_USE_SSE
+
+    if (cfg->gpuid < 0 && cfg->method == rtBLBadouelGrid) {
+        cfg->method = rtPlucker;
+    }
+
+#endif
+
     if (cfg->method == rtBLBadouelGrid) {
         cfg->basisorder = 0;
     }
