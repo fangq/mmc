@@ -216,17 +216,17 @@ void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
         mesh->detelem = NULL;
     }
 
-    if (mesh->noderoi && cfg->roitype != rtNode) {
+    if (mesh->noderoi) {
         free(mesh->noderoi);
         mesh->noderoi = NULL;
     }
 
-    if (mesh->edgeroi && cfg->roitype != rtEdge) {
+    if (mesh->edgeroi) {
         free(mesh->edgeroi);
         mesh->edgeroi = NULL;
     }
 
-    if (mesh->faceroi && cfg->roitype != rtFace) {
+    if (mesh->faceroi) {
         free(mesh->faceroi);
         mesh->faceroi = NULL;
     }

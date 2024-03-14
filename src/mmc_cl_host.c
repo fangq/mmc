@@ -620,6 +620,17 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 reporter.raytet += rep.raytet;
                 reporter.jumpdebug += rep.jumpdebug;
 
+                energy = (cl_float*)calloc(sizeof(cl_float), gpu[devid].autothread << 1);
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1),
+                                                energy, 0, NULL, NULL)));
+
+                for (i = 0; i < gpu[devid].autothread; i++) {
+                    cfg->energyesc += energy[(i << 1)];
+                    cfg->energytot += energy[(i << 1) + 1];
+                }
+
+                free(energy);
+
                 if (cfg->debuglevel & dlTraj) {
                     uint debugrec = rep.jumpdebug;
 
@@ -701,28 +712,6 @@ is more than what your have specified (%d), please use the -H option to specify 
                     }
 
                     free(rawfield);
-
-                    /*          if(cfg->respin>1){
-                                        for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
-                                           field[fieldlen+i]+=field[i];
-                                }
-                                if(iter+1==cfg->respin){
-                                        if(cfg->respin>1)  //copy the accumulated fields back
-                                        memcpy(field,field+fieldlen,sizeof(cl_float)*fieldlen);
-                                }
-                    */
-
-                    energy = (cl_float*)calloc(sizeof(cl_float), gpu[devid].autothread << 1);
-                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1),
-                                                    energy, 0, NULL, NULL)));
-
-                    for (i = 0; i < gpu[devid].autothread; i++) {
-                        cfg->energyesc += energy[(i << 1)];
-                        cfg->energytot += energy[(i << 1) + 1];
-                        //eabsorp+=Plen[i].z;  // the accumulative absorpted energy near the source
-                    }
-
-                    free(energy);
                 }
 
                 if (cfg->respin > 1 && RAND_SEED_WORD_LEN > 1) {
