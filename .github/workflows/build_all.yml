@@ -14,7 +14,7 @@ jobs:
     name: Build All
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, macos-12, macos-14, windows-2022]
+        os: [ubuntu-20.04, ubuntu-22.04, macos-12, macos-14, windows-2019]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -28,7 +28,7 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
-          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7 upx-ucl
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7 upx-ucl pocl-opencl-icd
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
       - name: Install dependencies (MacOS only)
@@ -132,7 +132,8 @@ jobs:
             make CC=gcc CXX=g++ USERARFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic lib/libzmat.a -Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib"
             ldd ../bin/mmc
           fi
-      - name: Build binary
+      - name: Run binary tests
+        if: ${{ matrix.os != 'windows-2019' }}
         run: |
           cd bin
           ./mmc -L
@@ -163,7 +164,7 @@ jobs:
             zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
           fi
       - name: Upload mmclab package
-        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2022' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: all-mmc-packages
@@ -183,7 +184,7 @@ jobs:
             zip -FSr --symlink mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -x 'mmc/packages*'
           fi
       - name: Upload mmc package
-        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2022' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: all-mmc-packages
