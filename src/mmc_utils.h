@@ -282,12 +282,12 @@ typedef struct MMC_config {
     char autopilot;                /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
     float normalizer;              /**<normalization factor*/
     unsigned int nbuffer;          /**<2^nbuffer is the number of buffers for accummulation*/
-    unsigned int gpuid;
-    int compute;
+    unsigned int gpuid;            /**<positive integer denotes the 1st/2nd/... OpenCL or CUDA devices, 0xFFFFFFFF for CPU only*/
+    int compute;                   /**<0: sse, 1: opencl or 2: cuda*/
     char isdumpjson;               /**<1 to save json */
     int  zipid;                    /**<data zip method "zlib","gzip","base64","lzip","lzma","lz4","lz4hc"*/
     unsigned int savedetflag;      /**<a flag to control the output fields of detected photon data*/
-    uint mediabyte;
+    uint mediabyte;                /**<not used*/
     char* shapedata;               /**<a pointer points to a string defining the JSON-formatted shape data*/
     FLOAT3* node;                  /**<node x/y/z data loaded from json input*/
     unsigned int nodenum;          /**<total number of nodes*/

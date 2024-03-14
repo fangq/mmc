@@ -2829,7 +2829,7 @@ void mcx_validatecfg(mcconfig* cfg) {
 
 #ifndef MMC_USE_SSE
 
-    if (cfg->gpuid < 0) {
+    if (cfg->gpuid > MAX_DEVICE) {
         cfg->method = rtPlucker;
     }
 
