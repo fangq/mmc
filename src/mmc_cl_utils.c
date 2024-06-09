@@ -40,7 +40,7 @@
 #include "mmc_cl_utils.h"
 #include "mmc_cl_host.h"
 
-const char* VendorList[] = {"Unknown", "NVIDIA", "AMD", "Intel", "IntelGPU"};
+const char* VendorList[] = {"Unknown", "NVIDIA", "AMD", "Intel", "IntelGPU", "AppleCPU", "AppleGPU"};
 
 char* print_cl_errstring(cl_int err) {
     switch (err) {
@@ -325,7 +325,17 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
                             cuinfo.vendor = dvIntel;
                         }
 
-                        cuinfo.autothread = cuinfo.autoblock * cuinfo.core;
+                        if (strstr(cuinfo.name, "Apple M")) {
+                            cuinfo.vendor = dvAppleGPU;
+                            cuinfo.autoblock = 64;
+                            cuinfo.autothread = cuinfo.core * (16 * 48); // each Apple GPU core has 16 EU
+                        } else if (strstr(cuinfo.name, "Apple")) {
+                            cuinfo.vendor = dvAppleCPU;
+                            cuinfo.autoblock = 1;
+                            cuinfo.autothread = 2048;
+                        } else {
+                            cuinfo.autothread = cuinfo.autoblock * cuinfo.core;
+                        }
 
                         if (cfg->isgpuinfo) {
                             MMC_FPRINTF(cfg->flog, "============ %s device ID %d [%d of %d]: %s  ============\n", devname[j], cuid, k + 1, devnum, cuinfo.name);
