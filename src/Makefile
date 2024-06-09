@@ -4,10 +4,12 @@ BINARY=mmc
 FILES=mmc_rand_xorshift128p mmc_mesh mmc_raytrace mmc_utils mmc_tictoc mmc_host mmc_highorder mmc_bench mmc_cl_utils mmc_cl_host
 CLPROGRAM=mmc_core
 
-ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-  EXTRALIB:=-static-libgcc -lgcc_eh
-  MEXLINKOPT:=$(EXTRALIB)
-endif
+#PLATFORM = $(shell uname -s)
+
+#ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+#  EXTRALIB:=-static-libgcc -lgcc_eh
+#  MEXLINKOPT:=$(EXTRALIB)
+#endif
 
 DOXYCFG=mmc_doxygen.cfg
 

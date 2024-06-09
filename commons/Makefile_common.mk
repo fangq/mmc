@@ -41,6 +41,7 @@ OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
 CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v
 CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
+SSEFLAGS   :=-DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
 
 ECHO	   := echo
 MKDIR      := mkdir
@@ -59,6 +60,7 @@ ARCH = $(shell uname -m)
 ifeq ($(findstring x86_64,$(ARCH)), x86_64)
      CCFLAGS+=-m64
 endif
+
 ISCLANG = $(shell $(CC) --version | grep clang)
 
 MEXLINKOPT +=$(OPENMPLIB)
@@ -98,17 +100,32 @@ else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     DLLFLAG     =
     MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers -I/usr/local/include
+    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers -I/usr/local/include -I/opt/homebrew/opt/libomp/include
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
     ifeq ($(ISCLANG),)
         OPENMPLIB=-static-libgcc -static-libstdc++ $(shell $(CC) --print-file-name=libgomp.a)
         OPENMP=-fopenmp
     else
-        OPENMPLIB=/usr/local/lib/libomp.a
+        ifneq (,$(wildcard /opt/homebrew/opt/libomp/lib/libomp.a))  # brew on arm64 Apple installs libomp to /opt/homebrew/opt
+            OPENMPLIB=/opt/homebrew/opt/libomp/lib/libomp.a
+        else
+            OPENMPLIB=/usr/local/lib/libomp.a
+        endif
         OPENMP=-Xclang -fopenmp
     endif
     CUDA_STATIC=--cudart static
+endif
+
+.DEFAULT_GOAL := ssemath
+
+ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+    ifeq ($(findstring arm64,$(ARCH)), arm64)
+       .DEFAULT_GOAL := omp
+       ifneq (,$(filter $(MAKECMDGOALS),mex oct))
+           SSEFLAGS=
+       endif
+    endif
 endif
 
 ifeq ($(BACKEND),ocelot)
@@ -171,7 +188,7 @@ OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
 CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
 
 release:   CCFLAGS+= -O3
-sse ssemath mex oct: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
+sse ssemath mex oct: CCFLAGS+=$(SSEFLAGS)
 sse ssemath omp mex oct mexomp octomp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
 ssemath:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
@@ -310,5 +327,3 @@ pretty:
 	   "*.c" "*.h" "*.cpp" "*.cu" "*.cl"
 
 .PHONY: regression clean arch makedirs dep $(SUBDIRS)
-
-.DEFAULT_GOAL := ssemath
