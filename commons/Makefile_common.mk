@@ -108,7 +108,11 @@ else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
         OPENMP=-fopenmp
     else
         ifneq (,$(wildcard /opt/homebrew/opt/libomp/lib/libomp.a))  # brew on arm64 Apple installs libomp to /opt/homebrew/opt
-            OPENMPLIB=/opt/homebrew/opt/libomp/lib/libomp.a
+            ifneq (,$(filter mex,$(MAKECMDGOALS)))
+                OPENMPLIB=-lomp
+            else
+                OPENMPLIB=/opt/homebrew/opt/libomp/lib/libomp.a
+            endif
         else
             OPENMPLIB=/usr/local/lib/libomp.a
         endif
