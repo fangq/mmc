@@ -622,8 +622,8 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     UBJ_WRITE_KEY(root, "Param2", uint8, 0);
     UBJ_WRITE_KEY(root, "Param3", uint8, 0);
     UBJ_WRITE_KEY(root, "Intent", uint8, 0);
-    UBJ_WRITE_KEY(root, "DataType", string, ((isfloat ? "single" : "uint32")));
-    UBJ_WRITE_KEY(root, "BitDepth", uint8, 32);
+    UBJ_WRITE_KEY(root, "DataType", string, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")));
+    UBJ_WRITE_KEY(root, "BitDepth", uint8, sizeof(OutputType) * 8);
     UBJ_WRITE_KEY(root, "FirstSliceID", uint8, 0);
     ubjw_write_key(root, "VoxelSize");
     UBJ_WRITE_ARRAY(root, single, ndim, voxelsize);
@@ -687,7 +687,7 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     /* the "NIFTIData" section stores volumetric data */
     ubjw_begin_object(root, UBJ_MIXED, 0);
 
-    if (mcx_jdataencode(vol, ndim, dims, (isfloat ? "single" : "uint32"), 4, cfg->zipid, root, 1, iscol, cfg)) {
+    if (mcx_jdataencode(vol, ndim, dims, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")), sizeof(OutputType), cfg->zipid, root, 1, iscol, cfg)) {
         MMC_ERROR(-1, "error when converting to JSON");
     }
 
@@ -763,8 +763,8 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     cJSON_AddNumberToObject(hdr, "Param2", 0);
     cJSON_AddNumberToObject(hdr, "Param3", 0);
     cJSON_AddNumberToObject(hdr, "Intent", 0);
-    cJSON_AddStringToObject(hdr, "DataType", (isfloat ? "single" : "uint32"));
-    cJSON_AddNumberToObject(hdr, "BitDepth", 32);
+    cJSON_AddStringToObject(hdr, "DataType", (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")));
+    cJSON_AddNumberToObject(hdr, "BitDepth", sizeof(OutputType) * 8);
     cJSON_AddNumberToObject(hdr, "FirstSliceID", 0);
     cJSON_AddItemToObject(hdr, "VoxelSize", cJSON_CreateFloatArray(voxelsize, ndim));
     cJSON_AddItemToObject(hdr, "Orientation", sub = cJSON_CreateObject());
@@ -814,7 +814,7 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     /* the "NIFTIData" section stores volumetric data */
     cJSON_AddItemToObject(root, "NIFTIData",   dat = cJSON_CreateObject());
 
-    if (mcx_jdataencode(vol, ndim, dims, (isfloat ? "single" : "uint32"), 4, cfg->zipid, dat, 0, iscol, cfg)) {
+    if (mcx_jdataencode(vol, ndim, dims, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")), sizeof(OutputType), cfg->zipid, dat, 0, iscol, cfg)) {
         MMC_ERROR(-1, "error when converting to JSON");
     }
 
