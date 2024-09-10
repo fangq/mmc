@@ -69,6 +69,7 @@ end
 
 Mesh = struct();
 Mesh = copycfg(cfg, 'unitinmm', Mesh, 'LengthUnit');
+Mesh.MeshID = fname;
 
 if (isfield(cfg, 'node') && ~isempty(cfg.node) && isfield(cfg, 'elem') && ~isempty(cfg.elem))
     node = cfg.node;
@@ -96,7 +97,6 @@ if (isfield(cfg, 'node') && ~isempty(cfg.node) && isfield(cfg, 'elem') && ~isemp
     Mesh = copycfg(cfg, 'e0', Mesh, 'InitElem');
 
 else
-    Mesh.MeshID = fname;
     warning('mesh is missing!');
 end
 
@@ -129,7 +129,7 @@ Session = copycfg(cfg, 'issave2pt', Session, 'DoSaveVolume');
 Session = copycfg(cfg, 'issavedet', Session, 'DoPartialPath');
 Session = copycfg(cfg, 'issaveexit', Session, 'DoSaveExit');
 Session = copycfg(cfg, 'issaveseed', Session, 'DoSaveSeed');
-Session = copycfg(cfg, 'isnormalize', Session, 'DoNormalize');
+Session = copycfg(cfg, 'isnormalized', Session, 'DoNormalize');
 Session = copycfg(cfg, 'ismomentum', Session, 'DoDCS');
 Session = copycfg(cfg, 'isspecular', Session, 'DoSpecular');
 Session = copycfg(cfg, 'outputformat', Session, 'OutputFormat');
