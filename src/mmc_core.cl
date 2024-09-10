@@ -702,7 +702,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #ifndef MCX_SKIP_VOLUME
 
             if (prop.mua > 0.f) {
-                if (GPU_PARAM(gcfg, outputtype) != otEnergy && GPU_PARAM(gcfg, outputtype) != otWP) {
+                if (GPU_PARAM(gcfg, outputtype) != otEnergy && GPU_PARAM(gcfg, outputtype) != otWP && GPU_PARAM(gcfg, outputtype) != otWL) {
                     ww /= prop.mua;
                 }
             }
