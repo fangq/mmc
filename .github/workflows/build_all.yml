@@ -35,7 +35,7 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           brew install octave
-          brew install upx
+          #brew install upx
           if [[ "$RUNNER_ARCH" == "ARM64" ]]; then
             echo 'OMPONLY=omp' >> $GITHUB_ENV
           fi
@@ -151,7 +151,7 @@ jobs:
         run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
       - name: Zip mmclab
         run: |
-          if [[ "$RUNNER_ARCH" != "ARM64" ]]; then
+          if [[ "$RUNNER_OS" != "macOS" ]]; then
             upx -9 mmclab/mmc.mex* || true
           fi
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
@@ -175,7 +175,7 @@ jobs:
       - name: Zip mmc
         run: |
           cd .. && pwd
-          if [[ "$RUNNER_ARCH" != "ARM64" ]]; then
+          if [[ "$RUNNER_OS" != "macOS" ]]; then
             upx -9 mmc/bin/* || true
           fi
           if [[ "$RUNNER_OS" == "Windows" ]]; then
