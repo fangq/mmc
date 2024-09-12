@@ -165,7 +165,7 @@ jobs:
           fi
       - name: Upload mmclab package
         if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: all-mmc-packages
           path: packages/mmclab-${{ env.RELEASE_TAG }}.zip
@@ -185,7 +185,7 @@ jobs:
           fi
       - name: Upload mmc package
         if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: all-mmc-packages
           path: packages/mmc-${{ env.RELEASE_TAG }}.zip
