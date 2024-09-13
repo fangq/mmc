@@ -27,7 +27,7 @@ cfg.srcdir = [0 0 1];
 cfg.tstart = 0;
 cfg.tend = 5e-9;
 cfg.tstep = 5e-10;
-cfg.prop = [0, 0, 1, 1; 0.02 7.0 0.89 1.37; 0.004 0.009 0.89 1.37; 0.02 9.0 0.89 1.37; 0.05 0.0 1.0 1.37];
+cfg.prop = [0, 0, 1, 1; 0.02 7.0 0.89 1.37; 0.0004 0.009 0.89 1.37; 0.02 9.0 0.89 1.37; 0.05 0.0 1.0 1.37];
 cfg.debuglevel = 'TP';
 cfg.isreflect = 1;
 
@@ -112,7 +112,7 @@ cfg_mcx.srcdir = [0 0 1];
 cfg_mcx.issrcfrom0 = 1;
 
 % format: [mua(1/mm) mus(1/mm) g n]
-cfg_mcx.prop = [0, 0, 1, 1; 0.02 7.0 0.89 1.37; 0.004 0.009 0.89 1.37; 0.02 9.0 0.89 1.37; 0.05 0.0 1.0 1.37];
+cfg_mcx.prop = [0, 0, 1, 1; 0.02 7.0 0.89 1.37; 0.0004 0.009 0.89 1.37; 0.02 9.0 0.89 1.37; 0.05 0.0 1.0 1.37];
 
 % time-domain simulation parameters
 cfg_mcx.tstart = 0;

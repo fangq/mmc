@@ -29,7 +29,7 @@ cfg.nphoton = 1e7; % takes ~240s on Intel i7-8700K(12 threads)
 cfg.node = double(node);
 cfg.elem = double(elem);
 cfg.elemprop = double(prop);
-cfg.prop = [0, 0, 1, 1; 0, 0, 1, 1; 0.019 7.8 0.89 1.37; 0.019 7.8 0.89 1.37; 0.004 0.009 0.89 1.37; 0.02 9.0 0.89 1.37; 0.08 40.9 0.84 1.37];
+cfg.prop = [0, 0, 1, 1; 0, 0, 1, 1; 0.019 7.8 0.89 1.37; 0.019 7.8 0.89 1.37; 0.0004 0.009 0.89 1.37; 0.02 9.0 0.89 1.37; 0.08 40.9 0.84 1.37];
 
 % light source
 cfg.srctype = 'pencil';

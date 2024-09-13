@@ -29,7 +29,7 @@ if (layercount == 2)
 else
     [node, face, c0] = latticegrid([0 60], [0 60], [0 20 25 30]); % if you like a 3-layer model
     c0(:, 4) = [2; 2; 1];
-    cfg.prop = [0 0 1 1; 0.02 9.0, 0.89 1.37; 0.004 0.009, 0.89 1.37; 0.019 7.8 0.89 1.37];
+    cfg.prop = [0 0 1 1; 0.02 9.0, 0.89 1.37; 0.0004 0.009, 0.89 1.37; 0.019 7.8 0.89 1.37];
 end
 [cfg.node, cfg.elem] = surf2mesh(node, face, [], [], 1, [], c0);
 
