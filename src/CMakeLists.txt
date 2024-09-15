@@ -88,6 +88,7 @@ add_library(mmc STATIC
     mmc_rand_xorshift128p.c
     mmc_rand_xorshift128p.h
     mmc_bench.h
+    mmc_bench.c
     mmc_tictoc.c
     mmc_tictoc.h
     mmc_cl_utils.c
@@ -179,6 +180,7 @@ if(BUILD_MEX AND Matlab_FOUND)
             mmc_rand_xorshift128p.c
             mmc_rand_xorshift128p.h
             mmc_bench.h
+            mmc_bench.c
             mmc_tictoc.c
             mmc_tictoc.h
             mmc_cl_utils.c
