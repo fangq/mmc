@@ -17,6 +17,11 @@ function varargout = mmc2json(cfg, filestub, varargin)
 %         filestub_shapes.json: the domain shape file if cfg.shapes is defined
 %         filestub_pattern.bin: the domain shape file if cfg.pattern is defined
 %
+%         if filestub ends with '.json', then mmc2json saves the mesh data
+%         in the single-file mode, and the mesh information is stored
+%         inside the "MeshNode" and "MeshElem" JSON keys inside the "Mesh"
+%         root-level object.
+%
 % Dependency:
 %    this function depends on the savejson/saveubjson functions from the
 %    Iso2Mesh toolbox (http://iso2mesh.sf.net) or JSONlab toolbox
@@ -77,6 +82,7 @@ if (isfield(cfg, 'node') && ~isempty(cfg.node) && isfield(cfg, 'elem') && ~isemp
         elem = [elem, cfg.elemprop];
     end
     if (~singlefile)
+        Mesh.MeshID = fname;
         savemmcmesh(fname, node, elem);
     else
         Mesh.MeshNode = single(node);
@@ -129,7 +135,7 @@ Session = copycfg(cfg, 'issave2pt', Session, 'DoSaveVolume');
 Session = copycfg(cfg, 'issavedet', Session, 'DoPartialPath');
 Session = copycfg(cfg, 'issaveexit', Session, 'DoSaveExit');
 Session = copycfg(cfg, 'issaveseed', Session, 'DoSaveSeed');
-Session = copycfg(cfg, 'isnormalize', Session, 'DoNormalize');
+Session = copycfg(cfg, 'isnormalized', Session, 'DoNormalize');
 Session = copycfg(cfg, 'ismomentum', Session, 'DoDCS');
 Session = copycfg(cfg, 'isspecular', Session, 'DoSpecular');
 Session = copycfg(cfg, 'outputformat', Session, 'OutputFormat');
