@@ -224,8 +224,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     float*  greplayweight = NULL, *greplaytime = NULL;
 
     MCXReporter* greporter;
-    uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)
-                   << cfg->nbuffer; // use 4 copies to reduce racing
+    uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;
     cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
 
     float* field, *dref = NULL;
@@ -237,6 +236,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop +
                      (cfg->issaveexit > 0) * 6 + 1;
     uint hostdetreclen = detreclen + 1;
+    // launch mcxkernel
+    size_t sharedmemsize = 0;
 
     MCXParam param = {make_float3(cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z),
                       make_float3(cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z),
@@ -280,7 +281,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                       cfg->e0,
                       cfg->isextdet,
                       (int)meshlen,
-                      cfg->nbuffer,
                       (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
                       (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
                       cfg->issaveseed,
@@ -290,6 +290,17 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     MCXReporter reporter = {0.f, 0};
 
+    if (cfg->issavedet) {
+        sharedmemsize = sizeof(float) * detreclen;
+    }
+
+    param.reclen = sharedmemsize / sizeof(float);  //< the shared memory buffer length associated with detected photon
+
+    if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+        sharedmemsize += sizeof(float) * cfg->srcnum;
+    }
+
+    sharedmemsize *= ((int)gpu[gpuid].autoblock);
 
 #ifdef _OPENMP
     threadid = omp_get_thread_num();
@@ -502,17 +513,17 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     if (cfg->srctype == MCX_SRC_PATTERN) {
         CUDA_ASSERT(cudaMalloc((void**)&gsrcpattern,
-                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w)));
+                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w * cfg->srcnum)));
         CUDA_ASSERT(cudaMemcpy(gsrcpattern, cfg->srcpattern,
-                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w),
+                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w * cfg->srcnum),
                                cudaMemcpyHostToDevice));
     } else if (cfg->srctype == MCX_SRC_PATTERN3D) {
         CUDA_ASSERT(cudaMalloc((void**)&gsrcpattern,
                                sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y*
-                                       cfg->srcparam1.z)));
+                                       cfg->srcparam1.z * cfg->srcnum)));
         CUDA_ASSERT(cudaMemcpy(gsrcpattern, cfg->srcpattern,
                                sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y*
-                                       cfg->srcparam1.z),
+                                       cfg->srcparam1.z * cfg->srcnum),
                                cudaMemcpyHostToDevice));
     } else {
         gsrcpattern = NULL;
@@ -591,14 +602,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             param.tstart = twindow0;
             param.tend = twindow1;
 
-            // launch mcxkernel
-            size_t sharedMemSize = sizeof(int);
 
-            if (cfg->issavedet) {
-                sharedMemSize = sizeof(float) * ((int)gpu[gpuid].autoblock) * detreclen;
-            }
-
-            mmc_main_loop <<< mcgrid, mcblock, sharedMemSize>>>(
+            mmc_main_loop <<< mcgrid, mcblock, sharedmemsize>>>(
                 threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
                 gtype, (int*)gfacenb, gsrcelem, gnormal,
                 gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
@@ -752,7 +757,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                 mcx_fflush(cfg->flog);
 
                 for (i = 0; i < fieldlen; i++) { // accumulate field, can be done in the GPU
-                    field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
+                    field[i] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
                 }
 
                 free(rawfield);
@@ -780,8 +785,6 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
     #pragma omp master
     {
         int i, j;
-        fieldlen = (fieldlen >> cfg->nbuffer);
-        field = (float*)realloc(field, sizeof(field[0]) * fieldlen);
 
         if (cfg->exportfield) {
             if (cfg->basisorder == 0 || cfg->method == rtBLBadouelGrid) {

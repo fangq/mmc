@@ -92,7 +92,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter, *gdebugdata;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
-    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) << cfg->nbuffer; // use 4 copies to reduce racing
+    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;
     cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
 
     cl_float*  field, *dref = NULL;
@@ -103,6 +103,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     char opt[MAX_PATH_LENGTH + 1] = {'\0'};
     cl_uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop + (cfg->issaveexit > 0) * 6 + 1;
     cl_uint hostdetreclen = detreclen + 1;
+    int sharedmemsize = 0;
+
     GPUInfo* gpu = NULL;
     float4* propdet;
 
@@ -122,7 +124,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x, mesh->nmin.y, mesh->nmin.z}}, cfg->nout,
         cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x, cfg->crop0.y, cfg->crop0.z, cfg->crop0.w}},
         mesh->srcelemlen, {{cfg->bary0.x, cfg->bary0.y, cfg->bary0.z, cfg->bary0.w}},
-        cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+        cfg->e0, cfg->isextdet, meshlen, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
         cfg->issaveseed, cfg->seed, cfg->maxjumpdebug
     };
@@ -136,6 +138,16 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     if (workdev == 0) {
         mcx_error(-99, (char*)("Unable to find devices!"), __FILE__, __LINE__);
+    }
+
+    if (cfg->issavedet) {
+        sharedmemsize = sizeof(cl_float) * detreclen;
+    }
+
+    param.reclen = sharedmemsize / sizeof(float);
+
+    if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+        sharedmemsize += sizeof(cl_float) * cfg->srcnum;
     }
 
     cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0};
@@ -324,9 +336,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT(((greporter[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(MCXReporter), &reporter, &status), status)));
 
         if (cfg->srctype == MCX_SRC_PATTERN) {
-            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w), cfg->srcpattern, &status), status)));
+            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w * cfg->srcnum), cfg->srcpattern, &status), status)));
         } else if (cfg->srctype == MCX_SRC_PATTERN3D) {
-            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y * cfg->srcparam1.z), cfg->srcpattern, &status), status)));
+            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y * cfg->srcparam1.z * cfg->srcnum), cfg->srcpattern, &status), status)));
         } else {
             gsrcpattern[i] = NULL;
         }
@@ -417,6 +429,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         sprintf(opt + strlen(opt), " -DUSE_BLBADOUEL");
     }
 
+    if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+        sprintf(opt + strlen(opt), " -DUSE_PHOTON_SHARING");
+    }
+
     if (gpu[0].vendor == dvNVIDIA) {
         sprintf(opt + strlen(opt), " -DUSE_NVIDIA_GPU");
     }
@@ -497,7 +513,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 0, sizeof(cl_uint), (void*)&threadphoton)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 1, sizeof(cl_uint), (void*)&oddphotons)));
         //OCL_ASSERT((clSetKernelArg(mcxkernel[i], 2, sizeof(cl_mem), (void*)(gparam+i))));
-        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, cfg->issavedet ? sizeof(cl_float) * ((int)gpu[i].autoblock)*detreclen : sizeof(int), NULL)));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, sharedmemsize * (int)gpu[i].autothread, NULL)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)(gproperty + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)(gnode + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 6, sizeof(cl_mem), (void*)(gelem + i))));
@@ -708,7 +724,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                     mcx_fflush(cfg->flog);
 
                     for (i = 0; i < fieldlen; i++) { //accumulate field, can be done in the GPU
-                        field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
+                        field[i] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
                     }
 
                     free(rawfield);
@@ -731,9 +747,6 @@ is more than what your have specified (%d), please use the -H option to specify 
             }// loop over work devices
         }// iteration
     }// time gates
-
-    fieldlen = (fieldlen >> cfg->nbuffer);
-    field = realloc(field, sizeof(field[0]) * fieldlen);
 
     if (cfg->exportfield) {
         if (cfg->basisorder == 0 || cfg->method == rtBLBadouelGrid) {

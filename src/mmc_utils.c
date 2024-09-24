@@ -326,7 +326,6 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->energyesc = 0.f;
     cfg->runtime = 0;
     cfg->autopilot = 1;
-    cfg->nbuffer = 0;
     cfg->gpuid = 0;
     cfg->maxjumpdebug = 10000000;
     cfg->exportdebugdata = NULL;
@@ -3216,8 +3215,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         i = mcx_readarg(argc, argv, i, &(cfg->debugphoton), "int");
                     } else if (strcmp(argv[i] + 2, "maxjumpdebug") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->maxjumpdebug), "int");
-                    } else if (strcmp(argv[i] + 2, "buffer") == 0) {
-                        i = mcx_readarg(argc, argv, i, &(cfg->nbuffer), "int");
                     } else if (strcmp(argv[i] + 2, "gridsize") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->steps.x), "float");
                         cfg->steps.y = cfg->steps.x;

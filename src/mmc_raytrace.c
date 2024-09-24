@@ -386,12 +386,11 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                     #pragma omp atomic
                     tracer->mesh->weight[eid + tshift] += ww;
                 } else if (cfg->srctype == stPattern) { // must be pattern and srcnum more than 1
-                    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                     int pidx; // pattern index
 
                     for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                         #pragma omp atomic
-                        tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
+                        tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                     }
                 }
             }
@@ -437,13 +436,12 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                                 tracer->mesh->weight[ee[i] - 1 + tshift] += ww * (baryp0[i] + baryout[i]);
                             }
                         } else if (cfg->srctype == stPattern) { // must be pattern and srcnum more than 1
-                            int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                             int pidx; // pattern index
 
                             for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                 for (i = 0; i < 4; i++) {
                                     #pragma omp atomic
-                                    tracer->mesh->weight[(ee[i] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx] * (baryp0[i] + baryout[i]);
+                                    tracer->mesh->weight[(ee[i] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx] * (baryp0[i] + baryout[i]);
                                 }
                             }
                         }
@@ -716,12 +714,11 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                         #pragma omp atomic
                         tracer->mesh->weight[eid + tshift] += ww;
                     } else if (cfg->srctype == stPattern) { // must be pattern and srcnum more than 1
-                        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                         int pidx; // pattern index
 
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                             #pragma omp atomic
-                            tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
+                            tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                         }
                     }
                 } else {
@@ -734,13 +731,12 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                             tracer->mesh->weight[ee[j] - 1 + tshift] += barypout[j];
                         }
                     } else if (cfg->srctype == stPattern) {
-                        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
                         int pidx; // pattern index
 
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                             for (j = 0; j < 4; j++) {
                                 #pragma omp atomic
-                                tracer->mesh->weight[(ee[j] - 1 + tshift)*cfg->srcnum + pidx] += barypout[j] * cfg->srcpattern[pidx * psize + r->posidx];
+                                tracer->mesh->weight[(ee[j] - 1 + tshift)*cfg->srcnum + pidx] += barypout[j] * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                             }
                         }
                     }
@@ -1405,7 +1401,6 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
         medium* prop;
         int* enb, *ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
         float mus;
-        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
         int pidx; // pattern index
 
         if (cfg->implicit == 1 && r->inroi && tracer->mesh->edgeroi && fabs(tracer->mesh->edgeroi[eid * 6]) < EPS) {
@@ -1526,7 +1521,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             } else if (cfg->srctype == stPattern) {
                                 for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                     #pragma omp atomic
-                                    tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
+                                    tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                                 }
                             }
 
@@ -1543,7 +1538,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             } else if (cfg->srctype == stPattern) {
                                 for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                     #pragma omp atomic
-                                    tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
+                                    tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                                 }
                             }
 
@@ -1577,7 +1572,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                                     for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                             #pragma omp atomic
-                                            tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
+                                            tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                                         }
                                     }
                                 }
@@ -1596,7 +1591,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                                     for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                             #pragma omp atomic
-                                            tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
+                                            tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                                         }
                                     }
                                 }
@@ -1621,7 +1616,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                             for (i = 0; i < 3; i++) {
                                 #pragma omp atomic
-                                tracer->mesh->weight[(ee[out[faceidx][i]] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
+                                tracer->mesh->weight[(ee[out[faceidx][i]] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                             }
                         }
                     }
@@ -1761,13 +1756,11 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
     } else if (cfg->srctype == stPattern) {
         *((int*)(r.partialpath + visit->reclen - 2)) = r.posidx;
 
-        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
-
         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
             if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) {
                 kahany = cfg->replayweight[r.photonid] - visit->kahanc0[pidx];    /* when replay mode, accumulate detected photon weight */
             } else {
-                kahany = r.weight * cfg->srcpattern[pidx * psize + r.posidx] - visit->kahanc0[pidx];
+                kahany = r.weight * cfg->srcpattern[r.posidx * cfg->srcnum + pidx] - visit->kahanc0[pidx];
             }
 
             kahant = visit->launchweight[pidx] + kahany;
@@ -2033,10 +2026,8 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         visit->kahanc1[0] = (kahant - visit->absorbweight[0]) - kahany;
         visit->absorbweight[0] = kahant;
     } else if (cfg->srctype == stPattern) {
-        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
-
         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-            kahany = r.Eabsorb * cfg->srcpattern[pidx * psize + r.posidx] - visit->kahanc1[pidx];
+            kahany = r.Eabsorb * cfg->srcpattern[r.posidx * cfg->srcnum + pidx] - visit->kahanc1[pidx];
             kahant = visit->absorbweight[pidx] + kahany;
             visit->kahanc1[pidx] = (kahant - visit->absorbweight[pidx]) - kahany;
             visit->absorbweight[pidx] = kahant;

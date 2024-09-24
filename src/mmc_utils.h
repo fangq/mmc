@@ -281,7 +281,6 @@ typedef struct MMC_config {
     unsigned int runtime;          /**<total simulation runtime in ms*/
     char autopilot;                /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
     float normalizer;              /**<normalization factor*/
-    unsigned int nbuffer;          /**<2^nbuffer is the number of buffers for accummulation*/
     unsigned int gpuid;            /**<positive integer denotes the 1st/2nd/... OpenCL or CUDA devices, 0xFFFFFFFF for CPU only*/
     int compute;                   /**<0: sse, 1: opencl or 2: cuda*/
     char isdumpjson;               /**<1 to save json */

@@ -443,7 +443,6 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
     const dimtype* arraydim;
     char* jsonshapes = NULL;
     int i, j;
-    dimtype k;
 
     if (strcmp(name, "nphoton") == 0 && cfg->photonseed != NULL) {
         return;
@@ -778,25 +777,26 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         printf("mmc.session='%s';\n", cfg->session);
     } else if (strcmp(name, "srcpattern") == 0) {
         arraydim = mxGetDimensions(item);
+        dimtype dimz = 1;
+
+        if (mxGetNumberOfDimensions(item) == 3) {
+            dimz = arraydim[2];
+            cfg->srcnum = arraydim[0];
+        }
+
         double* val = mxGetPr(item);
 
         if (cfg->srcpattern) {
             free(cfg->srcpattern);
         }
 
-        if (mxGetNumberOfDimensions(item) == 3) {
-            cfg->srcnum = arraydim[2];
-        } else {
-            cfg->srcnum = 1;
+        cfg->srcpattern = (float*)malloc(arraydim[0] * arraydim[1] * dimz * sizeof(float));
+
+        for (i = 0; i < arraydim[0]*arraydim[1]*dimz; i++) {
+            cfg->srcpattern[i] = val[i];
         }
 
-        cfg->srcpattern = (float*)malloc(arraydim[0] * arraydim[1] * cfg->srcnum * sizeof(float));
-
-        for (k = 0; k < arraydim[0]*arraydim[1]*cfg->srcnum; k++) {
-            cfg->srcpattern[k] = val[k];
-        }
-
-        printf("mmc.srcpattern=[%d %d %d];\n", (int)arraydim[0], (int)arraydim[1], cfg->srcnum);
+        printf("mmc.srcpattern=[%ld %ld %ld];\n", arraydim[0], arraydim[1], dimz);
     } else if (strcmp(name, "method") == 0) {
         int len = mxGetNumberOfElements(item);
         const char* methods[] = {"plucker", "havel", "badouel", "elem", "grid", ""};
