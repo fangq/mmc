@@ -513,7 +513,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 0, sizeof(cl_uint), (void*)&threadphoton)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 1, sizeof(cl_uint), (void*)&oddphotons)));
         //OCL_ASSERT((clSetKernelArg(mcxkernel[i], 2, sizeof(cl_mem), (void*)(gparam+i))));
-        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, sharedmemsize * (int)gpu[i].autothread, NULL)));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, sharedmemsize * (int)gpu[i].autoblock, NULL)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)(gproperty + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)(gnode + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 6, sizeof(cl_mem), (void*)(gelem + i))));

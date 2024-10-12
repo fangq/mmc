@@ -777,7 +777,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         printf("mmc.session='%s';\n", cfg->session);
     } else if (strcmp(name, "srcpattern") == 0) {
         arraydim = mxGetDimensions(item);
-        dimtype dimz = 1;
+        dimtype dimz = 1, k;
 
         if (mxGetNumberOfDimensions(item) == 3) {
             dimz = arraydim[2];
@@ -792,8 +792,8 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
 
         cfg->srcpattern = (float*)malloc(arraydim[0] * arraydim[1] * dimz * sizeof(float));
 
-        for (i = 0; i < arraydim[0]*arraydim[1]*dimz; i++) {
-            cfg->srcpattern[i] = val[i];
+        for (k = 0; k < arraydim[0]*arraydim[1]*dimz; k++) {
+            cfg->srcpattern[k] = val[k];
         }
 
         printf("mmc.srcpattern=[%ld %ld %ld];\n", arraydim[0], arraydim[1], dimz);

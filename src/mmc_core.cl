@@ -901,7 +901,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 float oldval = atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx, r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx]);
 
                                 if (oldval > MAX_ACCUM) {
-                                if (atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx, -oldval) < 0.0f) {
+                                    if (atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx, -oldval) < 0.0f) {
                                         atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx, oldval);
                                     } else {
                                         atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx + gcfg->crop0.w, oldval);
