@@ -506,7 +506,7 @@ __device__ uint finddetector(float3* p0, __constant float4* gmed, __constant MCX
 __device__ void savedetphoton(__global float* n_det, __global uint* detectedphoton,
                               __local float* ppath, ray* r, __constant Medium* gmed,
                               int extdetid, __constant MCXParam* gcfg, __global RandType* photonseed, RandType* initseed) {
-    uint detid = (extdetid < 0) ? finddetector(p0, (__constant float4*)gmed, gcfg) : extdetid;
+    uint detid = (extdetid < 0) ? finddetector(&(r->p0), (__constant float4*)gmed, gcfg) : extdetid;
 
     if (detid) {
         uint baseaddr = atomic_inc(detectedphoton);
@@ -535,9 +535,9 @@ __device__ void savedetphoton(__global float* n_det, __global uint* detectedphot
                 n_det[baseaddr++] = r->p0.x;
                 n_det[baseaddr++] = r->p0.y;
                 n_det[baseaddr++] = r->p0.z;
-                n_det[baseaddr++] = r->v.x;
-                n_det[baseaddr++] = r->v.y;
-                n_det[baseaddr++] = r->v.z;
+                n_det[baseaddr++] = r->vec.x;
+                n_det[baseaddr++] = r->vec.y;
+                n_det[baseaddr++] = r->vec.z;
             }
 
             n_det[baseaddr++] = ppath[GPU_PARAM(gcfg, reclen) - 1]; // save partial pathlength to the memory

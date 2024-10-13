@@ -300,6 +300,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         sharedmemsize += sizeof(float) * cfg->srcnum;
     }
 
+    gpuid = cfg->deviceid[threadid] - 1;
+
     sharedmemsize *= ((int)gpu[gpuid].autoblock);
 
 #ifdef _OPENMP
@@ -309,8 +311,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     if (threadid < MAX_DEVICE && cfg->deviceid[threadid] == '\0') {
         return;
     }
-
-    gpuid = cfg->deviceid[threadid] - 1;
 
     if (gpuid < 0) {
         mcx_error(-1, "GPU ID must be non-zero", __FILE__, __LINE__);
