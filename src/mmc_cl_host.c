@@ -92,8 +92,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter, *gdebugdata;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
-    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;
-    cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
+    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;    /**< total output data length in float count per time-frame */
+    cfg->crop0.w = meshlen * cfg->maxgate;    /**< total output data length, before double-buffer expansion */
 
     cl_float*  field, *dref = NULL;
 
@@ -107,6 +107,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     GPUInfo* gpu = NULL;
     float4* propdet;
+    double energytot = 0.0, energyesc = 0.0;
 
     MCXParam param = {{{cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z}}, {{cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z}},
         cfg->tstart, cfg->tend, (uint)cfg->isreflect, (uint)cfg->issavedet, (uint)cfg->issaveexit,
@@ -124,7 +125,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x, mesh->nmin.y, mesh->nmin.z}}, cfg->nout,
         cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x, cfg->crop0.y, cfg->crop0.z, cfg->crop0.w}},
         mesh->srcelemlen, {{cfg->bary0.x, cfg->bary0.y, cfg->bary0.z, cfg->bary0.w}},
-        cfg->e0, cfg->isextdet, meshlen, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+        cfg->e0, cfg->isextdet, (meshlen / cfg->srcnum), (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
         cfg->issaveseed, cfg->seed, cfg->maxjumpdebug
     };
@@ -145,6 +146,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     }
 
     param.reclen = sharedmemsize / sizeof(float);
+
+    sharedmemsize += sizeof(cl_float) * (cfg->srcnum << 1);   /**< store energyesc/energytot */
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
         sharedmemsize += sizeof(cl_float) * cfg->srcnum;
@@ -256,7 +259,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         Pphotonseed = (RandType*)calloc(cfg->maxdetphoton, (sizeof(RandType) * RAND_BUF_LEN));
     }
 
-    fieldlen = meshlen * cfg->maxgate;
+    fieldlen = cfg->crop0.w;  /**< total float counts of the output buffer, before double-buffer expansion (x2) for improving saving accuracy */
 
     if (cfg->seed > 0) {
         srand(cfg->seed);
@@ -310,7 +313,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT(((gparam[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(MCXParam), &param, &status), status)));
 
         Pseed = (cl_uint*)malloc(sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN);
-        energy = (cl_float*)calloc(sizeof(cl_float), gpu[i].autothread << 1);
+        energy = (cl_float*)calloc(sizeof(cl_float) * cfg->srcnum, gpu[i].autothread << 1);
 
         for (j = 0; j < gpu[i].autothread * RAND_SEED_WORD_LEN; j++) {
             Pseed[j] = rand();
@@ -331,7 +334,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             OCL_ASSERT(((gdebugdata[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (debuglen * cfg->maxjumpdebug), cfg->exportdebugdata, &status), status)));
         }
 
-        OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1), energy, &status), status)));
+        OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1) * cfg->srcnum, energy, &status), status)));
         OCL_ASSERT(((gdetected[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint), &detected, &status), status)));
         OCL_ASSERT(((greporter[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(MCXReporter), &reporter, &status), status)));
 
@@ -509,6 +512,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         MMC_FPRINTF(cfg->flog, "- [device %d(%d): %s] threadph=%d oddphotons=%d np=%.1f nthread=%d nblock=%d repetition=%d\n", i, gpu[i].id, gpu[i].name, threadphoton, oddphotons,
                     cfg->nphoton * cfg->workload[i] / fullload, (int)gpu[i].autothread, (int)gpu[i].autoblock, cfg->respin);
 
+        MMC_FPRINTF(cfg->flog, "requesting %d bytes of shared memory\n", sharedmemsize * (int)gpu[i].autoblock);
+
         OCL_ASSERT(((mcxkernel[i] = clCreateKernel(mcxprogram, "mmc_main_loop", &status), status)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 0, sizeof(cl_uint), (void*)&threadphoton)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 1, sizeof(cl_uint), (void*)&oddphotons)));
@@ -556,8 +561,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
     }
 
-    cfg->energytot = 0.f;
-    cfg->energyesc = 0.f;
+    cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
+    cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
+    energytot = 0.0;
+    energyesc = 0.0;
     cfg->runtime = 0;
 
     //simulate for all time-gates in maxgate groups per run
@@ -636,13 +643,17 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 reporter.raytet += rep.raytet;
                 reporter.jumpdebug += rep.jumpdebug;
 
-                energy = (cl_float*)calloc(sizeof(cl_float), gpu[devid].autothread << 1);
-                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1),
+                energy = (cl_float*)calloc(sizeof(cl_float) * cfg->srcnum, gpu[devid].autothread << 1);
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1) * cfg->srcnum,
                                                 energy, 0, NULL, NULL)));
 
                 for (i = 0; i < gpu[devid].autothread; i++) {
-                    cfg->energyesc += energy[(i << 1)];
-                    cfg->energytot += energy[(i << 1) + 1];
+                    for (j = 0; j < cfg->srcnum; j++) {
+                        cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
+                        cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
+                        energyesc += energy[(i << 1) * cfg->srcnum + j];
+                        energytot += energy[((i << 1) + 1) * cfg->srcnum + j];
+                    }
                 }
 
                 free(energy);
@@ -707,6 +718,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdref[devid], CL_TRUE, 0, sizeof(float)*nflen,
                                                     rawdref, 0, NULL, NULL)));
 
+                    //TODO: saving dref has not yet adopting double-buffer
                     for (i = 0; i < nflen; i++) { //accumulate field, can be done in the GPU
                         dref[i] += rawdref[i];    //+rawfield[i+fieldlen];
                     }
@@ -724,7 +736,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                     mcx_fflush(cfg->flog);
 
                     for (i = 0; i < fieldlen; i++) { //accumulate field, can be done in the GPU
-                        field[i] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
+                        field[i] += rawfield[i] + rawfield[i + fieldlen];
                     }
 
                     free(rawfield);
@@ -754,15 +766,20 @@ is more than what your have specified (%d), please use the -H option to specify 
                 cfg->exportfield[i] += field[i];
             }
         } else {
-            for (i = 0; i < cfg->maxgate; i++)
-                for (j = 0; j < mesh->ne; j++) {
-                    float ww = field[i * mesh->ne + j] * 0.25f;
-                    int k;
+            int srcid;
 
-                    for (k = 0; k < mesh->elemlen; k++) {
-                        cfg->exportfield[i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1] += ww;
+            for (i = 0; i < cfg->maxgate; i++) {
+                for (j = 0; j < mesh->ne; j++) {
+                    for (srcid = 0; srcid < cfg->srcnum; srcid++) {
+                        float ww = field[(i * mesh->ne + j) * cfg->srcnum + srcid] * 0.25f;
+                        int k;
+
+                        for (k = 0; k < mesh->elemlen; k++) {
+                            cfg->exportfield[(i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1) * cfg->srcnum + srcid] += ww;
+                        }
                     }
                 }
+            }
         }
     }
 
@@ -773,11 +790,17 @@ is more than what your have specified (%d), please use the -H option to specify 
     }
 
     if (cfg->isnormalized) {
-        MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-        mcx_fflush(cfg->flog);
+        double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
-        cfg->energyabs = cfg->energytot - cfg->energyesc;
-        mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
+        for (j = 0; j < cfg->srcnum; j++) {
+            energyabs =  cfg->energytot[j] - cfg->energyesc[j];
+            cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
+            sum_normalizer += cur_normalizer;
+            MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
+                                   j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
+        }
+
+        cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
     }
 
 #ifndef MCX_CONTAINER
@@ -817,7 +840,7 @@ is more than what your have specified (%d), please use the -H option to specify 
     MMC_FPRINTF(cfg->flog, "simulated %zu photons (%zu) with %d devices (ray-tet %.0f)\nMCX simulation speed: %.2f photon/ms\n",
                 cfg->nphoton, cfg->nphoton, workdev, reporter.raytet, (double)cfg->nphoton / toc);
     MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
-                cfg->energytot, (cfg->energytot - cfg->energyesc) / cfg->energytot * 100.f);
+                energytot, (energytot - energyesc) / energytot * 100.f);
     mcx_fflush(cfg->flog);
 
     OCL_ASSERT(clReleaseMemObject(gprogress[0]));
@@ -899,6 +922,10 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(mcxkernel);
 
     free(waittoread);
+    free(cfg->energytot);
+    free(cfg->energyesc);
+    cfg->energytot = NULL;
+    cfg->energyesc = NULL;
 
     if (gpu) {
         free(gpu);

@@ -238,6 +238,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     uint hostdetreclen = detreclen + 1;
     // launch mcxkernel
     size_t sharedmemsize = 0;
+    double energytot = 0.0, energyesc = 0.0;
 
     MCXParam param = {make_float3(cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z),
                       make_float3(cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z),
@@ -280,7 +281,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                       cfg->bary0,
                       cfg->e0,
                       cfg->isextdet,
-                      (int)meshlen,
+                      (int)(meshlen / cfg->srcnum),
                       (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
                       (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
                       cfg->issaveseed,
@@ -295,6 +296,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     }
 
     param.reclen = sharedmemsize / sizeof(float);  //< the shared memory buffer length associated with detected photon
+
+    sharedmemsize += sizeof(float) * (cfg->srcnum << 1);   /**< store energyesc/energytot */
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
         sharedmemsize += sizeof(float) * cfg->srcnum;
@@ -332,8 +335,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             cfg->exportseed = (unsigned char*)malloc(cfg->maxdetphoton * (sizeof(RandType) * RAND_BUF_LEN));
         }
 
-        cfg->energytot = 0.f;
-        cfg->energyesc = 0.f;
+        cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
+        cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
         cfg->runtime = 0;
     }
     #pragma omp barrier
@@ -472,7 +475,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     *progress = 0;
 
     Pseed = (uint*)malloc(sizeof(uint) * gpu[gpuid].autothread * RAND_SEED_WORD_LEN);
-    energy = (float*)calloc(sizeof(float), gpu[gpuid].autothread << 1);
+    energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
 
     for (j = 0; j < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; j++) {
         Pseed[j] = rand();
@@ -499,9 +502,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&genergy,
-                           sizeof(float) * (gpu[gpuid].autothread << 1)));
+                           sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum));
     CUDA_ASSERT(cudaMemcpy(genergy, energy,
-                           sizeof(float) * (gpu[gpuid].autothread << 1),
+                           sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&gdetected, sizeof(uint)));
@@ -591,6 +594,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         MMC_FPRINTF(cfg->flog,
                     "lauching mcx_main_loop for time window [%.1fns %.1fns] ...\n",
                     twindow0 * 1e9, twindow1 * 1e9);
+
+        MMC_FPRINTF(cfg->flog, "requesting %ld bytes of shared memory\n", sharedmemsize);
+
         mcx_fflush(cfg->flog);
 
         // total number of repetition for the simulations, results will be
@@ -650,16 +656,21 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             reporter.raytet += rep.raytet;
             reporter.jumpdebug += rep.jumpdebug;
 
-            energy = (float*)calloc(sizeof(float), gpu[gpuid].autothread << 1);
+            energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
 
             CUDA_ASSERT(cudaMemcpy(energy, genergy,
-                                   sizeof(float) * (gpu[gpuid].autothread << 1),
+                                   sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
                                    cudaMemcpyDeviceToHost));
             #pragma omp critical
             {
+
                 for (i = 0; i < gpu[gpuid].autothread; i++) {
-                    cfg->energyesc += energy[(i << 1)];
-                    cfg->energytot += energy[(i << 1) + 1];
+                    for (j = 0; j < (uint) cfg->srcnum; j++) {
+                        cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
+                        cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
+                        energyesc += energy[(i << 1) * cfg->srcnum + j];
+                        energytot += energy[((i << 1) + 1) * cfg->srcnum + j];
+                    }
                 }
             }
 
@@ -784,7 +795,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
     #pragma omp master
     {
-        int i, j;
+        int i, j, srcid;
 
         if (cfg->exportfield) {
             if (cfg->basisorder == 0 || cfg->method == rtBLBadouelGrid) {
@@ -792,14 +803,18 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                     #pragma omp atomic
                     cfg->exportfield[i] += field[i];
             } else {
-                for (i = 0; i < cfg->maxgate; i++)
+                for (i = 0; i < cfg->maxgate; i++) {
                     for (j = 0; j < mesh->ne; j++) {
-                        float ww = field[i * mesh->ne + j] * 0.25f;
+                        for (srcid = 0; srcid < cfg->srcnum; srcid++) {
+                            float ww = field[(i * mesh->ne + j) * cfg->srcnum + srcid] * 0.25f;
+                            int k;
 
-                        for (int k = 0; k < mesh->elemlen; k++)
-                            cfg->exportfield[i * mesh->nn +
-                                               mesh->elem[j * mesh->elemlen + k] - 1] += ww;
+                            for (k = 0; k < mesh->elemlen; k++) {
+                                cfg->exportfield[(i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1) * cfg->srcnum + srcid] += ww;
+                            }
+                        }
                     }
+                }
             }
         }
 
@@ -810,11 +825,17 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
         }
 
         if (cfg->isnormalized) {
-            MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-            mcx_fflush(cfg->flog);
+            double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
-            cfg->energyabs = cfg->energytot - cfg->energyesc;
-            mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
+            for (j = 0; j < cfg->srcnum; j++) {
+                energyabs =  cfg->energytot[j] - cfg->energyesc[j];
+                cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
+                sum_normalizer += cur_normalizer;
+                MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
+                                       j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
+            }
+
+            cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
         }
 
 #ifndef MCX_CONTAINER
@@ -868,8 +889,8 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
         MMC_FPRINTF(cfg->flog,
                     "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to "
                     "initial specular reflection is excluded in the total)\n",
-                    cfg->energytot,
-                    (cfg->energytot - cfg->energyesc) / cfg->energytot * 100.f);
+                    energytot,
+                    (energytot - energyesc) / energytot * 100.f);
         mcx_fflush(cfg->flog);
     }
     #pragma omp barrier
@@ -913,9 +934,15 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
     CUDA_ASSERT(cudaFree(greporter));
 
     #pragma omp master
+    {
+        if (gpu) {
+            free(gpu);
+        }
 
-    if (gpu) {
-        free(gpu);
+        free(cfg->energytot);
+        free(cfg->energyesc);
+        cfg->energytot = NULL;
+        cfg->energyesc = NULL;
     }
 
     free(field);

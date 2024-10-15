@@ -47,6 +47,9 @@ inline __device__ __host__ int get_global_id(int idx) {
 inline __device__ __host__ int get_local_id(int idx) {
     return (idx == 0) ? threadIdx.x : ( (idx == 1) ? threadIdx.y : threadIdx.z );
 }
+inline __device__ __host__ int get_local_size(int idx) {
+    return (idx == 0) ? blockDim.x : ( (idx == 1) ? blockDim.y : blockDim.z );
+}
 inline __device__ __host__ float3 operator *(float3 a, float3 b) {
     return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
@@ -480,7 +483,6 @@ __device__ inline float atomicadd(volatile __global float* address, const float 
 
 #endif
 
-#ifdef MCX_SAVE_DETECTORS
 __device__ void clearpath(__local float* p, int len) {
     uint i;
 
@@ -489,6 +491,7 @@ __device__ void clearpath(__local float* p, int len) {
     }
 }
 
+#ifdef MCX_SAVE_DETECTORS
 __device__ uint finddetector(float3* p0, __constant float4* gmed, __constant MCXParam* gcfg) {
     uint i;
 
@@ -1443,7 +1446,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global floa
 
 __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXParam* gcfg, __global float3* node, __global int* elem, __global float* weight, __global float* dref,
                           __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal, __constant Medium* gmed,
-                          __global float* n_det, __global uint* detectedphoton, float* energytot, float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
+                          __global float* n_det, __global uint* detectedphoton, __local float* energytot, __local float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
                           __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata) {
 
     int oldeid, fixcount = 0;
@@ -1464,12 +1467,10 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     /*initialize the photon parameters*/
     launchnewphoton(gcfg, &r, node, elem, srcelem, ran, srcpattern);
-    *energytot += r.weight;
+
 #ifdef MCX_SAVE_DETECTORS
 
     if (GPU_PARAM(gcfg, issavedet)) {
-        clearpath(ppath, GPU_PARAM(gcfg, reclen));  /*clear shared memory for saving history of a new photon*/
-
         if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
             ppath[GPU_PARAM(gcfg, reclen) - 1] = r.weight; /*last record in partialpath is the initial photon weight*/
         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
@@ -1479,9 +1480,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
 #endif
 
-    if (GPU_PARAM(gcfg, srctype) == stPattern && GPU_PARAM(gcfg, srcnum) > 1) {
-        for (oldeid = 0; oldeid > GPU_PARAM(gcfg, srcnum); oldeid++) {
+    if (GPU_PARAM(gcfg, srcnum) == 1) {
+        *energytot += r.weight;
+    } else {
+        for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
             ppath[GPU_PARAM(gcfg, reclen) + oldeid] = srcpattern[r.posidx * GPU_PARAM(gcfg, srcnum) + oldeid];
+            energytot[oldeid] += r.weight * ppath[GPU_PARAM(gcfg, reclen) + oldeid];
         }
     }
 
@@ -1700,7 +1704,9 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         savedebugdata(&r, id, reporter, gdebugdata, gcfg);
     }
 
-    *energyesc += r.weight;
+    for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
+        energyesc[oldeid] += r.weight * ppath[GPU_PARAM(gcfg, reclen) + oldeid];
+    }
 }
 
 __kernel void mmc_main_loop(const int nphoton, const int ophoton,
@@ -1714,7 +1720,6 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
-    float  energyesc = 0.f, energytot = 0.f;
     int raytet = 0;
 
 #ifdef __NVCC__
@@ -1725,6 +1730,9 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
         gpu_rng_init(t, n_seed, idx);
     }
 
+    clearpath(sharedmem, get_local_size(0) * ((GPU_PARAM(gcfg, srcnum) << 1) +
+              (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum))));
+
     /*launch photons*/
     for (int i = 0; i < nphoton + (idx < ophoton); i++) {
         if (GPU_PARAM(gcfg, seed) == SEED_FROM_FILE)
@@ -1732,14 +1740,17 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
                 t[j] = replayseed[(idx * nphoton + MIN(idx, ophoton) + i) * RAND_BUF_LEN + j];
             }
 
-        onephoton(idx * nphoton + MIN(idx, ophoton) + i, sharedmem + get_local_id(0) *
-                  (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)), gcfg, node, elem,
-                  weight, dref, type, facenb, srcelem, normal, gmed, n_det, detectedphoton, &energytot, &energyesc, t, &raytet,
+        onephoton(idx * nphoton + MIN(idx, ophoton) + i, sharedmem + get_local_size(0) * (GPU_PARAM(gcfg, srcnum) << 1) +
+                  get_local_id(0) * (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)), gcfg, node, elem,
+                  weight, dref, type, facenb, srcelem, normal, gmed, n_det, detectedphoton, sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum),
+                  sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), t, &raytet,
                   srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata);
     }
 
-    energy[idx << 1] = energyesc;
-    energy[1 + (idx << 1)] = energytot;
+    for (int i = 0; i < GPU_PARAM(gcfg, srcnum); i++) {
+        energy[(idx << 1) * GPU_PARAM(gcfg, srcnum) + i] += sharedmem[(get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum) + i];
+        energy[((idx << 1) + 1) * GPU_PARAM(gcfg, srcnum) + i] += sharedmem[get_local_id(0) * GPU_PARAM(gcfg, srcnum) + i];
+    }
 
     if (GPU_PARAM(gcfg, debuglevel) & MCX_DEBUG_PROGRESS && progress) {
         atomic_inc(progress);
