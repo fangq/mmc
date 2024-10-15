@@ -276,12 +276,12 @@ typedef struct MMC_config {
     unsigned char* exportseed;     /*memory buffer when returning the RNG seed to matlab*/
     float* exportdetected;         /*memory buffer when returning the partial length info to external programs such as matlab*/
     float* exportdebugdata;        /**<pointer to the buffer where the photon trajectory data are stored*/
-    double energytot, energyabs, energyesc;
+    double* energytot;             /**<total energy launched for each source, a buffer of length srcnum */
+    double* energyesc;             /**<total energy escaped for each source, a buffer of length srcnum */
     unsigned int detectedcount;    /**<total number of detected photons*/
     unsigned int runtime;          /**<total simulation runtime in ms*/
     char autopilot;                /**<1 optimal setting for dedicated card, 2, for non dedicated card*/
     float normalizer;              /**<normalization factor*/
-    unsigned int nbuffer;          /**<2^nbuffer is the number of buffers for accummulation*/
     unsigned int gpuid;            /**<positive integer denotes the 1st/2nd/... OpenCL or CUDA devices, 0xFFFFFFFF for CPU only*/
     int compute;                   /**<0: sse, 1: opencl or 2: cuda*/
     char isdumpjson;               /**<1 to save json */
@@ -334,6 +334,7 @@ void mcx_convertcol2row4d(unsigned int** vol, uint4* dim);
 void mcx_savejdata(char* filename, mcconfig* cfg);
 int  mcx_jdataencode(void* vol,  int ndim, uint* dims, char* type, int byte, int zipid, void* obj, int isubj, int iscol, mcconfig* cfg);
 int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type, cJSON* obj, mcconfig* cfg);
+void mcx_convertrow2col(float* vol, uint3* dim);
 void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
 void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
 void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);

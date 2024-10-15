@@ -13,9 +13,6 @@ function varargout = mmc2json(cfg, filestub, varargin)
 %         mcxpreview supports the cfg input for both mcxlab and mmclab.
 %    filestub: the filestub is the name stub for all output files,including
 %         filestub.json: the JSON input file
-%         filestub_vol.bin: the volume file if cfg.vol is defined
-%         filestub_shapes.json: the domain shape file if cfg.shapes is defined
-%         filestub_pattern.bin: the domain shape file if cfg.pattern is defined
 %
 %         if filestub ends with '.json', then mmc2json saves the mesh data
 %         in the single-file mode, and the mesh information is stored
@@ -58,16 +55,7 @@ if (isfield(cfg, 'detpos') && ~isempty(cfg.detpos))
     end
 end
 if (isfield(cfg, 'srcpattern') && ~isempty(cfg.srcpattern))
-    Optode.Source.Pattern.Nx = size(cfg.srcpattern, 1);
-    Optode.Source.Pattern.Ny = size(cfg.srcpattern, 2);
-    Optode.Source.Pattern.Nz = size(cfg.srcpattern, 3);
-    Optode.Source.Pattern.Data = single(cfg.srcpattern);
-    if (~singlefile)
-        Optode.Source.Pattern.Data = [filestub '_pattern.bin'];
-        fid = fopen(Optode.Source.Pattern.Data, 'wb');
-        fwrite(fid, cfg.srcpattern, 'float32');
-        fclose(fid);
-    end
+    Optode.Source.Pattern = single(cfg.srcpattern);
 end
 
 %% define the domain and optical properties

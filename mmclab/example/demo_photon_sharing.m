@@ -16,7 +16,7 @@ cfg.prop = [0 0 1 1; 0.01 10 0.9 1.37];
 cfg.tstart = 0;
 cfg.tend = 5e-9;
 cfg.tstep = 1e-10;
-cfg.gpuid = -1;
+cfg.gpuid = 1;
 cfg.method = 'elem';
 cfg.debuglevel = 'TP';
 
@@ -30,7 +30,7 @@ pat(11:30, 11:30, 4) = 1; % pattern with bright square in the middle
 pat(16:25, :, 5) = 1;
 pat(:, 16:25, 5) = 1;     % pattern with a bright cross
 
-cfg.srcpattern = pat;
+cfg.srcpattern = permute(pat, [3 1 2]);
 
 %% run the simulation
 

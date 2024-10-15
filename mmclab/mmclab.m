@@ -105,8 +105,8 @@ function varargout = mmclab(varargin)
 %                                by srcpos, srcpos+srcparam1(1:3) and srcpos+srcparam2(1:3)
 %                      'pattern' - a 3D quadrilateral pattern illumination, same as above, except
 %                                srcparam1(4) and srcparam2(4) specify the pattern array x/y dimensions,
-%                                and srcpattern is a floating-point pattern array, with values between [0-1].
-%                                if cfg.srcnum>1, srcpattern must be a floating-point array with
+%                                and srcpattern is a double-precision pattern array, with values between [0-1].
+%                                if cfg.srcnum>1, srcpattern must be a 3-D double-precision array with
 %                                a dimension of [srcnum srcparam1(4) srcparam2(4)]
 %                                Example: <demo_photon_sharing.m>
 %                      'fourier' - spatial frequency domain source, similar to 'planar', except

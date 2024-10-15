@@ -321,12 +321,10 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->exportdetected = NULL;
     cfg->exportseed = NULL;
     cfg->detectedcount = 0;
-    cfg->energytot = 0.f;
-    cfg->energyabs = 0.f;
-    cfg->energyesc = 0.f;
+    cfg->energytot = NULL;
+    cfg->energyesc = NULL;
     cfg->runtime = 0;
     cfg->autopilot = 1;
-    cfg->nbuffer = 0;
     cfg->gpuid = 0;
     cfg->maxjumpdebug = 10000000;
     cfg->exportdebugdata = NULL;
@@ -420,6 +418,14 @@ void mcx_clearcfg(mcconfig* cfg) {
 
     if (cfg->roidata) {
         free(cfg->roidata);
+    }
+
+    if (cfg->energytot) {
+        free(cfg->energytot);
+    }
+
+    if (cfg->energyesc) {
+        free(cfg->energyesc);
     }
 
 #ifndef MCX_EMBED_CL
@@ -1583,6 +1589,8 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                     if (ndim == 3 && dims[2] > 1 && dims[0] > 1 && cfg->srctype == MCX_SRC_PATTERN) {
                         cfg->srcnum = dims[0];
                     }
+
+                    mcx_convertrow2col(cfg->srcpattern, (uint3*)dims);
                 } else {
                     int nx = FIND_JSON_KEY("Nx", "Optode.Source.Pattern.Nx", subitem, 0, valueint);
                     int ny = FIND_JSON_KEY("Ny", "Optode.Source.Pattern.Ny", subitem, 0, valueint);
@@ -2777,6 +2785,35 @@ int mcx_isbinstr(const char* str) {
     return 1;
 }
 
+/**
+ * @brief Convert a row-major (C/C++) array to a column-major (MATLAB/FORTRAN) array
+ *
+ * @param[in,out] vol: a 3D array (wrapped in 1D) to be converted
+ * @param[in] dim: the dimensions of the 3D array
+ */
+
+void  mcx_convertrow2col(float* vol, uint3* dim) {
+    uint x, y, z;
+    unsigned int dimxy, dimyz;
+    float* newvol = NULL;
+
+    if (vol == NULL || dim->x == 0 || dim->y == 0 || dim->z == 0) {
+        return;
+    }
+
+    newvol = (float*)malloc(sizeof(float) * dim->x * dim->y * dim->z);
+    dimxy = dim->x * dim->y;
+    dimyz = dim->y * dim->z;
+
+    for (x = 0; x < dim->x; x++)
+        for (y = 0; y < dim->y; y++)
+            for (z = 0; z < dim->z; z++) {
+                newvol[z * dimxy + y * dim->x + x] = vol[x * dimyz + y * dim->z + z];
+            }
+
+    memcpy(vol, newvol, sizeof(float) * dim->x * dim->y * dim->z);
+    free(newvol);
+}
 
 /**
  * @brief Validate all input fields, and warn incompatible inputs
@@ -2846,10 +2883,6 @@ void mcx_validatecfg(mcconfig* cfg) {
 
     if (cfg->implicit && (int)(cfg->gpuid) >= 0) {
         MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
-    }
-
-    if (cfg->srcnum > 1 && (int)(cfg->gpuid) >= 0) {
-        MMC_ERROR(-2, "Photon-sharing MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
     }
 
     for (i = 0; i < MAX_DEVICE; i++)
@@ -3216,8 +3249,6 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         i = mcx_readarg(argc, argv, i, &(cfg->debugphoton), "int");
                     } else if (strcmp(argv[i] + 2, "maxjumpdebug") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->maxjumpdebug), "int");
-                    } else if (strcmp(argv[i] + 2, "buffer") == 0) {
-                        i = mcx_readarg(argc, argv, i, &(cfg->nbuffer), "int");
                     } else if (strcmp(argv[i] + 2, "gridsize") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->steps.x), "float");
                         cfg->steps.y = cfg->steps.x;
