@@ -1704,8 +1704,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         savedebugdata(&r, id, reporter, gdebugdata, gcfg);
     }
 
-    for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
-        energyesc[oldeid] += r.weight * ppath[GPU_PARAM(gcfg, reclen) + oldeid];
+    if (GPU_PARAM(gcfg, srcnum) == 1) {
+        *energyesc += r.weight;
+    } else {
+        for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
+            energyesc[oldeid] += r.weight * ppath[GPU_PARAM(gcfg, reclen) + oldeid];
+        }
     }
 }
 
