@@ -328,7 +328,7 @@ typedef struct MMC_Parameter {
     float4 bary0;
     int    e0;
     int    isextdet;
-    int    framelen;
+    uint   framelen;
     uint   maxpropdet;
     uint   normbuf;
     int    issaveseed;
@@ -484,7 +484,7 @@ __device__ inline float atomicadd(volatile __global float* address, const float 
 #endif
 
 __device__ void clearpath(__local float* p, int len) {
-    uint i;
+    int i;
 
     for (i = 0; i < len; i++) {
         p[i] = 0.f;
@@ -1474,7 +1474,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
             ppath[GPU_PARAM(gcfg, reclen) - 1] = r.weight; /*last record in partialpath is the initial photon weight*/
         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
-            *((uint*)(ppath + GPU_PARAM(gcfg, reclen) - 1)) = r.posidx;
+            *((__local uint*)(ppath + GPU_PARAM(gcfg, reclen) - 1)) = r.posidx;
         }
     }
 
