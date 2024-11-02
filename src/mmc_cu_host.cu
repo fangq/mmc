@@ -281,7 +281,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                       cfg->bary0,
                       cfg->e0,
                       cfg->isextdet,
-                      (int)(meshlen / cfg->srcnum),
+                      (uint)(meshlen / cfg->srcnum),
                       (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
                       (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
                       cfg->issaveseed,

@@ -1,6 +1,6 @@
 ########################################################
 #  MMC: Mesh-based Monte Carlo
-#  Copyright (C) 2009 Qianqian Fang 
+#  Copyright (C) 2009-2024 Qianqian Fang
 #                    <q.fang at neu.edu>
 #
 #  $Id$
@@ -176,14 +176,14 @@ ifeq ($(CC),clang)
         OPENMPLIB:= -lomp
 endif
 
-ifneq (,$(filter mex,$(MAKECMDGOALS)))
+ifneq (,$(filter $(MAKECMDGOALS),mex cudamex))
         CCFLAGS+=-DMATLAB_MEX_FILE
 endif
 
-ARFLAGS    := 
+ARFLAGS    :=
 
 OBJSUFFIX  := .o
-BINSUFFIX  := 
+BINSUFFIX  :=
 CLHEADER=.clh
 
 OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
@@ -231,8 +231,8 @@ debug:     CUCCOPT+=-DMCX_DEBUG
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 ifeq ($(TARGETSUFFIX),.so)
-	CCFLAGS+= $(DLLFLAG) 
-	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1 
+	CCFLAGS+= $(DLLFLAG)
+	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1
 endif
 
 ifeq ($(TARGETSUFFIX),.a)

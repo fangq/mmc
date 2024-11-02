@@ -15,8 +15,7 @@ header3;
 data1 = data1(data1(:, 1) == 1, :);
 
 % the two sets of captured photons should be identical
-if (all(ismember(round(data1 * 1e10) * 1e-10, round(data2 * 1e10) * 1e-10, 'rows')) && ...
-    all(ismember(round(data1 * 1e10) * 1e-10, round(data2 * 1e10) * 1e-10, 'rows')))
+if (all(ismember(round(data1 * 1e10) * 1e-10, round(data2 * 1e10) * 1e-10, 'rows')))
     disp('replay is successful :-)');
 else
     disp('replay failed :-(');
