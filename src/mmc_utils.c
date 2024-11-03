@@ -3169,6 +3169,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
 
                 case 'H':
                     i = mcx_readarg(argc, argv, i, &(cfg->maxdetphoton), "int");
+                    break;
 
                 case 'A':
                     i = mcx_readarg(argc, argv, i, &(cfg->autopilot), "int");
