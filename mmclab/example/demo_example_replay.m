@@ -36,6 +36,7 @@ cfg.detpos = [30. 20. 0. 1.
 cfg.issaveexit = 1;  % save detected photon exit position and angles
 cfg.issaveseed = 1;  % save detected photon seeds to replay later
 % cfg.method=0;
+cfg.compute='cuda';
 
 newcfg = mmclab(cfg, 'prep');  % preprocessing of the mesh to get the missing fields
 
