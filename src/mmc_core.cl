@@ -1673,24 +1673,11 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
 
                 if (r.eid <= 0) {
+
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
-
-                    if (GPU_PARAM(gcfg, issaveseed)) {
-                        if (GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) {
-                            savedetphoton(n_det, detectedphoton, ppath, &r, gmed, oldeid, gcfg, photonseed, initseed);
-                        } else {
-                            savedetphoton(n_det, detectedphoton, ppath, &r, gmed, -1, gcfg, photonseed, initseed);
-                        }
-                    }
-
+                    savedetphoton(n_det, detectedphoton, ppath, &r, gmed, ((GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) ? oldeid : -1), gcfg, photonseed, initseed);
 #else
-
-                    if (GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) {
-                        savedetphoton(n_det, detectedphoton, ppath, &r, gmed, oldeid, gcfg, photonseed, NULL);
-                    } else {
-                        savedetphoton(n_det, detectedphoton, ppath, &r, gmed, -1, gcfg, photonseed, NULL);
-                    }
-
+                    savedetphoton(n_det, detectedphoton, ppath, &r, gmed, ((GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) ? oldeid : -1), gcfg, photonseed, NULL);
 #endif
                 }
 
