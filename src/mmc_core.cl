@@ -417,7 +417,7 @@ __device__ static float xorshift128p_nextf (__private RandType t[RAND_BUF_LEN]) 
 
     return s1.f[0] - 1.0f;
 }
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 __device__ static void copystate(__local float* v1, __private float* v2, int len) {
     for (int i = 0; i < len; i++) {
         v1[i] = v2[i];
@@ -491,7 +491,7 @@ __device__ void clearpath(__local float* p, int len) {
     }
 }
 
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 __device__ uint finddetector(float3* p0, __constant float4* gmed, __constant MCXParam* gcfg) {
     uint i;
 
@@ -516,11 +516,20 @@ __device__ void savedetphoton(__global float* n_det, __global uint* detectedphot
 
         if (baseaddr < GPU_PARAM(gcfg, maxdetphoton)) {
             uint i;
-#ifdef MCX_SAVE_SEED
+#if defined(MCX_SAVE_SEED) || defined(__NVCC__)
+#ifdef __NVCC__
 
-            for (i = 0; i < RAND_BUF_LEN; i++) {
-                photonseed[baseaddr * RAND_BUF_LEN + i] = initseed[i];
+            if (GPU_PARAM(gcfg, issaveseed)) {
+#endif
+
+                for (i = 0; i < RAND_BUF_LEN; i++) {
+                    photonseed[baseaddr * RAND_BUF_LEN + i] = initseed[i];
+                }
+
+#ifdef __NVCC__
             }
+
+#endif
 
 #endif
             baseaddr *= (GPU_PARAM(gcfg, reclen) + 1);
@@ -1451,8 +1460,8 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     int oldeid, fixcount = 0;
     ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f};
-#ifdef MCX_SAVE_SEED
-    RandType initseed[RAND_BUF_LEN];
+#if defined(MCX_SAVE_SEED) || defined(__NVCC__)
+    RandType initseed[RAND_BUF_LEN] = {NULL};
 #endif
 
     clearpath(ppath, (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)));
@@ -1461,26 +1470,43 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     r.photonid = id;
 
-#ifdef MCX_SAVE_SEED
+#if defined(MCX_SAVE_SEED) || defined(__NVCC__)
 
-    for (oldeid = 0; oldeid < RAND_BUF_LEN; oldeid++) {
-        initseed[oldeid] = ran[oldeid];
+#ifdef __NVCC__
+
+    if (GPU_PARAM(gcfg, issaveseed)) {
+#endif
+
+        for (oldeid = 0; oldeid < RAND_BUF_LEN; oldeid++) {
+            initseed[oldeid] = ran[oldeid];
+        }
+
+#ifdef __NVCC__
     }
+
+#endif
 
 #endif
 
     /*initialize the photon parameters*/
     launchnewphoton(gcfg, &r, node, elem, srcelem, ran, srcpattern);
 
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
+#ifdef __NVCC__
 
     if (GPU_PARAM(gcfg, issavedet)) {
+#endif
+
         if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
             ppath[GPU_PARAM(gcfg, reclen) - 1] = r.weight; /*last record in partialpath is the initial photon weight*/
         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
             *((__local uint*)(ppath + GPU_PARAM(gcfg, reclen) - 1)) = r.posidx;
         }
+
+#ifdef __NVCC__
     }
+
+#endif
 
 #endif
 
@@ -1518,7 +1544,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             r.faceid = -1;
         }
 
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
         if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
             ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;    /*second medianum block is the partial path*/
@@ -1576,7 +1602,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
             r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime);
             (*raytet)++;
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
             if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
                 ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
@@ -1594,7 +1620,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
                 r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime);
                 (*raytet)++;
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
                 if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
                     ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
@@ -1618,7 +1644,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 //if(GPU_PARAM(gcfg,debuglevel)&dlExit)
                 GPUDEBUG(("E %f %f %f %f %f %f %f %d\n", r.p0.x, r.p0.y, r.p0.z,
                           r.vec.x, r.vec.y, r.vec.z, r.weight, r.eid));
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
                 if (GPU_PARAM(gcfg, issavedet) && GPU_PARAM(gcfg, issaveexit)) {                                 /*when issaveexit is set to 1*/
                     copystate(ppath + (GPU_PARAM(gcfg, reclen) - 7), (__private float*) & (r.p0), 3); /*columns 7-5 from the right store the exit positions*/
@@ -1640,16 +1666,21 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 GPUDEBUG(("X %f %f %f %d %u %e\n", r.p0.x, r.p0.y, r.p0.z, r.eid, id, r.slen));
             }
 
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
+#ifdef __NVCC__
 
             if (GPU_PARAM(gcfg, issavedet)) {
-                if (r.eid <= 0) {
-#ifdef MCX_SAVE_SEED
+#endif
 
-                    if (GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) {
-                        savedetphoton(n_det, detectedphoton, ppath, &r, gmed, oldeid, gcfg, photonseed, initseed);
-                    } else {
-                        savedetphoton(n_det, detectedphoton, ppath, &r, gmed, -1, gcfg, photonseed, initseed);
+                if (r.eid <= 0) {
+#if defined(MCX_SAVE_SEED) || defined(__NVCC__)
+
+                    if (GPU_PARAM(gcfg, issaveseed)) {
+                        if (GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) {
+                            savedetphoton(n_det, detectedphoton, ppath, &r, gmed, oldeid, gcfg, photonseed, initseed);
+                        } else {
+                            savedetphoton(n_det, detectedphoton, ppath, &r, gmed, -1, gcfg, photonseed, initseed);
+                        }
                     }
 
 #else
@@ -1662,7 +1693,11 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
 #endif
                 }
+
+#ifdef __NVCC__
             }
+
+#endif
 
 #endif
             break;  /*photon exits boundary*/
@@ -1689,7 +1724,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             savedebugdata(&r, id, reporter, gdebugdata, gcfg);
         }
 
-#ifdef MCX_SAVE_DETECTORS
+#if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
         if (GPU_PARAM(gcfg, issavedet)) {
             if (GPU_PARAM(gcfg, ismomentum) && type[r.eid - 1] > 0) {             /*when ismomentum is set to 1*/

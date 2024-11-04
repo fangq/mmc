@@ -36,7 +36,6 @@ cfg.detpos = [30. 20. 0. 1.
 cfg.issaveexit = 1;  % save detected photon exit position and angles
 cfg.issaveseed = 1;  % save detected photon seeds to replay later
 % cfg.method=0;
-cfg.compute='cuda';
 
 newcfg = mmclab(cfg, 'prep');  % preprocessing of the mesh to get the missing fields
 
@@ -82,7 +81,7 @@ shading interp;
 % set up for wp replay
 
 newcfg.outputtype = 'wp';    % replay and get wp
-[cube3, detp3, ~, ~] = mmclab(newcfg);
+[cube3, detp3] = mmclab(newcfg);
 
 % the two detected photon arrays should be the same. however, because
 % the program uses multi-threading, the orders may be different

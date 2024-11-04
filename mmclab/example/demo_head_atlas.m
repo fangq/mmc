@@ -6,11 +6,11 @@
 % for Fig.9(a) in TranYan2019(submitted). For simplicity, a coarse mesh (lower
 % sampling rate) that represents part of the head(z>155) is simulated.
 %
-% [Sanchez2012] C.E.Sanchez J.E.Richards and C.R.Almli, “Age-Specific MRI Templates
-% for Pediatric Neuroimaging,” Developmental Neuropsychology 37, 379–399 (2012).
+% [Sanchez2012] C.E.Sanchez J.E.Richards and C.R.Almli, "Age-Specific MRI Templates
+% for Pediatric Neuroimaging," Developmental Neuropsychology 37, 379–399 (2012).
 %
-% [Yan2019] S.Yan, A.P.Tran, and Q.Fang, “Dual-grid mesh-based monte carlo algorithm
-% for efficient photon transport simulations in complex three-dimensional media,”
+% [Yan2019] S.Yan, A.P.Tran, and Q.Fang, "Dual-grid mesh-based monte carlo algorithm
+% for efficient photon transport simulations in complex three-dimensional media,"
 % Journal of Biomedical Optics 24(2), 020503 (2019).
 %
 % [TranYan2019] A.P.Tran, S.Yan and Q.Fang, "Improving model-based fNIRS

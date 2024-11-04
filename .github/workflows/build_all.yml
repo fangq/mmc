@@ -14,7 +14,7 @@ jobs:
     name: Build All
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, macos-12, macos-14, windows-2019]
+        os: [ubuntu-20.04, ubuntu-22.04, macos-13, macos-14, windows-2019]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -164,7 +164,7 @@ jobs:
             zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
           fi
       - name: Upload mmclab package
-        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: all-mmc-packages
@@ -184,7 +184,7 @@ jobs:
             zip -FSr --symlink mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -x 'mmc/packages*'
           fi
       - name: Upload mmc package
-        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-12' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'windows-2019' }}
         uses: actions/upload-artifact@v3
         with:
           name: all-mmc-packages

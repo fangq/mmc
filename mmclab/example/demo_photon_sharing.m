@@ -5,7 +5,7 @@
 %% prepare simulation input
 
 cfg.nphoton = 3e6;
-[cfg.node face cfg.elem] = meshabox([0 0 0], [60 60 20], 2, 2);
+[cfg.node, face, cfg.elem] = meshabox([0 0 0], [60 60 20], 2, 2);
 cfg.elemprop = ones(size(cfg.elem, 1), 1);
 cfg.srcpos = [10 10 -2];
 cfg.srcdir = [0 0 1];
@@ -38,7 +38,7 @@ cfg.srcpattern = permute(pat, [3 1 2]);
 
 %% plot results (same as in the mmc example)
 
-[node, ~, elem] = meshabox([0 0 0], [60 60 20], 2, 2);
+[node, face, elem] = meshabox([0 0 0], [60 60 20], 2, 2);
 data = flux.data(:, 1:length(node), :);
 cwdata = squeeze(sum(data, 3));
 
