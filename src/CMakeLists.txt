@@ -155,14 +155,23 @@ if(BUILD_CUDA)
       OpenCL::OpenCL
       )
 
-  target_compile_definitions(mmc-trinity PUBLIC USE_CUDA)
+  target_compile_definitions(mmc-trinity PUBLIC USE_CUDA USE_BLBADOUEL USE_ATOMIC MCX_SAVE_DETECTORS MCX_DO_REFLECTION USE_DMMC)
   add_dependencies(mmc-trinity mmc mmc-cuda)
+
+  # Create mmc library
+  cuda_add_library(mmclab-cudahost STATIC
+        mmc_cu_host.cu
+        mmc_cu_host.h
+        mmc_utils.c
+        mmc_utils.h
+        )
+  target_compile_definitions(mmclab-cudahost PUBLIC USE_CUDA USE_BLBADOUEL USE_ATOMIC MCX_SAVE_DETECTORS MCX_DO_REFLECTION USE_DMMC MCX_CONTAINER)
 
   set_target_properties(mmc-trinity
         PROPERTIES OUTPUT_NAME mmciii)
   #static link libraries
-  set_target_properties(mmc-trinity PROPERTIES LINK_SEARCH_START_STATIC 1)
-  set_target_properties(mmc-trinity PROPERTIES LINK_SEARCH_END_STATIC 1)
+  #set_target_properties(mmc-trinity PROPERTIES LINK_SEARCH_START_STATIC 1)
+  #set_target_properties(mmc-trinity PROPERTIES LINK_SEARCH_END_STATIC 1)
 endif()
 
 # Build mex file
@@ -218,18 +227,42 @@ if(BUILD_MEX AND Matlab_FOUND)
     add_dependencies(mmclab clheader)
 
     if(BUILD_CUDA)
+    # Create mcx-matlab library
+        add_library(mmclab-cuda STATIC
+                mmc_utils.c
+                mmc_utils.h
+                mmc_mesh.c
+                mmc_mesh.h
+                mmc_host.c
+                mmc_host.h
+                mmc_raytrace.c
+                mmc_raytrace.h
+                mmc_rand_xorshift128p.c
+                mmc_rand_xorshift128p.h
+                mmc_bench.h
+                mmc_bench.c
+                mmc_tictoc.c
+                mmc_tictoc.h
+                mmc_cl_utils.c
+                mmc_cl_utils.h
+                mmc_cl_host.c
+                mmc_cl_host.h
+                mmc_highorder.cpp
+                )
+        target_compile_definitions(mmclab-cuda PUBLIC MCX_CONTAINER MATLAB_MEX_FILE USE_CUDA USE_OS_TIMER MMC_XORSHIFT MMC_USE_SSE HAVE_SSE2)
+
         if(${CMAKE_VERSION} VERSION_LESS "3.24.0")
                 matlab_add_mex(
                   NAME mmclab-trinity
                   SRC mmclab.cpp
-                  LINK_TO mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
+                  LINK_TO mmclab-cudahost mmclab-cuda OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
                 )
         else()
                 matlab_add_mex(
                   NAME mmclab-trinity
                   SRC mmclab.cpp
                   NO_IMPLICIT_LINK_TO_MATLAB_LIBRARIES
-                  LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} mmc-cuda mmc-matlab OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
+                  LINK_TO ${Matlab_MEX_LIBRARY} ${Matlab_MX_LIBRARY} mmclab-cudahost mmclab-cuda OpenMP::OpenMP_CXX OpenCL::OpenCL zmat
                 )
         endif()
 
