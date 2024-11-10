@@ -1,7 +1,7 @@
 {
     "Mesh": {
 	"MeshID": "mesh1",
-	"InitElem": 5
+	"InitElem": 3
     },
     "Session": {
 	"Photons":  1000000,

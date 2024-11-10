@@ -246,6 +246,11 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
     mesh_loadnode(mesh, cfg);
     mesh_loadelem(mesh, cfg);
 
+    if (cfg->isdumpjson == 1) {
+        mcx_savejdata(cfg->jsonfile, cfg);
+        exit(0);
+    }
+
     if (cfg->basisorder == 2) {
         mesh_10nodetet(mesh, cfg);
     }

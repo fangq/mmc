@@ -1741,8 +1741,12 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             MMC_ERROR(-2, "the specified output format is not recognized");
         }
 
-        if (cfg->debuglevel == 0) {
-            cfg->debuglevel = mcx_parsedebugopt((char*)FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, "", valuestring));
+        if (!flagset['D']) {
+            if (FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, "", valuestring)) {
+                cfg->debuglevel = mcx_parsedebugopt(FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, "", valuestring), debugflag);
+            } else {
+                cfg->debuglevel = FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, 0, valueint);
+            }
         }
 
         if (!flagset['M']) {
@@ -1797,6 +1801,11 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
     if (cfg->e0 == 0) {
         MMC_ERROR(-1, "InitElem must be given");
+    }
+
+    if (cfg->isdumpjson == 3) {
+        mcx_savejdata(cfg->jsonfile, cfg);
+        exit(0);
     }
 
     return 0;
@@ -2163,7 +2172,13 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     }
 
     cJSON_AddNumberToObject(obj, "DebugFlag", cfg->debuglevel);
-    cJSON_AddNumberToObject(obj, "SaveDataMask", cfg->savedetflag);
+    cJSON_AddNumberToObject(obj, "BasisOrder", cfg->basisorder);
+
+    {
+        char cflag[2] = {'\0', '\0'};
+        cflag[0] = raytracing[(int)cfg->method];
+        cJSON_AddStringToObject(obj, "RayTracer", cflag);
+    }
 
     if (cfg->outputformat >= 0) {
         cJSON_AddStringToObject(obj, "OutputFormat", outputformat[(int)cfg->outputformat]);
@@ -2180,6 +2195,10 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     cJSON_AddNumberToObject(obj, "T0", cfg->tstart);
     cJSON_AddNumberToObject(obj, "T1", cfg->tend);
     cJSON_AddNumberToObject(obj, "Dt", cfg->tstep);
+
+    if (cfg->nout > 1.f) {
+        cJSON_AddNumberToObject(obj, "N0", cfg->nout);
+    }
 
     /* the "Domain" section */
     cJSON_AddItemToObject(root, "Domain", obj = cJSON_CreateObject());
@@ -2219,22 +2238,44 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
         cJSON_AddNumberToObject(tmp, "R", cfg->detpos[i].w);
     }
 
-    /* save "Shapes" constructs, prioritize over saving volume for smaller size */
-    if (cfg->shapedata) {
-        cJSON* shape = cJSON_Parse(cfg->shapedata), *sp;
+    /* save "Shapes" constructs, containing InitElem, MeshNode, MeshElem, and MeshROI */
+    cJSON_AddItemToObject(root, "Shapes", obj = cJSON_CreateObject());
 
-        if (shape == NULL) {
-            MMC_ERROR(-1, "the input shape construct is not a valid JSON object");
+    if (cfg->meshtag[0]) {
+        cJSON_AddStringToObject(obj, "MeshID", cfg->meshtag);
+    } else {
+        uint dims[2] = {0};
+        cJSON_AddItemToObject(obj, "MeshNode", sub = cJSON_CreateObject());
+
+        dims[0] = cfg->nodenum;
+        dims[1] = 3;
+
+        if (mcx_jdataencode((void*)cfg->node, 2, dims, "single", 4, cfg->zipid, sub, 0, 0, cfg)) {
+            MMC_ERROR(-10, "saving node data to JSON failed");
         }
 
-        sp = FIND_JSON_OBJ("Shapes", "Shapes", shape);
+        cJSON_AddItemToObject(obj, "MeshElem", sub = cJSON_CreateObject());
 
-        if (sp == NULL) {
-            sp = shape;
+        dims[0] = cfg->elemnum;
+        dims[1] = cfg->elemlen + 1;
+
+        if (mcx_jdataencode((void*)cfg->elem, 2, dims, "int32", 4, cfg->zipid, sub, 0, 0, cfg)) {
+            MMC_ERROR(-10, "saving elem data to JSON failed");
         }
 
-        cJSON_AddItemToObject(root, "Shapes", sp);
+        if (cfg->roidata) {
+            cJSON_AddItemToObject(obj, "MeshROI", sub = cJSON_CreateObject());
+
+            dims[0] = (cfg->roitype == rtNode ? cfg->nodenum : cfg->elemnum);
+            dims[1] = (cfg->roitype == rtNode ? 1 : (cfg->roitype == rtEdge ? 6 : 4));
+
+            if (mcx_jdataencode((void*)cfg->roidata, 2, dims, "single", 4, cfg->zipid, sub, 0, 0, cfg)) {
+                MMC_ERROR(-10, "saving mesh ROI data to JSON failed");
+            }
+        }
     }
+
+    cJSON_AddNumberToObject(obj, "InitElem", cfg->e0);
 
     /* now save JSON to file */
     jsonstr = cJSON_Print(root);
@@ -2523,10 +2564,10 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
  * This function converts the string debug flags into number format
  *
  * @param[in] debugopt: string following the -D parameter
- * @return debugflag: the numerical format of the debug flag
+ * @param[out] debugflag: the numerical format of the debug flag
  */
 
-int mcx_parsedebugopt(char* debugopt) {
+int mcx_parsedebugopt(char* debugopt, const char* debugflag) {
     char* c = debugopt, *p;
     int debuglevel = 0;
 
@@ -2919,6 +2960,7 @@ void mcx_prep(mcconfig* cfg) {
         cfg->savedetflag = SET_SAVE_PEXIT(cfg->savedetflag);
         cfg->savedetflag = SET_SAVE_VEXIT(cfg->savedetflag);
     }
+
 }
 
 #ifndef MCX_CONTAINER
@@ -3156,7 +3198,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
 
                 case 'D':
                     if (i + 1 < argc && isalpha((int)argv[i + 1][0]) ) {
-                        cfg->debuglevel = mcx_parsedebugopt(argv[++i]);
+                        cfg->debuglevel = mcx_parsedebugopt(argv[++i], debugflag);
                     } else {
                         i = mcx_readarg(argc, argv, i, &(cfg->debuglevel), "int");
                     }
