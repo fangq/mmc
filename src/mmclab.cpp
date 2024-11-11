@@ -87,6 +87,8 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
 void mmc_validate_config(mcconfig* cfg, tetmesh* mesh);
 void mmclab_usage();
 
+extern const char debugflag[];
+
 /** @brief Mex function for the MMC host function for MATLAB/Octave
  *  This is the master function to interface all MMC features inside MATLAB.
  *  In MMCLAB, all inputs are read from the cfg structure, which contains all
@@ -729,7 +731,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
             mexWarnMsgTxt("not enough space. string is truncated.");
         }
 
-        cfg->debuglevel = mcx_parsedebugopt(buf);
+        cfg->debuglevel = mcx_parsedebugopt(buf, debugflag);
         printf("mmc.debuglevel='%s';\n", buf);
     } else if (strcmp(name, "srctype") == 0) {
         int len = mxGetNumberOfElements(item);

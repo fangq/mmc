@@ -27,7 +27,11 @@ function savemmcmesh(key, node, elem, varargin)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-opt = varargin2struct(varargin{:});
+if(~isempty(varargin) && ischar(varargin{1}))
+    opt = varargin2struct(varargin{:});
+else
+    opt = struct;
+end
 
 if (nargin < 5 || isempty(jsonopt('evol', [], opt)))
     evol = elemvolume(node, elem(:, 1:4));

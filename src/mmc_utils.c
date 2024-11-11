@@ -2241,9 +2241,9 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     /* save "Shapes" constructs, containing InitElem, MeshNode, MeshElem, and MeshROI */
     cJSON_AddItemToObject(root, "Shapes", obj = cJSON_CreateObject());
 
-    if (cfg->meshtag[0]) {
+    if (cfg->meshtag[0] && cfg->nodenum == 0) {
         cJSON_AddStringToObject(obj, "MeshID", cfg->meshtag);
-    } else {
+    } else if (cfg->nodenum && cfg->elemnum) {
         uint dims[2] = {0};
         cJSON_AddItemToObject(obj, "MeshNode", sub = cJSON_CreateObject());
 
@@ -2273,6 +2273,8 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
                 MMC_ERROR(-10, "saving mesh ROI data to JSON failed");
             }
         }
+    } else {
+        MMC_ERROR(-10, "incomplete mesh data");
     }
 
     cJSON_AddNumberToObject(obj, "InitElem", cfg->e0);
