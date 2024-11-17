@@ -914,6 +914,96 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
 #endif
 
 /**
+ * @brief Scan all tetrahedral elements to find the one enclosing the source
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ *
+ * @return 0 if an enclosing element is found, 1 if not found
+ */
+
+int mesh_initelem(tetmesh* mesh, mcconfig* cfg) {
+    FLOAT3* nodes = mesh->node;
+    int i, j;
+
+    for (i = 0; i < mesh->ne; i++) {
+        float3 pmin = {VERY_BIG, VERY_BIG, VERY_BIG}, pmax = {-VERY_BIG, -VERY_BIG, -VERY_BIG};
+        int* elems = (int*)(mesh->elem + i * mesh->elemlen); // convert int4* to int*
+
+        for (j = 0; j < mesh->elemlen; j++) {
+            pmin.x = MIN(nodes[elems[0] - 1].x, pmin.x);
+            pmin.y = MIN(nodes[elems[0] - 1].y, pmin.y);
+            pmin.z = MIN(nodes[elems[0] - 1].z, pmin.z);
+
+            pmax.x = MAX(nodes[elems[0] - 1].x, pmax.x);
+            pmax.y = MAX(nodes[elems[0] - 1].y, pmax.y);
+            pmax.z = MAX(nodes[elems[0] - 1].z, pmax.z);
+        }
+
+        if (cfg->srcpos.x <= pmax.x && cfg->srcpos.x >= pmin.x &&
+                cfg->srcpos.y <= pmax.y && cfg->srcpos.y >= pmin.y &&
+                cfg->srcpos.z <= pmax.z && cfg->srcpos.z >= pmin.z) {
+            if (mesh_barycentric(i + 1, &(cfg->bary0.x), (FLOAT3*) & (cfg->srcpos), mesh) == 0) {
+                cfg->e0 = i + 1;
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
+
+/**
+ * @brief Compute the barycentric coordinate of the source in the initial element
+ *
+ * @param[in] e0: the index (start from 1) of the initial element
+ * @param[in] bary: the index (start from 1) of the initial element
+ * @param[in] srcpos: the source position
+ * @param[in] mesh: the mesh of the domain
+ *
+ * @return 0 if all barycentric coordinates are computed and all positive, or 1 any of those is negative
+ */
+
+int mesh_barycentric(int e0, float* bary, FLOAT3* srcpos, tetmesh* mesh) {
+    int eid = e0 - 1, i;
+    FLOAT3 vecS = {0.f}, vecAB, vecAC, vecN;
+    FLOAT3* nodes = mesh->node;
+    int ea, eb, ec;
+    float s = 0.f;
+    int* elems = (int*)(mesh->elem + eid * mesh->elemlen); // convert int4* to int*
+
+    if (eid >= mesh->ne) {
+        MESH_ERROR("initial element index exceeds total element count");
+    }
+
+    for (i = 0; i < 4; i++) {
+        ea = elems[out[i][0]] - 1;
+        eb = elems[out[i][1]] - 1;
+        ec = elems[out[i][2]] - 1;
+        vec_diff3(&nodes[ea], &nodes[eb], &vecAB);
+        vec_diff3(&nodes[ea], &nodes[ec], &vecAC);
+        vec_diff3(&nodes[ea], srcpos, &vecS);
+        vec_cross3(&vecAB, &vecAC, &vecN);
+        bary[facemap[i]] = -vec_dot3(&vecS, &vecN);
+    }
+
+    for (i = 0; i < 4; i++) {
+        if (bary[i] < 0.f) {
+            return 1;
+        }
+
+        s += bary[i];
+    }
+
+    for (i = 0; i < 4; i++) {
+        bary[i] /= s;
+    }
+
+    return 0;
+}
+
+/**
  * @brief Initialize a data structure storing all pre-computed ray-tracing related data
  *
  * the pre-computed ray-tracing data include
@@ -935,6 +1025,7 @@ void tracer_init(raytracer* tracer, tetmesh* pmesh, char methodid) {
     tracer_build(tracer);
 }
 
+
 /**
  * @brief Preparing for the ray-tracing calculations
  *
@@ -954,44 +1045,16 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         } else {
             MESH_ERROR("tracer is not associated with a mesh");
         }
-    } else if ( (cfg->srctype == stPencil || cfg->srctype == stIsotropic || cfg->srctype == stCone || cfg->srctype == stArcSin)  && cfg->e0 > 0) {
-        int eid = cfg->e0 - 1;
-        FLOAT3 vecS = {0.f}, vecAB, vecAC, vecN;
-        FLOAT3* nodes = tracer->mesh->node;
-        int ea, eb, ec;
-        float s = 0.f, *bary = &(cfg->bary0.x);
-        int* elems = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen); // convert int4* to int*
-
-        if (eid >= tracer->mesh->ne) {
-            MESH_ERROR("initial element index exceeds total element count");
-        }
-
-        for (i = 0; i < 4; i++) {
-            ea = elems[out[i][0]] - 1;
-            eb = elems[out[i][1]] - 1;
-            ec = elems[out[i][2]] - 1;
-            vec_diff3(&nodes[ea], &nodes[eb], &vecAB);
-            vec_diff3(&nodes[ea], &nodes[ec], &vecAC);
-            vec_diff3(&nodes[ea], (FLOAT3*) & (cfg->srcpos), &vecS);
-            vec_cross3(&vecAB, &vecAC, &vecN);
-            bary[facemap[i]] = -vec_dot3(&vecS, &vecN);
+    } else if ( (cfg->srctype == stPencil || cfg->srctype == stIsotropic || cfg->srctype == stCone || cfg->srctype == stArcSin) ) {
+        if (cfg->e0 <= 0 || mesh_barycentric(cfg->e0, &cfg->bary0.x, (FLOAT3*) & (cfg->srcpos), tracer->mesh)) {
+            if (mesh_initelem(tracer->mesh, cfg)) {
+                MESH_ERROR("initial element does not enclose the source!");
+            }
         }
 
         if (cfg->debuglevel & dlWeight)
             fprintf(cfg->flog, "initial bary-centric volumes [%e %e %e %e]\n",
-                    bary[0] / 6., bary[1] / 6., bary[2] / 6., bary[3] / 6.);
-
-        for (i = 0; i < 4; i++) {
-            if (bary[i] < 0.f) {
-                MESH_ERROR("initial element does not enclose the source!");
-            }
-
-            s += bary[i];
-        }
-
-        for (i = 0; i < 4; i++) {
-            bary[i] /= s;
-        }
+                    cfg->bary0.x / 6., cfg->bary0.y / 6., cfg->bary0.z / 6., cfg->bary0.w / 6.);
     }
 
     // TODO: this is a partial fix to the normalization bug described in https://github.com/fangq/mmc/issues/82

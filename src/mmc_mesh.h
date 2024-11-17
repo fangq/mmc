@@ -158,6 +158,8 @@ void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadroi(tetmesh* mesh, mcconfig* cfg);
 double mesh_getreff_approx(double n_in, double n_out);
 double mesh_getreff(double n_in, double n_out);
+int mesh_barycentric(int e0, float* bary, FLOAT3* srcpos, tetmesh* mesh);
+int mesh_initelem(tetmesh* mesh, mcconfig* cfg);
 
 void tracer_init(raytracer* tracer, tetmesh* mesh, char methodid);
 void tracer_build(raytracer* tracer);
