@@ -100,47 +100,33 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
     for (it = edgelist.begin(); it != edgelist.end(); it++) {
         for (int i = 0; i < 3; i++) {
             ((float*)(&mesh->node[oldnn + pos]))[i] =
-                (((float*)(&mesh->node[(*it).first]))[i] + ((float*)(&mesh->node[(*it).second]))[i]) * 0.5f;
+                (((float*)(&mesh->node[it->first]))[i] + ((float*)(&mesh->node[it->second]))[i]) * 0.5f;
         }
 
         pos++;
     }
 }
 
-std::string face_to_string(int a, int b, int c) {
-    int ar[3];
-    ar[0] = MIN(MIN(a, b), c);
-    ar[2] = MAX(MAX(a, b), c);
-    ar[1] = - ar[0] - ar[2] + a + b + c;
-
-    std::ostringstream strkey;
-    strkey << ar[0] << "," << ar[1] << "," << ar[2];
-
-    return std::string(strkey.str());
-}
 
 #ifdef __cplusplus
     extern "C"
 #endif
 void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg) {
-    std::vector<std::string> faces;
-    std::map< std::string, std::pair<unsigned int, unsigned int> > facenb;
-
-    faces.reserve(mesh->ne << 2);
+    std::map< std::vector<int>, std::pair<unsigned int, unsigned int> > facenb;
+    std::map< std::vector<int>, std::pair<unsigned int, unsigned int> > ::iterator it;
 
     for (int i = 0; i < mesh->ne; i++) {
         int* ee = mesh->elem + i * mesh->elemlen;
 
         for (int j = 0; j < 4; j++) {
-            faces.push_back(face_to_string(ee[facelist[j][0]], ee[facelist[j][1]], ee[facelist[j][2]]));
-        }
-    }
+            std::vector<int> facevec = { ee[facelist[j][0]], ee[facelist[j][1]], ee[facelist[j][2]] };
+            std::sort (facevec.begin(), facevec.end());
 
-    for (unsigned int i = 0; i < faces.size(); i++) {
-        if (facenb.count(faces[i])) {
-            facenb[faces[i]].second = (i >> 2) + 1;
-        } else {
-            facenb[faces[i]] = std::make_pair((i >> 2) + 1, 0);
+            if (facenb.count(facevec)) {
+                facenb[facevec].second = (i << 2) + j + 1;
+            } else {
+                facenb[facevec] = std::make_pair((i << 2) + j, 0);
+            }
         }
     }
 
@@ -150,11 +136,10 @@ void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg) {
 
     mesh->facenb = (int*)calloc(sizeof(int) * mesh->elemlen, mesh->ne);
 
-    for (unsigned int i = 0; i < faces.size(); i++) {
-        std::pair<unsigned int, unsigned int> item = facenb[faces[i]];
-
-        if (item.second != 0) {
-            mesh->facenb[i] = ((i >> 2) + 1 == item.first ? item.second : item.first);
+    for (it = facenb.begin(); it != facenb.end(); it++) {
+        if (it->second.second != 0) {
+            mesh->facenb[it->second.first] = ((it->second.second - 1) >> 2) + 1;
+            mesh->facenb[it->second.second - 1] = (it->second.first >> 2) + 1;
         }
     }
 }

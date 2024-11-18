@@ -731,15 +731,11 @@ void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg) {
     int tmp, len, i, j, *ee;
     char fvelem[MAX_FULL_PATH];
 
-    if (cfg->elem && cfg->elemnum && cfg->node && cfg->nodenum) {
-        mesh_getvolume(mesh, cfg);
-        return;
-    }
-
     mesh_filenames("velem_%s.dat", fvelem, cfg);
 
-    if ((fp = fopen(fvelem, "rt")) == NULL) {
-        MESH_ERROR("can not open element volume file");
+    if ((cfg->elem && cfg->elemnum && cfg->node && cfg->nodenum) || (fp = fopen(fvelem, "rt")) == NULL) {
+        mesh_getvolume(mesh, cfg);
+        return;
     }
 
     len = fscanf(fp, "%d %d", &tmp, &(mesh->ne));
@@ -784,15 +780,11 @@ void mesh_loadfaceneighbor(tetmesh* mesh, mcconfig* cfg) {
     int* pe;
     char ffacenb[MAX_FULL_PATH];
 
-    if (cfg->elem && cfg->elemnum) {
-        mesh_getfacenb(mesh, cfg);
-        return;
-    }
-
     mesh_filenames("facenb_%s.dat", ffacenb, cfg);
 
-    if ((fp = fopen(ffacenb, "rt")) == NULL) {
-        MESH_ERROR("can not open face-neighbor list file");
+    if ((cfg->elem && cfg->elemnum) || (fp = fopen(ffacenb, "rt")) == NULL) {
+        mesh_getfacenb(mesh, cfg);
+        return;
     }
 
     len = fscanf(fp, "%d %d", &(mesh->elemlen), &(mesh->ne));
@@ -927,22 +919,23 @@ int mesh_initelem(tetmesh* mesh, mcconfig* cfg) {
     int i, j;
 
     for (i = 0; i < mesh->ne; i++) {
-        float3 pmin = {VERY_BIG, VERY_BIG, VERY_BIG}, pmax = {-VERY_BIG, -VERY_BIG, -VERY_BIG};
+        double pmin[3] = {VERY_BIG, VERY_BIG, VERY_BIG}, pmax[3] = {-VERY_BIG, -VERY_BIG, -VERY_BIG};
         int* elems = (int*)(mesh->elem + i * mesh->elemlen); // convert int4* to int*
 
         for (j = 0; j < mesh->elemlen; j++) {
-            pmin.x = MIN(nodes[elems[0] - 1].x, pmin.x);
-            pmin.y = MIN(nodes[elems[0] - 1].y, pmin.y);
-            pmin.z = MIN(nodes[elems[0] - 1].z, pmin.z);
+            pmin[0] = MIN(nodes[elems[j] - 1].x, pmin[0]);
+            pmin[1] = MIN(nodes[elems[j] - 1].y, pmin[1]);
+            pmin[2] = MIN(nodes[elems[j] - 1].z, pmin[2]);
 
-            pmax.x = MAX(nodes[elems[0] - 1].x, pmax.x);
-            pmax.y = MAX(nodes[elems[0] - 1].y, pmax.y);
-            pmax.z = MAX(nodes[elems[0] - 1].z, pmax.z);
+            pmax[0] = MAX(nodes[elems[j] - 1].x, pmax[0]);
+            pmax[1] = MAX(nodes[elems[j] - 1].y, pmax[1]);
+            pmax[2] = MAX(nodes[elems[j] - 1].z, pmax[2]);
         }
 
-        if (cfg->srcpos.x <= pmax.x && cfg->srcpos.x >= pmin.x &&
-                cfg->srcpos.y <= pmax.y && cfg->srcpos.y >= pmin.y &&
-                cfg->srcpos.z <= pmax.z && cfg->srcpos.z >= pmin.z) {
+        if (cfg->srcpos.x <= pmax[0] && cfg->srcpos.x >= pmin[0] &&
+                cfg->srcpos.y <= pmax[1] && cfg->srcpos.y >= pmin[1] &&
+                cfg->srcpos.z <= pmax[2] && cfg->srcpos.z >= pmin[2]) {
+
             if (mesh_barycentric(i + 1, &(cfg->bary0.x), (FLOAT3*) & (cfg->srcpos), mesh) == 0) {
                 cfg->e0 = i + 1;
                 return 0;
