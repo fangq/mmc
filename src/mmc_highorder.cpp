@@ -32,7 +32,7 @@
 #include <set>
 #include <list>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <algorithm>
 #include <string>
 #include <string.h>
@@ -108,21 +108,34 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
 }
 
 
+class Vec3Hash {
+  public:
+    std::size_t operator()(std::array<int, 3> const& vec) const {
+        std::size_t seed = 3;
+
+        for (int i = 0; i < 3; i++) {
+            seed ^= vec[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+
+        return seed;
+    }
+};
+
 #ifdef __cplusplus
     extern "C"
 #endif
 void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg) {
-    std::map< std::vector<int>, std::pair<unsigned int, unsigned int> > facenb;
-    std::map< std::vector<int>, std::pair<unsigned int, unsigned int> > ::iterator it;
+    std::unordered_map< std::array<int, 3>, std::pair<unsigned int, unsigned int>, Vec3Hash > facenb;
+    std::unordered_map< std::array<int, 3>, std::pair<unsigned int, unsigned int>, Vec3Hash > ::iterator it;
 
     for (int i = 0; i < mesh->ne; i++) {
         int* ee = mesh->elem + i * mesh->elemlen;
 
         for (int j = 0; j < 4; j++) {
-            std::vector<int> facevec = { ee[facelist[j][0]], ee[facelist[j][1]], ee[facelist[j][2]] };
+            std::array<int, 3> facevec = { ee[facelist[j][0]], ee[facelist[j][1]], ee[facelist[j][2]] };
             std::sort (facevec.begin(), facevec.end());
 
-            if (facenb.count(facevec)) {
+            if (facenb.find(facevec) != facenb.end()) {
                 facenb[facevec].second = (i << 2) + j + 1;
             } else {
                 facenb[facevec] = std::make_pair((i << 2) + j, 0);
