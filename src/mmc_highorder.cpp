@@ -114,7 +114,7 @@ class Vec3Hash {
         std::size_t seed = 3;
 
         for (int i = 0; i < 3; i++) {
-            seed ^= vec[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            seed ^= vec.at(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
 
         return seed;
