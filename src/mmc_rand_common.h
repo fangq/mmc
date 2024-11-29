@@ -38,6 +38,10 @@
 #ifndef _MMC_RNG_COMMON_H
 #define _MMC_RNG_COMMON_H
 
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
 #define EPS2       0.1*EPS
