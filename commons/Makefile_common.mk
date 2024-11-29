@@ -26,6 +26,7 @@ BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
 CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
+CXXFLAGS   += -std=c++11
 INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
 MAKE       ?= make
@@ -272,7 +273,7 @@ $(OBJDIR)/%$(OBJSUFFIX): %.cu
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CXX) $(CCFLAGS) $(CXXFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
 ##  Compile .cpp files ##
 %$(OBJSUFFIX): %.cpp
