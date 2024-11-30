@@ -881,17 +881,29 @@ void mcx_savedata(OutputType* dat, size_t len, mcconfig* cfg, int isref) {
         mcx_savenii(dat, len, name, NIFTI_TYPE_FLOAT64, cfg->outputformat, cfg);
         return;
     } else if (cfg->outputformat == ofJNifti || cfg->outputformat == ofBJNifti) {
-        uint dims[6] = {cfg->dim.x, cfg->dim.y, cfg->dim.z, cfg->maxgate, cfg->srcnum, 1};
+        uint dims[6] = {cfg->dim.x, cfg->dim.y, cfg->dim.z, cfg->maxgate, cfg->srcnum, 1}, lastdim = 5;
         float voxelsize[6] = {cfg->steps.x, cfg->steps.y, cfg->steps.z, cfg->tstep, 1, 1};
 
+        if (cfg->method != rtBLBadouelGrid) {
+            dims[0] = cfg->nodenum;
+            dims[1] = cfg->maxgate;
+            dims[2] = cfg->srcnum;
+            dims[3] = 1;
+            lastdim = 3;
+            voxelsize[0] = 1.f;
+            voxelsize[1] = cfg->tstep;
+            voxelsize[2] = 1.f;
+            voxelsize[3] = 1.f;
+        }
+
         if (cfg->seed == SEED_FROM_FILE && (cfg->replaydet == -1 && cfg->detnum > 1)) {
-            dims[5] *= cfg->detnum;
+            dims[lastdim] *= cfg->detnum;
         }
 
         if (cfg->outputformat == ofJNifti) {
-            mcx_savejnii(dat, 5 + (dims[5] > 1), dims, voxelsize, name, 1, 1, cfg);
+            mcx_savejnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), cfg);
         } else {
-            mcx_savebnii(dat, 5 + (dims[5] > 1), dims, voxelsize, name, 1, 1, cfg);
+            mcx_savebnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), cfg);
         }
 
         return;
@@ -1733,7 +1745,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             cfg->basisorder = FIND_JSON_KEY("BasisOrder", "Session.BasisOrder", Session, cfg->basisorder, valueint);
         }
 
-        if (!cfg->outputformat) {
+        if (!flagset['F']) {
             cfg->outputformat = mcx_keylookup((char*)FIND_JSON_KEY("OutputFormat", "Session.OutputFormat", Session, "ascii", valuestring), outputformat);
         }
 
@@ -2214,7 +2226,6 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     }
 
     cJSON_AddItemToObject(obj, "Dim", cJSON_CreateIntArray((int*) & (cfg->dim.x), 3));
-    cJSON_AddNumberToObject(obj, "OriginType", 1);
 
     /* the "Optode" section */
     cJSON_AddItemToObject(root, "Optode", obj = cJSON_CreateObject());

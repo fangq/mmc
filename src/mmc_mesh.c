@@ -245,9 +245,40 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
     mesh_init(mesh);
     mesh_loadnode(mesh, cfg);
     mesh_loadelem(mesh, cfg);
+    mesh_loadmedia(mesh, cfg);
 
     if (cfg->isdumpjson == 1) {
+        int i, j, *elem = NULL;
+
+        if (cfg->medianum == 0) {
+            cfg->medianum = mesh->prop + 1;
+            cfg->prop = mesh->med;
+        }
+
+        if (cfg->nodenum == 0 && cfg->elemnum == 0) {
+            cfg->nodenum = mesh->nn;
+            cfg->elemnum = mesh->ne;
+            cfg->elemlen = mesh->elemlen;
+            cfg->node = mesh->node;
+            elem = (int*)malloc(mesh->ne * (mesh->elemlen + 1) * sizeof(int));
+
+            for (i = 0; i < mesh->ne; i++) {
+                for (j = 0; j < mesh->elemlen; j++) {
+                    elem[i * (mesh->elemlen + 1) + j] = mesh->elem[i * mesh->elemlen + j];
+                }
+
+                elem[i * (mesh->elemlen + 1) + mesh->elemlen] = mesh->type[i];
+            }
+
+            cfg->elem = elem;
+        }
+
         mcx_savejdata(cfg->jsonfile, cfg);
+
+        if (elem) {
+            free(elem);
+        }
+
         exit(0);
     }
 
@@ -257,7 +288,6 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
 
     mesh_loadelemvol(mesh, cfg);
     mesh_loadfaceneighbor(mesh, cfg);
-    mesh_loadmedia(mesh, cfg);
     mesh_loadroi(mesh, cfg);
 
     if (cfg->seed == SEED_FROM_FILE && cfg->seedfile[0]) {
