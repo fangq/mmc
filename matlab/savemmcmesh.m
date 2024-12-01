@@ -1,7 +1,7 @@
 function savemmcmesh(key, node, elem, varargin)
 %
-% savemmcmesh(key,node,elem,face,evol,facenb)
-% savemmcmesh(key,node,elem,'face',face,'evol',evol,'facenb',facenb,'roi',roi)
+% savemmcmesh(key,node,elem,facenb,roi)
+% savemmcmesh(key,node,elem,'facenb',facenb,'roi',roi)
 %
 % Export a tetrahedral mesh to the MMC mesh format
 %
@@ -12,8 +12,6 @@ function savemmcmesh(key, node, elem, varargin)
 %          format of the files are {node,elem,face,facenb,evol}_key.dat
 %      node: a node coordinate list, 3 columns for x/y/z
 %      elem: a tetrahedral element list
-%      face: a triangular surface face list, if missing, it will be calculated
-%      evol: the volumes of all tetrahedra, if missing, it will be calculated
 %      facenb: the 4 neighboring elements for each element, if missing, it will
 %             be calculated
 %      roi: if 1 colume, roi defines noderoi; if 4 column, roi defines
@@ -33,8 +31,11 @@ else
     opt = struct;
 end
 
-if (nargin < 5 || isempty(jsonopt('evol', [], opt)))
-    evol = elemvolume(node, elem(:, 1:4));
+if(~isempty(varargin) && ~ischar(varargin{1}))
+    facenb = varargin{1};
+    if(length(varargin) > 1)
+        roi = varargin{2};
+    end
 end
 
 if (~isempty(node))
@@ -63,32 +64,9 @@ end
 if (~isempty(jsonopt('facenb', [], opt)))
     facenb = jsonopt('facenb', [], opt);
 end
-if (nargin < 6 || isempty(jsonopt('facenb', [], opt)))
+
+if (nargin < 4 || isempty(jsonopt('facenb', [], opt)))
     facenb = faceneighbors(elem(:, 1:4));
-    if (nargin < 4 || isempty(jsonopt('face', [], opt)))
-        face = faceneighbors(elem(:, 1:4), 'rowmajor');
-    end
-end
-
-if (~isempty(face))
-    fid = fopen(['face_', key, '.dat'], 'wt');
-    fprintf(fid, '%d\t%d\n', 1, size(face, 1));
-    if (size(face, 2) == 3)
-        fprintf(fid, '%d\t%d\t%d\t%d\t1\n', [1:length(face); face']);
-    elseif (size(face, 2) == 4)
-        fprintf(fid, '%d\t%d\t%d\t%d\t%d\n', [1:length(face); face']);
-    else
-        fclose(fid);
-        error('wrong face input: must be 3 or 4 columns');
-    end
-    fclose(fid);
-end
-
-if (~isempty(evol))
-    fid = fopen(['velem_' key '.dat'], 'wt');
-    fprintf(fid, '%d %d\n', 1, size(elem, 1));
-    fprintf(fid, '%d %e\n', [(1:size(elem, 1))', evol]');
-    fclose(fid);
 end
 
 if (~isempty(facenb))
@@ -98,7 +76,10 @@ if (~isempty(facenb))
     fclose(fid);
 end
 
-roi = jsonopt('roi', [], opt);
+if(~exist('roi', 'var'))
+    roi = jsonopt('roi', [], opt);
+end
+
 if (~isempty(roi))
     fid = fopen(['roi_' key '.dat'], 'wt');
     fprintf(fid, '%d %d\n', size(roi, 2), size(roi, 1));
