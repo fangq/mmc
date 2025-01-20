@@ -50,7 +50,7 @@ MKDIR      := mkdir
 ifneq (,$(filter $(MAKECMDGOALS),mex oct mexomp octomp cudamex cudaoct))
     ZMATLIB=
 else
-    FILES+=mmc cjson/cJSON ubj/ubjw
+    FILES+=mmc cjson/cJSON ubj/ubjw mmc_neurojson
 endif
 
 USERARFLAGS?=$(ZMATLIB)
