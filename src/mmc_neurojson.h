@@ -29,13 +29,13 @@
 **          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
-#ifndef _MCEXTREME_EXT_UTILS_RAND_H
-#define _MCEXTREME_EXT_UTILS_RAND_H
+#ifndef _MCEXTREME_NEUROJSON_API_H
+#define _MCEXTREME_NEUROJSON_API_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-void runcommand(char* cmd, char* param, char** output);
+int runcommand(char* cmd, char* param, char** output);
 
 #ifdef __cplusplus
 }

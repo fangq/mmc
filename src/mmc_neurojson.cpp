@@ -29,33 +29,40 @@
 **          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
-#include <array>
-#include <string>
-#include <memory>
-#include <stdexcept>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "mmc_neurojson.h"
 
+#define ALLOC_CHUNK  4096
 
-std::string runcmd(std::string cmd, std::string param = "") {
-    std::array<char, 128> buffer;
-    std::string result;
-    std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen((cmd + param).c_str(), "r"), pclose);
+int runcommand(char* cmd, char* param, char** output) {
+    int len = ALLOC_CHUNK, pos = 0;
+    char buffer[256] = {'\0'}, fullcmd[ALLOC_CHUNK] = {'\0'};
+
+    snprintf(fullcmd, ALLOC_CHUNK, "%s%s", cmd, param);
+    FILE* pipe = popen(fullcmd, "r");
 
     if (!pipe) {
-        throw std::runtime_error("unable to run curl to access online data at https://neurojson.io; please install curl from https://curl.se/");
+        return -1;
     }
 
-    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-        result += buffer.data();
+    free(*output);
+    *output = (char*)calloc(ALLOC_CHUNK, 1);
+
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        int buflen = strlen(buffer);
+
+        if (buflen > len - pos - 1) {
+            *output = (char*)realloc(*output, len + ALLOC_CHUNK);
+            len += ALLOC_CHUNK;
+        }
+
+        strncpy(*output + pos, buffer, len - pos - 1);
+        pos += buflen;
     }
 
-    return result;
-}
-
-#ifdef __cplusplus
-    extern "C"
-#endif
-void runcommand(char* cmd, char* param, char** output) {
-    std::string result = runcmd(std::string(cmd) + param);
-    *output = (char*)calloc(result.size() + 1, 1);
-    result.copy(*output, result.size());
+    *output = (char*)realloc(*output, pos + 1);
+    pclose(pipe);
+    return pos;
 }
