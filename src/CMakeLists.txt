@@ -91,6 +91,8 @@ add_library(mmc STATIC
     mmc_bench.c
     mmc_tictoc.c
     mmc_tictoc.h
+    mmc_neurojson.cpp
+    mmc_neurojson.h
     mmc_cl_utils.c
     mmc_cl_utils.h
     mmc_cl_host.c
@@ -243,6 +245,8 @@ if(BUILD_MEX AND Matlab_FOUND)
                 mmc_bench.c
                 mmc_tictoc.c
                 mmc_tictoc.h
+                mmc_neurojson.cpp
+                mmc_neurojson.h
                 mmc_cl_utils.c
                 mmc_cl_utils.h
                 mmc_cl_host.c
