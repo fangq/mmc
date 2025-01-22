@@ -3285,7 +3285,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     if (i == argc - 1 || argv[i + 1][0] == '-') {
                         int j, doclen;
                         char* jbuf = NULL;
-                        runcommand("curl -s -X GET 'https://neurojson.io:7777/mmc/_all_docs'", "", &jbuf);
+                        runcommand("curl -s -X GET \"https://neurojson.io:7777/mmc/_all_docs\"", "", &jbuf);
                         cJSON* root = cJSON_Parse(jbuf), *docs = cJSON_GetObjectItem(root, "rows"), *subitem, *tmp;
 
                         if (!docs) {
