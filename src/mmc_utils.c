@@ -3036,6 +3036,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     if (i < argc - 1 && argv[i + 1][0] == '{') {
                         jsoninput = argv[i + 1];
                         i++;
+                    } else if (i == argc - 1 || argv[i + 1][0] == '-') {
+                        runcommand("", "", &jsoninput);
+                        isinteractive = 2;
+                        i += (i < argc - 1);
                     } else {
                         i = mcx_readarg(argc, argv, i, filename, "string");
                     }
@@ -3474,7 +3478,7 @@ void mcx_printheader(mcconfig* cfg) {
     MMC_FPRINTF(cfg->flog, S_YELLOW "\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
-#          Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          #\n\
+#          Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          #\n\
 #" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.io/               " S_YELLOW "#\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
@@ -3488,7 +3492,7 @@ void mcx_printheader(mcconfig* cfg) {
 #Please visit our free scientific data sharing portal at " S_BLUE "https://neurojson.io/" S_YELLOW "#\n\
 # and consider sharing your public datasets in standardized JSON/JData format #\n\
 ###############################################################################\n\
-$Rev::      $" S_GREEN MMC_VERSION S_YELLOW " $Date::                       $ by $Author::             $\n\
+$Rev::       $ " S_GREEN MMC_VERSION S_YELLOW " $Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 
@@ -3505,7 +3509,10 @@ usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
 \n"S_BOLD S_CYAN"\
 == Required option ==\n"S_RESET"\
- -f config     (--input)       read an input file in .json or inp format\n\
+ -f config     (--input)       read an input file in the .json format,if config\n\
+                               string starts with '{',it is parsed as an inline\n\
+                               JSON input file; if -f is followed by nothing or\n\
+                               a single '-', it reads input from stdin via pipe\n\
  -Q benchmark  (--bench)       run a built-in benchmark, -Q only to list\n\
  -N benchmark  (--net)         get benchmark from NeuroJSON.io, -N only to list\n\
                                benchmark can be dataset URL,or dbname/benchname\n\

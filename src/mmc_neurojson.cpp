@@ -36,12 +36,18 @@
 
 #define ALLOC_CHUNK  4096
 
+#ifdef _WIN32
+    #define popen   _popen
+    #define pclose  _pclose
+#endif
+
 int runcommand(char* cmd, char* param, char** output) {
     int len = ALLOC_CHUNK, pos = 0;
     char buffer[256] = {'\0'}, fullcmd[ALLOC_CHUNK] = {'\0'};
+    FILE* pipe = NULL;
 
     snprintf(fullcmd, ALLOC_CHUNK, "%s%s", cmd, param);
-    FILE* pipe = popen(fullcmd, "r");
+    pipe = strlen(fullcmd) ? popen(fullcmd, "r") : stdin;
 
     if (!pipe) {
         return -1;
