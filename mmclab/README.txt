@@ -54,7 +54,7 @@ the verbose command line options in MMC.
 <pre>
  #############################################################################%
                       Mesh-based Monte Carlo (MMC) - OpenCL                   %
-           Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          %
+           Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          %
                https://mcx.space/#mmc  &  https://neurojson.io/               %
                                                                               %
  Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%

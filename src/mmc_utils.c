@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2024
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -3479,7 +3479,7 @@ void mcx_printheader(mcconfig* cfg) {
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
 #          Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          #\n\
-#" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.io/               " S_YELLOW "#\n\
+#" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.io                " S_YELLOW "#\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #\n\
@@ -3489,7 +3489,7 @@ void mcx_printheader(mcconfig* cfg) {
 #  Open-source codes and reusable scientific data are essential for research, #\n\
 # MCX proudly developed human-readable JSON-based data formats for easy reuse.#\n\
 #                                                                             #\n\
-#Please visit our free scientific data sharing portal at " S_BLUE "https://neurojson.io/" S_YELLOW "#\n\
+#Please visit our free scientific data sharing portal at " S_BLUE "https://neurojson.io " S_YELLOW "#\n\
 # and consider sharing your public datasets in standardized JSON/JData format #\n\
 ###############################################################################\n\
 $Rev::       $ " S_GREEN MMC_VERSION S_YELLOW " $Date::                       $ by $Author::             $\n\
@@ -3638,7 +3638,22 @@ where possible parameters include (the first item in [] is the default value)\n\
                                stored (default: 1e7)\n\
 \n"S_BOLD S_CYAN"\
 == Example ==\n"S_RESET"\
-       %s -n 1000000 -f input.json -s test -b 0 -D TP -G -1\n", exename,
+example: (list built-in benchmarks: -Q/--bench)\n"S_CYAN"\
+       %s -Q\n" S_RESET"\
+or (use multiple devices - 1st,2nd and 4th GPUs - together with equal load)\n"S_CYAN"\
+       %s -Q dmmc-cube60 -n 1e7 -G 1101 -W 10,10,10\n" S_RESET"\
+or (use inline json setting modifier)\n"S_CYAN"\
+       %s -f input.json -j '{\"Optode\":{\"Source\":{\"Type\":\"isotropic\"}}}'\n" S_RESET"\
+or (dump simulation in a single json file)\n"S_CYAN"\
+       %s -Q dmmc-cube60 --dumpjson\n" S_RESET"\
+or (use -N/--net to browse community-contributed mmc simulations at https://neurojson.io)\n"S_CYAN"\
+       %s -N\n" S_RESET"\
+or (run user-shared mmc simulations, see full list at https://neurojson.org/db/mmc)\n"S_CYAN"\
+       %s -N dmmc-cube60\n" S_RESET"\
+or (use -f - to read piped input file modified by shell text processing utilities)\n"S_CYAN"\
+       %s -Q dmmc-cube60 --dumpjson | sed -e 's/pencil/isotropic/g' | %s -f -\n" S_RESET"\
+or (download/modify simulations from NeuroJSON.io and run with mmc -f)\n"S_CYAN"\
+       curl -s -X GET https://neurojson.io:7777/mmc/dmmc-cube60 | jq '.Forward.Dt = 1e-9' | %s -f\n", exename,
 #ifdef USE_OPENCL
            'G',
 #else
@@ -3648,5 +3663,5 @@ where possible parameters include (the first item in [] is the default value)\n\
            'P',
 #endif
 #endif
-           exename);
+           exename, exename, exename, exename, exename, exename, exename, exename, exename);
 }

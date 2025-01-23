@@ -1,5 +1,57 @@
 Change Log
 
+
+== MMC 2.6.0 (v2025, Popcorn), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2025-01-23 [1f94c27] [feat] support reading pipe from command line with -f -
+ 2025-01-21 [fbe4648] [bug] fix windows -N error
+ 2025-01-21 [fe709c4] [cmake] update cmake to add -N support
+ 2025-01-20 [efd265d] [feat] use C-based runcommand
+ 2025-01-20 [e2c1160] [feat] add -N/--net to download simulations from NeuroJSON.io, add -Q
+ 2024-12-01 [db481ad] [feat] simplify savemmcmesh, compute evol at runtime
+ 2024-11-29 [094e390] [feat] export mesh data with --dumpjson
+ 2024-11-29 [d28110b] [ci] fix windows-2019 gcc error
+ 2024-11-29 [e6c4ed9] [ci] add array header for macos-14 clang
+ 2024-11-29 [ad080fa] [ci] fix macos-14 clang ci error
+ 2024-11-29 [8a8fc5f] [ci] add -std=c++11 to use unordered_map in ci
+ 2024-11-22 [9e2dce4] [feat] speed up facenb computation using std::unordered_map
+ 2024-11-17 [9f1c355] [feat] accelerate facenb using std::vector, fix initelem bug
+ 2024-11-17 [add7ec0] [feat] automatically find initial element id, partially done
+ 2024-11-10 [6346ecd] [bug] fix mmclab compilation error
+ 2024-11-10 [805a59f] [feat] enable --dumpjson flag to export simulations to a json file
+ 2024-11-05 [2886ba3] [build] fix CMakeFile.txt to produce valid mmc-trinity binaries, fix #105
+ 2024-11-04 [36626f4] [bug] allow cudamex to pass replay demo, fix #98
+ 2024-11-04 [a6c2984] [bug] partially fix cuda saveseed, #98
+ 2024-11-03 [6baa839] [bug] fix incorrect shared memory initialization, fix #101, fix #103
+ 2024-11-03 [22bcdbd] [bug] fix incorrect command line parsing due to -H flag, fix #104
+ 2024-11-02 [351b61f] [bug] fix stdout not found bug after make cudamex
+ 2024-10-18 [126e53d] [bug] fix Apple silicon kernel JIT error, fix #102
+ 2024-10-16 [c646344] [bug] fix incorrect normalization for GPU mmc, fix #100
+ 2024-10-14 [072fafe] [bug] fix gpu photon-sharing hanging, support mmc binary mode, close #86
+ 2024-10-13 [b3f9739] [bug] fix cuda compilation errors
+ 2024-10-11 [4e6bfad] [bug] fix sharedmem buffer length error, thanks to ShijieYan
+ 2024-09-23 [749f0eb] [feat] implement photon sharing on GPU, not working, stalls, #72
+ 2024-09-21 [2a7e9dd] [bug] support photon-sharing in DMMC on CPU, fix #97
+ 2024-09-17 [73926c8] [bug] fix MeshID and typo in mmc2json, by andreafarina, close #96
+ 2024-09-15 [fef5207] Merge pull request #94 from andreafarina/WL-Jacobian
+ 2024-09-15 [97330d1] Merge pull request #95 from andreafarina/fix-build
+ 2024-09-13 [bf54fa9] [bug] fix the potential typo in Custo et al for CSF mua, fangq/mcx#232
+ 2024-09-12 [fdf855f] [ci] restore v3 upload and download artifacts
+ 2024-09-11 [888efee] [ci] github upgraded both upload and download-artifacts
+ 2024-09-11 [2dcd000] [ci] github disabled upx on mac since 09/05/2024
+ 2024-09-11 [6ac856f] [ci] allow make oct to link with OpenCL
+ 2024-09-11 [ccccdd7] [ci] upgrade gcc-11 to gcc-12 as github retired gcc11
+ 2024-09-10 [f4acbf5] [bug] add missing source file in CMakeLists.txt
+ 2024-09-10 [1926ea0] [bug] fix WL calculation with mua>0
+ 2024-09-09 [868cde3] [bug] fix extra brackets in mmc2json, port from mcx2json
+ 2024-09-03 [c67142d] [ci] fix action alert related to download-artifact https://github.com/NeuroJSON/zmat/security/dependabot/1
+ 2024-08-23 [17811da] [bug] save double-precision DMMC ouput in jnii/bnii, fix #90
+ 2024-08-18 [85ae591] [bug] fix lzma memory leakage, NeuroJSON/zmat#11, update lz4
+ 2024-08-18 [d249435] [deploy] disable static linking with libomp.a on arm64 mac, fix #89
+ 2024-06-09 [efc7496] [opencl] optimizing thread number on Apple silicon, gain 6x speedup
+ 2024-06-09 [e5d41cc] [ci] disable SSE on arm64 apple
+ 2024-04-25 [626b810] [bug] avoid double-base64-encoding when -Z 2 is used, fangq/mcx#219
+
 == MMC 2.2.0 (v2024.2, Nougat), Qianqian Fang <q.fang at neu.edu> ==
 
  2024-03-14 [58aa18c] [ci] fix macos-14 test under make omp

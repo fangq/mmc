@@ -6,8 +6,8 @@
 
 *Author:  Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPL v3), see License.txt
-*Version: 2.2.0 (v2024.2, Nougat)
-*URL:     http://mcx.space/mmc
+*Version: 2.6.0 (v2025, Popcorn)
+*URL:     https://mcx.space/mmc
 
 ---------------------------------------------------------------------
 
@@ -19,7 +19,7 @@ Table of Content:
 
 == # What's New ==
 
-MMC v2024.2 (2.2.0) adds the below key features
+MMC v2025 (2.6.0) adds the below key features
 
 *   support saving photon trajectories (`-D M` or `cfg.debuglevel='M'`)
 *   allow to use a single JSON input file to store mesh node, element and iMMC ROI data, along with other simulation settings
@@ -300,7 +300,7 @@ The full command line options of MMC include the following:
 <pre>
 ###############################################################################
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
-#          Copyright (c) 2010-2024 Qianqian Fang <q.fang at neu.edu>          #
+#          Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          #
 #              https://mcx.space/#mmc  &  https://neurojson.io/               #
 #                                                                             #
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
