@@ -19,19 +19,33 @@ Table of Content:
 
 == # What's New ==
 
-MMC v2025 (2.6.0) adds the below key features
+MMC v2025 (2.6.0) is a maintenance release with multiple bug fixes and new features. It is highly
+recommended to upgrade for all users.
 
-*   support saving photon trajectories (`-D M` or `cfg.debuglevel='M'`)
-*   allow to use a single JSON input file to store mesh node, element and iMMC ROI data, along with other simulation settings
-*   compute element face-neighbours (`facenb`) and volumes (`evol`) in C code, avoid needing preprocessing
-*   support built-in benchmarks, use `--bench` to list and `--bench name` to run
-*   accept pattern data in the JSON input file
-*   store pattern pixel index for each photon in photon sharing
-*   provide native Apple M1 binaries
+MMC v2025 adds the below key features
 
-Aside from these added new features, we have also fixed a number of bugs. All
-MATLAB scripts have been automatically formatted using `miss_hit`. The binary JSON
-library was also updated to the latest version.
+* add photon-sharing (multi-pattern simulations) in OpenCL/GPU
+* optimizing thread number on Apple silicon (M1/M2/M3/M4), gain 6x speedup
+* the new `-N/--net` command line flag allows one to browse and run growing number of community-contributed \
+  simulations hosted on https://neurojson.io (one can browse the list at https://neurojson.org/db/mmc)
+* mmc can read stdin (standard input) using pipe, allow one to use advanced text processing utilities in the shell, \
+  such as `sed, perl, jq` to modify JSON inputs at runtime. For example `mcx -N cube60 | jq '.Forward.Dt=1e-10' | mcx -f`
+* a new shortcut option `-Q` for `--bench` to conveniently browse and run built-in benchmarks
+* automatically compute initial element ID, facenb, element/nodal volume if not provided, greatly simplifying input data
+* speed up facenb computation by a factor of 2x
+* add `--dumpjson` flag to allow exporting simulations to a JSON file
+
+Aside from these added new features, we have also fixed a number of bugs.
+We want to particularly thank Andrea Farina (CNR-IFN) for reporting and fixing 
+a number of the below issues.
+
+* fix shared memory initialization error (#101, #103)
+* fix stdout not found error when building with `cudamex` target, fix various trinity/cuda compilation errors
+* fix replay error in trinity/cuda target (#98)
+* fix double-precision saving bug in jnii/bnii (#90)
+* disable SSE on arm64 Apple silicon as it is not supported
+* add the missing `-H/--maxdetphoton` flag
+
 
 
 ------------------------------------------------------------------------------- 

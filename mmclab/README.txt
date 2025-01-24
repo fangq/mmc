@@ -2,7 +2,7 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 2.2, v2024.2
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 2.2, v2025
 *URL: https://mcx.space/wiki/?Learn#mmc
 
 <toc>
