@@ -267,7 +267,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                       mesh->elemlen,
                       cfg->mcmethod,
                       cfg->method,
-                      1.f / cfg->unitinmm,
+                      1.f / cfg->steps.x,
                       cfg->srcdir.w,
                       mesh->nn,
                       mesh->ne,
