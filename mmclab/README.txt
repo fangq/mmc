@@ -2,7 +2,7 @@
 
 *Author: Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPLv3)
-*Version: this package is part of Mesh-based Monte Carlo (MMC) 2.2, v2025
+*Version: this package is part of Mesh-based Monte Carlo (MMC) 2.6, v2025
 *URL: https://mcx.space/wiki/?Learn#mmc
 
 <toc>
@@ -68,7 +68,7 @@ the verbose command line options in MMC.
  Please visit our free scientific data sharing portal at https://neurojson.io/%
   and consider sharing your public datasets in standardized JSON/JData format %
  #############################################################################%
- $Rev::4ca899$v2024.2$Date::2023-09-11 17:37:07 -04$ by $Author::Qianqian Fang%
+ $Rev::4ca899$ v2025 $Date::2023-09-11 17:37:07 -04$ by $Author::Qianqian Fang%
  #############################################################################%
  
   Format:
