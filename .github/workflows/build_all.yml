@@ -199,7 +199,8 @@ jobs:
       - name: Download mmclab
         uses: actions/download-artifact@v4
         with:
-          name: all-mmclab-packages-*
+          pattern: all-mmclab-packages-*
+          merge-multiple: true
           path: packages
       - name: Create all-in-one octave mmclab
         run: |
