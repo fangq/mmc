@@ -93,7 +93,7 @@ typedef struct MMC_mesh {
     int nf;                /**< number of surface triangles */
     int prop;              /**< number of media */
     int elemlen;           /**< number of nodes per element */
-    FLOAT3* node;          /**< node coordinates */
+    FLOAT3* node;          /**< node coordinates, FLOAT3 is defined in vector_types.h, it is the true float3, which has a size of 12 byte */
     int*  elem;            /**< element indices */
     int*  elem2;           /**< element indices */
     float* edgeroi;        /**< immc: vessel edge radii */

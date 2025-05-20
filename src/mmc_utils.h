@@ -47,7 +47,7 @@
 #endif
 
 #ifdef __NVCC__
-    #define FLOAT3 float3
+    #define FLOAT3 float3           ///< FLOAT3 is the true float3; in OpenCL, float3 is actually float4; but CUDA supports true float3
 #endif
 
 #define MAX_FULL_PATH       2048                         /**< max characters in a full file name string */

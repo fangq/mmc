@@ -182,6 +182,7 @@ inline __device__ __host__ float4 convert_float4_rte(float4 v) {
 }
 #define FL4(f) make_float4(f,f,f,f)
 #define FL3(f) make_float3(f,f,f)
+#define FL4_3(f) make_float3(f.x,f.y,f.z)
 #define FLT_EPSILON   1.19209290E-07F
 #define atomicadd(a,b)  atomicAdd(a,b)
 #define atomic_inc(x)   atomicAdd(x,1)
@@ -194,8 +195,12 @@ inline __device__ __host__ float4 convert_float4_rte(float4 v) {
 #define MCX_SINCOS(theta,osin,ocos)   sincosf((theta),&(osin),&(ocos))
 
 #else
+typedef struct MMC_FLOAT3 {
+    float x, y, z;
+} FLOAT3;
 #define FL4(f) (f)
 #define FL3(f) (f)
+#define FL4_3(f) (f.x,f.y,f.z)
 #define __constant__  __constant
 #define __device__
 #ifndef NULL
@@ -1105,17 +1110,19 @@ __device__ float mc_next_scatter(float g, float3* dir, __private RandType* ran, 
  * photon toward the center of the element and try again
  *
  * \param[in,out] p: current photon position
- * \param[in] nodes: pointer to the 4 nodes of the tet
+ * \param[in] node: pointer to the 4 nodes of the tet
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-__device__ void fixphoton(float3* p, __global float3* nodes, __global int* ee) {
+__device__ void fixphoton(float3* p, __global FLOAT3* node, __global int* ee) {
     float3 c0 = {0.f, 0.f, 0.f};
     int i;
 
     /*calculate element centroid*/
     for (i = 0; i < 4; i++) {
-        c0 += nodes[ee[i] - 1];
+        c0.x += node[ee[i] - 1].x;
+        c0.y += node[ee[i] - 1].y;
+        c0.z += node[ee[i] - 1].z;
     }
 
     *p += (c0 * FL3(0.25f) - *p) * (FL3(FIX_PHOTON));
@@ -1134,7 +1141,7 @@ __device__ void fixphoton(float3* p, __global float3* nodes, __global int* ee) {
  * \param[in,out] ran: the random number generator states
  */
 
-__device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global float3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern) {
+__device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOAT3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern) {
     int canfocus = 1;
     float3 origin = r->p0;
 
@@ -1400,9 +1407,9 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global floa
                 ea = elems[out[i][0]] - 1;
                 eb = elems[out[i][1]] - 1;
                 ec = elems[out[i][2]] - 1;
-                vecAB = node[eb] - node[ea];
-                vecAC = node[ec] - node[ea];
-                vecS = r->p0 - node[ea];
+                vecAB = FL4_3(node[eb]) - FL4_3(node[ea]);
+                vecAC = FL4_3(node[ec]) - FL4_3(node[ea]);
+                vecS = r->p0 - FL4_3(node[ea]);
                 vecN = cross(vecAB, vecAC);
                 bary[facemap[i]] = -dot(vecS, vecN);
             }
@@ -1453,7 +1460,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global floa
  * \param[out] visit: statistics counters of this thread
  */
 
-__device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXParam* gcfg, __global float3* node, __global int* elem, __global float* weight, __global float* dref,
+__device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXParam* gcfg, __global FLOAT3* node, __global int* elem, __global float* weight, __global float* dref,
                           __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal, __constant Medium* gmed,
                           __global float* n_det, __global uint* detectedphoton, __local float* energytot, __local float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
                           __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata) {
@@ -1743,7 +1750,7 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
 #ifndef __NVCC__
     __constant__ MCXParam* gcfg, __local float* sharedmem, __constant__ Medium* gmed,
 #endif
-                            __global float3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
+                            __global FLOAT3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
                             __global float* n_det, __global uint* detectedphoton,
                             __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
                             __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata) {
