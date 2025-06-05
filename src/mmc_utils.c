@@ -2606,8 +2606,10 @@ int mcx_parsedebugopt(char* debugopt, const char* debugflag) {
  */
 
 void mcx_fflush(FILE* out) {
-#ifdef MCX_CONTAINER
+#if defined(MCX_CONTAINER) && (defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER))
     mcx_matlab_flush();
+#elif defined(PYBIND11_VERSION_MAJOR)
+    mcx_python_flush();
 #else
     fflush(out);
 #endif

@@ -982,7 +982,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
  * @param[in] linenum: the line number in the file where this error is raised
  */
 
-int mcx_throw_exception(const int id, const char* msg, const char* filename, const int linenum) {
+int mmc_throw_exception(const int id, const char* msg, const char* filename, const int linenum) {
     throw msg;
     return id;
 }

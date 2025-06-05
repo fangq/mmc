@@ -344,14 +344,14 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
 void mcx_fflush(FILE* out);
 void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte);
 
-#ifdef MCX_CONTAINER
+#if defined(MCX_CONTAINER) && (defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER))
 #ifdef _OPENMP
-#define MMC_FPRINTF(fp,...) {if(omp_get_thread_num()==0) mexPrintf(__VA_ARGS__);}
+#define MMC_FPRINTF(fp,...) {if(omp_get_thread_num()==0) {(fp==stderr) ? mexPrintf(__VA_ARGS__) : fprintf(fp,__VA_ARGS__);}}  /**< macro to print messages, calls mexPrint if inside MATLAB */
 #else
-#define MMC_FPRINTF(fp,...) mexPrintf(__VA_ARGS__)
+#define MMC_FPRINTF(fp,...) {(fp==stderr) ? mexPrintf(__VA_ARGS__) : fprintf(fp,__VA_ARGS__);} /**< macro to print messages, calls mexPrint in MATLAB */
 #endif
 #else
-#define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__)
+#define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__) /**< macro to print messages, calls fprintf in command line mode */
 #endif
 
 #if defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER) || defined (HAVE_OCTAVE)
@@ -374,6 +374,7 @@ extern "C"
 #endif
 int  mmc_throw_exception(const int id, const char* msg, const char* filename, const int linenum);
 void mcx_matlab_flush(void);
+void mcx_python_flush(void);
 #endif
 
 
