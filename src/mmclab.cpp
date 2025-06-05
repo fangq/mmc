@@ -84,10 +84,13 @@
 typedef mwSize dimtype;                                   //! MATLAB type alias for integer type to use for array sizes and dimensions
 
 void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* cfg, tetmesh* mesh);
-void mmc_validate_config(mcconfig* cfg, tetmesh* mesh);
 void mmclab_usage();
 
 extern const char debugflag[];
+
+float* detps = NULL;       //! buffer to receive data from cfg.detphotons field
+int    dimdetps[2] = {0, 0}; //! dimensions of the cfg.detphotons array
+int    seedbyte = 0;
 
 /** @brief Mex function for the MMC host function for MATLAB/Octave
  *  This is the master function to interface all MMC features inside MATLAB.
@@ -256,7 +259,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             mesh_srcdetelem(&mesh, &cfg);
 
             /** Validate all input fields, and warn incompatible inputs */
-            mmc_validate_config(&cfg, &mesh);
+            mmc_validate_config(&cfg, &mesh, det_ps, dim_det_ps, seed_byte);
 
             if (cfg.isgpuinfo == 0) {
                 mmc_prep(&cfg, &mesh, &tracer);
@@ -887,6 +890,13 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         jsonshapes = new char[len + 1];
         mxGetString(item, jsonshapes, len + 1);
         jsonshapes[len] = '\0';
+    } else if (strcmp(name, "detphotons") == 0) {
+        arraydim = mxGetDimensions(item);
+        dimdetps[0] = arraydim[0];
+        dimdetps[1] = arraydim[1];
+        detps = (float*)malloc(arraydim[0] * arraydim[1] * sizeof(float));
+        memcpy(detps, mxGetData(item), arraydim[0]*arraydim[1]*sizeof(float));
+        printf("mmc.detphotons=[%ld %ld];\n", arraydim[0], arraydim[1]);
     } else if (strcmp(name, "seed") == 0) {
         arraydim = mxGetDimensions(item);
 
@@ -896,9 +906,11 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
 
         if (!mxIsUint8(item)) {
             double* val = mxGetPr(item);
+
             cfg->seed = val[0];
             printf("mmc.seed=%d;\n", cfg->seed);
         } else {
+            seedbyte = arraydim[0];
             cfg->photonseed = malloc(arraydim[0] * arraydim[1]);
 
             if (arraydim[0] != (sizeof(RandType)*RAND_BUF_LEN)) {
@@ -992,141 +1004,6 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
     }
 }
 
-/**
- * @brief Validate all input fields, and warn incompatible inputs
- *
- * Perform self-checking and raise exceptions or warnings when input error is detected
- *
- * @param[in,out] cfg: the simulation configuration structure
- * @param[out] mesh: the mesh data structure
- */
-
-void mmc_validate_config(mcconfig* cfg, tetmesh* mesh) {
-    int i, j, *ee, datalen;
-
-    if (cfg->nphoton <= 0) {
-        MEXERROR("cfg.nphoton must be a positive number");
-    }
-
-    if (cfg->tstart > cfg->tend || cfg->tstep == 0.f) {
-        MEXERROR("incorrect time gate settings or missing tstart/tend/tstep fields");
-    }
-
-    if (cfg->tstep > cfg->tend - cfg->tstart) {
-        cfg->tstep = cfg->tend - cfg->tstart;
-    }
-
-    if (ABS(cfg->srcdir.x * cfg->srcdir.x + cfg->srcdir.y * cfg->srcdir.y + cfg->srcdir.z * cfg->srcdir.z - 1.f) > 1e-5) {
-        MEXERROR("field 'srcdir' must be a unitary vector");
-    }
-
-    if (cfg->tend <= cfg->tstart) {
-        MEXERROR("field 'tend' must be greater than field 'tstart'");
-    }
-
-    cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
-    cfg->tend = cfg->tstart + cfg->tstep * cfg->maxgate;
-
-    if (mesh->prop == 0) {
-        MEXERROR("you must define the 'prop' field in the input structure");
-    }
-
-    if (mesh->nn == 0 || mesh->ne == 0 || mesh->evol == NULL || mesh->facenb == NULL) {
-        MEXERROR("a complete input mesh include 'node','elem','facenb' and 'evol'");
-    }
-
-    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
-
-    for (i = 0; i < mesh->ne; i++) {
-        if (mesh->type[i] <= 0) {
-            continue;
-        }
-
-        ee = (int*)(mesh->elem + i * mesh->elemlen);
-
-        for (j = 0; j < 4; j++) {
-            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
-        }
-    }
-
-    if (mesh->weight) {
-        free(mesh->weight);
-    }
-
-    if (cfg->method == rtBLBadouelGrid) {
-        mesh_createdualmesh(mesh, cfg);
-        cfg->basisorder = 0;
-    }
-
-    datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-    mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
-
-    if (cfg->srctype == stPattern && cfg->srcpattern == NULL) {
-        mexErrMsgTxt("the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
-    }
-
-    if (cfg->srcnum > 1 && cfg->seed == SEED_FROM_FILE) {
-        mexErrMsgTxt("multiple source simulation is currently not supported under replay mode");
-    }
-
-    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
-        for (i = 1; i <= mesh->prop; i++) {
-            mesh->med[i].mus *= cfg->unitinmm;
-            mesh->med[i].mua *= cfg->unitinmm;
-        }
-    }
-
-    cfg->his.unitinmm = cfg->unitinmm;
-
-    if (cfg->steps.x != cfg->steps.y || cfg->steps.y != cfg->steps.z) {
-        MEXERROR("MMC dual-grid algorithm currently does not support anisotropic voxels");
-    }
-
-    if (mesh->node == NULL || mesh->elem == NULL || mesh->prop == 0) {
-        MEXERROR("You must define 'mesh' and 'prop' fields.");
-    }
-
-    /*make medianum+1 the same as medium 0*/
-    if (cfg->isextdet) {
-        mesh->med = (medium*)realloc(mesh->med, sizeof(medium) * (mesh->prop + 2));
-        memcpy(mesh->med + mesh->prop + 1, mesh->med, sizeof(medium));
-
-        for (i = 0; i < mesh->ne; i++) {
-            if (mesh->type[i] == -2) {
-                mesh->type[i] = mesh->prop + 1;
-            }
-        }
-    }
-
-    if (cfg->issavedet && cfg->detnum == 0 && cfg->isextdet == 0) {
-        cfg->issavedet = 0;
-    }
-
-    if (cfg->seed < 0 && cfg->seed != SEED_FROM_FILE) {
-        cfg->seed = time(NULL);
-    }
-
-    if (cfg->issavedet == 0) {
-        cfg->ismomentum = 0;
-        cfg->issaveexit = 0;
-    }
-
-    if (cfg->seed == SEED_FROM_FILE && cfg->his.detected != cfg->nphoton) {
-        cfg->his.detected = 0;
-
-        if (cfg->replayweight == NULL) {
-            MEXERROR("You must define 'replayweight' when you specify 'seed'.");
-        } else if (cfg->replaytime == NULL) {
-            MEXERROR("You must define 'replayweight' when you specify 'seed'.");
-        } else {
-            MEXERROR("The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
-        }
-    }
-
-    // cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
-    cfg->his.detnum = cfg->detnum;
-    cfg->his.colcount = (1 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 1;
-}
 
 /**
  * @brief Error reporting function in the mex function, equivallent to mcx_error in binary mode

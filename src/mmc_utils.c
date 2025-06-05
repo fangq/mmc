@@ -2801,14 +2801,13 @@ int mcx_lookupindex(char* key, const char* index) {
  * @return if found, return the index of the string in the dictionary, otherwise -1.
  */
 
-int mcx_keylookup(char* key, const char* table[]) {
+int mcx_keylookup(char* origkey, const char* table[]) {
     int i = 0;
+    char* key = malloc(strlen(origkey) + 1);
+    memcpy(key, origkey, strlen(origkey) + 1);
 
     while (key[i]) {
-        if (key[i] >= 'A' && key[i] <= 'Z') {
-            key[i] += ('a' - 'A');
-        }
-
+        key[i] = tolower(key[i]);
         i++;
     }
 
@@ -2816,12 +2815,14 @@ int mcx_keylookup(char* key, const char* table[]) {
 
     while (table[i] && table[i][0] != '\0') {
         if (strcmp(key, table[i]) == 0) {
+            free(key);
             return i;
         }
 
         i++;
     }
 
+    free(key);
     return -1;
 }
 
@@ -2944,6 +2945,215 @@ void mcx_validatecfg(mcconfig* cfg) {
         if (cfg->deviceid[i] == '0') {
             cfg->deviceid[i] = '\0';
         }
+}
+
+/**
+ * @brief Initialize the replay data structure from detected photon data - in embedded mode (MATLAB/Python)
+ *
+ * @param[in,out] cfg: simulation configuration
+ * @param[in] detps: detected photon data
+ * @param[in] dimdetps: the dimension vector of the detected photon data
+ * @param[in] seedbyte: the number of bytes per RNG seed
+ */
+
+void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
+    int i, j, hasdetid = 0, offset;
+    float plen;
+
+    if (cfg->seed == SEED_FROM_FILE && detps == NULL) {
+        MMC_ERROR(-6, "you give cfg.seed for replay, but did not specify cfg.detphotons.\nPlease define it as the detphoton output from the baseline simulation\n");
+    }
+
+    if (detps == NULL || cfg->seed != SEED_FROM_FILE) {
+        return;
+    }
+
+    if (cfg->nphoton != dimdetps[1]) {
+        MMC_ERROR(-6, "the column numbers of detphotons and seed do not match\n");
+    }
+
+    if (seedbyte == 0) {
+        MMC_ERROR(-6, "the seed input is empty");
+    }
+
+    hasdetid = SAVE_DETID(cfg->savedetflag);
+    offset = SAVE_NSCAT(cfg->savedetflag) * (cfg->medianum - 1);
+
+    if (((!hasdetid) && cfg->detnum > 1) || !SAVE_PPATH(cfg->savedetflag)) {
+        MMC_ERROR(-6, "please rerun the baseline simulation and save detector ID (D) and partial-path (P) using cfg.savedetflag='dp' ");
+    }
+
+    cfg->replayweight = (float*) malloc(cfg->nphoton * sizeof(float));
+    cfg->replaytime= (float*) calloc(cfg->nphoton, sizeof(float));
+
+    cfg->nphoton = 0;
+
+    for (i = 0; i < dimdetps[1]; i++) {
+        if (cfg->replaydet <= 0 || cfg->replaydet == (int) (detps[i * dimdetps[0]])) {
+            if (i != cfg->nphoton) {
+                memcpy((char*) (cfg->photonseed) + cfg->nphoton * seedbyte,
+                       (char*) (cfg->photonseed) + i * seedbyte,
+                       seedbyte);
+            }
+
+            cfg->replayweight[cfg->nphoton] = 1.f;
+            cfg->replaytime[cfg->nphoton] = 0.f;
+
+            for (j = hasdetid; j < cfg->medianum - 1 + hasdetid; j++) {
+                plen = detps[i * dimdetps[0] + offset + j];
+                cfg->replayweight[cfg->nphoton] *= expf(-cfg->prop[j - hasdetid + 1].mua * plen);
+                plen *= cfg->unitinmm;
+                cfg->replaytime[cfg->nphoton] += plen * R_C0 * cfg->prop[j - hasdetid + 1].n;
+            }
+
+            if (cfg->replaytime[cfg->nphoton] < cfg->tstart
+                    || cfg->replaytime[cfg->nphoton] > cfg->tend) { /*need to consider -g*/
+                continue;
+            }
+
+            cfg->nphoton++;
+        }
+    }
+
+    cfg->replayweight = (float*) realloc(cfg->replayweight, cfg->nphoton * sizeof(float));
+    cfg->replaytime= (float*) realloc(cfg->replaytime, cfg->nphoton * sizeof(float));
+}
+
+/**
+ * @brief Validate all input fields, and warn incompatible inputs
+ *
+ * Perform self-checking and raise exceptions or warnings when input error is detected
+ *
+ * @param[in,out] cfg: the simulation configuration structure
+ * @param[out] mesh: the mesh data structure
+ */
+
+void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], tetmesh* mesh, int seedbyte)) {
+    int i, j, *ee, datalen;
+
+    if (cfg->nphoton <= 0) {
+        MMC_ERROR(999, "cfg.nphoton must be a positive number");
+    }
+
+    if (cfg->tstart > cfg->tend || cfg->tstep == 0.f) {
+        MMC_ERROR(999, "incorrect time gate settings or missing tstart/tend/tstep fields");
+    }
+
+    if (cfg->tstep > cfg->tend - cfg->tstart) {
+        cfg->tstep = cfg->tend - cfg->tstart;
+    }
+
+    if (ABS(cfg->srcdir.x * cfg->srcdir.x + cfg->srcdir.y * cfg->srcdir.y + cfg->srcdir.z * cfg->srcdir.z - 1.f) > 1e-5) {
+        MMC_ERROR(999, "field 'srcdir' must be a unitary vector");
+    }
+
+    if (cfg->tend <= cfg->tstart) {
+        MMC_ERROR(999, "field 'tend' must be greater than field 'tstart'");
+    }
+
+    cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
+    cfg->tend = cfg->tstart + cfg->tstep * cfg->maxgate;
+
+    if (mesh->prop == 0) {
+        MMC_ERROR(999, "you must define the 'prop' field in the input structure");
+    }
+
+    if (mesh->nn == 0 || mesh->ne == 0 || mesh->evol == NULL || mesh->facenb == NULL) {
+        MMC_ERROR(999, "a complete input mesh include 'node','elem','facenb' and 'evol'");
+    }
+
+    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
+
+    for (i = 0; i < mesh->ne; i++) {
+        if (mesh->type[i] <= 0) {
+            continue;
+        }
+
+        ee = (int*)(mesh->elem + i * mesh->elemlen);
+
+        for (j = 0; j < 4; j++) {
+            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
+        }
+    }
+
+    if (mesh->weight) {
+        free(mesh->weight);
+    }
+
+    if (cfg->method == rtBLBadouelGrid) {
+        mesh_createdualmesh(mesh, cfg);
+        cfg->basisorder = 0;
+    }
+
+    datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+    mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
+
+    if (cfg->srctype == stPattern && cfg->srcpattern == NULL) {
+        MMC_ERROR(999, "the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
+    }
+
+    if (cfg->srcnum > 1 && cfg->seed == SEED_FROM_FILE) {
+        MMC_ERROR(999, "multiple source simulation is currently not supported under replay mode");
+    }
+
+    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
+        for (i = 1; i <= mesh->prop; i++) {
+            mesh->med[i].mus *= cfg->unitinmm;
+            mesh->med[i].mua *= cfg->unitinmm;
+        }
+    }
+
+    cfg->his.unitinmm = cfg->unitinmm;
+
+    if (cfg->steps.x != cfg->steps.y || cfg->steps.y != cfg->steps.z) {
+        MMC_ERROR(999, "MMC dual-grid algorithm currently does not support anisotropic voxels");
+    }
+
+    if (mesh->node == NULL || mesh->elem == NULL || mesh->prop == 0) {
+        MMC_ERROR(999, "You must define 'mesh' and 'prop' fields.");
+    }
+
+    /*make medianum+1 the same as medium 0*/
+    if (cfg->isextdet) {
+        mesh->med = (medium*)realloc(mesh->med, sizeof(medium) * (mesh->prop + 2));
+        memcpy(mesh->med + mesh->prop + 1, mesh->med, sizeof(medium));
+
+        for (i = 0; i < mesh->ne; i++) {
+            if (mesh->type[i] == -2) {
+                mesh->type[i] = mesh->prop + 1;
+            }
+        }
+    }
+
+    if (cfg->issavedet && cfg->detnum == 0 && cfg->isextdet == 0) {
+        cfg->issavedet = 0;
+    }
+
+    if (cfg->seed < 0 && cfg->seed != SEED_FROM_FILE) {
+        cfg->seed = time(NULL);
+    }
+
+    if (cfg->issavedet == 0) {
+        cfg->ismomentum = 0;
+        cfg->issaveexit = 0;
+    }
+
+    if (cfg->seed == SEED_FROM_FILE && cfg->his.detected != cfg->nphoton) {
+        cfg->his.detected = 0;
+
+        if (cfg->replayweight == NULL) {
+            MMC_ERROR(999, "You must define 'replayweight' when you specify 'seed'.");
+        } else if (cfg->replaytime == NULL) {
+            MMC_ERROR(999, "You must define 'replayweight' when you specify 'seed'.");
+        } else {
+            MMC_ERROR(999, "The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
+        }
+    }
+
+    // cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
+    cfg->his.detnum = cfg->detnum;
+    cfg->his.colcount = (1 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 1;
+    mcx_replayinit(cfg, detps, dimdetps, seedbyte);
 }
 
 /**
