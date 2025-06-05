@@ -177,6 +177,49 @@ if(BUILD_CUDA)
 endif()
 
 # Build mex file
+if(BUILD_PYTHON)
+    # Create mcx-matlab library
+    add_library(_pmmc MODULE
+            mmc_utils.c
+            mmc_utils.h
+            mmc_mesh.c
+            mmc_mesh.h
+            mmc_host.c
+            mmc_host.h
+            mmc_raytrace.c
+            mmc_raytrace.h
+            mmc_rand_xorshift128p.c
+            mmc_rand_xorshift128p.h
+            mmc_bench.h
+            mmc_bench.c
+            mmc_tictoc.c
+            mmc_tictoc.h
+            mmc_cl_utils.c
+            mmc_cl_utils.h
+            mmc_cl_host.c
+            mmc_cl_host.h
+            mmc_highorder.cpp
+            cjson/cJSON.c
+            cjson/cJSON.h
+            ubj/ubj.h
+            ubj/ubjw.c
+			pmmc.cpp
+            )
+
+    target_compile_definitions(_pmmc PUBLIC MCX_CONTAINER PYBIND11_VERSION_MAJOR)
+
+    target_link_libraries(_pmmc pybind11::module pybind11::lto pybind11::windows_extras OpenCL::OpenCL)
+
+    pybind11_extension(_pmmc)
+    pybind11_strip(_pmmc)
+
+    add_dependencies(_pmmc clheader)
+    set_target_properties(_pmmc PROPERTIES CXX_VISIBILITY_PRESET "hidden")
+
+endif()
+
+
+# Build mex file
 if(BUILD_MEX AND Matlab_FOUND)
     # Create mcx-matlab library
     add_library(mmc-matlab STATIC

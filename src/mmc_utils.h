@@ -83,6 +83,9 @@
     #define S_RESET
 #endif
 
+#define MIN(a,b)  ((a)<(b)?(a):(b))
+#define MAX(a,b)  ((a)>(b)?(a):(b))
+#define ABS(a)    ((a)<0?-(a):(a))                        //! Macro to calculate the absolute value
 
 typedef double OutputType;
 
@@ -339,6 +342,7 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
 void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
 void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);
 void mcx_fflush(FILE* out);
+void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte);
 
 #ifdef MCX_CONTAINER
 #ifdef _OPENMP

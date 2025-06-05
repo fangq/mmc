@@ -97,11 +97,18 @@ int seed_byte = 0;
         catch (const std::runtime_error &err ) {throw py::type_error(std::string("Failed to assign MCX property " + std::string(#prop) + ". Reason: " + err.what()));}                                                                 \
     }
 
-#define ABS(a)    ((a)<0?-(a):(a))                        //! Macro to calculate the absolute value
-#define MAX(a,b)  ((a)>(b)?(a):(b))                       //! Macro to calculate the max of two floating points
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
 
 extern const char debugflag[];
+
+/**
+ * @brief Force matlab refresh the command window to print all buffered messages
+ */
+
+extern "C" void mcx_python_flush() {
+    std::cout.flush();
+}
+
 
 /**
  * Parse user input cfg object and convert to to MMC's mcconfig object.
@@ -110,7 +117,7 @@ extern const char debugflag[];
  */
 
 
-void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)) {
+void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh) {
     mcx_initcfg(&mcx_config);
 
     mcx_config.flog = stderr;
@@ -148,7 +155,6 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     GET_VEC3_FIELD(user_cfg, mcx_config, srcpos, float);
     GET_VEC34_FIELD(user_cfg, mcx_config, srcdir, float);
     GET_VEC3_FIELD(user_cfg, mcx_config, steps, float);
-    GET_VEC4_FIELD(user_cfg, mcx_config, srciquv, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, srcparam1, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, srcparam2, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, detparam1, float);
@@ -173,7 +179,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             free(mesh.node);
         }
 
-        mesh.node = (float3*) malloc(mesh.nn * sizeof(float3));
+        mesh.node = (FLOAT3*) malloc(mesh.nn * sizeof(FLOAT3));
         auto val = static_cast<float*>(buffer_info.ptr);
 
         for (int j = 0; j < 3; j++)
@@ -341,13 +347,13 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         mesh.nn = (buffer_info.shape.size() == 1) ? buffer_info.shape.at(0) : buffer_info.shape.at(0) * buffer_info.shape.at(1);
 
-        if (mesh.elemprop) {
-            free(mesh.elemprop);
+        if (mesh.type) {
+            free(mesh.type);
         }
 
-        mesh.elemprop = (int*) malloc(mesh.nn * sizeof(int));
+        mesh.type = (int*) malloc(mesh.nn * sizeof(int));
         auto val = static_cast<int*>(buffer_info.ptr);
-        memcpy(mesh.elemprop, val, mesh.nn * sizeof(int));
+        memcpy(mesh.type, val, mesh.nn * sizeof(int));
     }
 
 
@@ -389,7 +395,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         auto buffer_info = f_style_volume.request();
 
-        if ((buffer_info.shape.size() > 1 && buffer_info.shape.at(0) > 0 && buffer_info.shape.at(1) != 4) || buffer_info.shape.size() == 1 && buffer_info.shape.at(0) != 4) {
+        if ((buffer_info.shape.size() > 1 && buffer_info.shape.at(0) > 0 && buffer_info.shape.at(1) != 4) || (buffer_info.shape.size() == 1 && buffer_info.shape.at(0) != 4)) {
             throw py::value_error("the 'prop' field must have 4 columns (mua,mus,g,n)");
         }
 
@@ -399,7 +405,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             free(mcx_config.prop);
         }
 
-        mcx_config.prop = (Medium*) malloc(mcx_config.medianum * sizeof(Medium));
+        mcx_config.prop = (medium*) malloc(mcx_config.medianum * sizeof(medium));
         auto val = static_cast<float*>(buffer_info.ptr);
 
         for (int j = 0; j < 4; j++)
@@ -435,7 +441,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'srctype' field must be a non-empty string");
         }
 
-        mcx_config.srctype = mcx_keylookup(src_type.c_str(), srctypeid);
+        mcx_config.srctype = mcx_keylookup((char*)(src_type.c_str()), srctypeid);
 
         if (mcx_config.srctype == -1) {
             throw py::value_error("the specified source type is not supported");
@@ -451,9 +457,9 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'methods' field must be a non-empty string");
         }
 
-        mcx_config.methods = mcx_keylookup(method_str.c_str(), methods);
+        mcx_config.method = mcx_keylookup((char*)(method_str.c_str()), methods);
 
-        if (mcx_config.methods == -1) {
+        if (mcx_config.method == -1) {
             throw py::value_error("the specified ray-tracing method is not supported");
         }
     }
@@ -467,7 +473,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'srctype' field must be a non-empty string");
         }
 
-        mcx_config.outputtype = mcx_keylookup(output_type_str.c_str(), outputtype);
+        mcx_config.outputtype = mcx_keylookup((char*)(output_type_str.c_str()), outputtype);
 
         if (mcx_config.outputtype >= 5) { // map wl to jacobian, wp to nscat
             mcx_config.outputtype -= 2;
@@ -487,7 +493,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'compute' field must be a non-empty string");
         }
 
-        mcx_config.compute = mcx_keylookup(compute_str.c_str(), computebackend);
+        mcx_config.compute = mcx_keylookup((char*)(compute_str.c_str()), computebackend);
 
         if (mcx_config.compute == -1) {
             throw py::value_error("the specified compute backend is not supported");
@@ -586,12 +592,12 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             auto buffer_info = f_style_array.request();
             seed_byte = buffer_info.shape.at(0);
 
-            if (buffer_info.shape.at(0) != sizeof(float) * RAND_WORD_LEN) {
+            if (buffer_info.shape.at(0) != sizeof(float) * RAND_BUF_LEN) {
                 throw py::value_error("the row number of cfg.seed does not match RNG seed byte-length");
             }
 
-            mcx_config.replay.seed = malloc(buffer_info.size);
-            memcpy(mcx_config.replay.seed, buffer_info.ptr, buffer_info.size);
+            mcx_config.photonseed = malloc(buffer_info.size);
+            memcpy(mcx_config.photonseed, buffer_info.ptr, buffer_info.size);
             mcx_config.seed = SEED_FROM_FILE;
             mcx_config.nphoton = buffer_info.shape.at(1);
         }
@@ -678,17 +684,17 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 }
 
 /**
- * Function that's called to cleanup any memory/configs allocated by PMCX. It is used in both normal and exceptional
+ * Function that's called to cleanup any memory/configs allocated by PMMC. It is used in both normal and exceptional
  * termination of the application
  * @param gpu_info reference to an array of MCXGPUInfo data structure
- * @param mcx_config reference to MCXConfig data structure
+ * @param mcx_config reference to mcconfig data structure
  */
-inline void cleanup_configs(MCXGPUInfo*& gpu_info, MCXConfig& mcx_config) {
+inline void cleanup_configs(MCXGPUInfo*& gpu_info, mcconfig& mcx_config) {
     mcx_cleargpuinfo(&gpu_info);
     mcx_clearcfg(&mcx_config);
 }
 
-inline void cleanup_mesh(MCXConfig& mcx_config, tetmesh& mesh) {
+inline void cleanup_mesh(mcconfig& mcx_config, tetmesh& mesh) {
     mesh_clear(&mesh, &mcx_config);
     mcx_clearcfg(&mcx_config);
 }
@@ -699,10 +705,8 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
     mcconfig mcx_config;  /* mcx_config: structure to store all simulation parameters */
     tetmesh mesh;
     raytracer tracer = {NULL, 0, NULL, NULL, NULL};
-    unsigned int threadid = 0, t0, dt;
     GPUInfo* gpu_info = nullptr;        /** gpuInfo: structure to store GPU information */
     unsigned int active_dev = 0;     /** activeDev: count of total active GPUs to be used */
-    int error_flag = 0;
     std::vector<std::string> exception_msgs;
     int thread_id = 0;
     size_t field_dim[6];
@@ -716,17 +720,28 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
         parse_config(user_cfg, mcx_config, mesh);
 
+        if (mcx_config.compute == cbCUDA) {
+#ifdef USE_CUDA
+            mcx_list_cu_gpu(&mcx_config, &active_dev, NULL, &gpu_info);
+#endif
+        } else {
+#ifdef USE_OPENCL
+            mcx_list_cl_gpu(&mcx_config, &active_dev, NULL, &gpu_info);
+#endif
+        }
+
         /** The next step, we identify gpu number and query all GPU info */
-        if (!(active_dev = mcx_list_gpu(&mcx_config, &gpu_info))) {
+        if (!active_dev) {
             mcx_error(-1, "No GPU device found\n", __FILE__, __LINE__);
         }
 
-        mcx_flush(&mcx_config);
+        mcx_python_flush();
 
         /** Validate all input fields, and warn incompatible inputs */
-        mcx_validatecfg(&mcx_config, det_ps, dim_det_ps, seed_byte);
+        mmc_validate_config(&mcx_config, det_ps, dim_det_ps, seed_byte);
+        mesh_validate(&mesh, &mcx_config);
 
-        hostdetreclen = (2 + ((cfg.ismomentum) > 0)) * mesh.prop + (cfg.issaveexit > 0) * 6 + 2;
+        hostdetreclen = (2 + ((mcx_config.ismomentum) > 0)) * mesh.prop + (mcx_config.issaveexit > 0) * 6 + 2;
 
         /** One must define the domain and properties */
         if (mcx_config.vol == nullptr || mcx_config.medianum == 0) {
@@ -739,23 +754,15 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 static_cast<int>(mcx_config.dim.x) * static_cast<int>(mcx_config.dim.y) * static_cast<int>(mcx_config.dim.z) *
                 (size_t) ((mcx_config.tend - mcx_config.tstart) / mcx_config.tstep + 0.5) * mcx_config.srcnum;
 
-            if (mcx_config.replay.seed != nullptr && mcx_config.replaydet == -1) {
+            if (mcx_config.photonseed != nullptr && mcx_config.replaydet == -1) {
                 field_len *= mcx_config.detnum;
             }
 
-            if (mcx_config.replay.seed != nullptr && (mcx_config.outputtype == otRF || mcx_config.outputtype == otRFmus)) {
-                field_len *= 2;
-            }
-
-            if (mcx_config.extrasrclen && mcx_config.srcid == -1) {
-                field_len *= (mcx_config.extrasrclen + 1);
-            }
-
-            mcx_config.exportfield = (float*) calloc(field_len, sizeof(float));
+            mcx_config.exportfield = (double*) calloc(field_len, sizeof(double));
         }
 
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
-        cfg.issaveseed = 0;
+        mcx_config.issaveseed = 0;
 #endif
 
         if (mcx_config.issavedet >= 1) {
@@ -763,18 +770,18 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         }
 
         if (mcx_config.issaveseed == 1) {
-            mcx_config.seeddata = malloc(mcx_config.maxdetphoton * sizeof(float) * RAND_WORD_LEN);
+            mcx_config.photonseed = malloc(mcx_config.maxdetphoton * sizeof(float) * RAND_BUF_LEN);
         }
 
-        if (mcx_config.debuglevel & (MCX_DEBUG_MOVE | MCX_DEBUG_MOVE_ONLY)) {
+        if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
             mcx_config.exportdebugdata = (float*)malloc(mcx_config.maxjumpdebug * sizeof(float) * MCX_DEBUG_REC_LEN);
             mcx_config.debuglevel |= dlTraj;
         }
 
-        mesh_srcdetelem(&mesh, &cfg);
+        mesh_srcdetelem(&mesh, &mcx_config);
 
-        if (cfg.isgpuinfo == 0) {
-            mmc_prep(&cfg, &mesh, &tracer);
+        if (mcx_config.isgpuinfo == 0) {
+            mmc_prep(&mcx_config, &mesh, &tracer);
         }
 
         /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
@@ -788,19 +795,19 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             /** Enclose all simulation calls inside a try/catch construct for exception handling */
             try {
 
-                if (cfg.compute == cbSSE || cfg.gpuid > MAX_DEVICE) {
-                    mmc_run_mp(&cfg, &mesh, &tracer);
+                if (mcx_config.compute == cbSSE || mcx_config.gpuid > MAX_DEVICE) {
+                    mmc_run_mp(&mcx_config, &mesh, &tracer);
                 }
 
 #ifdef USE_CUDA
-                else if (cfg.compute == cbCUDA) {
-                    mmc_run_cu(&cfg, &mesh, &tracer);
+                else if (mcx_config.compute == cbCUDA) {
+                    mmc_run_cu(&mcx_config, &mesh, &tracer);
                 }
 
 #endif
 #ifdef USE_OPENCL
                 else {
-                    mmc_run_cl(&cfg, &mesh, &tracer);
+                    mmc_run_cl(&mcx_config, &mesh, &tracer);
                 }
 
 #endif
@@ -826,14 +833,14 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         field_dim[4] = 1;
         field_dim[5] = 1;
 
-        if (mcx_config.debuglevel & (MCX_DEBUG_MOVE | MCX_DEBUG_MOVE_ONLY)) {
+        if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
             field_dim[0] = MCX_DEBUG_REC_LEN;
             field_dim[1] = mcx_config.debugdatalen; // his.savedphoton is for one repetition, should correct
             field_dim[2] = 0;
             field_dim[3] = 0;
             auto photon_traj_data = py::array_t<float, py::array::f_style>({field_dim[0], field_dim[1]});
 
-            if (mcx_config.debuglevel & (MCX_DEBUG_MOVE | MCX_DEBUG_MOVE_ONLY)) {
+            if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
                 memcpy(photon_traj_data.mutable_data(), mcx_config.exportdebugdata, field_dim[0] * field_dim[1] * sizeof(float));
             }
 
@@ -846,19 +853,19 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         }
 
         if (mcx_config.issaveseed == 1) {
-            field_dim[0] = (mcx_config.issaveseed > 0) * RAND_WORD_LEN * sizeof(float);
+            field_dim[0] = (mcx_config.issaveseed > 0) * RAND_BUF_LEN * sizeof(float);
             field_dim[1] = mcx_config.detectedcount; // his.savedphoton is for one repetition, should correct
             field_dim[2] = 0;
             field_dim[3] = 0;
             auto detected_seeds = py::array_t<uint8_t, py::array::f_style>({field_dim[0], field_dim[1]});
-            memcpy(detected_seeds.mutable_data(), mcx_config.seeddata, field_dim[0] * field_dim[1]);
-            free(mcx_config.seeddata);
-            mcx_config.seeddata = nullptr;
+            memcpy(detected_seeds.mutable_data(), mcx_config.photonseed, field_dim[0] * field_dim[1]);
+            free(mcx_config.photonseed);
+            mcx_config.photonseed = nullptr;
             output["seeds"] = detected_seeds;
         }
 
         if (mcx_config.issavedet >= 1) {
-            if (cfg.issaveexit != 2) {
+            if (mcx_config.issaveexit != 2) {
                 field_dim[0] = hostdetreclen;
                 field_dim[1] = mcx_config.detectedcount;
                 field_dim[2] = 0;
@@ -871,13 +878,13 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                     output["detp"] = partial_path;
                 }
             } else {
-                fielddim[0] = cfg.detparam1.w;
-                fielddim[1] = cfg.detparam2.w;
-                fielddim[2] = cfg.maxgate;
-                fielddim[3] = 0;
+                field_dim[0] = mcx_config.detparam1.w;
+                field_dim[1] = mcx_config.detparam2.w;
+                field_dim[2] = mcx_config.maxgate;
+                field_dim[3] = 0;
 
-                if (fielddim[0] * fielddim[1] > 0) {
-                    auto partial_path = py::array_t<float, py::array::f_style>(std::initializer_list<size_t>({field_dim[0], fielddim[1], fielddim[2]}));
+                if (field_dim[0] * field_dim[1] > 0) {
+                    auto partial_path = py::array_t<float, py::array::f_style>(std::initializer_list<size_t>({field_dim[0], field_dim[1], field_dim[2]}));
                     memcpy(partial_path.mutable_data(), mcx_config.exportdetected,
                            field_dim[0] * field_dim[1] * field_dim[2] * sizeof(float));
                     output["detp"] = partial_path;
@@ -890,8 +897,8 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
         if (mcx_config.issave2pt) {
             size_t datalen = (mcx_config.method == rtBLBadouelGrid) ? mcx_config.crop0.z : ( (mcx_config.basisorder) ? mesh.nn : mesh.ne);
-            field_dim[0] = cfg.srcnum;
-            field_dim[1] = datalen
+            field_dim[0] = mcx_config.srcnum;
+            field_dim[1] = datalen;
             field_dim[2] = mcx_config.maxgate;
             field_dim[3] = 1;
             field_dim[4] = 1;
@@ -905,13 +912,13 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 field_dim[3] = mcx_config.dim.z;
                 field_dim[4] = mcx_config.maxgate;
 
-                if (cfg.srcnum > 1) {
+                if (mcx_config.srcnum > 1) {
                     array_dims = {field_dim[0], field_dim[1], field_dim[2], field_dim[3], field_dim[4], field_dim[5]};
                 } else {
                     array_dims = {field_dim[1], field_dim[2], field_dim[3], field_dim[4], field_dim[5]};
                 }
             } else {
-                if (cfg.srcnum > 1) {
+                if (mcx_config.srcnum > 1) {
                     array_dims = {field_dim[0], field_dim[1], field_dim[2]};
                 } else {
                     array_dims = {field_dim[1], field_dim[2]};
@@ -926,8 +933,9 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 field_dim[1] = mesh.nf;
                 field_dim[2] = mcx_config.maxgate;
                 array_dims = {field_dim[1], field_dim[2]};
+                auto dref_array = py::array_t<double, py::array::f_style>(array_dims);
                 auto* dref = static_cast<double*>(dref_array.mutable_data());
-                memcpy(dref, mcx_config.exportfield, dref. * sizeof(double));
+                memcpy(dref, mcx_config.exportfield, dref_array.size() * sizeof(double));
 
                 output["dref"] = dref_array;
             }
@@ -966,7 +974,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
 
 /**
- * @brief Error reporting function in PMCX, equivalent to mcx_error in binary mode
+ * @brief Error reporting function in PMMC, equivalent to mcx_error in binary mode
  *
  * @param[in] id: a single integer for the types of the error
  * @param[in] msg: the error message string
@@ -981,15 +989,7 @@ int mcx_throw_exception(const int id, const char* msg, const char* filename, con
 
 void print_mcx_usage() {
     std::cout
-            << "PMMC (" MCX_VERSION ")\nUsage:\n    output = pmmc.run(cfg);\n\nRun 'help(pmmc.run)' for more details.\n";
-}
-
-/**
- * @brief Force matlab refresh the command window to print all buffered messages
- */
-
-extern "C" void mcx_python_flush() {
-    std::cout.flush();
+            << "PMMC (" MMC_VERSION ")\nUsage:\n    output = pmmc.run(cfg);\n\nRun 'help(pmmc.run)' for more details.\n";
 }
 
 py::dict pmmc_interface_wargs(py::args args, const py::kwargs& kwargs) {
@@ -1006,7 +1006,7 @@ py::str print_version() {
     mcx_initcfg(&mcx_config);
     mcx_printheader(&mcx_config);
     mcx_clearcfg(&mcx_config);
-    return py::str(MCX_VERSION);
+    return py::str(MMC_VERSION);
 }
 
 py::list get_GPU_info() {
@@ -1018,8 +1018,17 @@ py::list get_GPU_info() {
     unsigned int  workdev;
 
     try {
+
+        if (mcx_config.compute == cbCUDA) {
+#ifdef USE_CUDA
+            mcx_list_cu_gpu(&mcx_config, &workdev, NULL, &gpu_info);
+#endif
+        } else {
 #ifdef USE_OPENCL
-        mcx_list_cl_gpu(&mcx_config, &workdev, NULL &gpu_info
+            mcx_list_cl_gpu(&mcx_config, &workdev, NULL, &gpu_info);
+#endif
+        }
+
     } catch (...) {
         std::cerr << "No CUDA-capable device was found." << std::endl;
         return output;
@@ -1053,12 +1062,12 @@ py::list get_GPU_info() {
         output.append(current_device_info);
     }
 
-    cleanup_configs(&gpu_info, &mcx_config);
+    cleanup_configs(gpu_info, mcx_config);
     return output;
 }
 
 PYBIND11_MODULE(_pmmc, m) {
-    m.doc() = "PMCX (" MCX_VERSION "): Python bindings for Monte Carlo eXtreme photon transport simulator, https://mcx.space";
+    m.doc() = "PMMC (" MMC_VERSION "): Python bindings for Monte Carlo eXtreme photon transport simulator, https://mcx.space";
     m.def("run", &pmmc_interface, "Runs MCX with the given config.", py::call_guard<py::scoped_ostream_redirect,
           py::scoped_estream_redirect>());
     m.def("run", &pmmc_interface_wargs, "Runs MCX with the given config.", py::call_guard<py::scoped_ostream_redirect,

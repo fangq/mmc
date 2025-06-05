@@ -77,8 +77,6 @@
 /**<  Macro to output GPU parameters as field */
 #define SET_GPU_INFO(output,id,v)  mxSetField(output,id,#v,mxCreateDoubleScalar(gpuinfo[i].v));
 
-#define ABS(a)    ((a)<0?-(a):(a))                        //! Macro to calculate the absolute value
-#define MAX(a,b)  ((a)>(b)?(a):(b))                       //! Macro to calculate the max of two floating points
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
 
 typedef mwSize dimtype;                                   //! MATLAB type alias for integer type to use for array sizes and dimensions
@@ -259,7 +257,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             mesh_srcdetelem(&mesh, &cfg);
 
             /** Validate all input fields, and warn incompatible inputs */
-            mmc_validate_config(&cfg, &mesh, det_ps, dim_det_ps, seed_byte);
+            mmc_validate_config(&cfg, detps, dimdetps, seedbyte);
+            mesh_validate(&mesh, &cfg);
 
             if (cfg.isgpuinfo == 0) {
                 mmc_prep(&cfg, &mesh, &tracer);

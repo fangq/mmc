@@ -2984,7 +2984,7 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
     }
 
     cfg->replayweight = (float*) malloc(cfg->nphoton * sizeof(float));
-    cfg->replaytime= (float*) calloc(cfg->nphoton, sizeof(float));
+    cfg->replaytime = (float*) calloc(cfg->nphoton, sizeof(float));
 
     cfg->nphoton = 0;
 
@@ -3016,7 +3016,7 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
     }
 
     cfg->replayweight = (float*) realloc(cfg->replayweight, cfg->nphoton * sizeof(float));
-    cfg->replaytime= (float*) realloc(cfg->replaytime, cfg->nphoton * sizeof(float));
+    cfg->replaytime = (float*) realloc(cfg->replaytime, cfg->nphoton * sizeof(float));
 }
 
 /**
@@ -3028,9 +3028,7 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
  * @param[out] mesh: the mesh data structure
  */
 
-void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], tetmesh* mesh, int seedbyte)) {
-    int i, j, *ee, datalen;
-
+void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
     if (cfg->nphoton <= 0) {
         MMC_ERROR(999, "cfg.nphoton must be a positive number");
     }
@@ -3054,40 +3052,6 @@ void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], tetmesh* 
     cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
     cfg->tend = cfg->tstart + cfg->tstep * cfg->maxgate;
 
-    if (mesh->prop == 0) {
-        MMC_ERROR(999, "you must define the 'prop' field in the input structure");
-    }
-
-    if (mesh->nn == 0 || mesh->ne == 0 || mesh->evol == NULL || mesh->facenb == NULL) {
-        MMC_ERROR(999, "a complete input mesh include 'node','elem','facenb' and 'evol'");
-    }
-
-    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
-
-    for (i = 0; i < mesh->ne; i++) {
-        if (mesh->type[i] <= 0) {
-            continue;
-        }
-
-        ee = (int*)(mesh->elem + i * mesh->elemlen);
-
-        for (j = 0; j < 4; j++) {
-            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
-        }
-    }
-
-    if (mesh->weight) {
-        free(mesh->weight);
-    }
-
-    if (cfg->method == rtBLBadouelGrid) {
-        mesh_createdualmesh(mesh, cfg);
-        cfg->basisorder = 0;
-    }
-
-    datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-    mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
-
     if (cfg->srctype == stPattern && cfg->srcpattern == NULL) {
         MMC_ERROR(999, "the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
     }
@@ -3096,33 +3060,10 @@ void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], tetmesh* 
         MMC_ERROR(999, "multiple source simulation is currently not supported under replay mode");
     }
 
-    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
-        for (i = 1; i <= mesh->prop; i++) {
-            mesh->med[i].mus *= cfg->unitinmm;
-            mesh->med[i].mua *= cfg->unitinmm;
-        }
-    }
-
     cfg->his.unitinmm = cfg->unitinmm;
 
     if (cfg->steps.x != cfg->steps.y || cfg->steps.y != cfg->steps.z) {
         MMC_ERROR(999, "MMC dual-grid algorithm currently does not support anisotropic voxels");
-    }
-
-    if (mesh->node == NULL || mesh->elem == NULL || mesh->prop == 0) {
-        MMC_ERROR(999, "You must define 'mesh' and 'prop' fields.");
-    }
-
-    /*make medianum+1 the same as medium 0*/
-    if (cfg->isextdet) {
-        mesh->med = (medium*)realloc(mesh->med, sizeof(medium) * (mesh->prop + 2));
-        memcpy(mesh->med + mesh->prop + 1, mesh->med, sizeof(medium));
-
-        for (i = 0; i < mesh->ne; i++) {
-            if (mesh->type[i] == -2) {
-                mesh->type[i] = mesh->prop + 1;
-            }
-        }
     }
 
     if (cfg->issavedet && cfg->detnum == 0 && cfg->isextdet == 0) {

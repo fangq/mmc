@@ -42,6 +42,8 @@
 
 #define MAX_PROP           4000
 
+#define R_C0               3.335640951981520e-12f  /**< one over speed of light in s/mm */
+
 #define MCX_DEBUG_REC_LEN  6  /**<  number of floating points per position saved when -D M is used for trajectory */
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */

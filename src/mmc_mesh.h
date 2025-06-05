@@ -70,11 +70,8 @@
 #define EPS        1e-6f
 #define LOG_MT_MAX 22.1807097779182f
 #define R_MIN_MUS  1e9f
-#define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 #define DELTA_MUA  1e-4f
 #define VERY_BIG   1e30f
-#define MIN(a,b)  ((a)<(b)?(a):(b))
-#define MAX(a,b)  ((a)>(b)?(a):(b))
 
 #define MESH_ERROR(a)  mesh_error((a),__FILE__,__LINE__)
 
@@ -160,6 +157,7 @@ double mesh_getreff_approx(double n_in, double n_out);
 double mesh_getreff(double n_in, double n_out);
 int mesh_barycentric(int e0, float* bary, FLOAT3* srcpos, tetmesh* mesh);
 int mesh_initelem(tetmesh* mesh, mcconfig* cfg);
+void mesh_validate(tetmesh* mesh, mcconfig* cfg);
 
 void tracer_init(raytracer* tracer, tetmesh* mesh, char methodid);
 void tracer_build(raytracer* tracer);

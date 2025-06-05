@@ -36,6 +36,7 @@
 *******************************************************************************/
 
 #include <stdlib.h>
+#include "mmc_const.h"
 #include "mmc_mesh.h"
 #include <string.h>
 #include "mmc_highorder.h"
@@ -1890,4 +1891,75 @@ double mesh_getreff(double n_in, double n_out) {
     r_phi *= ostep;
     r_j *= ostep;
     return (r_phi + r_j) / (2.0 - r_phi + r_j);
+}
+
+
+/**
+ * @brief Validate all input fields, and warn incompatible inputs
+ *
+ * Perform self-checking and raise exceptions or warnings when input error is detected
+ *
+ * @param[in,out] cfg: the simulation configuration structure
+ * @param[out] mesh: the mesh data structure
+ */
+
+void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
+    int i, j, *ee, datalen;
+
+    if (mesh->prop == 0) {
+        MMC_ERROR(999, "you must define the 'prop' field in the input structure");
+    }
+
+    if (mesh->nn == 0 || mesh->ne == 0 || mesh->evol == NULL || mesh->facenb == NULL) {
+        MMC_ERROR(999, "a complete input mesh include 'node','elem','facenb' and 'evol'");
+    }
+
+    if (mesh->node == NULL || mesh->elem == NULL || mesh->prop == 0) {
+        MMC_ERROR(999, "You must define 'mesh' and 'prop' fields.");
+    }
+
+    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
+
+    for (i = 0; i < mesh->ne; i++) {
+        if (mesh->type[i] <= 0) {
+            continue;
+        }
+
+        ee = (int*)(mesh->elem + i * mesh->elemlen);
+
+        for (j = 0; j < 4; j++) {
+            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
+        }
+    }
+
+    if (mesh->weight) {
+        free(mesh->weight);
+    }
+
+    if (cfg->method == rtBLBadouelGrid) {
+        mesh_createdualmesh(mesh, cfg);
+        cfg->basisorder = 0;
+    }
+
+    datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+    mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
+
+    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
+        for (i = 1; i <= mesh->prop; i++) {
+            mesh->med[i].mus *= cfg->unitinmm;
+            mesh->med[i].mua *= cfg->unitinmm;
+        }
+    }
+
+    /*make medianum+1 the same as medium 0*/
+    if (cfg->isextdet) {
+        mesh->med = (medium*)realloc(mesh->med, sizeof(medium) * (mesh->prop + 2));
+        memcpy(mesh->med + mesh->prop + 1, mesh->med, sizeof(medium));
+
+        for (i = 0; i < mesh->ne; i++) {
+            if (mesh->type[i] == -2) {
+                mesh->type[i] = mesh->prop + 1;
+            }
+        }
+    }
 }
