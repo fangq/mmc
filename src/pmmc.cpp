@@ -58,6 +58,7 @@
 #endif
 #include "mmc_tictoc.h"
 #include "mmc_raytrace.h"
+#include "mmc_highorder.h"
 
 // Python binding for runtime_error exception in Python.
 namespace pybind11 {
@@ -119,6 +120,7 @@ extern "C" void mcx_python_flush() {
 
 void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh) {
     mcx_initcfg(&mcx_config);
+    mesh_init(&mesh);
 
     mcx_config.flog = stderr;
 
@@ -399,19 +401,21 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'prop' field must have 4 columns (mua,mus,g,n)");
         }
 
-        mcx_config.medianum = (buffer_info.shape.size() == 1) ? 1 : buffer_info.shape.at(0);
+        mesh.prop = (buffer_info.shape.size() == 1) ? 0 : buffer_info.shape.at(0) - 1;
 
-        if (mcx_config.prop) {
-            free(mcx_config.prop);
+        if (mesh.med) {
+            free(mesh.med);
         }
 
-        mcx_config.prop = (medium*) malloc(mcx_config.medianum * sizeof(medium));
+        mesh.med = (medium*) malloc((mesh.prop + 1) * sizeof(medium));
         auto val = static_cast<float*>(buffer_info.ptr);
 
         for (int j = 0; j < 4; j++)
-            for (int i = 0; i < mcx_config.medianum; i++) {
-                ((float*) (&mcx_config.prop[i]))[j] = val[j * mcx_config.medianum + i];
+            for (int i = 0; i <= mesh.prop; i++) {
+                ((float*) (&mesh.med[i]))[j] = val[j * (mesh.prop + 1) + i];
             }
+
+        mcx_config.his.maxmedia = mesh.prop;
     }
 
 
@@ -678,6 +682,18 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         }
     }
 
+    if (mesh.facenb == NULL) {
+        mesh_getfacenb(&mesh, &mcx_config);
+    }
+
+    if (mesh.evol == NULL) {
+        mesh_getvolume(&mesh, &mcx_config);
+    }
+
+    if (!user_cfg.contains("e0")) {
+        mesh_initelem(&mesh, &mcx_config);
+    }
+
     // Flush the std::cout and std::cerr
     std::cout.flush();
     std::cerr.flush();
@@ -744,8 +760,8 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         hostdetreclen = (2 + ((mcx_config.ismomentum) > 0)) * mesh.prop + (mcx_config.issaveexit > 0) * 6 + 2;
 
         /** One must define the domain and properties */
-        if (mcx_config.vol == nullptr || mcx_config.medianum == 0) {
-            throw py::value_error("You must define 'vol' and 'prop' field.");
+        if (mesh.node == nullptr || mesh.prop == 0) {
+            throw py::value_error("You must define 'node' and 'prop' field.");
         }
 
         /** Initialize all buffers necessary to store the output variables */

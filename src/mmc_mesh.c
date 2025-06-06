@@ -703,54 +703,6 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
 }
 
 /**
- * @brief Compute the tetrahedron and nodal volumes if not provided
- *
- * @param[in] mesh: the mesh object
- * @param[in] cfg: the simulation configuration structure
- */
-
-
-void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
-    float dx, dy, dz;
-    int i, j;
-
-    mesh->evol = (float*)calloc(sizeof(float), mesh->ne);
-    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
-
-    for (i = 0; i < mesh->ne; i++) {
-        int* ee = (int*)(mesh->elem + i * mesh->elemlen);
-
-        dx = mesh->node[ee[2] - 1].x - mesh->node[ee[3] - 1].x;
-        dy = mesh->node[ee[2] - 1].y - mesh->node[ee[3] - 1].y;
-        dz = mesh->node[ee[2] - 1].z - mesh->node[ee[3] - 1].z;
-
-        mesh->evol[i] = mesh->node[ee[1] - 1].x * (mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y)
-                        - mesh->node[ee[1] - 1].y * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x)
-                        + mesh->node[ee[1] - 1].z * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x);
-        mesh->evol[i] += -mesh->node[ee[0] - 1].x * ((mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y) + mesh->node[ee[1] - 1].y * dz - mesh->node[ee[1] - 1].z * dy);
-        mesh->evol[i] += +mesh->node[ee[0] - 1].y * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dz - mesh->node[ee[1] - 1].z * dx);
-        mesh->evol[i] += -mesh->node[ee[0] - 1].z * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dy - mesh->node[ee[1] - 1].y * dx);
-        mesh->evol[i] = -mesh->evol[i];
-
-        if (mesh->evol[i] < 0.f) {
-            int e1 = ee[3];
-            ee[3] = ee [2];
-            ee[2] = e1;
-        }
-
-        mesh->evol[i] *= (1.f / 6.f);
-
-        if (mesh->type[i] == 0) {
-            continue;
-        }
-
-        for (j = 0; j < mesh->elemlen; j++) {
-            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
-        }
-    }
-}
-
-/**
  * @brief Load tet element volume file and initialize the related mesh properties
  *
  * @param[in] mesh: the mesh object
@@ -935,6 +887,54 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
 }
 
 #endif
+
+/**
+ * @brief Compute the tetrahedron and nodal volumes if not provided
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+
+void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
+    float dx, dy, dz;
+    int i, j;
+
+    mesh->evol = (float*)calloc(sizeof(float), mesh->ne);
+    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
+
+    for (i = 0; i < mesh->ne; i++) {
+        int* ee = (int*)(mesh->elem + i * mesh->elemlen);
+
+        dx = mesh->node[ee[2] - 1].x - mesh->node[ee[3] - 1].x;
+        dy = mesh->node[ee[2] - 1].y - mesh->node[ee[3] - 1].y;
+        dz = mesh->node[ee[2] - 1].z - mesh->node[ee[3] - 1].z;
+
+        mesh->evol[i] = mesh->node[ee[1] - 1].x * (mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y)
+                        - mesh->node[ee[1] - 1].y * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x)
+                        + mesh->node[ee[1] - 1].z * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x);
+        mesh->evol[i] += -mesh->node[ee[0] - 1].x * ((mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y) + mesh->node[ee[1] - 1].y * dz - mesh->node[ee[1] - 1].z * dy);
+        mesh->evol[i] += +mesh->node[ee[0] - 1].y * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dz - mesh->node[ee[1] - 1].z * dx);
+        mesh->evol[i] += -mesh->node[ee[0] - 1].z * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dy - mesh->node[ee[1] - 1].y * dx);
+        mesh->evol[i] = -mesh->evol[i];
+
+        if (mesh->evol[i] < 0.f) {
+            int e1 = ee[3];
+            ee[3] = ee [2];
+            ee[2] = e1;
+        }
+
+        mesh->evol[i] *= (1.f / 6.f);
+
+        if (mesh->type[i] == 0) {
+            continue;
+        }
+
+        for (j = 0; j < mesh->elemlen; j++) {
+            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
+        }
+    }
+}
 
 /**
  * @brief Scan all tetrahedral elements to find the one enclosing the source
