@@ -349,9 +349,9 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             free(mesh.type);
         }
 
-        mesh.type = (int*) malloc(mesh.nn * sizeof(int));
+        mesh.type = (int*) malloc(mesh.ne * sizeof(int));
         auto val = static_cast<int*>(buffer_info.ptr);
-        memcpy(mesh.type, val, mesh.nn * sizeof(int));
+        memcpy(mesh.type, val, mesh.ne * sizeof(int));
     }
 
 
@@ -678,12 +678,12 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         }
     }
 
-    if (mesh.facenb == NULL) {
-        mesh_getfacenb(&mesh, &mcx_config);
-    }
-
     if (mesh.evol == NULL) {
         mesh_getvolume(&mesh, &mcx_config);
+    }
+
+    if (mesh.facenb == NULL) {
+        mesh_getfacenb(&mesh, &mcx_config);
     }
 
     if (!user_cfg.contains("e0")) {
@@ -721,7 +721,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
     unsigned int active_dev = 0;     /** activeDev: count of total active GPUs to be used */
     std::vector<std::string> exception_msgs;
     int thread_id = 0;
-    size_t field_dim[6];
+    size_t field_dim[5] = {0};
     py::dict output;
 
     try {
@@ -831,9 +831,6 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             throw py::runtime_error("PMMC terminated due to an exception!");
         }
 
-        field_dim[4] = 1;
-        field_dim[5] = 1;
-
         if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
             field_dim[0] = MCX_DEBUG_REC_LEN;
             field_dim[1] = mcx_config.debugdatalen; // his.savedphoton is for one repetition, should correct
@@ -901,8 +898,8 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             field_dim[0] = mcx_config.srcnum;
             field_dim[1] = datalen;
             field_dim[2] = mcx_config.maxgate;
-            field_dim[3] = 1;
-            field_dim[4] = 1;
+            field_dim[3] = 0;
+            field_dim[4] = 0;
 
             std::vector<size_t> array_dims;
 
@@ -914,9 +911,9 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 field_dim[4] = mcx_config.maxgate;
 
                 if (mcx_config.srcnum > 1) {
-                    array_dims = {field_dim[0], field_dim[1], field_dim[2], field_dim[3], field_dim[4], field_dim[5]};
+                    array_dims = {field_dim[0], field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
                 } else {
-                    array_dims = {field_dim[1], field_dim[2], field_dim[3], field_dim[4], field_dim[5]};
+                    array_dims = {field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
                 }
             } else {
                 if (mcx_config.srcnum > 1) {

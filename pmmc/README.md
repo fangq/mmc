@@ -4,7 +4,7 @@
 
 - Copyright: (C) Qianqian Fang (2025) <q.fang at neu.edu>
 - License: GNU Public License V3 or later
-- Version: 0.1.0
+- Version: 0.1.1
 - URL: https://pypi.org/project/pmmc/
 - Github: https://github.com/fangq/mmc
 
@@ -112,10 +112,8 @@ import tetgen
 box = pv.Box(bounds=(0, 60, 0, 60, 0, 60))
 box_tri = box.triangulate()
 tet = tetgen.TetGen(box_tri)
-tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20)
-tetra_mesh = tet.grid
-node = tetra_mesh.points
-elem = tetra_mesh.cells_dict[pv.CellType.TETRA] + 1
+node, elem = tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20, switches='pq1.2a50')
+elem = elem + 1
 ```
 
 A simulation can be defined conveniently in two approaches - a one-liner and a two-liner:

@@ -922,6 +922,7 @@ void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
             int e1 = ee[3];
             ee[3] = ee [2];
             ee[2] = e1;
+            mesh->evol[i] = -mesh->evol[i];
         }
 
         mesh->evol[i] *= (1.f / 6.f);

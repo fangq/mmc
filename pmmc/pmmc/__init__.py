@@ -22,8 +22,20 @@ Example usage:
 import pmmc
 pmmc.gpuinfo()
 
+# To generate tetrahedral mesh
+import pyvista as pv
+import tetgen
+
+box = pv.Box(bounds=(0, 60, 0, 60, 0, 60))
+box_tri = box.triangulate()
+tet = tetgen.TetGen(box_tri)
+tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20)
+tetra_mesh = tet.grid
+node = tetra_mesh.points
+elem = tetra_mesh.cells_dict[pv.CellType.TETRA] + 1
+
 # To run a simulation
-res = pmmc.run(nphoton=1000000, vol=np.ones([60, 60, 60], dtype='uint8'),
+res = pmmc.run(nphoton=1000000, node=node, elem=elem, elemprop=np.ones(elem.shape[0]),
                tstart=0, tend=5e-9, tstep=5e-9, srcpos=[30,30,0],
                srcdir=[0,0,1], prop=np.array([[0, 0, 1, 1], [0.005, 1, 0.01, 1.37]]))
 """
@@ -51,15 +63,12 @@ except ImportError:  # pragma: no cover
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
-from .bench import bench
-
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = (
     "gpuinfo",
     "run",
     "version",
-    "bench",
     "detweight",
     "cwdref",
     "meanpath",
