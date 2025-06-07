@@ -1,5 +1,4 @@
-# Copyright (c) 2022-2023 Matin Raayai Ardakani <raayaiardakani.m at northeastern.edu>. All rights reserved.
-# Copyright (c) 2022-2024 Qianqian Fang <q.fang at neu.edu>. All rights reserved.
+# Copyright (c) 2025 Qianqian Fang <q.fang at neu.edu>. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,19 +24,19 @@ pmmc.gpuinfo()
 # To generate tetrahedral mesh
 import pyvista as pv
 import tetgen
+import numpy as np
 
 box = pv.Box(bounds=(0, 60, 0, 60, 0, 60))
 box_tri = box.triangulate()
 tet = tetgen.TetGen(box_tri)
-tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20)
-tetra_mesh = tet.grid
-node = tetra_mesh.points
-elem = tetra_mesh.cells_dict[pv.CellType.TETRA] + 1
+node, elem = tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20, switches='pq1.2a50')
+elem = elem + 1
 
 # To run a simulation
-res = pmmc.run(nphoton=1000000, node=node, elem=elem, elemprop=np.ones(elem.shape[0]),
-               tstart=0, tend=5e-9, tstep=5e-9, srcpos=[30,30,0],
-               srcdir=[0,0,1], prop=np.array([[0, 0, 1, 1], [0.005, 1, 0.01, 1.37]]))
+cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.shape[0]),
+       'tstart':0, 'tend':5e-9, 'tstep':5e-9, 'srcpos': [30,30,0], 'srcdir':[0,0,1],
+       'prop':[[0,0,1,1],[0.005,1,0.01,1.37]]}
+res = pmmc.run(cfg)
 """
 
 try:
@@ -63,7 +62,7 @@ except ImportError:  # pragma: no cover
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = (
     "gpuinfo",

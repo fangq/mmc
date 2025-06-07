@@ -760,19 +760,6 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             throw py::value_error("You must define 'node' and 'prop' field.");
         }
 
-        /** Initialize all buffers necessary to store the output variables */
-        if (mcx_config.issave2pt == 1) {
-            size_t field_len =
-                static_cast<int>(mcx_config.dim.x) * static_cast<int>(mcx_config.dim.y) * static_cast<int>(mcx_config.dim.z) *
-                (size_t) ((mcx_config.tend - mcx_config.tstart) / mcx_config.tstep + 0.5) * mcx_config.srcnum;
-
-            if (mcx_config.photonseed != nullptr && mcx_config.replaydet == -1) {
-                field_len *= mcx_config.detnum;
-            }
-
-            mcx_config.exportfield = (double*) calloc(field_len, sizeof(double));
-        }
-
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
         mcx_config.issaveseed = 0;
 #endif
@@ -933,7 +920,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 array_dims = {field_dim[1], field_dim[2]};
                 auto dref_array = py::array_t<double, py::array::f_style>(array_dims);
                 auto* dref = static_cast<double*>(dref_array.mutable_data());
-                memcpy(dref, mcx_config.exportfield, dref_array.size() * sizeof(double));
+                memcpy(dref, mesh.dref, dref_array.size() * sizeof(double));
 
                 output["dref"] = dref_array;
             }
