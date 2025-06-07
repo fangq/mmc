@@ -33,6 +33,7 @@ jobs:
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' && matrix.os != 'macos-14' }}
         run: |
+          brew install libomp
           ln -s /usr/local/opt/libomp/include/*.h /usr/local/include
           sudo ln -s /usr/local/lib/gcc/11/libgomp.a /usr/local/lib/libgomp.a
       - name: Set up Python
