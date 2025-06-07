@@ -42,7 +42,7 @@ if(BUILD_CUDA)
 endif()
 
 # C Options
-set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -fPIC ${OpenMP_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -D_hypot=hypot -fPIC ${OpenMP_CXX_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
