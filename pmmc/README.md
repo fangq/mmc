@@ -1,10 +1,10 @@
 ![](https://mcx.space/img/mcx_wiki_banner.png)
 
-# PMCX-CL - Python bindings for Monte Carlo eXtreme (OpenCL) photon transport simulator
+# PMMC - Python bindings for Mesh-based Monte Carlo (MMC) photon transport simulator
 
 - Copyright: (C) Qianqian Fang (2025) <q.fang at neu.edu>
 - License: GNU Public License V3 or later
-- Version: 0.1.0
+- Version: 0.0.0
 - URL: https://pypi.org/project/pmmc/
 - Github: https://github.com/fangq/mmc
 
@@ -12,16 +12,20 @@
 ![MacOS Python Module](https://github.com/fangq/mmc/actions/workflows/build_macos_wheel.yml/badge.svg)\
 ![Windows Python Module](https://github.com/fangq/mmc/actions/workflows/build_windows_wheel.yml/badge.svg)
 
-This module provides a Python binding for Monte Carlo eXtreme for OpenCL (MCXCL).
+This module provides a Python binding for Mesh-based Monte Carlo (MMC).
 For other binaries, including the standalone executable and the MATLAB bindings,
 see [our website](https://mcx.space).
 
-Monte Carlo eXtreme (MCX) is a fast photon transport simulation software for 3D 
-heterogeneous turbid media. By taking advantage of the massively parallel 
-threads and extremely low memory latency in a modern graphics processing unit 
-(GPU), MCX is capable of performing Monte Carlo (MC) photon simulations at a 
-blazing speed, typically hundreds to a thousand times faster than a single-threaded
-CPU-based MC implementation.
+Mesh-based Monte Carlo (MMC) is a 3D Monte Carlo (MC) simulation software for
+photon transport in complex turbid media. MMC combines the strengths of the 
+MC-based technique and the finite-element (FE) method: on the one hand, it 
+can handle general media, including low-scattering ones, as in the MC method; 
+on the other hand, it can use an FE-like tetrahedral mesh to represent curved 
+boundaries and complex structures, making it even more accurate, flexible, 
+and memory efficient. MMC uses the state-of-the-art ray-tracing techniques 
+to simulate photon propagation in a mesh space. It has been extensively 
+optimized for excellent computational efficiency and portability.
+
 
 ## How to Install
 
@@ -52,8 +56,8 @@ using apt-get: `sudo apt-get install python3-bjdata`. See https://pypi.org/proje
 ## Build Instructions
 
 ### Build Dependencies
-* **Operating System**: pmmc and mcxcl can be compiled on most OSes, including Windows, Linux and MacOS.
-* **OpenCL library**: compiling mcxcl or pmmc requires to link with `libOpenCL.so` on Linux, or `libOpenCL.dylib`
+* **Operating System**: pmmc and mmc can be compiled on most OSes, including Windows, Linux and MacOS.
+* **OpenCL library**: compiling mmc or pmmc requires to link with `libOpenCL.so` on Linux, or `libOpenCL.dylib`
 on MacOS or `OpenCL.dll` on Windows. These libraries should have been installed by either graphics driver or
 OpenCL runtimes.
 * **Python Interpreter**: Python 3.6 or above. The ```pip``` Python package manager and the ```wheel``` package (available
@@ -82,15 +86,15 @@ This can be queried via ```echo $env:PATH``` on Windows or ```echo $PATH``` on L
 
 2. Clone the repository and switch to the ```pmmc/``` folder:
     ```bash
-        git clone --recursive https://github.com/fangq/mcx.git
-        cd mcx/pmmc
+        git clone --recursive https://github.com/fangq/mmc.git
+        cd mmc/pmmc
     ```
 3. One can run `python3 setup.py install` or `python3 -m pip install .` to both locally build and install the module
 
 4. If one only wants to locally build the module, one should run `python3 -m pip wheel .`
 
 5. If the binary module is successfully built locally, you should see a binary wheel file `pmmc-X.X.X-cpXX-cpXX-*.whl`
-stored inside the `mcxcl/pmmc` folder. You can install this wheel package using `python3 -m pip install --force-reinstall pmmc-*.whl`
+stored inside the `mmc/pmmc` folder. You can install this wheel package using `python3 -m pip install --force-reinstall pmmc-*.whl`
 to force installing this locally compiled `pmmc` module and overwrite any previously installed versions.
 
 
@@ -102,9 +106,9 @@ you can then call the `run()` function to launch a photon simulation.
 
 A simulation can be defined conveniently in two approaches - a one-liner and a two-liner:
 
-* For the one-liner, one simply pass on each MCX simulation setting as positional
+* For the one-liner, one simply pass on each MMC simulation setting as positional
 argument. The supported setting names are compatible to nearly all the input fields
-for the MATLAB version of MCX/MCXCL - [MCXLAB](https://github.com/fangq/mcx/blob/master/mcxlab/mcxlab.m))
+for the MATLAB version of MMC - [MMCLAB](https://github.com/fangq/mmc/blob/master/mmclab/mmclab.m))
 
 ```python3
 import pmmc
