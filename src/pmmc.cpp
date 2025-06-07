@@ -43,10 +43,6 @@
 #include <string>
 #include <pybind11/iostream.h>
 
-#ifdef _OPENMP
-    #include <omp.h>
-#endif
-
 #include "mmc_const.h"
 #include "mmc_mesh.h"
 #include "mmc_host.h"
@@ -216,7 +212,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         for (int j = 0; j < mesh.elemlen; j++)
             for (int i = 0; i < mesh.ne; i++) {
-                ((int*) (&mesh.elem[i]))[j] = val[j * mesh.ne + i];
+                mesh.elem[i * mesh.elemlen + j] = val[j * mesh.ne + i];
             }
     }
 
@@ -270,7 +266,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         for (int j = 0; j < 6; j++)
             for (int i = 0; i < mesh.ne; i++) {
-                ((float*) (&mesh.edgeroi[i]))[j] = val[j * mesh.ne + i];
+                mesh.edgeroi[i * 6 + j] = val[j * mesh.ne + i];
             }
     }
 
@@ -299,7 +295,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         for (int j = 0; j < 4; j++)
             for (int i = 0; i < mesh.ne; i++) {
-                ((float*) (&mesh.faceroi[i]))[j] = val[j * mesh.ne + i];
+                mesh.faceroi[i * 4 + j] = val[j * mesh.ne + i];
             }
     }
 
@@ -329,7 +325,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         for (int j = 0; j < mesh.elemlen; j++)
             for (int i = 0; i < mesh.ne; i++) {
-                ((int*) (&mesh.facenb[i]))[j] = val[j * mesh.ne + i];
+                mesh.facenb[i * mesh.elemlen + j] = val[j * mesh.ne + i];
             }
     }
 
@@ -347,7 +343,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'elemprop' field must have 1 row or 1 column");
         }
 
-        mesh.nn = (buffer_info.shape.size() == 1) ? buffer_info.shape.at(0) : buffer_info.shape.at(0) * buffer_info.shape.at(1);
+        mesh.ne = (buffer_info.shape.size() == 1) ? buffer_info.shape.at(0) : buffer_info.shape.at(0) * buffer_info.shape.at(1);
 
         if (mesh.type) {
             free(mesh.type);
@@ -800,44 +796,33 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             mmc_prep(&mcx_config, &mesh, &tracer);
         }
 
-        /** Start multiple threads, one thread to run portion of the simulation on one CUDA GPU, all in parallel */
-#ifdef _OPENMP
-        omp_set_num_threads(active_dev);
-        #pragma omp parallel shared(exception_msgs)
-        {
-            thread_id = omp_get_thread_num();
-#endif
+        /** Enclose all simulation calls inside a try/catch construct for exception handling */
+        try {
 
-            /** Enclose all simulation calls inside a try/catch construct for exception handling */
-            try {
-
-                if (mcx_config.compute == cbSSE || mcx_config.gpuid > MAX_DEVICE) {
-                    mmc_run_mp(&mcx_config, &mesh, &tracer);
-                }
+            if (mcx_config.compute == cbSSE || mcx_config.gpuid > MAX_DEVICE) {
+                mmc_run_mp(&mcx_config, &mesh, &tracer);
+            }
 
 #ifdef USE_CUDA
-                else if (mcx_config.compute == cbCUDA) {
-                    mmc_run_cu(&mcx_config, &mesh, &tracer);
-                }
+            else if (mcx_config.compute == cbCUDA) {
+                mmc_run_cu(&mcx_config, &mesh, &tracer);
+            }
 
 #endif
 #ifdef USE_OPENCL
-                else {
-                    mmc_run_cl(&mcx_config, &mesh, &tracer);
-                }
-
-#endif
-            } catch (const char* err) {
-                exception_msgs.push_back("Error from thread (" + std::to_string(thread_id) + "): " + err);
-            } catch (const std::exception& err) {
-                exception_msgs.push_back("C++ Error from thread (" + std::to_string(thread_id) + "): " + err.what());
-            } catch (...) {
-                exception_msgs.push_back("Unknown Exception from thread (" + std::to_string(thread_id) + ")");
+            else {
+                mmc_run_cl(&mcx_config, &mesh, &tracer);
             }
 
-#ifdef _OPENMP
-        }
 #endif
+        } catch (const char* err) {
+            exception_msgs.push_back("Error from thread (" + std::to_string(thread_id) + "): " + err);
+        } catch (const std::exception& err) {
+            exception_msgs.push_back("C++ Error from thread (" + std::to_string(thread_id) + "): " + err.what());
+        } catch (...) {
+            exception_msgs.push_back("Unknown Exception from thread (" + std::to_string(thread_id) + ")");
+        }
+
 
         tracer_clear(&tracer);
 

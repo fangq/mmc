@@ -1918,6 +1918,10 @@ void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
         MMC_ERROR(999, "You must define 'mesh' and 'prop' fields.");
     }
 
+    if (mesh->nvol) {
+        free(mesh->nvol);
+    }
+
     mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
 
     for (i = 0; i < mesh->ne; i++) {
