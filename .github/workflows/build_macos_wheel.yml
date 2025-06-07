@@ -30,6 +30,10 @@ jobs:
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
+      - name: Link libgomp.a (MacOS only)
+        if: ${{ runner.os == 'macOS' && matrix.os != 'macos-14' }}
+        run: |
+          sudo ln -s /usr/local/lib/gcc/11/libgomp.a /usr/local/lib/libgomp.a
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
