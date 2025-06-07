@@ -4,7 +4,7 @@
 
 - Copyright: (C) Qianqian Fang (2025) <q.fang at neu.edu>
 - License: GNU Public License V3 or later
-- Version: 0.0.0
+- Version: 0.1.0
 - URL: https://pypi.org/project/pmmc/
 - Github: https://github.com/fangq/mmc
 
@@ -44,6 +44,7 @@ POCL's support is largely limited to CPUs. You **do not need** to install CUDA S
 * **Python**: Python 3.6 and newer is required. **Python 2 is not supported**.
 * **numpy**: Used to pass/receive volumetric information to/from pmmc. To install, use either conda or pip 
 package managers: `pip install numpy` or `conda install numpy`
+* **pyvista** and **tetgen** are needed to create tetrahedral mesh. To install, use `pip install pyvista tetgen`
 * (optional) **jdata**: Only needed to read/write JNIfTI output files. To install, use pip: `pip install jdata` 
 on all operating systems; For Debian-based Linux distributions, you can also install to the system interpreter 
 using apt-get: `sudo apt-get install python3-jdata`. See https://pypi.org/project/jdata/ for more details. 
@@ -104,6 +105,19 @@ The PMMC module is easy to use. You can use the `pmmc.gpuinfo()` function to fir
 if you have NVIDIA/CUDA compatible GPUs installed; if there are NVIDIA GPUs detected,
 you can then call the `run()` function to launch a photon simulation.
 
+```python3
+import pyvista as pv
+import tetgen
+
+box = pv.Box(bounds=(0, 60, 0, 60, 0, 60))
+box_tri = box.triangulate()
+tet = tetgen.TetGen(box_tri)
+tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20)
+tetra_mesh = tet.grid
+node = tetra_mesh.points
+elem = tetra_mesh.cells_dict[pv.CellType.TETRA] + 1
+```
+
 A simulation can be defined conveniently in two approaches - a one-liner and a two-liner:
 
 * For the one-liner, one simply pass on each MMC simulation setting as positional
@@ -115,7 +129,7 @@ import pmmc
 import numpy as np
 import matplotlib.pyplot as plt
 
-res = pmmc.run(nphoton=1000000, vol=np.ones([60, 60, 60], dtype='uint8'), tstart=0, tend=5e-9, 
+res = pmmc.run(nphoton=1000000, node=node, elem=elem, elemprop=np.ones(elem.shape[0]), tstart=0, tend=5e-9, 
                tstep=5e-9, srcpos=[30,30,0], srcdir=[0,0,1], prop=np.array([[0, 0, 1, 1], [0.005, 1, 0.01, 1.37]]))
 res['flux'].shape
 
@@ -129,7 +143,7 @@ as a key, and pass on the dict object to `pmmc.run()`
 ```python3
 import pmmc
 import numpy as np
-cfg = {'nphoton': 1000000, 'vol':np.ones([60,60,60],dtype='uint8'), 'tstart':0, 'tend':5e-9, 'tstep':5e-9,
+cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.shape[0]), 'tstart':0, 'tend':5e-9, 'tstep':5e-9,
        'srcpos': [30,30,0], 'srcdir':[0,0,1], 'prop':[[0,0,1,1],[0.005,1,0.01,1.37]]}
 res = pmmc.run(cfg)
 ```
