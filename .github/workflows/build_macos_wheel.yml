@@ -41,7 +41,8 @@ jobs:
       - name: Select Supported XCode Version + Link OpenMP
         run: |
           brew install libomp
-          ln -s /usr/local/opt/libomp/include/*.h /usr/local/include
+          brew link --force libomp
+          ln -sf /usr/local/opt/libomp/include/*.h /usr/local/include
       - name: Build Wheels
         run: |
           cd pmmc/
