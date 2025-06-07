@@ -33,7 +33,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-24.04' }}
         run: |
           sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
-          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev octave-dev gcc-7 g++-7 upx-ucl pocl-opencl-icd
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev octave-dev gcc-7 g++-7 gcc-9 g++-9 upx-ucl pocl-opencl-icd
       - name: Install dependencies (Linux only)
         if: ${{ runner.os == 'Linux' }}
         run: |
@@ -50,6 +50,7 @@ jobs:
       - name: Link libgomp.a (MacOS only)
         if: ${{ runner.os == 'macOS' && matrix.os != 'macos-14' }}
         run: |
+          ln -s /usr/local/opt/libomp/include/*.h /usr/local/include
           sudo ln -s /usr/local/lib/gcc/11/libgomp.a /usr/local/lib/libgomp.a
       - name: Install dependencies (Windows only)
         if: ${{ runner.os == 'Windows' }}
