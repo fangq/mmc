@@ -40,6 +40,7 @@ jobs:
           python-version: ${{ matrix.python_version }}
       - name: Select Supported XCode Version + Link OpenMP
         run: |
+          brew install libomp
           brew link --force libomp
       - name: Build Wheels
         run: |
