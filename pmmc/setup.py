@@ -49,13 +49,15 @@ class CMakeBuild(build_ext):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
             "-DBUILD_PYTHON=true",
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
         ]
         build_args = []
         # Adding CMake arguments set as environment variable
         # (needed e.g. to build for ARM OSx on conda-forge)
         if "CMAKE_ARGS" in os.environ:
-            cmake_args += [item for item in os.environ["CMAKE_ARGS"].split('\t') if item]
+            cmake_args += [
+                item for item in os.environ["CMAKE_ARGS"].split("\t") if item
+            ]
 
         if self.compiler.compiler_type != "msvc":
             # Using Ninja-build since it a) is available as a wheel and b)
@@ -74,7 +76,9 @@ class CMakeBuild(build_ext):
         else:
 
             # Single config generators are handled "normally"
-            single_config = any(x in cmake_generator for x in {"MinGW Makefiles", "Ninja"})
+            single_config = any(
+                x in cmake_generator for x in {"MinGW Makefiles", "Ninja"}
+            )
 
             # CMake allows an arch-in-generator style for backward compatibility
             contains_arch = any(x in cmake_generator for x in {"ARM", "Win64"})
@@ -82,7 +86,7 @@ class CMakeBuild(build_ext):
             # Specify the arch if using MSVC generator, but only if it doesn't
             # contain a backward-compatibility arch spec already in the
             # generator name.
-            #if not single_config and not contains_arch:
+            # if not single_config and not contains_arch:
             #    cmake_args += ["-A", PLAT_TO_CMAKE[self.plat_name]]
 
             # Multi-config generators have a different way to specify configs
@@ -112,43 +116,58 @@ class CMakeBuild(build_ext):
             os.makedirs(build_temp)
 
         subprocess.check_call(["cmake", ext.source_dir] + cmake_args, cwd=build_temp)
-        subprocess.check_call(["cmake", "--build", ".", "--target", ext.target] + build_args, cwd=build_temp)
+        subprocess.check_call(
+            ["cmake", "--build", ".", "--target", ext.target] + build_args,
+            cwd=build_temp,
+        )
 
 
 # The information here can also be placed in setup.cfg - better separation of
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
     name="pmmc",
-    packages=['pmmc'],
-    version="0.2.0",
-    requires=['numpy'],
-    license='GPLv3+',
+    packages=["pmmc"],
+    version="0.2.1",
+    requires=["numpy"],
+    license="GPLv3+",
     author="Qianqian Fang",
     author_email="q.fang@neu.edu",
     description="Python bindings for Mesh-based Monte Carlo (MMC) photon transport simulator",
     long_description=readme,
     long_description_content_type="text/markdown",
-    maintainer= 'Qianqian Fang',
-    url='https://github.com/fangq/mmc',
-    download_url='https://mcx.space',
-    keywords=['Monte Carlo simulation', 'Biophotonics', 'Ray-tracing', 'Rendering', 'GPU', 'Modeling',
-                'Biomedical Optics', 'Tissue Optics', 'Simulator', 'Optics', 'OpenCL'],
+    maintainer="Qianqian Fang",
+    url="https://github.com/fangq/mmc",
+    download_url="https://mcx.space",
+    keywords=[
+        "Monte Carlo simulation",
+        "Biophotonics",
+        "Ray-tracing",
+        "Rendering",
+        "GPU",
+        "Modeling",
+        "Biomedical Optics",
+        "Tissue Optics",
+        "Simulator",
+        "Optics",
+        "OpenCL",
+    ],
     ext_modules=[CMakeExtension("_pmmc", target="_pmmc", source_dir="../src/")],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
     python_requires=">=3.6",
     classifiers=[
-      'Development Status :: 4 - Beta',
-      'Intended Audience :: Science/Research',
-      'Environment :: GPU',
-      'Topic :: Scientific/Engineering :: Physics',
-      'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-      'Programming Language :: Python :: 3.6',
-      'Programming Language :: Python :: 3.7',
-      'Programming Language :: Python :: 3.8',
-      'Programming Language :: Python :: 3.9',
-      'Programming Language :: Python :: 3.10',
-      'Programming Language :: Python :: 3.11',
-      'Programming Language :: Python :: 3.12'
-    ]
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Science/Research",
+        "Environment :: GPU",
+        "Topic :: Scientific/Engineering :: Physics",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+    ],
 )

@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""PMMC - Python bindings for Monte Carlo eXtreme (OpenCL) photon transport simulator
+"""PMMC - Python bindings for Mesh-based Monte Carlo (MMC) photon transport simulator
 
 Example usage:
 
@@ -21,16 +21,11 @@ Example usage:
 import pmmc
 pmmc.gpuinfo()
 
-# To generate tetrahedral mesh
-import pyvista as pv
-import tetgen
 import numpy as np
 
-box = pv.Box(bounds=(0, 60, 0, 60, 0, 60))
-box_tri = box.triangulate()
-tet = tetgen.TetGen(box_tri)
-node, elem = tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20, switches='pq1.2a50')
-elem = elem + 1
+# To generate tetrahedral mesh
+import iso2mesh as i2m
+node, face, elem = i2m.meshabox([0, 0, 0], [60, 60, 60], 10, 100)  # create a mesh
 
 # To run a simulation
 cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.shape[0]),
@@ -62,7 +57,7 @@ except ImportError:  # pragma: no cover
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = (
     "gpuinfo",

@@ -4,7 +4,7 @@
 
 - Copyright: (C) Qianqian Fang (2025) <q.fang at neu.edu>
 - License: GNU Public License V3 or later
-- Version: 0.2.0
+- Version: 0.2.1
 - URL: https://pypi.org/project/pmmc/
 - Github: https://github.com/fangq/mmc
 
@@ -44,7 +44,8 @@ POCL's support is largely limited to CPUs. You **do not need** to install CUDA S
 * **Python**: Python 3.6 and newer is required. **Python 2 is not supported**.
 * **numpy**: Used to pass/receive volumetric information to/from pmmc. To install, use either conda or pip 
 package managers: `pip install numpy` or `conda install numpy`
-* **pyvista** and **tetgen** are needed to create tetrahedral mesh. To install, use `pip install pyvista tetgen`
+* **iso2mesh** is a easy-to-use mesh generator for creating the tetrahedral meshed domain
+for pmmc, install it with `pip install iso2mesh`
 * (optional) **jdata**: Only needed to read/write JNIfTI output files. To install, use pip: `pip install jdata` 
 on all operating systems; For Debian-based Linux distributions, you can also install to the system interpreter 
 using apt-get: `sudo apt-get install python3-jdata`. See https://pypi.org/project/jdata/ for more details. 
@@ -74,10 +75,10 @@ OpenCL runtimes.
   GCC and Microsoft Visual Studio compiler support OpenMP out of the box. Apple Clang, however, requires manual 
   installation of OpenMP libraries for Apple Clang. The easiest way to do this is via the [Brew](https://brew.sh/) package
   manager, preferably after selecting the correct Xcode version:
-  ```zsh
-    brew install libomp
-    brew link --force libomp
-  ```
+```bash
+brew install libomp
+brew link --force libomp
+```
 * **CMake**: CMake version 3.15 and later is required. Refer to the [CMake website](https://cmake.org/download/) for more information on how to download.
   CMake is also widely available on package managers across all operating systems.
 
@@ -86,10 +87,10 @@ OpenCL runtimes.
 This can be queried via ```echo $env:PATH``` on Windows or ```echo $PATH``` on Linux. If not, locate them and add their folder to the ```PATH```.
 
 2. Clone the repository and switch to the ```pmmc/``` folder:
-    ```bash
-        git clone --recursive https://github.com/fangq/mmc.git
-        cd mmc/pmmc
-    ```
+```bash
+git clone --recursive https://github.com/fangq/mmc.git
+cd mmc/pmmc
+```
 3. One can run `python3 setup.py install` or `python3 -m pip install .` to both locally build and install the module
 
 4. If one only wants to locally build the module, one should run `python3 -m pip wheel .`
@@ -105,17 +106,6 @@ The PMMC module is easy to use. You can use the `pmmc.gpuinfo()` function to fir
 if you have NVIDIA/CUDA compatible GPUs installed; if there are NVIDIA GPUs detected,
 you can then call the `run()` function to launch a photon simulation.
 
-```python3
-import pyvista as pv
-import tetgen
-
-box = pv.Box(bounds=(0, 60, 0, 60, 0, 60))
-box_tri = box.triangulate()
-tet = tetgen.TetGen(box_tri)
-node, elem = tet.tetrahedralize(order=1, minratio=1.5, mindihedral=20, switches='pq1.2a50')
-elem = elem + 1
-```
-
 A simulation can be defined conveniently in two approaches - a one-liner and a two-liner:
 
 * For the one-liner, one simply pass on each MMC simulation setting as positional
@@ -127,11 +117,16 @@ import pmmc
 import numpy as np
 import matplotlib.pyplot as plt
 
-res = pmmc.run(nphoton=1000000, node=node, elem=elem, elemprop=np.ones(elem.shape[0]), tstart=0, tend=5e-9, 
+import iso2mesh as i2m
+node, face, elem = i2m.meshabox([0, 0, 0], [60, 60, 60], 10, 100)  # create a mesh
+
+gpus = pmmc.gpuinfo()  # list all available GPUs
+
+res = pmmc.run(nphoton=1000000, node=node, elem=elem, elemprop=np.ones(elem.shape[0]), tstart=0, tend=5e-9,
                tstep=5e-9, srcpos=[30,30,0], srcdir=[0,0,1], prop=np.array([[0, 0, 1, 1], [0.005, 1, 0.01, 1.37]]))
 res['flux'].shape
 
-plt.imshow(np.log10(res['flux'][30,:, :]))
+plt.imshow(np.log10(res['flux'][30,:, :].squeeze()))
 plt.show()
 ```
 
