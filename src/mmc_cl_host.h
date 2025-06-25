@@ -88,7 +88,7 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_int    nn, ne, nf;
     cl_float3 nmin;
     cl_float  nout;
-    cl_uint   roulettesize;
+    cl_float  roulettesize;
     cl_int    srcnum;
     cl_int4   crop0;
     cl_int    srcelemlen;

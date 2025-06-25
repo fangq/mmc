@@ -465,7 +465,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         FPARAM_TO_MACRO(opt, param, nout);
         IPARAM_TO_MACRO(opt, param, outputtype);
         IPARAM_TO_MACRO(opt, param, reclen);
-        IPARAM_TO_MACRO(opt, param, roulettesize);
+        FPARAM_TO_MACRO(opt, param, roulettesize);
         FPARAM_TO_MACRO(opt, param, Rtstep);
         IPARAM_TO_MACRO(opt, param, srcelemlen);
         IPARAM_TO_MACRO(opt, param, srctype);
@@ -829,7 +829,7 @@ is more than what your have specified (%d), please use the -H option to specify 
         mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
     }
 
-    if (cfg->issaveref) {
+    if (cfg->issaveref && cfg->parentid == mpStandalone) {
         MMC_FPRINTF(cfg->flog, "saving surface diffuse reflectance ...");
         mesh_saveweight(mesh, cfg, 1);
     }
