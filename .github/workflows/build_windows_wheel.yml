@@ -13,13 +13,13 @@ on:
 jobs:
   build_windows_wheels:
     name: Build Windows wheels
-    runs-on: windows-2019
+    runs-on: windows-2022
     defaults:
       run:
         shell: bash
     strategy:
       matrix:
-        python_version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', 'pypy3.7', 'pypy3.8', 'pypy3.9', 'pypy3.10' ]
+        python_version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', 'pypy3.7', 'pypy3.8', 'pypy3.9', 'pypy3.10' ]
     outputs:
       perform_pypi_upload: ${{ steps.perform_pypi_upload_check.outputs.perform_pypi_upload }}
     steps:
@@ -33,6 +33,8 @@ jobs:
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
+          cd src/pybind11
+          git pull
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
