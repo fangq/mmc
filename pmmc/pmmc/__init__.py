@@ -57,7 +57,7 @@ except ImportError:  # pragma: no cover
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 __all__ = (
     "gpuinfo",
