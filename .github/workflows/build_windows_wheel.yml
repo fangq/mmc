@@ -33,8 +33,7 @@ jobs:
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
-          cd src/pybind11
-          git pull
+          git submodule update --init --remote .
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
