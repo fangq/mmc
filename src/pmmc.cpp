@@ -454,7 +454,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         const char* methods[] = {"plucker", "havel", "badouel", "elem", "grid", ""};
 
         if (method_str.empty()) {
-            throw py::value_error("the 'methods' field must be a non-empty string");
+            throw py::value_error("the 'method' field must be a non-empty string");
         }
 
         mcx_config.method = mcx_keylookup((char*)(method_str.c_str()), methods);
@@ -467,10 +467,10 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
     if (user_cfg.contains("outputtype")) {
         std::string output_type_str = py::str(user_cfg["outputtype"]);
-        const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "nscat", "wl", "wp", "wm", "rf", "length", "rfmus", "wltof", "wptof"};
+        const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "nscat", "wl", "wp", ""};
 
         if (output_type_str.empty()) {
-            throw py::value_error("the 'srctype' field must be a non-empty string");
+            throw py::value_error("the 'outputtype' field must be a non-empty string");
         }
 
         mcx_config.outputtype = mcx_keylookup((char*)(output_type_str.c_str()), outputtype);

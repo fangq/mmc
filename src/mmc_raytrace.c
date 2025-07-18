@@ -2411,9 +2411,19 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
     int is, i, ea, eb, ec;
     float bary[4] = {0.f};
 
-    for (is = 0; is < mesh->srcelemlen; is++) {
+    for (is = -1; is < mesh->srcelemlen; is++) {
         int include = 1;
-        int* elems = (int*)(mesh->elem + (mesh->srcelem[is] - 1) * mesh->elemlen);
+        int* elems = NULL;
+
+        if(is < 0) {
+            if(r->eid >= 0) {
+                elems = (int*)(mesh->elem + (r->eid - 1) * mesh->elemlen);
+            } else {
+                continue;
+            }
+        } else {
+            elems = (int*)(mesh->elem + (mesh->srcelem[is] - 1) * mesh->elemlen);
+        }
 
         for (i = 0; i < 4; i++) {
             ea = elems[out[i][0]] - 1;
@@ -2433,7 +2443,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         }
 
         if (include) {
-            r->eid = mesh->srcelem[is];
+            r->eid = (is >= 0 ? mesh->srcelem[is] : r->eid);
             float s = 0.f;
 
             for (i = 0; i < 4; i++) {
