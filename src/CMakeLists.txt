@@ -42,7 +42,12 @@ if(BUILD_CUDA)
 endif()
 
 # C Options
-set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -D_hypot=hypot -fPIC ${OpenMP_CXX_FLAGS}")
+if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -D_hypot=hypot -fPIC ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_MODULE_LINKER_FLAGS "/opt/homebrew/lib/libomp.a")
+else()
+    set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -D_hypot=hypot -fPIC ${OpenMP_CXX_FLAGS}")
+endif()
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
@@ -205,7 +210,7 @@ if(BUILD_PYTHON)
             cjson/cJSON.h
             ubj/ubj.h
             ubj/ubjw.c
-			pmmc.cpp
+            pmmc.cpp
             )
 
     target_compile_definitions(_pmmc PUBLIC MCX_CONTAINER PYBIND11_VERSION_MAJOR)
