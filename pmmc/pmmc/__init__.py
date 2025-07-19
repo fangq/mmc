@@ -34,7 +34,22 @@ cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.
 res = pmmc.run(cfg)
 """
 
+import sys
+
 try:
+    if sys.platform.startswith("win"):
+        import os, sparse_numba, ctypes
+
+        ctypes.CDLL(
+            os.path.join(
+                os.path.dirname(sparse_numba.__file__),
+                "vendor",
+                "superlu",
+                "bin",
+                "libgomp-1.dll",
+            )
+        )
+
     from _pmmc import gpuinfo, run, version
 except ImportError:  # pragma: no cover
     print("the pmmc binary extension (_pmmc) is not compiled! please compile first")
@@ -57,7 +72,7 @@ except ImportError:  # pragma: no cover
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 __all__ = (
     "gpuinfo",
