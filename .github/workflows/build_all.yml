@@ -70,6 +70,10 @@ jobs:
           cp bin/OpenCL.dll 'c:\Windows\System32'
           cd ..
           rm -rf opencl
+      - name: Install OpenCL (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install opencl-intel-cpu-runtime --yes --no-progress
       - name: Set up MATLAB (non MacOS-14)
         if: ${{ matrix.os != 'macos-14' }}
         uses: matlab-actions/setup-matlab@v1
