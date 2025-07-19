@@ -78,7 +78,7 @@ jobs:
         run: |
           cd pmmc/
           pip install wheel setuptools
-          python setup.py bdist_wheel
+          VERBOSE=1 python setup.py bdist_wheel
           ls dist/
           mv dist/ ../
           cd ../
