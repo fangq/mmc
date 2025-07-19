@@ -127,7 +127,7 @@ class CMakeBuild(build_ext):
 setup(
     name="pmmc",
     packages=["pmmc"],
-    version="0.2.2",
+    version="0.2.3",
     requires=["numpy"],
     license="GPLv3+",
     author="Qianqian Fang",
