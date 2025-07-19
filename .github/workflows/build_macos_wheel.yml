@@ -18,6 +18,9 @@ jobs:
       matrix:
         os: [macos-13, macos-14]
         python_version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', 'pypy3.7', 'pypy3.8', 'pypy3.9', 'pypy3.10' ]
+        exclude:
+          - os: macos-14
+            python_version: 3.7
     outputs:
       perform_pypi_upload: ${{ steps.perform_pypi_upload_check.outputs.perform_pypi_upload }}
     steps:
@@ -65,7 +68,7 @@ jobs:
           name: macos-wheels-${{ matrix.os }}-${{ matrix.python_version }}
           path: dist/
 
-  upload_macos_wheels:
+  upload_macos_x86_wheels:
     needs: build_macos_wheels
     runs-on: ubuntu-latest
     if: ${{ github.repository_owner == 'fangq' && needs.build_macos_wheels.outputs.perform_pypi_upload == 1 && github.event_name != 'pull_request'}}
@@ -73,7 +76,26 @@ jobs:
       - name: Download Wheels from Build Job
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-wheels-*
+          pattern: macos-wheels-macos-13-*
+          merge-multiple: true
+          path: dist/
+      - name: Upload packages to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          verify_metadata: false
+          verbose: true
+          skip_existing: true
+
+  upload_macos_arm64_wheels:
+    needs: build_macos_wheels
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'fangq' && needs.build_macos_wheels.outputs.perform_pypi_upload == 1 && github.event_name != 'pull_request'}}
+    steps:
+      - name: Download Wheels from Build Job
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-wheels-macos-14-*
           merge-multiple: true
           path: dist/
       - name: Upload packages to PyPI
