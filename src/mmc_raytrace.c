@@ -2415,8 +2415,8 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         int include = 1;
         int* elems = NULL;
 
-        if(is < 0) {
-            if(r->eid >= 0) {
+        if (is < 0) {
+            if (r->eid >= 0) {
                 elems = (int*)(mesh->elem + (r->eid - 1) * mesh->elemlen);
             } else {
                 continue;

@@ -25,15 +25,15 @@ function savemmcmesh(key, node, elem, varargin)
 % License: GPLv3, see http://mcx.sf.net/mmc/ for details
 %
 
-if(~isempty(varargin) && ischar(varargin{1}))
+if (~isempty(varargin) && ischar(varargin{1}))
     opt = varargin2struct(varargin{:});
 else
     opt = struct;
 end
 
-if(~isempty(varargin) && ~ischar(varargin{1}))
+if (~isempty(varargin) && ~ischar(varargin{1}))
     facenb = varargin{1};
-    if(length(varargin) > 1)
+    if (length(varargin) > 1)
         roi = varargin{2};
     end
 end
@@ -76,7 +76,7 @@ if (~isempty(facenb))
     fclose(fid);
 end
 
-if(~exist('roi', 'var'))
+if (~exist('roi', 'var'))
     roi = jsonopt('roi', [], opt);
 end
 
