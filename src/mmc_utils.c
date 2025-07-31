@@ -3081,19 +3081,6 @@ void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedb
         cfg->issaveexit = 0;
     }
 
-    if (cfg->seed == SEED_FROM_FILE && cfg->his.detected != cfg->nphoton) {
-        cfg->his.detected = 0;
-
-        if (cfg->replayweight == NULL) {
-            MMC_ERROR(999, "You must define 'replayweight' when you specify 'seed'.");
-        } else if (cfg->replaytime == NULL) {
-            MMC_ERROR(999, "You must define 'replayweight' when you specify 'seed'.");
-        } else {
-            MMC_ERROR(999, "The dimension of the 'replayweight' OR 'replaytime' field does not match the column number of the 'seed' field.");
-        }
-    }
-
-    // cfg->his.maxmedia=cfg->medianum-1; /*skip medium 0*/
     cfg->his.detnum = cfg->detnum;
     cfg->his.colcount = (1 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 1;
     mcx_replayinit(cfg, detps, dimdetps, seedbyte);

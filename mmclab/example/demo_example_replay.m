@@ -44,13 +44,8 @@ newcfg = mmclab(cfg, 'prep');  % preprocessing of the mesh to get the missing fi
 % set up for wl replay
 
 newcfg.replaydet = 1;     % replay photons detected by det#1
-newcfg.seed = seeds.data(:, detp.data(1, :) == newcfg.replaydet);
-detp.ppath = detp.ppath(detp.data(1, :) == newcfg.replaydet, :);
-detp.w0 = detp.w0(detp.data(1, :) == newcfg.replaydet, :);
-detp.data = detp.data(:, detp.data(1, :) == newcfg.replaydet);
-% calculate the detected photon weight using the partial path output and prop
-newcfg.replayweight = mmcdetweight(detp, newcfg.prop);
-newcfg.replaytime = mmcdettime(detp, newcfg.prop);
+newcfg.seed = seeds.data;
+newcfg.detphotons = detp.data;
 newcfg.isnormalized = 0;
 newcfg.outputtype = 'wl';    % replay and get wl
 
@@ -85,6 +80,8 @@ newcfg.outputtype = 'wp';    % replay and get wp
 
 % the two detected photon arrays should be the same. however, because
 % the program uses multi-threading, the orders may be different
+
+detp.data = detp.data(:, detp.data(1, :) == newcfg.replaydet);
 
 if (all(ismember(round(detp.data' * 1e10) * 1e-10, round(detp3.data' * 1e10) * 1e-10, 'rows')))
     disp('replay is successful :-)');
