@@ -1154,9 +1154,15 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
             if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
                 for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
                     int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
+                    float roilabel = tracer->mesh->edgeroi[(id - 1) * 6];
 
-                    if (id > 0 && fabs(tracer->mesh->edgeroi[(id - 1) * 6]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
-                        tracer->mesh->edgeroi[i * 6] = -id - 6;
+                    if (id > 0 && fabs(roilabel) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
+                        if (roilabel < -6) {
+                            tracer->mesh->edgeroi[i * 6] = roilabel;
+                        } else {
+                            tracer->mesh->edgeroi[i * 6] = -id - 6;
+                        }
+
                         break;
                     }
                 }
@@ -1172,9 +1178,15 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
 
                     for (k = 0; k < tracer->mesh->elemlen; k++) { // loop over my j-th neighbor's neighbors
                         int id = tracer->mesh->facenb[firstnbid * tracer->mesh->elemlen + k]; // loop over 2nd order neighboring elements
+                        float roilabel = tracer->mesh->edgeroi[(id - 1) * 6];
 
-                        if (id > 0 && fabs(tracer->mesh->edgeroi[(id - 1) * 6]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
-                            tracer->mesh->edgeroi[i * 6] = -id - 6;
+                        if (id > 0 && fabs(roilabel) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
+                            if (roilabel < -6) {
+                                tracer->mesh->edgeroi[i * 6] = roilabel;
+                            } else {
+                                tracer->mesh->edgeroi[i * 6] = -id - 6;
+                            }
+
                             break;
                         }
                     }
