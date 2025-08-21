@@ -984,9 +984,9 @@ void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, f
     } else if (d2d[0] < r2 - EPS2 && d2d[1] > r2 + EPS2) {
         *hitstatus = htInOut;
     } else if (d2d[1] > r2 + EPS2) {
-        *hitstatus = htNoHitOut;
+        *hitstatus = (r->inroi == 1) ? htInOut : htNoHitOut; // check for photons on edge of ROI
     } else if (d2d[1] < r2 - EPS2) {
-        *hitstatus = htNoHitIn;
+        *hitstatus = (r->inroi == 0) ? htOutIn : htNoHitIn;
     }
 }
 
@@ -1077,9 +1077,9 @@ void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, fl
     } else if (npdist0 < nr - EPS2 && npdist1 > nr + EPS2) {
         *hitstatus = htInOut;
     } else if (npdist1 > nr + EPS2) {
-        *hitstatus = htNoHitOut;
+        *hitstatus = (r->inroi == 1) ? htInOut : htNoHitOut; // check for borderline photons very close to edge
     } else if (npdist1 < nr - EPS2) {
-        *hitstatus = htNoHitIn;
+        *hitstatus = (r->inroi == 0) ? htOutIn : htNoHitIn; // check for borderline photons very close to edge
     } else {
         *hitstatus = htNone;
     }
@@ -1220,7 +1220,8 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
 
                 if (!doinit) {
                     r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
-                    r->inroi = (firsthit == htNone && firstinout == htNone) ? 0 : r->inroi;
+                    // update inroi to 0 only if no endcaps need to be tested
+                    r->inroi = (firsthit == htNone && firstinout == htNone && !tracer->mesh->noderoi) ? 0 : r->inroi;
                 }
 
                 r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
@@ -1273,6 +1274,10 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
             r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtNode : rtNone;
         }
 
+        // prevent stuck photons when intersection is <EPS2 from current origin
+        if ((firsthit == htInOut || firsthit == htOutIn) && r->Lmove < EPS2) {
+            r->Lmove = EPS2;
+        }
     } else if (tracer->mesh->faceroi) {
         int neweid = -1, newbaseid = 0;
         int* newee;
@@ -1323,6 +1328,11 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
         }
 
         r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtFace : rtNone;
+
+        // prevent stuck photons if intersections is <EPS2 from current origin
+        if ((firsthit == htInOut || firsthit == htOutIn) && r->Lmove < EPS2) {
+            r->Lmove = EPS2;
+        }
     }
 }
 
@@ -1402,10 +1412,6 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
         int* enb, *ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
         float mus;
         int pidx; // pattern index
-
-        if (cfg->implicit == 1 && r->inroi && tracer->mesh->edgeroi && fabs(tracer->mesh->edgeroi[eid * 6]) < EPS) {
-            r->inroi = 0;
-        }
 
         if (cfg->implicit && r->inroi) {
             prop = tracer->mesh->med + tracer->mesh->prop;
