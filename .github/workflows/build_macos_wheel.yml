@@ -39,6 +39,7 @@ jobs:
           rm -rf src/*.c
           git checkout src/*.c
       - name: Update pybind11 to use v2 version
+        if: ${{ matrix.python-version != '3.6' }}
         shell: bash
         run: |
           git submodule update --init --remote .
