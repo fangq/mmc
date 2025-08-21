@@ -38,6 +38,12 @@ jobs:
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
           rm -rf src/*.c
           git checkout src/*.c
+      - name: Update pybind11 to use v2 version
+        shell: bash
+        run: |
+          git submodule update --init --remote .
+          cd src/pybind11
+          git checkout v2.13.6
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
