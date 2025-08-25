@@ -210,7 +210,7 @@ jobs:
       - name: Download mmclab
         uses: actions/download-artifact@v4
         with:
-          pattern: all-mmclab-packages-*
+          pattern: all-mmc*-packages-*
           merge-multiple: true
           path: packages
       - name: Create all-in-one octave mmclab

@@ -66,13 +66,30 @@ try:
         getdistance,
         detphoton,
         mcxlab,
+        cwdiffusion,
+        cwfluxdiffusion,
+        cwfluencediffusion,
+        dcsg1,
+        mcxcreate,
+        rfreplay,
+        rfmusreplay,
+        loadmc2,
+        loadmch,
+        loadfile,
+        mcx2json,
+        json2mcx,
+        loadnii,
+        preview,
+        plotshapes,
+        plotphotons,
+        plotvol,
     )
 except ImportError:  # pragma: no cover
     print(
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
-__version__ = "0.2.6"
+__version__ = "0.3.0"
 
 __all__ = (
     "gpuinfo",
@@ -88,4 +105,21 @@ __all__ = (
     "getdistance",
     "detphoton",
     "mcxlab",
+    "cwdiffusion",
+    "cwfluxdiffusion",
+    "cwfluencediffusion",
+    "dcsg1",
+    "mcxcreate",
+    "rfreplay",
+    "rfmusreplay",
+    "loadmc2",
+    "loadmch",
+    "loadfile",
+    "mcx2json",
+    "json2mcx",
+    "loadnii",
+    "preview",
+    "plotshapes",
+    "plotphotons",
+    "plotvol",
 )
