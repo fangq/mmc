@@ -1038,6 +1038,31 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
 
 #endif
 
+__device__ void rotatevector(float3* dir, float stheta, float ctheta, float sphi, float cphi) {
+    float3 p;
+    float tmp0;
+
+    if ( dir->z > -1.f + EPS && dir->z < 1.f - EPS ) {
+        tmp0 = 1.f - dir->z * dir->z; //reuse tmp to minimize registers
+        float tmp1 = MCX_MATHFUN(rsqrt)(tmp0);
+        tmp1 = stheta * tmp1;
+
+        p.x = tmp1 * (dir->x * dir->z * cphi - dir->y * sphi) + dir->x * ctheta;
+        p.y = tmp1 * (dir->y * dir->z * cphi + dir->x * sphi) + dir->y * ctheta;
+        p.z = -tmp1 * tmp0 * cphi            + dir->z * ctheta;
+    } else {
+        p.x = stheta * cphi;
+        p.y = stheta * sphi;
+        p.z = (dir->z > 0.f) ? ctheta : -ctheta;
+    }
+
+    tmp0 = MCX_MATHFUN(rsqrt)(p.x * p.x + p.y * p.y + p.z * p.z);
+
+    dir->x = p.x * tmp0;
+    dir->y = p.y * tmp0;
+    dir->z = p.z * tmp0;
+}
+
 /**
  * @brief Performing one scattering event of the photon
  *
@@ -1053,8 +1078,7 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
 __device__ float mc_next_scatter(float g, float3* dir, __private RandType* ran, __constant MCXParam* gcfg, float* pmom) {
 
     float nextslen;
-    float sphi, cphi, tmp0, theta, stheta, ctheta, tmp1;
-    float3 p;
+    float sphi, cphi, tmp0, theta, stheta, ctheta;
 
     //random scattering length (normalized)
     nextslen = rand_next_scatlen(ran);
@@ -1077,29 +1101,12 @@ __device__ float mc_next_scatter(float g, float3* dir, __private RandType* ran, 
         MCX_SINCOS(theta, stheta, ctheta);
     }
 
-    if ( dir->z > -1.f + EPS && dir->z < 1.f - EPS ) {
-        tmp0 = 1.f - dir->z * dir->z; //reuse tmp to minimize registers
-        tmp1 = MCX_MATHFUN(rsqrt)(tmp0);
-        tmp1 = stheta * tmp1;
-
-        p.x = tmp1 * (dir->x * dir->z * cphi - dir->y * sphi) + dir->x * ctheta;
-        p.y = tmp1 * (dir->y * dir->z * cphi + dir->x * sphi) + dir->y * ctheta;
-        p.z = -tmp1 * tmp0 * cphi             + dir->z * ctheta;
-    } else {
-        p.x = stheta * cphi;
-        p.y = stheta * sphi;
-        p.z = (dir->z > 0.f) ? ctheta : -ctheta;
-    }
+    rotatevector(dir, stheta, ctheta, sphi, cphi);
 
     if (GPU_PARAM(gcfg, ismomentum)) {
         pmom[0] += (1.f - ctheta);
     }
 
-    tmp0 = MCX_MATHFUN(rsqrt)(p.x * p.x + p.y * p.y + p.z * p.z);
-
-    dir->x = p.x * tmp0;
-    dir->y = p.y * tmp0;
-    dir->z = p.z * tmp0;
     return nextslen;
 }
 
@@ -1127,7 +1134,6 @@ __device__ void fixphoton(float3* p, __global FLOAT3* node, __global int* ee) {
 
     *p += (c0 * FL3(0.25f) - *p) * (FL3(FIX_PHOTON));
 }
-
 
 
 /**
@@ -1367,24 +1373,40 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 #endif
 #endif
 
-    if (canfocus && GPU_PARAM(gcfg, focus) != 0.f) { // if beam focus is set, determine the incident angle
-        float Rn2;
-        origin.x += GPU_PARAM(gcfg, focus) * r->vec.x;
-        origin.y += GPU_PARAM(gcfg, focus) * r->vec.y;
-        origin.z += GPU_PARAM(gcfg, focus) * r->vec.z;
+    if (canfocus) {
+        if (isnan(GPU_PARAM(gcfg, focus))) { // if beam focus is set, determine the incident angle
+            float ang, stheta, ctheta, sphi, cphi;
+            ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
+            MCX_SINCOS(ang, sphi, cphi);
+            ang = acos(2.f * rand_uniform01(ran) - 1.f); //sine distribution
+            MCX_SINCOS(ang, stheta, ctheta);
+            rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
+        } else if (GPU_PARAM(gcfg, focus) < 0.f && isinf(GPU_PARAM(gcfg, focus))) { // lambertian (cosine distribution) if focal length is -inf
+            float ang, stheta, ctheta, sphi, cphi;
+            ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
+            MCX_SINCOS(ang, sphi, cphi);
+            stheta = MCX_MATHFUN(sqrt)(rand_uniform01(ran));
+            ctheta = MCX_MATHFUN(sqrt)(1.f - stheta * stheta);
+            rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
+        } else if (GPU_PARAM(gcfg, focus) != 0.f) { // if beam focus is set, determine the incident angle
+            float Rn2;
+            origin.x += GPU_PARAM(gcfg, focus) * r->vec.x;
+            origin.y += GPU_PARAM(gcfg, focus) * r->vec.y;
+            origin.z += GPU_PARAM(gcfg, focus) * r->vec.z;
 
-        if (GPU_PARAM(gcfg, focus) < 0.f) { // diverging beam
-            r->vec.x = r->p0.x - origin.x;
-            r->vec.y = r->p0.y - origin.y;
-            r->vec.z = r->p0.z - origin.z;
-        } else {            // converging beam
-            r->vec.x = origin.x - r->p0.x;
-            r->vec.y = origin.y - r->p0.y;
-            r->vec.z = origin.z - r->p0.z;
+            if (GPU_PARAM(gcfg, focus) < 0.f) { // diverging beam
+                r->vec.x = r->p0.x - origin.x;
+                r->vec.y = r->p0.y - origin.y;
+                r->vec.z = r->p0.z - origin.z;
+            } else {            // converging beam
+                r->vec.x = origin.x - r->p0.x;
+                r->vec.y = origin.y - r->p0.y;
+                r->vec.z = origin.z - r->p0.z;
+            }
+
+            Rn2 = MCX_MATHFUN(rsqrt)(dot(r->vec, r->vec)); // normalize
+            r->vec = r->vec * Rn2;
         }
-
-        Rn2 = MCX_MATHFUN(rsqrt)(dot(r->vec, r->vec)); // normalize
-        r->vec = r->vec * Rn2;
     }
 
     r->p0 += r->vec * EPS;
