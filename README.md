@@ -1,10 +1,10 @@
-Mesh-based Monte Carlo (MMC) - SSE4 and OpenCL
+Mesh-based Monte Carlo (MMC) Trinity - SSE4, OpenCL and CUDA
 ==============================================
 
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
 -   License: GNU General Public License version 3 (GPL v3), see License.txt
--   Version: 2.6.0 (v2025, Popcorn)
+-   Version: 2.8.0 (v2025.9, Popcorn)
 -   URL: <https://mcx.space/mmc>
 
 ![Mex and Binaries](https://github.com/fangq/mcxcl/actions/workflows/build_all.yml/badge.svg)
@@ -35,32 +35,73 @@ Table of Content:
 What's New
 -------------
 
-MMC v2025 (2.6.0) is a maintenance release with multiple bug fixes and new features. It is highly
+MMC v2025.9 (2.8.0) is a maintenance release with multiple bug fixes and new features. It is highly
 recommended to upgrade for all users.
 
-MMC v2025 adds the below key features
+MMC v2025.9 adds the below key features
 
-* add photon-sharing (multi-pattern simulations) in OpenCL/GPU
-* optimizing thread number on Apple silicon (M1/M2/M3/M4), gain 6x speedup
-* the new `-N/--net` command line flag allows one to browse and run growing number of community-contributed
-  simulations hosted on https://neurojson.io (one can browse the list at https://neurojson.org/db/mmc)
-* mmc can read stdin (standard input) using pipe, allow one to use advanced text processing utilities in the shell,
-  such as `sed, perl, jq` to modify JSON inputs at runtime. For example `mcx -N cube60 | jq '.Forward.Dt=1e-10' | mcx -f`
-* a new shortcut option `-Q` for `--bench` to conveniently browse and run built-in benchmarks
-* automatically compute initial element ID, facenb, element/nodal volume if not provided, greatly simplifying input data
-* speed up facenb computation by a factor of 2x
-* add `--dumpjson` flag to allow exporting simulations to a JSON file
+* new Python module - pmmc (`pip install pmmc`)
+* pmmc supports Apple silicon
+* pmmc integrates with pyiso2mesh (`pip install iso2mesh`)
+* support focal length via `cfg.srcdir(4)`, fix #108
+* support isotropic (`cfg.srcdir(4)=nan`) and Lambertian launch (`cfg.srcdir(4)=-inf`)
 
-Aside from these added new features, we have also fixed a number of bugs.
-We want to particularly thank Andrea Farina (CNR-IFN) for reporting and fixing 
-a number of the below issues.
+this release also fixed a list of bugs, including
 
-* fix shared memory initialization error (#101, #103)
-* fix stdout not found error when building with `cudamex` target, fix various trinity/cuda compilation errors
-* fix replay error in trinity/cuda target (#98)
-* fix double-precision saving bug in jnii/bnii (#90)
-* disable SSE on arm64 Apple silicon as it is not supported
-* add the missing `-H/--maxdetphoton` flag
+* fix a "photon-leakage" bug in implicit MMC (immc) #76
+* fix the 2nd-neighboring element search in implicit MMC (immc)
+* fix incorrect node passing to OpenCL kernel, fix #109
+* fix roulettesize type in OpenCL bug, fixed by Aiden Lewis
+* remove outdated replay preprocessing, use mcx workflow, fix #110
+* allow widefield source to search cfg->e0 first before searching srcelem
+
+The full changelog is listed below
+
+* 2025-09-19 [74191ba] [ci] avoid using slow choco octave installation
+* 2025-09-15 [688c1ba] [feat] support focal length via cfg.srcdir(4), fix #108
+* 2025-08-25 [38f8e8a] [pmmc] bump version to 0.3.0 to include expanded mcx utils functions
+* 2025-08-21 [c085223] [pmmc] bump pmmc to v0.2.6 to include the bug fixes for immc
+* 2025-08-21 [3ab80db] [ci] adjust pybind11 version for various python
+* 2025-08-21 [aaf588c] [ci] avoid pybind11 upgrade for python 3.6
+* 2025-08-21 [6d93cd6] [ci] fetch tags before checking out specific version
+* 2025-08-21 [1d9b118] [ci] downgrade pybind11 to v2 to avoid ci errors
+* 2025-08-20 [0c43144] [bug] fix immc photon leakage from edge cases in tracer #76
+* 2025-08-18 [0d3cf79] [bug] fix 2nd neighbor element ID referencing, fixing notch artifact thanks to the debugging info provided by Aiden Lewis
+* 2025-07-30 [0798ba2] [format] reformat c and matlab with formatters
+* 2025-07-30 [f80d541] [bug] remove outdated replay preprocessing, use mcx workflow, fix #110
+* 2025-07-19 [f86c824] [ci] upload updated pmmc for apple silicon, bump 0.2.5
+* 2025-07-19 [3d6803a] [ci] build pmmc on apple silicon
+* 2025-07-19 [97543d3] [pmmc] statically link with libomp, build on apple silicon
+* 2025-07-19 [7328d46] [pmmc] use libgomp-1.dll from sparse_numba, bump to 0.2.4
+* 2025-07-18 [a808bd1] [ci] update pmmc version to use statically linked _pmmc module
+* 2025-07-18 [7c97cf0] [ci] install intel opencl runtime on windows 2022
+* 2025-07-18 [8923673] [ci] print verbose info to debug windows pmmc wheel build
+* 2025-07-18 [e68a427] [bug] allow widefield source to search cfg->e0 first before searching srcelem
+* 2025-07-17 [16031dd] [ci] build windows wheels for python 3.13, bump version 0.2.2
+* 2025-07-17 [504730f] [ci] only update pybind11 for 3.13
+* 2025-07-17 [542ae94] [ci] check out submodule
+* 2025-07-16 [792f809] [ci] use git version of pybind11 for windows pmmc build
+* 2025-06-25 [24dab0b] [ci] remove windows python 3.13 build due to errors
+* 2025-06-25 [7607095] [pmmc] bump to 0.2.1, add iso2mesh example, add 3.13 on win
+* 2025-06-25 [65642f1] [bug] fix roulettesize type in OpenCL bug, fixed by Aiden Lewis
+* 2025-06-07 [a69ed21] [pmmc] first fully working version, bump to v0.2.0
+* 2025-06-07 [e6b6540] [pmmc] fix pyvista tetgen mesh bug, need to flip element
+* 2025-06-07 [40ab888] [pmmc] bump version to 0.1.0
+* 2025-06-07 [b104d02] [ci] fix macos pmmc
+* 2025-06-07 [031cc06] [ci] macos pmmc build missing omp.h
+* 2025-06-07 [8e06991] [ci] fix windows pmmc build
+* 2025-06-07 [d747603] [ci] macos pmmc build error
+* 2025-06-07 [a3342d8] [ci] remove ubuntu-20.04 from linux, debug macos pmmc build
+* 2025-06-07 [98a11dc] [ci] debug windows and macos pmmc build
+* 2025-06-07 [f910e0a] [ci] try fixing macos build
+* 2025-06-07 [12346b7] [ci] build pmmc
+* 2025-06-07 [5ef7a78] [pmmc] version 0.0.1
+* 2025-06-06 [edacffb] [pmmc] fix memory error, runs locally
+* 2025-06-06 [a537219] [bug] fix some run time bugs, still crashes
+* 2025-06-05 [ef159b8] [pmmc] make pmmc module loadable in python3
+* 2025-06-05 [09d2499] [pmmc] fix all compilation errors
+* 2025-06-05 [eb0a506] [feat] initial units for pmmc
+* 2025-05-20 [b85e750] [bug] fix incorrect node passing to OpenCL kernel, fix #109
 
 
 Introduction
@@ -334,7 +375,7 @@ The full command line options of MMC include the following:
 #Please visit our free scientific data sharing portal at https://neurojson.io/#
 # and consider sharing your public datasets in standardized JSON/JData format #
 ###############################################################################
-$Rev::      $v2024.2 $Date::                       $ by $Author::             $
+$Rev::      $v2025.9 $Date::                       $ by $Author::             $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...

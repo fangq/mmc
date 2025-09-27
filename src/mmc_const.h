@@ -32,7 +32,7 @@
 #ifndef _MCEXTREME_CONSTANT_H
 #define _MCEXTREME_CONSTANT_H
 
-#define MMC_VERSION        "v2025"
+#define MMC_VERSION        "v2025.9"
 #define MMC_VERSION_MAJOR  2
 #define MMC_VERSION_MINOR  6
 #define MMC_VERSION_PATCH  0

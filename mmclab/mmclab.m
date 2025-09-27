@@ -16,7 +16,7 @@ function varargout = mmclab(varargin)
 % Please visit our free scientific data sharing portal at https://neurojson.io%
 % and consider sharing your public datasets in standardized JSON/JData format %
 % #############################################################################%
-% $Rev::      $v2024.2$Date::                       $ by $Author::Qianqian Fang%
+% $Rev::      $v2025.9$Date::                       $ by $Author::Qianqian Fang%
 % #############################################################################%
 %
 % Format:
@@ -249,7 +249,7 @@ function varargout = mmclab(varargin)
 %      [fluxs,detps]=mmclab(cfgs);
 %
 %
-% This function is part of Mesh-based Monte Carlo (MMC) URL: http://mcx.space/#mmc
+% This function is part of Mesh-based Monte Carlo (MMC) URL: https://mcx.space/#mmc
 %
 % License: GNU General Public License version 3, please read LICENSE.txt for details
 %
