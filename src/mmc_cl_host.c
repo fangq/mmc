@@ -470,6 +470,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         IPARAM_TO_MACRO(opt, param, srcelemlen);
         IPARAM_TO_MACRO(opt, param, srctype);
         IPARAM_TO_MACRO(opt, param, voidtime);
+        IPARAM_TO_MACRO(opt, param, seed);
+        IPARAM_TO_MACRO(opt, param, srcnum);
     }
 
     MMC_FPRINTF(cfg->flog, "Building kernel with option: %s\n", opt);
