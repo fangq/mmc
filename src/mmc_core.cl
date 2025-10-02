@@ -1381,7 +1381,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
             ang = acos(2.f * rand_uniform01(ran) - 1.f); //sine distribution
             MCX_SINCOS(ang, stheta, ctheta);
             rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
-        } else if (GPU_PARAM(gcfg, focus) < 0.f && isinf(GPU_PARAM(gcfg, focus))) { // lambertian (cosine distribution) if focal length is -inf
+        } else if ((GPU_PARAM(gcfg, focus) < 0.f) * (isinf(GPU_PARAM(gcfg, focus)))) { // lambertian (cosine distribution) if focal length is -inf
             float ang, stheta, ctheta, sphi, cphi;
             ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
             MCX_SINCOS(ang, sphi, cphi);
@@ -1719,7 +1719,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         //if(GPU_PARAM(gcfg,debuglevel)&dlMove)
         GPUDEBUG(("M %f %f %f %d %u %e\n", r.p0.x, r.p0.y, r.p0.z, r.eid, id, r.slen));
 
-        if (GPU_PARAM(gcfg, minenergy) > 0.f && r.weight < GPU_PARAM(gcfg, minenergy) && (gcfg->tend - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep) <= 1.f) { /*Russian Roulette*/
+        if ((GPU_PARAM(gcfg, minenergy) > 0.f) * (r.weight < GPU_PARAM(gcfg, minenergy)) * ((gcfg->tend - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep) <= 1.f)) { /*Russian Roulette*/
             if (rand_do_roulette(ran)*GPU_PARAM(gcfg, roulettesize) <= 1.f) {
                 r.weight *= GPU_PARAM(gcfg, roulettesize);
                 //if(GPU_PARAM(gcfg,debuglevel)&dlWeight)
