@@ -43,8 +43,10 @@
 #include "mmc_const.h"
 #include "mmc_tictoc.h"
 
-#define IPARAM_TO_MACRO(macro,a,b) sprintf(macro+strlen(macro)," -Dgcfg%s=%u ",    #b,(a.b))
-#define FPARAM_TO_MACRO(macro,a,b) sprintf(macro+strlen(macro)," -Dgcfg%s=%.10ef ",#b,(a.b))
+#define MAX_JIT_OPT_LEN  (MAX_PATH_LENGTH << 1)
+
+#define IPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%u ",    #b,(a.b))
+#define FPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%.10ef ",#b,(a.b))
 
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the
@@ -100,7 +102,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_uint*   Pseed = NULL;
     float*     Pdet = NULL;
     RandType*  Pphotonseed = NULL;
-    char opt[MAX_PATH_LENGTH + 1] = {'\0'};
+    char opt[MAX_JIT_OPT_LEN] = {'\0'};
     cl_uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop + (cfg->issaveexit > 0) * 6 + 1;
     cl_uint hostdetreclen = detreclen + 1;
     int sharedmemsize = 0;
@@ -383,61 +385,61 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     OCL_ASSERT(((mcxprogram = clCreateProgramWithSource(mcxcontext, 1, (const char**) & (cfg->clsource), NULL, &status), status)));
 
     if (cfg->optlevel >= 1) {
-        sprintf(opt, "%s ", "-cl-mad-enable -DMCX_USE_NATIVE");
+        snprintf(opt, MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-cl-mad-enable -DMCX_USE_NATIVE");
+    }
+
+    if (cfg->optlevel >= 2) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
     }
 
     if (cfg->optlevel >= 3) {
-        sprintf(opt + strlen(opt), "%s ", "-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
-    }
-
-    if (cfg->optlevel >= 4) {
-        sprintf(opt + strlen(opt), "%s ", "-DUSE_MACRO_CONST");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-DUSE_MACRO_CONST");
     }
 
     if ((uint)cfg->srctype < sizeof(sourceflag) / sizeof(sourceflag[0])) {
-        sprintf(opt + strlen(opt), "%s ", sourceflag[(uint)cfg->srctype]);
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", sourceflag[(uint)cfg->srctype]);
     }
 
-    sprintf(opt + strlen(opt), "%s ", cfg->compileropt);
+    snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", cfg->compileropt);
 
     if (cfg->isatomic) {
-        sprintf(opt + strlen(opt), " -DUSE_ATOMIC");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_ATOMIC");
     }
 
     if (cfg->issave2pt == 0) {
-        sprintf(opt + strlen(opt), " -DMCX_SKIP_VOLUME");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SKIP_VOLUME");
     }
 
     if (cfg->issavedet) {
-        sprintf(opt + strlen(opt), " -DMCX_SAVE_DETECTORS");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_DETECTORS");
     }
 
     if (cfg->issaveref) {
-        sprintf(opt + strlen(opt), " -DMCX_SAVE_DREF");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_DREF");
     }
 
     if (cfg->issaveseed) {
-        sprintf(opt + strlen(opt), " -DMCX_SAVE_SEED");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_SEED");
     }
 
     if (cfg->isreflect) {
-        sprintf(opt + strlen(opt), " -DMCX_DO_REFLECTION");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_DO_REFLECTION");
     }
 
     if (cfg->method == rtBLBadouelGrid) {
-        sprintf(opt + strlen(opt), " -DUSE_DMMC");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_DMMC");
     }
 
     if (cfg->method == rtBLBadouel) {
-        sprintf(opt + strlen(opt), " -DUSE_BLBADOUEL");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_BLBADOUEL");
     }
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
-        sprintf(opt + strlen(opt), " -DUSE_PHOTON_SHARING");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_PHOTON_SHARING");
     }
 
     if (gpu[0].vendor == dvNVIDIA) {
-        sprintf(opt + strlen(opt), " -DUSE_NVIDIA_GPU");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_NVIDIA_GPU");
     }
 
     if (strstr(opt, "USE_MACRO_CONST")) {

@@ -48,7 +48,7 @@
 static cl_ulong timerStart, timerStop;
 cl_event kernelevent;
 
-unsigned int GetTimeMillis () {
+unsigned int GetTimeMillis (void) {
     float elapsedTime;
     clGetEventProfilingInfo(kernelevent, CL_PROFILING_COMMAND_START,
                             sizeof(cl_ulong), &timerStart, NULL);
@@ -58,7 +58,7 @@ unsigned int GetTimeMillis () {
     return (unsigned int)(elapsedTime);
 }
 
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     return 0;
 }
 
@@ -70,7 +70,7 @@ unsigned int StartTimer () {
 /* use CUDA timer */
 static cudaEvent_t timerStart, timerStop;
 
-unsigned int GetTimeMillis () {
+unsigned int GetTimeMillis (void) {
     float elapsedTime;
     cudaEventRecord(timerStop, 0);
     cudaEventSynchronize(timerStop);
@@ -78,7 +78,7 @@ unsigned int GetTimeMillis () {
     return (unsigned int)(elapsedTime);
 }
 
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     cudaEventCreate(&timerStart);
     cudaEventCreate(&timerStop);
 
@@ -109,10 +109,10 @@ long GetTime (void) {
     temp += tv.tv_sec * 1000000;
     return temp;
 }
-unsigned int GetTimeMillis () {
+unsigned int GetTimeMillis (void) {
     return (unsigned int)(GetTime () / 1000);
 }
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     return GetTimeMillis();
 }
 
@@ -173,7 +173,7 @@ void SetupMillisTimer(void) {
         fprintf(stderr, "(* Set timer resolution to %d ms. *)\n", timeCaps.wPeriodMin);
     }
 }
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     SetupMillisTimer();
     return 0;
 }
@@ -219,7 +219,7 @@ void sleep_ms(int milliseconds) {
     #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 #endif
 
-int EnableVTMode() {
+int EnableVTMode(void) {
     // Set output mode to handle virtual terminal sequences
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 

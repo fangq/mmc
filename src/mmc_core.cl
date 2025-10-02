@@ -671,7 +671,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         totalloss = 1.f - totalloss; /*remaining fraction*/
 
         if (GPU_PARAM(gcfg, seed) == SEED_FROM_FILE) {
-            if (GPU_PARAM(gcfg, outputtype) == otWL || GPU_PARAM(gcfg, outputtype) == otJacobian) {
+            if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otJacobian)) {
                 currweight.f = r->Lmove;
                 currweight.f *= replayweight[r->photonid];
                 currweight.f += r->weight;
@@ -691,7 +691,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         ww = currweight.f - r->weight;
         r->photontimer += r->Lmove * (prop.n * R_C0);
 
-        if (GPU_PARAM(gcfg, outputtype) == otWL || GPU_PARAM(gcfg, outputtype) == otWP) {
+        if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP)) {
             tshift = MIN( ((int)(replaytime[r->photonid] * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
         } else {
             tshift = MIN( ((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
@@ -701,7 +701,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #ifndef MCX_SKIP_VOLUME
 
             if (prop.mua > 0.f) {
-                if (GPU_PARAM(gcfg, outputtype) != otEnergy && GPU_PARAM(gcfg, outputtype) != otWP && GPU_PARAM(gcfg, outputtype) != otWL) {
+                if ((GPU_PARAM(gcfg, outputtype) != otEnergy) * (GPU_PARAM(gcfg, outputtype) != otWP) * (GPU_PARAM(gcfg, outputtype) != otWL)) {
                     ww /= prop.mua;
                 }
             }
@@ -718,7 +718,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #ifndef DO_NOT_SAVE
 
                     if (r->oldweight > 0.f) {
-                        if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
+                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
 #ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + r->oldidx, r->oldweight);
 
@@ -766,7 +766,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
                 if (r->faceid == -2 || !r->isend) {
 
-                    if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
+                    if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
 
 #ifdef USE_ATOMIC
                         float oldval = atomicadd(weight + newidx, r->oldweight);
@@ -847,7 +847,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                     if (newidx != r->oldidx) {
 #ifndef DO_NOT_SAVE
 
-                        if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
+                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
 
 #ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + r->oldidx, r->oldweight);
@@ -895,7 +895,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
                     if (r->faceid == -2 || !r->isend) {
 
-                        if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
+                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
 
 #ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + newidx, r->oldweight);
@@ -1002,7 +1002,7 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
     tmp1 = n2 * n2;
     tmp2 = 1.f - tmp0 / tmp1 * (1.f - Icos * Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
-    if (tmp2 > 0.f && !(*eid <= 0 && GPU_PARAM(gcfg, isreflect) == bcMirror)) { /*if no total internal reflection*/
+    if (tmp2 > 0.f && !((*eid <= 0) * (GPU_PARAM(gcfg, isreflect) == bcMirror))) { /*if no total internal reflection*/
         Re = tmp0 * Icos * Icos + tmp1 * tmp2; /*transmission angle*/
         tmp2 = MCX_MATHFUN(sqrt)(tmp2); /*to save one sqrt*/
         Im = 2.f * n1 * n2 * Icos * tmp2;
@@ -1526,7 +1526,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     if (GPU_PARAM(gcfg, issavedet)) {
 #endif
 
-        if (GPU_PARAM(gcfg, srctype) != stPattern || GPU_PARAM(gcfg, srcnum) == 1) {
+        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
             ppath[GPU_PARAM(gcfg, reclen) - 1] = r.weight; /*last record in partialpath is the initial photon weight*/
         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
             *((__local uint*)(ppath + GPU_PARAM(gcfg, reclen) - 1)) = r.posidx;
@@ -1590,7 +1590,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #ifdef MCX_DO_REFLECTION
 
             if (GPU_PARAM(gcfg, isreflect) && (r.eid <= 0 || (r.eid > 0 && gmed[type[r.eid - 1]].n != gmed[type[oldeid - 1]].n ))) {
-                if (! (r.eid <= 0 && ((gmed[type[oldeid - 1]].n == GPU_PARAM(gcfg, nout) && GPU_PARAM(gcfg, isreflect) != (int)bcMirror) || GPU_PARAM(gcfg, isreflect) == (int)bcAbsorbExterior) )) {
+                if (! (r.eid <= 0 && (((gmed[type[oldeid - 1]].n == GPU_PARAM(gcfg, nout)) * (GPU_PARAM(gcfg, isreflect) != (int)bcMirror)) + (GPU_PARAM(gcfg, isreflect) == (int)bcAbsorbExterior)) )) {
                     reflectray(gcfg, &r.vec, &oldeid, &r.eid, r.faceid, ran, type, normal, gmed);
                 }
             }
@@ -1675,7 +1675,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                           r.vec.x, r.vec.y, r.vec.z, r.weight, r.eid));
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
-                if (GPU_PARAM(gcfg, issavedet) && GPU_PARAM(gcfg, issaveexit)) {                                 /*when issaveexit is set to 1*/
+                if (GPU_PARAM(gcfg, issavedet) * GPU_PARAM(gcfg, issaveexit)) {                                 /*when issaveexit is set to 1*/
                     copystate(ppath + (GPU_PARAM(gcfg, reclen) - 7), (__private float*) & (r.p0), 3); /*columns 7-5 from the right store the exit positions*/
                     copystate(ppath + (GPU_PARAM(gcfg, reclen) - 4), (__private float*) & (r.vec), 3); /*columns 4-2 from the right store the exit dirs*/
                 }
@@ -1689,9 +1689,9 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 }
 
 #endif
-            } else if (r.faceid == -2 && (GPU_PARAM(gcfg, debuglevel)&dlMove)) {
+            } else if ((r.faceid == -2) * (GPU_PARAM(gcfg, debuglevel)&dlMove)) {
                 GPUDEBUG(("T %f %f %f %d %u %e\n", r.p0.x, r.p0.y, r.p0.z, r.eid, id, r.slen));
-            } else if (r.eid && r.faceid != -2  && GPU_PARAM(gcfg, debuglevel)&dlEdge) {
+            } else if ((r.eid && r.faceid != -2) * (GPU_PARAM(gcfg, debuglevel)&dlEdge)) {
                 GPUDEBUG(("X %f %f %f %d %u %e\n", r.p0.x, r.p0.y, r.p0.z, r.eid, id, r.slen));
             }
 
