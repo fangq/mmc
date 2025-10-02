@@ -27,7 +27,7 @@ function res = sphdiffscatter(r, theta, phi, cfg)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 % if(cfg.src(2)<pi/2)

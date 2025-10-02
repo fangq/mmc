@@ -18,7 +18,7 @@ function jp = besseljprime(n, z)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 jp = besselj(n - 1, z) - n / z .* besselj(n, z);

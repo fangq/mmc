@@ -19,7 +19,7 @@ function [p, e0] = mmcraytrace(node, elem, p0, v0, e0)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 p = p0;

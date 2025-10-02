@@ -42,7 +42,7 @@ function [tau, g1] = generate_g1(fhist, tau, disp_model, DV, lambda, format, var
 %                   sent via "varargin"
 %
 %   This file is part of Mesh-Based Monte Carlo
-%   License: GPLv3, see http://mcx.sf.net for details
+%   License: GPLv3, see https://mcx.space for details
 %
 
 if nargin < 6

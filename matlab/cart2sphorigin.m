@@ -20,7 +20,7 @@ function [T, P, R] = cart2sphorigin(xi, yi, zi, x0, y0, z0)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 xi = xi - x0;

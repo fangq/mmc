@@ -3,7 +3,7 @@
 %
 % In this example, we show the most basic usage of MMCLAB.
 %
-% This file is part of Mesh-based Monte Carlo (MMC) URL:http://mcx.sf.net/mmc
+% This file is part of Mesh-based Monte Carlo (MMC) URL:https://mcx.space/mmc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prepare simulation input

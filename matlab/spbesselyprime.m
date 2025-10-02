@@ -18,7 +18,7 @@ function yp = spbesselyprime(n, z)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 yp = besselyprime(n + 1 / 2, z) .* sqrt(pi / (2 * z)) - sqrt(pi / 2) * bessely(n + 1 / 2, z) ./ (2 * z .* sqrt(z));

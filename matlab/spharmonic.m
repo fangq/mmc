@@ -19,7 +19,7 @@ function Y = spharmonic(l, m, theta, phi)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 coeff = 1;

@@ -57,7 +57,7 @@ function [newnode, newelem] = mmcaddsrc(node, elem, src, varargin)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 opt = varargin2struct(varargin{:});

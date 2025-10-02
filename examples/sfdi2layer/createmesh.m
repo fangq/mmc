@@ -4,7 +4,7 @@ clear all;
 
 layercount = 2;
 
-if (layercount == 2)
+if layercount == 2
     [node, face, c0] = latticegrid([0 60], [0 60], [0 25 30]);
     c0(:, 4) = [2; 1];   % maximum element size for bottom (label 1) and top (label 2) layers
 

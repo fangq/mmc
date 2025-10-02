@@ -594,7 +594,7 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     ubjw_write_key(root, "_DataInfo_");
     ubjw_begin_object(root, UBJ_MIXED, 0);
     UBJ_WRITE_KEY(root, "JNIFTIVersion", string, "0.5");
-    UBJ_WRITE_KEY(root, "Comment", string, "Created by MCX (http://mcx.space)");
+    UBJ_WRITE_KEY(root, "Comment", string, "Created by MCX (https://mcx.space)");
     UBJ_WRITE_KEY(root, "AnnotationFormat", string, "https://neurojson.org/jnifti/draft1");
     UBJ_WRITE_KEY(root, "SerialFormat", string, "https://neurojson.org/bjdata/draft2");
     ubjw_write_key(root, "Parser");
@@ -752,7 +752,7 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     /* the "_DataInfo_" section */
     cJSON_AddItemToObject(root, "_DataInfo_", info = cJSON_CreateObject());
     cJSON_AddStringToObject(info, "JNIFTIVersion", "0.5");
-    cJSON_AddStringToObject(info, "Comment", "Created by MCX (http://mcx.space)");
+    cJSON_AddStringToObject(info, "Comment", "Created by MCX (https://mcx.space)");
     cJSON_AddStringToObject(info, "AnnotationFormat", "https://neurojson.org/jnifti/draft1");
     cJSON_AddStringToObject(info, "SerialFormat", "https://json.org");
     cJSON_AddItemToObject(info, "Parser", parser = cJSON_CreateObject());

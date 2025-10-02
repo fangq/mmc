@@ -32,7 +32,7 @@ function [res, xi, yi, zi] = sphdiffusionslab(Reff1, Reff2, h, xrange, yrange, z
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 if (nargin < 7)

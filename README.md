@@ -4,7 +4,7 @@ Mesh-based Monte Carlo (MMC) Trinity - SSE4, OpenCL and CUDA
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
 -   License: GNU General Public License version 3 (GPL v3), see License.txt
--   Version: 2.8.0 (v2025.9, Popcorn)
+-   Version: 2.8.0 (v2025.9, Bubble Tea)
 -   URL: <https://mcx.space/mmc>
 
 ![Mex and Binaries](https://github.com/fangq/mcxcl/actions/workflows/build_all.yml/badge.svg)
@@ -45,9 +45,12 @@ MMC v2025.9 adds the below key features
 * pmmc integrates with pyiso2mesh (`pip install iso2mesh`)
 * support focal length via `cfg.srcdir(4)`, fix #108
 * support isotropic (`cfg.srcdir(4)=nan`) and Lambertian launch (`cfg.srcdir(4)=-inf`)
+* make implicit MMC (immc) available on OpenMP-only builds, such as Apple silicon (where SSE is not supported)
+* enable level-3 optimization (`--optlevel 3`) by default, accelerating simulations by 30%-100%
 
 this release also fixed a list of bugs, including
 
+* fix a critical-level bug related to fluence normalization - affect all simulations starting v2025
 * fix a "photon-leakage" bug in implicit MMC (immc) #76
 * fix the 2nd-neighboring element search in implicit MMC (immc)
 * fix incorrect node passing to OpenCL kernel, fix #109
@@ -57,6 +60,14 @@ this release also fixed a list of bugs, including
 
 The full changelog is listed below
 
+* 2025-10-02 [7dd25d9] [bug] enable immc in omp only mode on Apple silicon, fix memory error when r->nexteid
+* 2025-10-02 [d21587a] [bug] build immc in omp mode without sse, such as on Apple silicon, result incorrect
+* 2025-10-02 [c2cbc3b] [amd] fix one more warning
+* 2025-10-02 [7f1b47e] [amd] remove jit warnings
+* 2025-10-02 [8d0c19d] [bug] critical bug fix - incorrect energytot and energyesc introduced in commit 072fafe4305cd3c2da78094b0622dc4c67267983 Oct 14 2024
+* 2025-10-01 [2f81f87] [clang] silence clang warnings, make optlevel 3 default with macros
+* 2025-09-29 [63b48a6] [bug] add the missing gcfg constants when using -o 4 optimization
+* 2025-09-27 [2649e36] [doc] update documentation for v2025.9
 * 2025-09-19 [74191ba] [ci] avoid using slow choco octave installation
 * 2025-09-15 [688c1ba] [feat] support focal length via cfg.srcdir(4), fix #108
 * 2025-08-25 [38f8e8a] [pmmc] bump version to 0.3.0 to include expanded mcx utils functions
@@ -204,7 +215,7 @@ Download and Compile MMC
 
 The latest release of MMC can be downloaded from the following URL:
 
-<http://mcx.space/#mmc>
+<https://mcx.space/#mmc>
 
 The development branch (not fully tested) of the code can be accessed using 
 Git. However this is not encouraged unless you are a developer. To check out 
@@ -791,7 +802,7 @@ changes and accept your change.
 In you are a user, please use our mmc-users mailing list to post questions or 
 share experience regarding MMC. The mailing lists can be found from this link:
 
-<http://mcx.space/#about>
+<https://mcx.space/#about>
 
 
 Acknowledgement
@@ -947,9 +958,9 @@ Reference
 
 
 - [1] <http://iso2mesh.sf.net> -- an image-based surface/volumetric mesh generator 
-- [2] <http://mcx.sf.net> -- Monte Carlo eXtreme: a GPU-accelerated MC code 
+- [2] <https://mcx.space> -- Monte Carlo eXtreme: a GPU-accelerated MC code 
 - [3] <https://cygwin.com/setup-x86_64.exe> 
 - [4] <http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html> 
 - [5] <http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath> 
-- [6] <http://mcx.sf.net/cgi-bin/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data> 
+- [6] <https://mcx.space/cgi-bin/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data> 
 - [7] <http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut>

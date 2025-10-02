@@ -32,7 +32,7 @@ function [srcnode, srcface] = mmcsrcdomain(cfg, meshbbx, varargin)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 % the launching domain should be slightly larger than the actual source

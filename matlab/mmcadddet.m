@@ -34,7 +34,7 @@ function varargout = mmcadddet(varargin)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
 [varargout{1:nargout}] = mmcaddsrc(varargin{:}, 'extcorelabel', -2, 'KeepShape', 1, 'Expansion', 1.0);

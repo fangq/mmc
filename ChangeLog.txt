@@ -1,8 +1,88 @@
 Change Log
 
+== MMC 2.8.0 (v2025.9, Bubble Tea), Qianqian Fang <q.fang at neu.edu> ==
+
+ 2025-10-02 [7dd25d9] [bug] enable immc in omp only mode on Apple silicon, fix memory error when r->nexteid
+ 2025-10-02 [d21587a] [bug] build immc in omp mode without sse, such as on Apple silicon, result incorrect
+ 2025-10-02 [c2cbc3b] [amd] fix one more warning
+ 2025-10-02 [7f1b47e] [amd] remove jit warnings
+ 2025-10-02 [8d0c19d] [bug] critical bug fix - incorrect energytot and energyesc introduced in commit 072fafe4305cd3c2da78094b0622dc4c67267983 Oct 14 2024
+ 2025-10-01 [2f81f87] [clang] silence clang warnings, make optlevel 3 default with macros
+ 2025-09-29 [63b48a6] [bug] add the missing gcfg constants when using -o 4 optimization
+ 2025-09-27 [2649e36] [doc] update documentation for v2025.9
+ 2025-09-19 [74191ba] [ci] avoid using slow choco octave installation
+ 2025-09-15 [688c1ba] [feat] support focal length via cfg.srcdir(4), fix #108
+ 2025-08-25 [38f8e8a] [pmmc] bump version to 0.3.0 to include expanded mcx utils functions
+ 2025-08-21 [c085223] [pmmc] bump pmmc to v0.2.6 to include the bug fixes for immc
+ 2025-08-21 [5cb5711] Merge pull request #111 from Ayedyn/immc-photonleakfix
+ 2025-08-21 [3ab80db] [ci] adjust pybind11 version for various python
+ 2025-08-21 [aaf588c] [ci] avoid pybind11 upgrade for python 3.6
+ 2025-08-21 [6d93cd6] [ci] fetch tags before checking out specific version
+ 2025-08-21 [1d9b118] [ci] downgrade pybind11 to v2 to avoid ci errors
+ 2025-08-20 [0c43144] [bug] fix immc photon leakage from edge cases in tracer #76
+ 2025-08-18 [0d3cf79] [bug] fix 2nd neighbor element ID referencing, fixing notch artifact thanks to the debugging info provided by Aiden Lewis
+ 2025-07-30 [0798ba2] [format] reformat c and matlab with formatters
+ 2025-07-30 [f80d541] [bug] remove outdated replay preprocessing, use mcx workflow, fix #110
+ 2025-07-19 [f86c824] [ci] upload updated pmmc for apple silicon, bump 0.2.5
+ 2025-07-19 [41d8ce8] [ci] update exclude statement
+ 2025-07-19 [d45bf2a] [ci] further exclude pypy3.7
+ 2025-07-19 [335b1bb] [ci] exclude 3.6 and 3.7 on macos-14
+ 2025-07-19 [0b7b6fa] [ci] separately upload macos-13 and macos-14 wheels
+ 2025-07-19 [547c5ac] [ci] fix duplicate artifact name
+ 2025-07-19 [2b51d1d] [ci] fix yaml error
+ 2025-07-19 [3d6803a] [ci] build pmmc on apple silicon
+ 2025-07-19 [97543d3] [pmmc] statically link with libomp, build on apple silicon
+ 2025-07-19 [7328d46] [pmmc] use libgomp-1.dll from sparse_numba, bump to 0.2.4
+ 2025-07-18 [a808bd1] [ci] update pmmc version to use statically linked _pmmc module
+ 2025-07-18 [7c97cf0] [ci] install intel opencl runtime on windows 2022
+ 2025-07-18 [8923673] [ci] print verbose info to debug windows pmmc wheel build
+ 2025-07-18 [e68a427] [bug] allow widefield source to search cfg->e0 first before searching srcelem
+ 2025-07-17 [16031dd] [ci] build windows wheels for python 3.13, bump version 0.2.2
+ 2025-07-17 [504730f] [ci] only update pybind11 for 3.13
+ 2025-07-17 [542ae94] [ci] check out submodule
+ 2025-07-16 [792f809] [ci] use git version of pybind11 for windows pmmc build
+ 2025-06-25 [24dab0b] [ci] remove windows python 3.13 build due to errors
+ 2025-06-25 [7607095] [pmmc] bump to 0.2.1, add iso2mesh example, add 3.13 on win
+ 2025-06-25 [65642f1] [bug] fix roulettesize type in OpenCL bug, fixed by Aiden Lewis
+ 2025-06-07 [a69ed21] [pmmc] first fully working version, bump to v0.2.0
+ 2025-06-07 [e6b6540] [pmmc] fix pyvista tetgen mesh bug, need to flip element
+ 2025-06-07 [40ab888] [pmmc] bump version to 0.1.0
+ 2025-06-07 [b104d02] [ci] fix macos pmmc
+ 2025-06-07 [8c40af6] [ci] fix macos pmmc
+ 2025-06-07 [dbae039] [ci] macos pmmc build
+ 2025-06-07 [3f46f28] [ci] fix macos pmmc
+ 2025-06-07 [031cc06] [ci] macos pmmc build missing omp.h
+ 2025-06-07 [8e06991] [ci] fix windows pmmc build
+ 2025-06-07 [d747603] [ci] macos pmmc build error
+ 2025-06-07 [3f97e71] [ci] debug ci errors
+ 2025-06-07 [76cee76] [ci] fix ci builds
+ 2025-06-07 [3bec3b4] [ci] downgrade pybind
+ 2025-06-07 [6512932] [ci] fix various ci errors
+ 2025-06-07 [a3342d8] [ci] remove ubuntu-20.04 from linux, debug macos pmmc build
+ 2025-06-07 [98a11dc] [ci] debug windows and macos pmmc build
+ 2025-06-07 [f910e0a] [ci] try fixing macos build
+ 2025-06-07 [12346b7] [ci] build pmmc
+ 2025-06-07 [5ef7a78] [pmmc] version 0.0.1
+ 2025-06-06 [edacffb] [pmmc] fix memory error, runs locally
+ 2025-06-06 [a537219] [bug] fix some run time bugs, still crashes
+ 2025-06-05 [ef159b8] [pmmc] make pmmc module loadable in python3
+ 2025-06-05 [09d2499] [pmmc] fix all compilation errors
+ 2025-06-05 [eb0a506] [feat] initial units for pmmc
+ 2025-05-20 [b85e750] [bug] fix incorrect node passing to OpenCL kernel, fix #109
+
 
 == MMC 2.6.0 (v2025, Popcorn), Qianqian Fang <q.fang at neu.edu> ==
 
+ 2025-02-13 [144ff48] [ci] fix upload artifact ci error
+ 2025-02-12 [0d328eb] [ci] upgrade upload-artifact to v4
+ 2025-02-11 [9a9a650] [feat] only list mmc json input when using -N, support _find post, limit/skip
+ 2025-01-30 [6c76b35] [bug] fix cfg.steps.x does not affect voxel size bug, close #107
+ 2025-01-26 [d495875] [typo] fix intel cpu test typo
+ 2025-01-26 [8656e99] [macos] handle apple with intel processor
+ 2025-01-26 [7215e6b] [macos] avoid Invalid work group size on macos with intel cpu
+ 2025-01-25 [4129275] [release] fix windows smudge error
+ 2025-01-24 [6c326a6] [doc] update README on v2025
+ 2025-01-23 [91f0ded] [doc] update documentation, prepare for mmc v2025 release, support -f -
  2025-01-23 [1f94c27] [feat] support reading pipe from command line with -f -
  2025-01-21 [fbe4648] [bug] fix windows -N error
  2025-01-21 [fe709c4] [cmake] update cmake to add -N support
