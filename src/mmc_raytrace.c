@@ -462,7 +462,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                 if (r->isend) {
                     memcpy(baryp0, baryout, sizeof(float4));
                 } else {
-                    if (r->nexteid && faceidx >= 0) {
+                    if (r->nexteid > 0 && faceidx >= 0) {
                         int j, k, *nextenb = (int*)(tracer->mesh->elem + (r->nexteid - 1) * tracer->mesh->elemlen);
                         memset(baryp0, 0, sizeof(float4));
 
@@ -2182,14 +2182,12 @@ float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int*
     faceid = ifaceorder[faceid];
 
     /*calculate the normal direction of the intersecting triangle*/
-    if (cfg->method == rtPlucker) { //Plucker ray-tracing
-        pn = tracer->n + (offs) + faceid;
-    } else if (cfg->method < rtBLBadouel) {
-        pn = tracer->m + (offs + faceid) * 3;
-    } else if (cfg->method == rtBLBadouel || cfg->method == rtBLBadouelGrid) {
+    if (cfg->method == rtPlucker || cfg->method == rtBLBadouel || cfg->method == rtBLBadouelGrid) { //Plucker ray-tracing
         pnorm.x = (&(tracer->n[offs].x))[faceid];
         pnorm.y = (&(tracer->n[offs].x))[faceid + 4];
         pnorm.z = (&(tracer->n[offs].x))[faceid + 8];
+    } else if (cfg->method == rtHavel || cfg->method == rtBadouel) {
+        pn = tracer->m + (offs + faceid) * 3;
     }
 
     /*pn pointing outward*/

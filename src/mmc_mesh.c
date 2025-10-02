@@ -1256,7 +1256,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
  */
 
 void tracer_build(raytracer* tracer) {
-    int ne, i, j;
+    unsigned int ne, i, j;
     const int pairs[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 
     FLOAT3* nodes;
@@ -1278,12 +1278,8 @@ void tracer_build(raytracer* tracer) {
     elems = (int*)(tracer->mesh->elem); // convert int4* to int*
 
     if (tracer->method == rtPlucker) {
-        int ea, eb, ec;
-        FLOAT3 vecAB = {0.f}, vecAC = {0.f};
-
         tracer->d = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
         tracer->m = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
-        tracer->n = (float3*)calloc(sizeof(float3), ne * 4); // 4 face norms
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
@@ -1293,17 +1289,6 @@ void tracer_build(raytracer* tracer) {
                 e0 = elems[ebase + pairs[j][0]] - 1;
                 vec_diff3(&nodes[e0], &nodes[e1], (FLOAT3*)(tracer->d + i * 6 + j));
                 vec_cross3(&nodes[e0], &nodes[e1], (FLOAT3*)(tracer->m + i * 6 + j));
-            }
-
-            for (j = 0; j < 4; j++) {
-                ea = elems[ebase + out[j][0]] - 1;
-                eb = elems[ebase + out[j][1]] - 1;
-                ec = elems[ebase + out[j][2]] - 1;
-                vec_diff3(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff3(&nodes[ea], &nodes[ec], &vecAC);
-                vec_cross3(&vecAB, &vecAC, (FLOAT3*)(tracer->n + ebase + j));
-                Rn2 = 1.f / sqrt(vec_dot(tracer->n + ebase + j, tracer->n + ebase + j));
-                vec_mult(tracer->n + ebase + j, Rn2, tracer->n + ebase + j);
             }
         }
     } else if (tracer->method == rtHavel || tracer->method == rtBadouel) {
@@ -1343,10 +1328,13 @@ void tracer_build(raytracer* tracer) {
             }
         }
     } else if (tracer->method == rtBLBadouel || tracer->method == rtBLBadouelGrid) {
+        tracer->d = NULL;
+    }
+
+    if (tracer->method == rtPlucker || tracer->method == rtBLBadouel || tracer->method == rtBLBadouelGrid) {
         int ea, eb, ec;
         float3 vecAB = {0.f}, vecAC = {0.f}, vN = {0.f};
 
-        tracer->d = NULL;
         tracer->n = (float3*)calloc(sizeof(float3), ne * 4);
 
         for (i = 0; i < ne; i++) {
