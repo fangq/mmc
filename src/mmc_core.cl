@@ -1494,9 +1494,6 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
 
     clearpath(ppath, (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)));
-    clearpath(energytot, GPU_PARAM(gcfg, srcnum));
-    clearpath(energyesc, GPU_PARAM(gcfg, srcnum));
-
     r.photonid = id;
 
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
@@ -1788,6 +1785,9 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
     if (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE) {
         gpu_rng_init(t, n_seed, idx);
     }
+
+    clearpath(sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
+    clearpath(sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
 
     /*launch photons*/
     for (int i = 0; i < nphoton + (idx < ophoton); i++) {
