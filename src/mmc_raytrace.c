@@ -235,7 +235,13 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
     vec_add(&(r->p0), &(r->vec), &p1);
     vec_cross(&(r->p0), &p1, &pcrx);
     ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
-    prop = tracer->mesh->med + (tracer->mesh->type[eid]);
+
+    if (cfg->implicit && r->inroi) {
+        prop = tracer->mesh->med + tracer->mesh->prop;
+    } else {
+        prop = tracer->mesh->med + (tracer->mesh->type[eid]);
+    }
+
     rc = prop->n * R_C0;
     currweight = r->weight;
     mus = (cfg->mcmethod == mmMCX) ? prop->mus : (prop->mua + prop->mus);
@@ -323,6 +329,11 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->Lmove = ((r->isend) ? dlen : Lp0);
             break;
         }
+    }
+
+    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
+    if (cfg->implicit) {
+        traceroi(r, tracer, cfg->implicit, 0);
     }
 
     visit->raytet++;
@@ -941,6 +952,8 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 }
 #endif  /* #if !defined(__EMSCRIPTEN__) */
 
+#endif
+
 
 /**
  * \brief Compute distances to edge (infinite cylindrical) ROIs in the element
@@ -1335,6 +1348,8 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
         }
     }
 }
+
+#ifdef MMC_USE_SSE
 
 /**
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
@@ -1778,14 +1793,13 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 #ifdef MMC_USE_SSE
     const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
     int_coef = _mm_load_ps(int_coef_arr);
+#endif
 
     /** retrieve the iMMC ROI size and ray location at initial launch */
     if (cfg->implicit) {
         updateroi(cfg->implicit, &r, tracer->mesh);
         traceroi(&r, tracer, cfg->implicit, 1);
     }
-
-#endif
 
     while (1) { /*propagate a photon until exit*/
         if (cfg->implicit) {
