@@ -1018,7 +1018,7 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
             *c0 += (FL3(-2.f * Icos)) * pnorm;
             //if(GPU_PARAM(gcfg,debuglevel)&dlReflect) GPUDEBUG(("R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal));
             *eid = *oldeid; /*stay with the current element*/
-        } else if (GPU_PARAM(gcfg, isspecular) == 2 && *eid == 0) {
+        } else if ((GPU_PARAM(gcfg, isspecular) == 2) * (*eid == 0)) {
             // if do transmission, but next neighbor is 0, terminate
         } else {                             /*do transmission*/
             *c0 += (FL3(-Icos)) * pnorm;
