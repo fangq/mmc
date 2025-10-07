@@ -6,7 +6,7 @@
 
 *Author:  Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPL v3), see License.txt
-*Version: 2.8.0 (v2025.9, Bubble Tea)
+*Version: 2.8.0 (v2025.10, Bubble Tea)
 *URL:     https://mcx.space/mmc
 
 ---------------------------------------------------------------------
@@ -19,10 +19,10 @@ Table of Content:
 
 == # What's New ==
 
-MMC v2025.9 (2.8.0) is a maintenance release with multiple bug fixes and new features. It is highly
+MMC v2025.10 (2.8.0) is a maintenance release with multiple bug fixes and new features. It is highly
 recommended to upgrade for all users.
 
-MMC v2025.9 adds the below key features
+MMC v2025.10 adds the below key features
 
 * new Python module - pmmc (`pip install pmmc`)
 * pmmc supports Apple silicon
@@ -44,6 +44,7 @@ this release also fixed a list of bugs, including
 
 The full changelog is listed below
 
+* 2025-10-02 [cc5179c] [doc] update doc for v2025.10, bump pmmc to 0.3.5
 * 2025-10-02 [7dd25d9] [bug] enable immc in omp only mode on Apple silicon, fix memory error when r->nexteid
 * 2025-10-02 [d21587a] [bug] build immc in omp mode without sse, such as on Apple silicon, result incorrect
 * 2025-10-02 [c2cbc3b] [amd] fix one more warning
@@ -51,7 +52,7 @@ The full changelog is listed below
 * 2025-10-02 [8d0c19d] [bug] critical bug fix - incorrect energytot and energyesc introduced in commit 072fafe4305cd3c2da78094b0622dc4c67267983 Oct 14 2024
 * 2025-10-01 [2f81f87] [clang] silence clang warnings, make optlevel 3 default with macros
 * 2025-09-29 [63b48a6] [bug] add the missing gcfg constants when using -o 4 optimization
-* 2025-09-27 [2649e36] [doc] update documentation for v2025.9
+* 2025-09-27 [2649e36] [doc] update documentation for v2025.10
 * 2025-09-19 [74191ba] [ci] avoid using slow choco octave installation
 * 2025-09-15 [688c1ba] [feat] support focal length via cfg.srcdir(4), fix #108
 * 2025-08-25 [38f8e8a] [pmmc] bump version to 0.3.0 to include expanded mcx utils functions
@@ -380,7 +381,7 @@ The full command line options of MMC include the following:
 #Please visit our free scientific data sharing portal at https://neurojson.io/#
 # and consider sharing your public datasets in standardized JSON/JData format #
 ###############################################################################
-$Rev::      $v2024.2 $Date::                       $ by $Author::             $
+$Rev::      $v2025.10$Date::                       $ by $Author::             $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...

@@ -3651,7 +3651,7 @@ void mcx_printheader(mcconfig* cfg) {
 #Please visit our free scientific data sharing portal at " S_BLUE "https://neurojson.io " S_YELLOW "#\n\
 # and consider sharing your public datasets in standardized JSON/JData format #\n\
 ###############################################################################\n\
-$Rev::      $" S_GREEN MMC_VERSION S_YELLOW " $Date::                       $ by $Author::             $\n\
+$Rev::      $" S_GREEN MMC_VERSION S_YELLOW "$Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 

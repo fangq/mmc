@@ -16,7 +16,7 @@ function varargout = mmclab(varargin)
 % Please visit our free scientific data sharing portal at https://neurojson.io%
 % and consider sharing your public datasets in standardized JSON/JData format %
 % #############################################################################%
-% $Rev::      $v2025.9$Date::                       $ by $Author::Qianqian Fang%
+% $Rev::      $v2025.10$Date::                       $by $Author::Qianqian Fang%
 % #############################################################################%
 %
 % Format:
