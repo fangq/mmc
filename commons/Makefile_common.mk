@@ -225,7 +225,7 @@ oct:            BINARY=mmc.mex
 oct octomp:     ARFLAGS+=--mex -DMATLAB_MEX_FILE mmclab.cpp -I$(INCLUDEDIR)
 oct octomp:     AR=CC=$(CC) CXX=$(CXX) LDFLAGS='$(OCT_LDFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
 oct octomp:     USERARFLAGS+=-o $(BINDIR)/mmc
-oct cudaoct:    EXTRALIB+=-lOpenCL
+oct cudaoct:    EXTRALIB+=$(LIBOPENCL)
 
 debug:     sse
 debug:     CUCCOPT+=-DMCX_DEBUG
