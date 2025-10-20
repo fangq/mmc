@@ -44,6 +44,13 @@ this release also fixed a list of bugs, including
 
 The full changelog is listed below
 
+* 2025-10-20 [ae42a8c] [pmmc] bump version to 0.3.6 to include fix to #113
+* 2025-10-20 [4be1227] [bug] add missing macros after enabling optlevel 3, fix #113
+* 2025-10-12 [c113625] [deploy] fix octave 5.2 opencl not linked bug, fix command
+* 2025-10-12 [6acfb54] [deploy] fix octave 5.2 opencl not linked bug, need to set LFLAGS instead of LDFLAGS
+* 2025-10-11 [36c381d] [deploy] use LIBOPENCL for opencl library
+* 2025-10-09 [904fd93] [deploy] fix octave mex file missing libOpenCL on older Linux
+* 2025-10-06 [8d170a6] [release] prepare release for v2025.10
 * 2025-10-02 [cc5179c] [doc] update doc for v2025.10, bump pmmc to 0.3.5
 * 2025-10-02 [7dd25d9] [bug] enable immc in omp only mode on Apple silicon, fix memory error when r->nexteid
 * 2025-10-02 [d21587a] [bug] build immc in omp mode without sse, such as on Apple silicon, result incorrect
