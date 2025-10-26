@@ -40,6 +40,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 #include "mmc_rand_xorshift128p.h"
 #include "mmc_fastmath.h"
 
@@ -53,11 +54,11 @@
 
 static float xorshift128p_nextf (RandType t[RAND_BUF_LEN]) {
     union {
-        ulong  i;
+        uint64_t  i;
         float f[2];
         uint  u[2];
     } s1;
-    const ulong s0 = t[1];
+    const uint64_t s0 = t[1];
     s1.i = t[0];
     t[0] = s0;
     s1.i ^= s1.i << 23; // a
@@ -69,8 +70,8 @@ static float xorshift128p_nextf (RandType t[RAND_BUF_LEN]) {
 }
 
 static void xorshift128p_seed (uint* seed, RandType t[RAND_BUF_LEN]) {
-    t[0] = (ulong)seed[0] << 32 | seed[1] ;
-    t[1] = (ulong)seed[2] << 32 | seed[3];
+    t[0] = (uint64_t)seed[0] << 32 | seed[1];
+    t[1] = (uint64_t)seed[2] << 32 | seed[3];
 }
 
 // transform into [0,1] random number
