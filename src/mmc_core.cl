@@ -296,12 +296,17 @@ typedef struct MMC_Ray {
     //float4 bary0;               /**< the Barycentric coordinate of the intersection with the tet */
     float slen0;                  /**< initial unitless scattering length = length*mus */
     unsigned int photonid;        /**< index of the current photon */
-} ray __attribute__ ((aligned (16)));
+} ray __attribute__ ((aligned (4)));
 
 
 typedef struct MMC_Parameter {
+    float4 srcparam1;             /**< source parameters set 1 */
+    float4 srcparam2;             /**< source parameters set 2 */
+    uint4  crop0;
+    float4 bary0;
     float3 srcpos;
     float3 srcdir;
+    float3 nmin;
     float  tstart, tend;
     uint   isreflect, issavedet, issaveexit, ismomentum, isatomic, isspecular;
     float  Rtstep;
@@ -311,8 +316,6 @@ typedef struct MMC_Parameter {
     uint   detnum;
     int    voidtime;
     int    srctype;               /**< type of the source */
-    float4 srcparam1;             /**< source parameters set 1 */
-    float4 srcparam2;             /**< source parameters set 2 */
     uint   issaveref;             /**<1 save diffuse reflectance at the boundary voxels, 0 do not save*/
     uint   maxgate;
     uint   debuglevel;            /**< debug flags */
@@ -324,13 +327,10 @@ typedef struct MMC_Parameter {
     float  dstep;
     float  focus;
     int    nn, ne, nf;
-    float3 nmin;
     float  nout;
     float  roulettesize;
     int    srcnum;
-    uint4  crop0;
     int    srcelemlen;
-    float4 bary0;
     int    e0;
     int    isextdet;
     uint   framelen;
@@ -344,7 +344,7 @@ typedef struct MMC_Parameter {
 typedef struct MMC_Reporter {
     float  raytet;
     uint   jumpdebug;
-} MCXReporter  __attribute__ ((aligned (16)));
+} MCXReporter  __attribute__ ((aligned (4)));
 
 typedef struct MCX_medium {
     float mua;                    /**<absorption coeff in 1/mm unit*/

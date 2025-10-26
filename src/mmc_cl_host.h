@@ -62,8 +62,13 @@ typedef cl_bitfield         cl_mem_flags_NV;
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 
 typedef struct PRE_ALIGN(32) GPU_mcconfig {
+    cl_float4 srcparam1;                  /**< source parameters set 1 */
+    cl_float4 srcparam2;                  /**< source parameters set 2 */
+    cl_int4   crop0;
+    cl_float4 bary0;
     cl_float3 srcpos;
     cl_float3 srcdir;
+    cl_float3 nmin;
     cl_float  tstart, tend;
     cl_uint   isreflect, issavedet, issaveexit, ismomentum, isatomic, isspecular;
     cl_float  Rtstep;
@@ -73,8 +78,6 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_uint   detnum;
     cl_int    voidtime;
     cl_int    srctype;                    /**< type of the source */
-    cl_float4 srcparam1;                  /**< source parameters set 1 */
-    cl_float4 srcparam2;                  /**< source parameters set 2 */
     cl_uint   issaveref;     /**<1 save diffuse reflectance at the boundary voxels, 0 do not save*/
     cl_uint   maxgate;
     cl_uint   debuglevel;           /**< debug flags */
@@ -86,13 +89,10 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_float  dstep;
     cl_float  focus;
     cl_int    nn, ne, nf;
-    cl_float3 nmin;
     cl_float  nout;
     cl_float  roulettesize;
     cl_int    srcnum;
-    cl_int4   crop0;
     cl_int    srcelemlen;
-    cl_float4 bary0;
     cl_int    e0;
     cl_int    isextdet;
     cl_int    framelen;
