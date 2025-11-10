@@ -87,6 +87,10 @@ function varargout = mmclab(varargin)
 %
 % == Source-detector parameters ==
 %      cfg.detpos:      an N by 4 array, each row specifying a detector: [x,y,z,radius]
+%      cfg.detparam1:   a 4-element vector: [u1, u2, u3, Nx], define the x-axis of a widefield
+%                       detector, [u1,u2,u3] is the x-axis vector; Nx is the pixel count in the x-axis
+%      cfg.detparam2:   a 4-element vector: [v1, v2, v3, Ny], define the y-axis of a widefield
+%                       detector, [v1,v2,v3] is the y-axis vector; Ny is the pixel count in the y-axis
 %      cfg.maxdetphoton:   maximum number of photons saved by the detectors [1000000]
 %      cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
 %                      'pencil' - default, pencil beam, no param needed
@@ -157,7 +161,15 @@ function varargout = mmclab(varargin)
 %                       '-': search both directions
 %
 % == Output control ==
-%      cfg.issaveexit: [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
+%      cfg.issaveexit: [0]-whether to save the position (x,y,z) and (vx,vy,vz) for a detected photon
+%                      When issaveexit is set to 2, this signals mmclab to output a 2D array
+%                      a widefield detector defined by cfg.detparam1 and cfg.detparam2.
+%                      Specifically, instead of output individual detected photon data,
+%                      the exiting weight of all detected photons are binned and summed
+%                      into a detparam1(4)-by-detparam2(4) pixelated output, covering
+%                      the quadrilateral area with 4 corners defined by (only 1:3 elem are used)
+%                      [detpos, detpos+detparam1, detpos+detparam1+detaram2, detpos+detparam2].
+%                      When a widefield detector is used, detector radii are ignored.
 %      cfg.issaveref:  [0]-save diffuse reflectance/transmittance on the exterior surfaces.
 %                      The output is stored as flux.dref in a 2D array of size [#Nf,  #time_gate]
 %                      where #Nf is the number of triangles on the surface; #time_gate is the
