@@ -449,7 +449,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         FPARAM_TO_MACRO(opt, param, dstep);
         IPARAM_TO_MACRO(opt, param, e0);
         IPARAM_TO_MACRO(opt, param, elemlen);
-        FPARAM_TO_MACRO(opt, param, focus);
         IPARAM_TO_MACRO(opt, param, framelen);
         IPARAM_TO_MACRO(opt, param, isextdet);
         IPARAM_TO_MACRO(opt, param, ismomentum);
@@ -479,6 +478,16 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         IPARAM_TO_MACRO(opt, param, detnum);
         IPARAM_TO_MACRO(opt, param, issaveseed);
         IPARAM_TO_MACRO(opt, param, nf);
+
+        if (param.focus != param.focus) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=NAN");
+        } else if (param.focus == INFINITY) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=INFINITY");
+        } else if (param.focus == -INFINITY) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=-INFINITY");
+        } else {
+            FPARAM_TO_MACRO(opt, param, focus);
+        }
     }
 
     MMC_FPRINTF(cfg->flog, "Building kernel with option: %s\n", opt);

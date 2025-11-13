@@ -106,7 +106,8 @@
 const char shortopt[] = {'h', 'E', 'f', 'n', 'A', 't', 'T', 's', 'a', 'g', 'b', 'D', 'G',
                          'd', 'r', 'S', 'e', 'U', 'R', 'l', 'L', 'I', '-', 'u', 'C', 'M',
                          'i', 'V', 'O', '-', 'F', 'q', 'x', 'P', 'k', 'v', 'm', '-', '-',
-                         'J', 'o', 'H', '-', 'W', 'X', '-', 'c', 'Q', '-', 'Z', 'N', '\0'
+                         'J', 'o', 'H', '-', 'W', 'X', '-', 'c', 'Q', '-', 'Z', 'N', 'j',
+                         '\0'
                         };
 
 /**
@@ -125,7 +126,7 @@ const char* fullopt[] = {"--help", "--seed", "--input", "--photon", "--autopilot
                          "--replaydet", "--voidtime", "--version", "--mc", "--atomic",
                          "--debugphoton", "--compileropt", "--optlevel", "--maxdetphoton",
                          "--buffer", "--workload", "--saveref", "--gridsize", "--compute",
-                         "--bench", "--dumpjson", "--zip", "--net", ""
+                         "--bench", "--dumpjson", "--zip", "--net", "--json", ""
                         };
 
 extern char pathsep;
@@ -237,6 +238,7 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->zipid = zmZlib;
     memset(cfg->jsonfile, 0, MAX_PATH_LENGTH);
     cfg->shapedata = NULL;
+    cfg->extrajson = NULL;
 
 #if defined(USE_OPENCL) || defined(USE_CUDA)
     cfg->method = rtBLBadouelGrid;
@@ -407,6 +409,10 @@ void mcx_clearcfg(mcconfig* cfg) {
 
     if (cfg->shapedata) {
         free(cfg->shapedata);
+    }
+
+    if (cfg->extrajson) {
+        free(cfg->extrajson);
     }
 
     if (cfg->node) {
@@ -1531,7 +1537,18 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 cfg->srcdir.z = subitem->child->next->next->valuedouble;
 
                 if (subitem->child->next->next->next) {
-                    cfg->srcdir.w = subitem->child->next->next->next->valuedouble;
+                    if (cJSON_IsString(subitem->child->next->next->next)) {
+                        if (strcmp(subitem->child->next->next->next->valuestring, "_NaN_") == 0) {
+                            printf("isnan\n");
+                            cfg->srcdir.w = NAN;
+                        } else if (strcmp(subitem->child->next->next->next->valuestring, "_Inf_") == 0) {
+                            cfg->srcdir.w = INFINITY;
+                        } else if (strcmp(subitem->child->next->next->next->valuestring, "-_Inf_") == 0) {
+                            cfg->srcdir.w = -INFINITY;
+                        }
+                    } else {
+                        cfg->srcdir.w = subitem->child->next->next->next->valuedouble;
+                    }
                 }
             }
 
@@ -3403,6 +3420,22 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     i = mcx_readarg(argc, argv, i, cfg->workload, "floatlist");
                     break;
 
+                case 'j':
+                    if (i + 1 < argc) {
+                        int len = strlen(argv[i + 1]);
+
+                        if (cfg->extrajson) {
+                            free(cfg->extrajson);
+                        }
+
+                        cfg->extrajson = (char*)calloc(1, len + 1);
+                        memcpy(cfg->extrajson, argv[++i], len);
+                    } else {
+                        MMC_ERROR(-1, "json fragment is expected after --json");
+                    }
+
+                    break;
+
                 case 'Q':
                     if (i + 1 < argc && isalpha((int)(argv[i + 1][0])) ) {
                         int idx = mcx_keylookup(argv[++i], benchname);
@@ -3577,6 +3610,18 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
             mcx_loadfromjson(jsoninput, cfg);
         } else {
             mcx_readconfig(filename, cfg);
+        }
+
+        if (cfg->extrajson) {
+            cJSON* jroot = cJSON_Parse(cfg->extrajson);
+
+            if (jroot) {
+                cfg->extrajson[0] = '_';
+                mcx_loadjson(jroot, cfg);
+                cJSON_Delete(jroot);
+            } else {
+                MMC_ERROR(-1, "invalid json fragment following --json");
+            }
         }
     }
 

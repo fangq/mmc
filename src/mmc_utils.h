@@ -292,6 +292,7 @@ typedef struct MMC_config {
     unsigned int savedetflag;      /**<a flag to control the output fields of detected photon data*/
     uint mediabyte;                /**<not used*/
     char* shapedata;               /**<a pointer points to a string defining the JSON-formatted shape data*/
+    char* extrajson;               /**<a pointer points to a string defining the extra JSON input data*/
     FLOAT3* node;                  /**<node x/y/z data loaded from json input*/
     unsigned int nodenum;          /**<total number of nodes*/
     int* elem;                     /**<tetrahedron node indices from json input*/
