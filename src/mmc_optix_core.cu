@@ -18,10 +18,6 @@ constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // heuristic to ensure ray cut through triangle
 constexpr float DOUBLE_SAFETY_DISTANCE = SAFETY_DISTANCE * 2.0f;
 
-constexpr unsigned int INITIAL_MEDIUM_UNKNOWN = std::numeric_limits<unsigned int>::max();
-constexpr unsigned int AMBIENT_MEDIUM_ID = 0;
-constexpr unsigned int DEAD_MEDIUM_ID = std::numeric_limits<unsigned int>::max()-1;
-
 // simulation configuration and medium optical properties
 extern "C" {
     __constant__ MMCParam gcfg;
@@ -51,10 +47,21 @@ __device__ __forceinline__ void getInitialMediumId(optixray &r, mcx::Random &rng
  * @brief Launch a new photon
  */
 __device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
-    r.p0 = gcfg.srcpos;
-    r.dir = gcfg.srcdir;
+    if (gcfg.srctype == MCX_SRC_PENCIL) {
+        r.p0 = gcfg.srcpos;
+        r.dir = gcfg.srcdir;
+        r.weight = 1.0f;
+    } else if (gcfg.srctype == MCX_SRC_PLANAR) {
+        float rx = rng.uniform(0.0f, 1.0f);
+        float ry = rng.uniform(0.0f, 1.0f);
+        r.p0.x = gcfg.srcpos.x + rx * gcfg.srcparam1.x + ry * gcfg.srcparam2.x;
+        r.p0.y = gcfg.srcpos.y + rx * gcfg.srcparam1.y + ry * gcfg.srcparam2.y;
+        r.p0.z = gcfg.srcpos.z + rx * gcfg.srcparam1.z + ry * gcfg.srcparam2.z;
+        r.dir = gcfg.srcdir;
+        r.weight = 1.f;
+    }
+
     r.slen = rng.rand_next_scatlen();
-    r.weight = 1.0f;
     r.photontimer = 0.0f;
     r.mediumid = gcfg.mediumid0;
 

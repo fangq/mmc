@@ -338,7 +338,7 @@ for i=1:len
             'srcparam1',cfg.srcparam1,'srcparam2',cfg.srcparam2);
         sdom=mmcsrcdomain(srcdef,[min(cfg.node);max(cfg.node)]);
         isinside=ismember(round(sdom*1e10)*1e-10,round(cfg(i).node*1e10)*1e-10,'rows');
-        if(all(~isinside))
+        if(all(~isinside) && ~(isfield(cfg(i),'compute') && strcmp(cfg(i).compute,'optix')))
             if(size(cfg(i).elem,2)==4)
                 cfg(i).elem(:,5)=1;
             end
@@ -346,11 +346,11 @@ for i=1:len
             cfg(i).elemprop=cfg(i).elem(:,5);
             [cfg(i).elem, evol, idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
             if(isfield(cfg(i),'edgeroi'))
-	        cfg(i).edgeroi(idx,:)=cfg(i).edgeroi(idx,[1 3 2 5 4 6]);
-	    end
-	    if(isfield(cfg(i),'faceroi'))
-	        cfg(i).faceroi(idx,:)=cfg(i).faceroi(idx,[2 1 3 4]);
-	    end
+	            cfg(i).edgeroi(idx,:)=cfg(i).edgeroi(idx,[1 3 2 5 4 6]);
+	        end
+	        if(isfield(cfg(i),'faceroi'))
+	            cfg(i).faceroi(idx,:)=cfg(i).faceroi(idx,[2 1 3 4]);
+	        end
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;

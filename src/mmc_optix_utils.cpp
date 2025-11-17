@@ -163,12 +163,22 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     }
 
     // source setup
+    optixcfg->launchParams.srctype = cfg->srctype;
+    MMC_FPRINTF(cfg->flog, "cfg->srctype:  \t%u ms\n", cfg->srctype);
     optixcfg->launchParams.srcpos = make_float3(cfg->srcpos.x,
                                                 cfg->srcpos.y,
                                                 cfg->srcpos.z);
     optixcfg->launchParams.srcdir = make_float3(cfg->srcdir.x,
                                                 cfg->srcdir.y,
                                                 cfg->srcdir.z);
+    optixcfg->launchParams.srcparam1 = make_float4(cfg->srcparam1.x,
+                                                   cfg->srcparam1.y,
+                                                   cfg->srcparam1.z,
+                                                   cfg->srcparam1.w);
+    optixcfg->launchParams.srcparam2 = make_float4(cfg->srcparam2.x,
+                                                   cfg->srcparam2.y,
+                                                   cfg->srcparam2.z,
+                                                   cfg->srcparam2.w);
 
     // parameters of dual grid
     optixcfg->launchParams.nmin = make_float3(mesh->nmin.x,
@@ -190,7 +200,12 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.maxgate = cfg->maxgate;
 
     // init medium ID using element based
-    optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0-1];
+    if (cfg->e0 == -1) {
+        optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
+        MMC_FPRINTF(cfg->flog, "Init element:  \t%d ms\n", cfg->e0);
+    } else {
+        optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0-1];
+    }
 
     // simulation flags
     optixcfg->launchParams.isreflect = cfg->isreflect;
