@@ -18,6 +18,10 @@ constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // heuristic to ensure ray cut through triangle
 constexpr float DOUBLE_SAFETY_DISTANCE = SAFETY_DISTANCE * 2.0f;
 
+constexpr unsigned int INITIAL_MEDIUM_UNKNOWN = std::numeric_limits<unsigned int>::max();
+constexpr unsigned int AMBIENT_MEDIUM_ID = 0;
+constexpr unsigned int DEAD_MEDIUM_ID = std::numeric_limits<unsigned int>::max()-1;
+
 // simulation configuration and medium optical properties
 extern "C" {
     __constant__ MMCParam gcfg;
@@ -31,6 +35,19 @@ __device__ __forceinline__ void initRNGSeed(mcx::Random &rng, const int &idx) {
 }
 
 /**
+ * @brief Determine the initial medium ID where the photon is launched
+ */
+__device__ __forceinline__ void getInitialMediumId(optixray &r, mcx::Random &rng) {
+    optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0f, std::numeric_limits<float>::max(),
+        0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
+        *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
+        *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
+        *(uint32_t*)&(r.slen), *(uint32_t*)&(r.weight), *(uint32_t*)&(r.photontimer),
+        r.mediumid,
+        rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
+}
+
+/**
  * @brief Launch a new photon
  */
 __device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
@@ -40,6 +57,11 @@ __device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
     r.weight = 1.0f;
     r.photontimer = 0.0f;
     r.mediumid = gcfg.mediumid0;
+
+    // if the initial medium ID is unknown, determine it at runtime
+    if (r.mediumid == INITIAL_MEDIUM_UNKNOWN) {
+        getInitialMediumId(r, rng);
+    }
 }
 
 /**
@@ -246,10 +268,12 @@ extern "C" __global__ void __raygen__rg() {
 
     int ndone = 0;  // number of simulated photons
     while (ndone < (gcfg.threadphoton + (launchindex.x < gcfg.oddphoton))) {
-        movePhoton(r, rng);
+        if (r.mediumid != DEAD_MEDIUM_ID) {
+            movePhoton(r, rng);
+        }
 
         // when a photon escapes or tof reaches the upper limit
-        if (!(r.mediumid && r.photontimer < gcfg.tend)) {
+        if (!(r.mediumid != DEAD_MEDIUM_ID && r.photontimer < gcfg.tend)) {
             launchPhoton(r, rng);
             ++ndone;
         }
@@ -280,6 +304,13 @@ extern "C" __global__ void __closesthit__ch() {
         *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
     float4 fnorm = sbtData.fnorm[primid];
     const uint media = __float_as_uint(fnorm.w);
+
+    // immediately return once the initial medium ID unknown -> known
+    if (r.mediumid == INITIAL_MEDIUM_UNKNOWN) {
+        r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
+        setRay(r);
+        return;
+    }
 
     // current medium id
     r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
@@ -316,6 +347,11 @@ extern "C" __global__ void __closesthit__ch() {
             // if the ray is reflected
             r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
         }
+
+        // terminate if ray gets reflected or diffracted into ambient medium
+        if (r.mediumid == AMBIENT_MEDIUM_ID) {
+            r.mediumid = DEAD_MEDIUM_ID;
+        }
     }
 
     // update rng
@@ -328,6 +364,14 @@ extern "C" __global__ void __closesthit__ch() {
 extern "C" __global__ void __miss__ms() {
     // get photon and ray information from payload
     optixray r = getRay();
+
+    // terminate if a ray's initial medium is unknown and
+    // misses the entire tissue volume
+    if (r.mediumid == INITIAL_MEDIUM_UNKNOWN) {
+        r.mediumid = DEAD_MEDIUM_ID;
+        setRay(r);
+        return;
+    }
 
     // get rng
     mcx::Random rng = getRNG();
