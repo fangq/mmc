@@ -340,7 +340,7 @@ for i=1:len
         isinside=ismember(round(sdom*1e10)*1e-10,round(cfg(i).node*1e10)*1e-10,'rows');
         if(all(~isinside) && ~(isfield(cfg(i),'compute') && strcmp(cfg(i).compute,'optix')))
             if(size(cfg(i).elem,2)==4)
-                cfg(i).elem(:,5)=1;
+                cfg(i).elem(:,5)=cfg(i).elemprop;
             end
             [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
             cfg(i).elemprop=cfg(i).elem(:,5);
