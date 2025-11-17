@@ -164,7 +164,6 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 
     // source setup
     optixcfg->launchParams.srctype = cfg->srctype;
-    MMC_FPRINTF(cfg->flog, "cfg->srctype:  \t%u ms\n", cfg->srctype);
     optixcfg->launchParams.srcpos = make_float3(cfg->srcpos.x,
                                                 cfg->srcpos.y,
                                                 cfg->srcpos.z);
@@ -202,7 +201,6 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     // init medium ID using element based
     if (cfg->e0 == -1) {
         optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
-        MMC_FPRINTF(cfg->flog, "Init element:  \t%d ms\n", cfg->e0);
     } else {
         optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0-1];
     }
