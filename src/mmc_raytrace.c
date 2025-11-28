@@ -1823,7 +1823,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0 && r.faceid >= 0) {
-            r.partialpath[mesh->prop - 1 + mesh->type[r.eid - 1]] += r.Lmove;    /*second medianum block is the partial path*/
+            r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
         }
 
         if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
@@ -1895,7 +1895,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
             if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                r.partialpath[mesh->prop - 1 + mesh->type[r.eid - 1]] += r.Lmove;
+                r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
             }
 
             if (r.faceid == -2) {
@@ -1909,7 +1909,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
                 r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
                 if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                    r.partialpath[mesh->prop - 1 + mesh->type[r.eid - 1]] += r.Lmove;
+                    r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
                 }
             }
 
@@ -2001,10 +2001,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->ismomentum && mesh->type[r.eid - 1] > 0) {              /*when ismomentum is set to 1*/
-            r.partialpath[(mesh->prop << 1) - 1 + mesh->type[r.eid - 1]] += mom;    /*the third medianum block stores the momentum transfer*/
+            r.partialpath[(mesh->prop << 1) - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += mom;    /*the third medianum block stores the momentum transfer*/
         }
 
-        r.partialpath[mesh->type[r.eid - 1] - 1]++;                      /*the first medianum block stores the scattering event counts*/
+        r.partialpath[(r.inroi ? mesh->prop : mesh->type[r.eid - 1]) - 1]++;                      /*the first medianum block stores the scattering event counts*/
     }
 
     if (cfg->issavedet && exitdet > 0) {

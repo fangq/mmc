@@ -4,7 +4,7 @@
 
 - Copyright: (C) Qianqian Fang (2025) <q.fang at neu.edu>
 - License: GNU Public License V3 or later
-- Version: 0.3.7
+- Version: 0.3.8
 - URL: https://pypi.org/project/pmmc/
 - Github: https://github.com/fangq/mmc
 

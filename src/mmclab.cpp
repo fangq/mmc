@@ -83,6 +83,7 @@ typedef mwSize dimtype;                                   //! MATLAB type alias 
 
 void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* cfg, tetmesh* mesh);
 void mmclab_usage();
+mxArray* mmclab_assert(mxArray* arr);
 
 extern const char debugflag[];
 
@@ -314,7 +315,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                 fielddim[1] = cfg.debugdatalen; // his.savedphoton is for one repetition, should correct
                 fielddim[2] = 0;
                 fielddim[3] = 0;
-                mxSetFieldByNumber(plhs[outputidx], jstruct, 0, mxCreateNumericArray(2, fielddim, mxSINGLE_CLASS, mxREAL));
+                mxSetFieldByNumber(plhs[outputidx], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, fielddim, mxSINGLE_CLASS, mxREAL)));
 
                 if ((cfg.debuglevel & dlTraj) && cfg.exportdebugdata) {
                     memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[outputidx], jstruct, 0)), cfg.exportdebugdata, fielddim[0]*fielddim[1]*sizeof(float));
@@ -331,7 +332,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                 fielddim[1] = cfg.detectedcount;
                 fielddim[2] = 0;
                 fielddim[3] = 0;
-                mxSetFieldByNumber(plhs[2], jstruct, 0, mxCreateNumericArray(2, fielddim, mxUINT8_CLASS, mxREAL));
+                mxSetFieldByNumber(plhs[2], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, fielddim, mxUINT8_CLASS, mxREAL)));
                 memcpy((unsigned char*)mxGetPr(mxGetFieldByNumber(plhs[2], jstruct, 0)), cfg.exportseed, fielddim[0]*fielddim[1]);
             }
 
@@ -350,7 +351,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     fielddim[3] = 0;
 
                     if (cfg.detectedcount > 0) {
-                        mxSetFieldByNumber(plhs[1], jstruct, 0, mxCreateNumericArray(2, fielddim, mxSINGLE_CLASS, mxREAL));
+                        mxSetFieldByNumber(plhs[1], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, fielddim, mxSINGLE_CLASS, mxREAL)));
                         memcpy((float*)mxGetPr(mxGetFieldByNumber(plhs[1], jstruct, 0)), cfg.exportdetected,
                                fielddim[0]*fielddim[1]*sizeof(float));
                     }
@@ -359,7 +360,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     fielddim[1] = cfg.detparam2.w;
                     fielddim[2] = cfg.maxgate;
                     fielddim[3] = 0;
-                    mxSetFieldByNumber(plhs[1], jstruct, 0, mxCreateNumericArray(3, fielddim, mxSINGLE_CLASS, mxREAL));
+                    mxSetFieldByNumber(plhs[1], jstruct, 0, mmclab_assert(mxCreateNumericArray(3, fielddim, mxSINGLE_CLASS, mxREAL)));
                     float* detmap = (float*)mxGetPr(mxGetFieldByNumber(plhs[1], jstruct, 0));
                     memset(detmap, cfg.detparam1.w * cfg.detparam2.w * cfg.maxgate, sizeof(float));
                     mesh_getdetimage(detmap, cfg.exportdetected, cfg.detectedcount, &cfg, &mesh);
@@ -387,25 +388,30 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     fielddim[4] = cfg.maxgate;
 
                     if (cfg.srcnum > 1) {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mxCreateNumericArray(5, fielddim, mxDOUBLE_CLASS, mxREAL));
+                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(5, fielddim, mxDOUBLE_CLASS, mxREAL)));
                     } else {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mxCreateNumericArray(4, &fielddim[1], mxDOUBLE_CLASS, mxREAL));
+                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(4, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
                     }
                 } else {
                     if (cfg.srcnum > 1) {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mxCreateNumericArray(3, fielddim, mxDOUBLE_CLASS, mxREAL));
+                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(3, fielddim, mxDOUBLE_CLASS, mxREAL)));
                     } else {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL));
+                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
                     }
                 }
 
                 double* output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0], jstruct, 0));
+
+                if (output == NULL) {
+                    mexErrMsgTxt("MMCLAB failed to allocate memory!");
+                }
+
                 memcpy(output, mesh.weight, cfg.srcnum * datalen * cfg.maxgate * sizeof(double));
 
                 if (cfg.issaveref) {      /** save diffuse reflectance */
                     fielddim[1] = mesh.nf;
                     fielddim[2] = cfg.maxgate;
-                    mxSetFieldByNumber(plhs[0], jstruct, 1, mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL));
+                    mxSetFieldByNumber(plhs[0], jstruct, 1, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
                     memcpy((double*)mxGetPr(mxGetFieldByNumber(plhs[0], jstruct, 1)), mesh.dref, fielddim[1]*fielddim[2]*sizeof(double));
                 }
             }
@@ -1001,6 +1007,18 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
     if (jsonshapes) {
         delete [] jsonshapes;
     }
+}
+
+/**
+ * @brief Print a brief help information if nothing is provided
+ */
+
+mxArray* mmclab_assert(mxArray* arr) {
+    if (arr == NULL) {
+        mexErrMsgTxt("MMCLAB failed to allocate memory!");
+    }
+
+    return arr;
 }
 
 
