@@ -28,7 +28,7 @@ jobs:
         if: ${{ runner.os == 'Linux' && matrix.os != 'ubuntu-24.04' }}
         run: |
           sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
-          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7 upx-ucl pocl-opencl-icd
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7 gcc-9 g++-9 upx-ucl pocl-opencl-icd
       - name: Install dependencies (Linux only)
         if: ${{ matrix.os == 'ubuntu-24.04' }}
         run: |
