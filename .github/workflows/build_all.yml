@@ -42,7 +42,7 @@ jobs:
       - name: Install dependencies (MacOS only)
         if: ${{ runner.os == 'macOS' }}
         run: |
-          brew install octave
+          brew install octave gcc@12
           #brew install upx
           if [[ "$RUNNER_ARCH" == "ARM64" ]]; then
             echo 'OMPONLY=omp' >> $GITHUB_ENV
