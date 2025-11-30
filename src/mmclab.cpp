@@ -287,7 +287,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
 #endif
 #ifdef USE_OPTIX
                 else if (cfg.compute == cbOptiX) {
-                    mmc_run_optix(&cfg, &mesh, &tracer, progressfun, (void*)hprop);
+                    mmc_run_optix(&cfg, &mesh, &tracer);
                 }
 
 #endif

@@ -37,22 +37,22 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     createMissPrograms(&optixcfg);
     createHitgroupPrograms(&optixcfg);
     MMC_FPRINTF(cfg->flog, "optix device programs complete:  \t%d ms\n",
-        GetTimeMillis() - tic0);
+                GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     optixcfg.launchParams.gashandle = buildAccel(mesh, &optixcfg);
     MMC_FPRINTF(cfg->flog, "optix acceleration structure complete:  \t%d ms\n",
-        GetTimeMillis() - tic0);
+                GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     createPipeline(&optixcfg);
     MMC_FPRINTF(cfg->flog, "optix pipeline complete:  \t%d ms\n",
-        GetTimeMillis() - tic0);
+                GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     buildSBT(mesh, &optixcfg);
     MMC_FPRINTF(cfg->flog, "optix shader binding table complete:  \t%d ms\n",
-        GetTimeMillis() - tic0);
+                GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     // ==================================================================
@@ -61,31 +61,31 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     prepLaunchParams(cfg, mesh, gpu, &optixcfg);
     CUDA_ASSERT(cudaDeviceSynchronize());
     MMC_FPRINTF(cfg->flog, "optix launch parameters complete:  \t%d ms\n",
-        GetTimeMillis() - tic0);
+                GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     // ==================================================================
     // Launch simulation
     // ==================================================================
     MMC_FPRINTF(cfg->flog, "lauching OptiX for time window [%.1fns %.1fns] ...\n",
-        cfg->tstart * 1e9, cfg->tend * 1e9);
+                cfg->tstart * 1e9, cfg->tend * 1e9);
     fflush(cfg->flog);
     uint kernel_start_time = GetTimeMillis();
     OPTIX_CHECK(optixLaunch(/*! pipeline we're launching launch: */
-                        optixcfg.pipeline,
-                        optixcfg.stream,
-                        /*! parameters and SBT */
-                        optixcfg.launchParamsBuffer.d_pointer(),
-                        optixcfg.launchParamsBuffer.sizeInBytes,
-                        &optixcfg.sbt,
-                        /*! dimensions of the launch: */
-                        optixcfg.launchWidth, 1, 1));
+                    optixcfg.pipeline,
+                    optixcfg.stream,
+                    /*! parameters and SBT */
+                    optixcfg.launchParamsBuffer.d_pointer(),
+                    optixcfg.launchParamsBuffer.sizeInBytes,
+                    &optixcfg.sbt,
+                    /*! dimensions of the launch: */
+                    optixcfg.launchWidth, 1, 1));
     CUDA_ASSERT(cudaDeviceSynchronize());
     uint kernel_runtime = GetTimeMillis() - kernel_start_time;
     MMC_FPRINTF(cfg->flog, "kernel complete:  \t%d ms\nretrieving flux ... \t",
-        GetTimeMillis() - tic0);
+                GetTimeMillis() - tic0);
     MMC_FPRINTF(cfg->flog, "simulated %zu photons (%zu) with 1 devices \nMMC simulation speed: %.2f photon/ms\n",
-        cfg->nphoton, cfg->nphoton, (double)cfg->nphoton / kernel_runtime);
+                cfg->nphoton, cfg->nphoton, (double)cfg->nphoton / kernel_runtime);
     fflush(cfg->flog);
 
     // ==================================================================
@@ -94,39 +94,41 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     optixcfg.outputBuffer.download(optixcfg.outputHostBuffer, optixcfg.outputBufferSize);
     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
+
     for (size_t i = 0; i < optixcfg.launchParams.crop0.w; i++) {
         // combine two outputs into one
         #pragma omp atomic
         mesh->weight[i] += optixcfg.outputHostBuffer[i] +
-            optixcfg.outputHostBuffer[i + optixcfg.launchParams.crop0.w];
+                           optixcfg.outputHostBuffer[i + optixcfg.launchParams.crop0.w];
     }
 
     // ==================================================================
     // normalize output
     // ==================================================================
-/*
-    if (cfg->isnormalized) {
-        MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-        fflush(cfg->flog);
+    /*
+        if (cfg->isnormalized) {
+            MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
+            fflush(cfg->flog);
 
-        float* energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
+            float* energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
 
-        CUDA_ASSERT(cudaMemcpy(energy, genergy,
-                               sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
-                               cudaMemcpyDeviceToHost));
-        optixcfg.outputBuffer.download(optixcfg.outputHostBuffer, optixcfg.outputBufferSize);
+            CUDA_ASSERT(cudaMemcpy(energy, genergy,
+                                   sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
+                                   cudaMemcpyDeviceToHost));
+            optixcfg.outputBuffer.download(optixcfg.outputHostBuffer, optixcfg.outputBufferSize);
 
-        // not used if cfg->method == rtBLBadouelGrid
-        cfg->energyabs = 0.0f;
+            // not used if cfg->method == rtBLBadouelGrid
+            cfg->energyabs = 0.0f;
 
-        // for now assume initial weight of each photon is 1.0
-        cfg->energytot = cfg->nphoton;
-        mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
-        MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
-            GetTimeMillis() - tic0);
-        fflush(cfg->flog);
-    }
-*/
+            // for now assume initial weight of each photon is 1.0
+            cfg->energytot = cfg->nphoton;
+            mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
+            MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
+                GetTimeMillis() - tic0);
+            fflush(cfg->flog);
+        }
+    */
+#ifndef MCX_CONTAINER
     #pragma omp master
     {
         if (cfg->issave2pt && cfg->parentid == mpStandalone) {
@@ -137,6 +139,7 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
             fflush(cfg->flog);
         }
     }
+#endif
 
     // ==================================================================
     // Free memory
@@ -148,12 +151,13 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
  * @brief prepare launch parameters
  */
 void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
-    OptixParams *optixcfg) {
+                      OptixParams* optixcfg) {
     if (cfg->method != rtBLBadouelGrid) {
         mcx_error(-1, "Optix MMC only supports dual grid mode", __FILE__, __LINE__);
     }
 
     int timeSteps = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
+
     if (timeSteps < 1) {
         mcx_error(-1, "There must be at least one time step.", __FILE__, __LINE__);
     }
@@ -162,6 +166,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     if (mesh->prop + 1 > MAX_PROP) {
         mcx_error(-1, "Medium type count exceeds limit.", __FILE__, __LINE__);
     }
+
     for (int i = 0; i <= mesh->prop; ++i) {
         optixcfg->launchParams.medium[i].mua = mesh->med[i].mua;
         optixcfg->launchParams.medium[i].mus = mesh->med[i].mus;
@@ -172,31 +177,31 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     // source setup
     optixcfg->launchParams.srctype = cfg->srctype;
     optixcfg->launchParams.srcpos = make_float3(cfg->srcpos.x,
-                                                cfg->srcpos.y,
-                                                cfg->srcpos.z);
+                                    cfg->srcpos.y,
+                                    cfg->srcpos.z);
     optixcfg->launchParams.srcdir = make_float3(cfg->srcdir.x,
-                                                cfg->srcdir.y,
-                                                cfg->srcdir.z);
+                                    cfg->srcdir.y,
+                                    cfg->srcdir.z);
     optixcfg->launchParams.srcparam1 = make_float4(cfg->srcparam1.x,
-                                                   cfg->srcparam1.y,
-                                                   cfg->srcparam1.z,
-                                                   cfg->srcparam1.w);
+                                       cfg->srcparam1.y,
+                                       cfg->srcparam1.z,
+                                       cfg->srcparam1.w);
     optixcfg->launchParams.srcparam2 = make_float4(cfg->srcparam2.x,
-                                                   cfg->srcparam2.y,
-                                                   cfg->srcparam2.z,
-                                                   cfg->srcparam2.w);
+                                       cfg->srcparam2.y,
+                                       cfg->srcparam2.z,
+                                       cfg->srcparam2.w);
 
     // parameters of dual grid
     optixcfg->launchParams.nmin = make_float3(mesh->nmin.x,
-                                              mesh->nmin.y,
-                                              mesh->nmin.z);
+                                  mesh->nmin.y,
+                                  mesh->nmin.z);
     optixcfg->launchParams.nmax = make_float3(mesh->nmax.x - mesh->nmin.x,
-                                              mesh->nmax.y - mesh->nmin.y,
-                                              mesh->nmax.z - mesh->nmin.z);
+                                  mesh->nmax.y - mesh->nmin.y,
+                                  mesh->nmax.z - mesh->nmin.z);
     optixcfg->launchParams.crop0 = make_uint4(cfg->crop0.x,
-                                               cfg->crop0.y,
-                                               cfg->crop0.z,
-                                               cfg->crop0.z * timeSteps);
+                                   cfg->crop0.y,
+                                   cfg->crop0.z,
+                                   cfg->crop0.z * timeSteps);
     optixcfg->launchParams.dstep = 1.0f / cfg->unitinmm;
 
     // time-gate settings
@@ -209,7 +214,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     if (cfg->e0 == -1) {
         optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
     } else {
-        optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0-1];
+        optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0 - 1];
     }
 
     // simulation flags
@@ -227,8 +232,9 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 #endif
     gpuid = cfg->deviceid[threadid] - 1;
 
-    if (cfg->autopilot)
+    if (cfg->autopilot) {
         totalthread = gpu[gpuid].autothread;
+    }
 
     optixcfg->launchWidth = totalthread;
     optixcfg->launchParams.threadphoton = cfg->nphoton / totalthread;
@@ -239,7 +245,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->outputBufferSize = (optixcfg->launchParams.crop0.w << 1);
     optixcfg->outputHostBuffer = (float*)calloc(optixcfg->outputBufferSize, sizeof(float));
     optixcfg->outputBuffer.alloc_and_upload(optixcfg->outputHostBuffer,
-        optixcfg->outputBufferSize);
+                                            optixcfg->outputBufferSize);
     optixcfg->launchParams.outputbuffer = optixcfg->outputBuffer.d_pointer();
 
     // photon seed buffer
@@ -248,13 +254,19 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     } else {
         srand(time(0));
     }
-    uint4 *hseed = (uint4 *)malloc(sizeof(uint4) * totalthread);
+
+    uint4* hseed = (uint4*)malloc(sizeof(uint4) * totalthread);
+
     for (int i = 0; i < totalthread; ++i) {
         hseed[i] = make_uint4(rand(), rand(), rand(), rand());
     }
+
     optixcfg->seedBuffer.alloc_and_upload(hseed, totalthread);
     optixcfg->launchParams.seedbuffer = optixcfg->seedBuffer.d_pointer();
-    if (hseed) free(hseed);
+
+    if (hseed) {
+        free(hseed);
+    }
 
     // upload launch parameters to device
     optixcfg->launchParamsBuffer.alloc_and_upload(&optixcfg->launchParams, 1);
@@ -283,6 +295,7 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
 #endif
 
     gpuid = cfg->deviceid[threadid] - 1;
+
     if (gpuid < 0) {
         mcx_error(-1, "GPU ID must be non-zero", __FILE__, __LINE__);
     }
@@ -294,16 +307,18 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
     std::cout << "Running on device: " << optixcfg->deviceProps.name << std::endl;
 
     CUresult cuRes = cuCtxGetCurrent(&optixcfg->cudaContext);
-    if(cuRes != CUDA_SUCCESS)
+
+    if (cuRes != CUDA_SUCCESS) {
         fprintf(stderr, "Error querying current context: error code %d\n", cuRes);
+    }
 
     OptixDeviceContextOptions options = {};
     options.logCallbackFunction = [](unsigned int level, const char* tag, const char* message,
-                                      void*) {
-                                      std::cerr << "[" << std::setw( 2 ) << level
-                                          << "][" << std::setw( 12 ) << tag << "]: "
-                                          << message << "\n";
-                                  };
+    void*) {
+        std::cerr << "[" << std::setw( 2 ) << level
+                  << "][" << std::setw( 12 ) << tag << "]: "
+                  << message << "\n";
+    };
 #ifndef NDEBUG
     options.logCallbackLevel = 4;
     options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
@@ -313,7 +328,7 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
 #endif
 
     OPTIX_CHECK(optixDeviceContextCreate(optixcfg->cudaContext, &options,
-        &optixcfg->optixContext));
+                                         &optixcfg->optixContext));
 }
 
 /**
@@ -339,7 +354,7 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
     optixcfg->pipelineCompileOptions.numAttributeValues = 2;  // for triangle
 #ifndef NDEBUG
     optixcfg->pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG |
-        OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
+            OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
 #else
     optixcfg->pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
 #endif
@@ -358,8 +373,11 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
                                          log,
                                          &logsize,
                                          &optixcfg->module
-                                         ));
-    if (logsize > 1) std::cout << log << std::endl;
+                                        ));
+
+    if (logsize > 1) {
+        std::cout << log << std::endl;
+    }
 }
 
 /**
@@ -383,8 +401,11 @@ void createRaygenPrograms(OptixParams* optixcfg) {
                                         log,
                                         &logsize,
                                         &optixcfg->raygenPGs[0]
-                                        ));
-    if (logsize > 1) std::cout << log << std::endl;
+                                       ));
+
+    if (logsize > 1) {
+        std::cout << log << std::endl;
+    }
 }
 
 /**
@@ -408,8 +429,11 @@ void createMissPrograms(OptixParams* optixcfg) {
                                         log,
                                         &logsize,
                                         &optixcfg->missPGs[0]
-                                        ));
-    if (logsize > 1) std::cout << log << std::endl;
+                                       ));
+
+    if (logsize > 1) {
+        std::cout << log << std::endl;
+    }
 }
 
 /**
@@ -433,8 +457,11 @@ void createHitgroupPrograms(OptixParams* optixcfg) {
                                         log,
                                         &logsize,
                                         &optixcfg->hitgroupPGs[0]
-                                        ));
-    if (logsize > 1) std::cout << log << std::endl;
+                                       ));
+
+    if (logsize > 1) {
+        std::cout << log << std::endl;
+    }
 }
 
 /**
@@ -487,8 +514,8 @@ OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg) {
     // ==================================================================
     OptixAccelBuildOptions accelOptions = {};
     accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE
-      | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
-      ;
+                                          | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
+                                          ;
     accelOptions.motionOptions.numKeys  = 1;
     accelOptions.operation              = OPTIX_BUILD_OPERATION_BUILD;
 
@@ -499,7 +526,7 @@ OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg) {
                  &triangleInput,
                  1,  // num_build_inputs
                  &blasBufferSizes
-                 ));
+                ));
 
     // ==================================================================
     // prepare compaction
@@ -530,15 +557,15 @@ OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg) {
                                 outputBuffer.d_pointer(),
                                 outputBuffer.sizeInBytes,
                                 &asHandle,
-                                &emitDesc,1
-                                ));
+                                &emitDesc, 1
+                               ));
     CUDA_SYNC_CHECK();
 
     // ==================================================================
     // perform compaction
     // ==================================================================
     uint64_t compactedSize;
-    compactedSizeBuffer.download(&compactedSize,1);
+    compactedSizeBuffer.download(&compactedSize, 1);
 
     optixcfg->asBuffer.alloc(compactedSize);
     OPTIX_CHECK(optixAccelCompact(optixcfg->optixContext,
@@ -564,12 +591,18 @@ OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg) {
  */
 void createPipeline(OptixParams* optixcfg) {
     std::vector<OptixProgramGroup> programGroups;
-    for (auto pg : optixcfg->raygenPGs)
-      programGroups.push_back(pg);
-    for (auto pg : optixcfg->missPGs)
-      programGroups.push_back(pg);
-    for (auto pg : optixcfg->hitgroupPGs)
-      programGroups.push_back(pg);
+
+    for (auto pg : optixcfg->raygenPGs) {
+        programGroups.push_back(pg);
+    }
+
+    for (auto pg : optixcfg->missPGs) {
+        programGroups.push_back(pg);
+    }
+
+    for (auto pg : optixcfg->hitgroupPGs) {
+        programGroups.push_back(pg);
+    }
 
     char log[2048];
     size_t logsize = sizeof(log);
@@ -581,8 +614,11 @@ void createPipeline(OptixParams* optixcfg) {
                                     log,
                                     &logsize,
                                     &optixcfg->pipeline
-                                    ));
-    if (logsize > 1) std::cout << log << std::endl;
+                                   ));
+
+    if (logsize > 1) {
+        std::cout << log << std::endl;
+    }
 }
 
 /**
@@ -593,12 +629,14 @@ void buildSBT(tetmesh* mesh, OptixParams* optixcfg) {
     // build raygen records
     // ==================================================================
     std::vector<RaygenRecord> raygenRecords;
-    for (size_t i = 0;i < optixcfg->raygenPGs.size();i++) {
-      RaygenRecord rec;
-      OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->raygenPGs[i],&rec));
-      rec.data = nullptr;
-      raygenRecords.push_back(rec);
+
+    for (size_t i = 0; i < optixcfg->raygenPGs.size(); i++) {
+        RaygenRecord rec;
+        OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->raygenPGs[i], &rec));
+        rec.data = nullptr;
+        raygenRecords.push_back(rec);
     }
+
     optixcfg->raygenRecordsBuffer.alloc_and_upload(raygenRecords);
     optixcfg->sbt.raygenRecord = optixcfg->raygenRecordsBuffer.d_pointer();
 
@@ -606,12 +644,14 @@ void buildSBT(tetmesh* mesh, OptixParams* optixcfg) {
     // build miss records
     // ==================================================================
     std::vector<MissRecord> missRecords;
-    for (size_t i = 0;i < optixcfg->missPGs.size();i++) {
-      MissRecord rec;
-      OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->missPGs[i],&rec));
-      rec.data = nullptr; /* for now ... */
-      missRecords.push_back(rec);
+
+    for (size_t i = 0; i < optixcfg->missPGs.size(); i++) {
+        MissRecord rec;
+        OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->missPGs[i], &rec));
+        rec.data = nullptr; /* for now ... */
+        missRecords.push_back(rec);
     }
+
     optixcfg->missRecordsBuffer.alloc_and_upload(missRecords);
     optixcfg->sbt.missRecordBase          = optixcfg->missRecordsBuffer.d_pointer();
     optixcfg->sbt.missRecordStrideInBytes = sizeof(MissRecord);
@@ -623,15 +663,17 @@ void buildSBT(tetmesh* mesh, OptixParams* optixcfg) {
     std::vector<HitgroupRecord> hitgroupRecords;
     HitgroupRecord rec;
     // all meshes use the same code, so all same hit group
-    OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->hitgroupPGs[0],&rec));
+    OPTIX_CHECK(optixSbtRecordPackHeader(optixcfg->hitgroupPGs[0], &rec));
 
     // combine face normal + front + back into a float4 array
-    float4 *fnorm = (float4*)calloc(mesh->nface, sizeof(float4));
+    float4* fnorm = (float4*)calloc(mesh->nface, sizeof(float4));
+
     for (size_t i = 0; i < mesh->nface; ++i) {
         uint media = (mesh->front[i] << 16) | (0xFF & mesh->back[i]);
         fnorm[i] = make_float4(mesh->fnorm[i].x, mesh->fnorm[i].y, mesh->fnorm[i].z,
-            *(float*)&media);
+                               *(float*)&media);
     }
+
     optixcfg->faceBuffer.alloc_and_upload(fnorm, mesh->nface);
     rec.data.fnorm = (float4*)optixcfg->faceBuffer.d_pointer();
     hitgroupRecords.push_back(rec);

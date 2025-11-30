@@ -5,27 +5,24 @@
 
 #include "mmc_utils.h"
 #include "mmc_mesh.h"
-#include "optix7.h"
-#include "CUDABuffer.h"
+#include "mmc_optix_macro.h"
+#include "mmc_optix_cudabuffer.h"
 #include "mmc_optix_launchparam.h"
 
 /*! SBT record for a raygen program */
-struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) RaygenRecord
-{
+struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) RaygenRecord {
     __align__( OPTIX_SBT_RECORD_ALIGNMENT ) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
-    void *data;
+    void* data;
 };
 
 /*! SBT record for a miss program */
-struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) MissRecord
-{
+struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) MissRecord {
     __align__( OPTIX_SBT_RECORD_ALIGNMENT ) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
-    void *data;
+    void* data;
 };
 
 /*! SBT record for a hitgroup program */
-struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) HitgroupRecord
-{
+struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) HitgroupRecord {
     __align__( OPTIX_SBT_RECORD_ALIGNMENT ) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
     TriangleMeshSBTData data;
 };
@@ -79,7 +76,7 @@ struct OptixParams {
     osc::CUDABuffer seedBuffer;
 
     /*! buffer for output storage */
-    float *outputHostBuffer;
+    float* outputHostBuffer;
     unsigned int outputBufferSize;
     osc::CUDABuffer outputBuffer;
 };
@@ -100,7 +97,7 @@ OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg);
 void createPipeline(OptixParams* optixcfg);
 void buildSBT(tetmesh* mesh, OptixParams* optixcfg);
 void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
-    OptixParams *optixcfg);
+                      OptixParams* optixcfg);
 void clearOptixParams(OptixParams* optixcfg);
 
 #ifdef __cplusplus

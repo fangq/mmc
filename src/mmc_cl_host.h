@@ -60,11 +60,11 @@ typedef cl_bitfield         cl_mem_flags_NV;
 #define OCL_ASSERT(x)  ocl_assess((x),__FILE__,__LINE__)
 
 #ifdef _MSC_VER
-    #define PRE_ALIGN(x) __declspec(align(x))
-    #define POST_ALIGN(x)
+#define PRE_ALIGN(x) __declspec(align(x))
+#define POST_ALIGN(x)
 #else
-    #define PRE_ALIGN(x)
-    #define POST_ALIGN(x) __attribute__ ((aligned(x)))
+#define PRE_ALIGN(x)
+#define POST_ALIGN(x) __attribute__ ((aligned(x)))
 #endif
 
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length

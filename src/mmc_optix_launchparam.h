@@ -24,7 +24,7 @@
 
 constexpr unsigned int INITIAL_MEDIUM_UNKNOWN = std::numeric_limits<unsigned int>::max();
 constexpr unsigned int AMBIENT_MEDIUM_ID = 0;
-constexpr unsigned int DEAD_MEDIUM_ID = std::numeric_limits<unsigned int>::max()-1;
+constexpr unsigned int DEAD_MEDIUM_ID = std::numeric_limits<unsigned int>::max() - 1;
 
 /**
  * @brief struct for medium optical properties
@@ -72,7 +72,7 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
 struct TriangleMeshSBTData {
     /**< x,y,z: face normal; w: front(upper 2-byte) and
      * back(lower 2-byte) face medium type */
-    float4 *fnorm;
+    float4* fnorm;
 };
 
 #endif

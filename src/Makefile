@@ -23,6 +23,7 @@ ifneq (,$(filter $(MAKECMDGOALS),optix optixmex optixoct))
     FILES+=$(PTXSOURCE) mmc_optix_host
     OPTIXPROGRAM=mmc_optix_core
     USERCCFLAGS+=-DUSE_OPTIX -DUSE_CUDA_VECTOR_TYPES -I$(CUDAHOME)/include -I$(OPTIXHOME)/include -I$(OPTIXHOME)/SDK
+    LIBCUDART+=-lcuda -ldl
     EXTRALIB+=-lcuda -ldl
 endif
 

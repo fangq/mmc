@@ -1,7 +1,7 @@
 #ifndef _MMC_OPTIX_RAY_H
 #define _MMC_OPTIX_RAY_H
 
-#include "random.cu"
+#include "mmc_optix_rand.cu"
 
 /**
  * @brief struct for Ray information
@@ -27,7 +27,7 @@ __device__ __forceinline__ float3 getPosition() {
 /**
  * @brief Set photon position
  */
-__device__ __forceinline__ void setPosition(const float3 &p) {
+__device__ __forceinline__ void setPosition(const float3& p) {
     optixSetPayload_0(__float_as_uint(p.x));
     optixSetPayload_1(__float_as_uint(p.y));
     optixSetPayload_2(__float_as_uint(p.z));
@@ -45,7 +45,7 @@ __device__ __forceinline__ float3 getDirection() {
 /**
  * @brief Set ray direction
  */
-__device__ __forceinline__ void setDirection(const float3 &v) {
+__device__ __forceinline__ void setDirection(const float3& v) {
     optixSetPayload_3(__float_as_uint(v.x));
     optixSetPayload_4(__float_as_uint(v.y));
     optixSetPayload_5(__float_as_uint(v.z));
@@ -62,7 +62,7 @@ __device__ __forceinline__ float getSlen() {
 /**
  * @brief Set remaining scattering length
  */
-__device__ __forceinline__ void setSlen(const float &slen) {
+__device__ __forceinline__ void setSlen(const float& slen) {
     optixSetPayload_6(__float_as_uint(slen));
 }
 
@@ -77,7 +77,7 @@ __device__ __forceinline__ float getWeight() {
 /**
  * @brief Set photon weight
  */
-__device__ __forceinline__ void setWeight(const float &w) {
+__device__ __forceinline__ void setWeight(const float& w) {
     optixSetPayload_7(__float_as_uint(w));
 }
 
@@ -92,7 +92,7 @@ __device__ __forceinline__ float getPhotonTimer() {
 /**
  * @brief Update time of flight for a photon
  */
-__device__ __forceinline__ void setPhotonTimer(const float &tof) {
+__device__ __forceinline__ void setPhotonTimer(const float& tof) {
     optixSetPayload_8(__float_as_uint(tof));
 }
 
@@ -107,7 +107,7 @@ __device__ __forceinline__ unsigned int getMediumID() {
 /**
  * @brief Set medium id
  */
-__device__ __forceinline__ void setMediumID(const unsigned int &id) {
+__device__ __forceinline__ void setMediumID(const unsigned int& id) {
     optixSetPayload_9(id);
 }
 
@@ -124,7 +124,7 @@ __device__ __forceinline__ uint4 getRNGSeed() {
 /**
  * @brief Set RNG seed
  */
-__device__ __forceinline__ void setRNGSeed(const uint4 &seed) {
+__device__ __forceinline__ void setRNGSeed(const uint4& seed) {
     optixSetPayload_10(seed.y);
     optixSetPayload_11(seed.z);
     optixSetPayload_12(seed.w);
@@ -148,7 +148,7 @@ __device__ __forceinline__ optixray getRay() {
 /**
  * @brief Set ray info
  */
-__device__ __forceinline__ void setRay(const optixray &r) {
+__device__ __forceinline__ void setRay(const optixray& r) {
     setPosition(r.p0);
     setDirection(r.dir);
     setSlen(r.slen);
@@ -167,18 +167,18 @@ __device__ __forceinline__ mcx::Random getRNG() {
 /**
  * @brief Set RNG
  */
-__device__ __forceinline__ void setRNG(const mcx::Random &rng) {
+__device__ __forceinline__ void setRNG(const mcx::Random& rng) {
     return setRNGSeed(rng.intSeed);
 }
 
 /**
  * @brief print ray information
  */
-__device__ __forceinline__ void printRay(const optixray &r) {
+__device__ __forceinline__ void printRay(const optixray& r) {
     printf("pos:[%f %f %f], dir:[%f %f %f], slen:%f, weight:%f, tof:%fns, type:%u\n",
-        r.p0.x, r.p0.y, r.p0.z,
-        r.dir.x, r.dir.y, r.dir.z,
-        r.slen, r.weight, r.photontimer * 1e9, r.mediumid);
+           r.p0.x, r.p0.y, r.p0.z,
+           r.dir.x, r.dir.y, r.dir.z,
+           r.slen, r.weight, r.photontimer * 1e9, r.mediumid);
 }
 
 #endif

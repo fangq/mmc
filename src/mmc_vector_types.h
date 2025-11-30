@@ -137,7 +137,9 @@ typedef unsigned char uchar;
 #else
 
 typedef unsigned char uchar;
-typedef struct FLOAT3 { float x, y, z; } FLOAT3;
+typedef struct FLOAT3 {
+    float x, y, z;
+} FLOAT3;
 
 #endif
 

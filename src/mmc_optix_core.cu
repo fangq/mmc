@@ -26,27 +26,27 @@ extern "C" {
 /**
  * @brief Init RNG seed for each thread
  */
-__device__ __forceinline__ void initRNGSeed(mcx::Random &rng, const int &idx) {
+__device__ __forceinline__ void initRNGSeed(mcx::Random& rng, const int& idx) {
     rng = mcx::Random(((uint4*)gcfg.seedbuffer)[idx]);
 }
 
 /**
  * @brief Determine the initial medium ID where the photon is launched
  */
-__device__ __forceinline__ void getInitialMediumId(optixray &r, mcx::Random &rng) {
+__device__ __forceinline__ void getInitialMediumId(optixray& r, mcx::Random& rng) {
     optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0f, std::numeric_limits<float>::max(),
-        0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
-        *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
-        *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
-        *(uint32_t*)&(r.slen), *(uint32_t*)&(r.weight), *(uint32_t*)&(r.photontimer),
-        r.mediumid,
-        rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
+               0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
+               *(uint32_t*) & (r.p0.x), *(uint32_t*) & (r.p0.y), *(uint32_t*) & (r.p0.z),
+               *(uint32_t*) & (r.dir.x), *(uint32_t*) & (r.dir.y), *(uint32_t*) & (r.dir.z),
+               *(uint32_t*) & (r.slen), *(uint32_t*) & (r.weight), *(uint32_t*) & (r.photontimer),
+               r.mediumid,
+               rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
 }
 
 /**
  * @brief Launch a new photon
  */
-__device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
+__device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
     if (gcfg.srctype == MCX_SRC_PENCIL) {
         r.p0 = gcfg.srcpos;
         r.dir = gcfg.srcdir;
@@ -74,29 +74,29 @@ __device__ __forceinline__ void launchPhoton(optixray &r, mcx::Random &rng) {
 /**
  * @brief Move a photon one step forward
  */
-__device__ __forceinline__ void movePhoton(optixray &r, mcx::Random &rng) {
+__device__ __forceinline__ void movePhoton(optixray& r, mcx::Random& rng) {
     optixTrace(gcfg.gashandle, r.p0, r.dir, 0.0f,
-        gcfg.medium[r.mediumid].mus ? r.slen / gcfg.medium[r.mediumid].mus : std::numeric_limits<float>::max(),
-        0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
-        *(uint32_t*)&(r.p0.x), *(uint32_t*)&(r.p0.y), *(uint32_t*)&(r.p0.z),
-        *(uint32_t*)&(r.dir.x), *(uint32_t*)&(r.dir.y), *(uint32_t*)&(r.dir.z),
-        *(uint32_t*)&(r.slen), *(uint32_t*)&(r.weight), *(uint32_t*)&(r.photontimer),
-        r.mediumid,
-        rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
+               gcfg.medium[r.mediumid].mus ? r.slen / gcfg.medium[r.mediumid].mus : std::numeric_limits<float>::max(),
+               0.0f, OptixVisibilityMask(255), OptixRayFlags::OPTIX_RAY_FLAG_NONE, 0, 1, 0,
+               *(uint32_t*) & (r.p0.x), *(uint32_t*) & (r.p0.y), *(uint32_t*) & (r.p0.z),
+               *(uint32_t*) & (r.dir.x), *(uint32_t*) & (r.dir.y), *(uint32_t*) & (r.dir.z),
+               *(uint32_t*) & (r.slen), *(uint32_t*) & (r.weight), *(uint32_t*) & (r.photontimer),
+               r.mediumid,
+               rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
 }
 
 /**
  * @brief Rotate a vector with given azimuth and zenith angles
  */
-__device__ __forceinline__ float3 rotateVector(const float3 &vec, const float2 &zen, 
-    const float2 &azi) {
-    if (vec.z > -1.0f + std::numeric_limits<float>::epsilon() && 
-        vec.z < 1.0f - std::numeric_limits<float>::epsilon()) {
+__device__ __forceinline__ float3 rotateVector(const float3& vec, const float2& zen,
+        const float2& azi) {
+    if (vec.z > -1.0f + std::numeric_limits<float>::epsilon() &&
+            vec.z < 1.0f - std::numeric_limits<float>::epsilon()) {
         float tmp0 = 1.0f - vec.z * vec.z;
         float tmp1 = zen.x * rsqrtf(tmp0);
-        return tmp1 * (azi.y * make_float3(vec.x, vec.y, -tmp0) * 
-            make_float3(vec.z, vec.z, 1.f) + azi.x * make_float3(-vec.y, vec.x, 0.0f))
-             + zen.y * vec;
+        return tmp1 * (azi.y * make_float3(vec.x, vec.y, -tmp0) *
+                       make_float3(vec.z, vec.z, 1.f) + azi.x * make_float3(-vec.y, vec.x, 0.0f))
+               + zen.y * vec;
     } else {
         return make_float3(zen.x * azi.y, zen.x * azi.x, (vec.z > 0.0f) ? zen.y : -zen.y);
     }
@@ -105,7 +105,7 @@ __device__ __forceinline__ float3 rotateVector(const float3 &vec, const float2 &
 /**
  * @brief Returns the sine and cosine from the Henyey-Greenstein distribution
  */
-__device__ __forceinline__ float2 henyeyGreenstein(const float &g, mcx::Random& rand) {
+__device__ __forceinline__ float2 henyeyGreenstein(const float& g, mcx::Random& rand) {
     float ctheta;
 
     if (fabs(g) > std::numeric_limits<float>::epsilon()) {
@@ -123,8 +123,8 @@ __device__ __forceinline__ float2 henyeyGreenstein(const float &g, mcx::Random& 
 /**
  * @brief Update ray direction after a scattering event
  */
-__device__ __forceinline__ float3 selectScatteringDirection(const float3 &dir, 
-    const float &g, mcx::Random& rand) {
+__device__ __forceinline__ float3 selectScatteringDirection(const float3& dir,
+        const float& g, mcx::Random& rand) {
     float2 aziScat;
     sincosf(rand.uniform(0.0f, 2.0f * M_PIf), &aziScat.x, &aziScat.y);
 
@@ -136,14 +136,14 @@ __device__ __forceinline__ float3 selectScatteringDirection(const float3 &dir,
 /**
  * @brief Convert 3D indices to 1D
  */
-__device__ __forceinline__ uint subToInd(const uint3 &idx3d) {
+__device__ __forceinline__ uint subToInd(const uint3& idx3d) {
     return idx3d.z * gcfg.crop0.y + idx3d.y * gcfg.crop0.x + idx3d.x;
 }
 
 /**
  * @brief Get the index of the voxel that encloses p
  */
-__device__ __forceinline__ uint getVoxelIdx(const float3 &p) {
+__device__ __forceinline__ uint getVoxelIdx(const float3& p) {
     return subToInd(make_uint3(p.x > 0.0f ? __float2int_rd(min(p.x, gcfg.nmax.x) * gcfg.dstep) : 0,
                                p.y > 0.0f ? __float2int_rd(min(p.y, gcfg.nmax.y) * gcfg.dstep) : 0,
                                p.z > 0.0f ? __float2int_rd(min(p.z, gcfg.nmax.z) * gcfg.dstep) : 0));
@@ -152,18 +152,19 @@ __device__ __forceinline__ uint getVoxelIdx(const float3 &p) {
 /**
  * @brief Get the offset of the current time frame
  */
-__device__ __forceinline__ uint getTimeFrame(const float &tof) {
+__device__ __forceinline__ uint getTimeFrame(const float& tof) {
     return min(((int)((tof - gcfg.tstart) * gcfg.Rtstep)),
-        gcfg.maxgate - 1) * gcfg.crop0.z;
+               gcfg.maxgate - 1) * gcfg.crop0.z;
 }
 
 /**
  * @brief Save output to a buffer
  */
-__device__ __forceinline__ void saveToBuffer(const uint &eid, const float &w) {
+__device__ __forceinline__ void saveToBuffer(const uint& eid, const float& w) {
     // to minimize numerical error, use the same trick as MCX
     // becomes much slower when using atomicAdd(*double, double)
     float accum = atomicAdd(&((float*)gcfg.outputbuffer)[eid], w);
+
     if (accum > MAX_ACCUM) {
         if (atomicAdd(&((float*)gcfg.outputbuffer)[eid], -accum) < 0.0f) {
             atomicAdd(&((float*)gcfg.outputbuffer)[eid], accum);
@@ -176,14 +177,14 @@ __device__ __forceinline__ void saveToBuffer(const uint &eid, const float &w) {
 /**
  * @brief Accumulate output quantities to a 3D grid
  */
-__device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium &prop,
-    const float &lmove) {
+__device__ __forceinline__ void accumulateOutput(const optixray& r, const Medium& prop,
+        const float& lmove) {
     // divide path into segments of equal length
     int segcount = ((int)(lmove * gcfg.dstep) + 1) << 1;
     float seglen = lmove / segcount;
     float segdecay = expf(-prop.mua * seglen);
     float segloss = (gcfg.outputtype == otEnergy) ? r.weight * (1.0f - segdecay) :
-        (prop.mua ? r.weight * (1.0f - segdecay) / prop.mua : 0.0f);
+                    (prop.mua ? r.weight * (1.0f - segdecay) / prop.mua : 0.0f);
 
     // deposit weight loss of each segment to the corresponding grid
     float3 step = seglen * r.dir;
@@ -209,6 +210,7 @@ __device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium
             oldeid = neweid;
             oldweight = 0.0f;
         }
+
         oldweight += segloss;
     }
 
@@ -219,8 +221,8 @@ __device__ __forceinline__ void accumulateOutput(const optixray &r, const Medium
 /**
  * @brief reflect or refract a ray at mismatched boundary
  */
-__device__ __forceinline__ bool reflectray(const float3 &norm, const float &n1,
-    const float &n2, mcx::Random &rng, optixray &r) {
+__device__ __forceinline__ bool reflectray(const float3& norm, const float& n1,
+        const float& n2, mcx::Random& rng, optixray& r) {
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2;
 
     Icos = fabs(dot(r.dir, norm));
@@ -274,6 +276,7 @@ extern "C" __global__ void __raygen__rg() {
     launchPhoton(r, rng);
 
     int ndone = 0;  // number of simulated photons
+
     while (ndone < (gcfg.threadphoton + (launchindex.x < gcfg.oddphoton))) {
         if (r.mediumid != DEAD_MEDIUM_ID) {
             movePhoton(r, rng);
@@ -307,7 +310,7 @@ extern "C" __global__ void __closesthit__ch() {
     const bool isfronthit = optixIsFrontFaceHit();
 
     // get info of triangle, including face normal, back and front media
-    const TriangleMeshSBTData &sbtData =
+    const TriangleMeshSBTData& sbtData =
         *(const TriangleMeshSBTData*)optixGetSbtDataPointer();
     float4 fnorm = sbtData.fnorm[primid];
     const uint media = __float_as_uint(fnorm.w);
@@ -349,8 +352,9 @@ extern "C" __global__ void __closesthit__ch() {
     // update ray direction at mismatched boundary
     if (gcfg.isreflect && currprop.n != gcfg.medium[r.mediumid].n) {
         fnorm = isfronthit ? -fnorm : fnorm;
+
         if (reflectray(*(float3*)&fnorm, currprop.n, gcfg.medium[r.mediumid].n,
-            rng, r)) {
+                       rng, r)) {
             // if the ray is reflected
             r.mediumid = isfronthit ? (media >> 16) : (media & 0xFFFF);
         }
