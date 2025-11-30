@@ -1,4 +1,4 @@
-function [newnode,newelem]=mmcaddsrc(node,elem,src,varargin)
+function [newnode, newelem] = mmcaddsrc(node, elem, src, varargin)
 %
 % [newnode,newelem]=mmcaddsrc(node,elem,src,opt)
 %   or
@@ -21,7 +21,7 @@ function [newnode,newelem]=mmcaddsrc(node,elem,src,varargin)
 %              the opt struct can be replaced by a list of 'param','value' pairs
 %
 % output:
-%     newnode: the node list of the modified mesh, by default, 
+%     newnode: the node list of the modified mesh, by default,
 %              newnode is a concatination of src at the end of node
 %     newelem: the elem list of the modified mesh, by default, the elements
 %              between the convex hull of the combined node/src and
@@ -57,15 +57,15 @@ function [newnode,newelem]=mmcaddsrc(node,elem,src,varargin)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-opt=varargin2struct(varargin{:});
-if(~isfield(opt,'extcmdopt'))
-   opt.extcmdopt='-Y';
+opt = varargin2struct(varargin{:});
+if (~isfield(opt, 'extcmdopt'))
+    opt.extcmdopt = '-Y';
 end
-if(isstruct(src))
-    src=mmcsrcdomain(src,[min(node);max(node)],opt);
+if (isstruct(src))
+    src = mmcsrcdomain(src, [min(node); max(node)], opt);
 end
-opt.newnode=src;
-[newnode,newelem]=meshrefine(node,elem,opt);
+opt.newnode = src;
+[newnode, newelem] = meshrefine(node, elem, opt);

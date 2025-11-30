@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,9 +30,9 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    mcx_host_cl.hpp
+\file    mcx_cl_host.hpp
 
-\brief   Definitions of mmc high-level driver functions for OpenCL backend
+\brief   OpenCL host code for OpenCL based MMC simulations
 *******************************************************************************/
 
 #ifndef _MMC_HOSTCODE_CL_H
@@ -70,8 +70,13 @@ typedef cl_bitfield         cl_mem_flags_NV;
 #define RAND_SEED_WORD_LEN      4        //48 bit packed with 64bit length
 
 typedef struct PRE_ALIGN(32) GPU_mcconfig {
+    cl_float4 srcparam1;                  /**< source parameters set 1 */
+    cl_float4 srcparam2;                  /**< source parameters set 2 */
+    cl_int4   crop0;
+    cl_float4 bary0;
     cl_float3 srcpos;
     cl_float3 srcdir;
+    cl_float3 nmin;
     cl_float  tstart, tend;
     cl_uint   isreflect, issavedet, issaveexit, ismomentum, isatomic, isspecular;
     cl_float  Rtstep;
@@ -81,8 +86,6 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_uint   detnum;
     cl_int    voidtime;
     cl_int    srctype;                    /**< type of the source */
-    cl_float4 srcparam1;                  /**< source parameters set 1 */
-    cl_float4 srcparam2;                  /**< source parameters set 2 */
     cl_uint   issaveref;     /**<1 save diffuse reflectance at the boundary voxels, 0 do not save*/
     cl_uint   maxgate;
     cl_uint   debuglevel;           /**< debug flags */
@@ -94,28 +97,26 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_float  dstep;
     cl_float  focus;
     cl_int    nn, ne, nf;
-    cl_float3 nmin;
     cl_float  nout;
-    cl_uint   roulettesize;
+    cl_float  roulettesize;
     cl_int    srcnum;
-    cl_int4   crop0;
     cl_int    srcelemlen;
-    cl_float4 bary0;
     cl_int    e0;
     cl_int    isextdet;
     cl_int    framelen;
-    cl_uint   nbuffer;
     cl_uint   maxpropdet;
     cl_uint   normbuf;
     cl_int    issaveseed;
     cl_uint   seed;
+    cl_uint   maxjumpdebug;         /**< max number of positions to be saved to save photon trajectory when -D M is used */
 } MCXParam POST_ALIGN(32);
 
 typedef struct POST_ALIGN(32) GPU_reporter {
-    float  raytet;
+    float     raytet;
+    cl_uint   jumpdebug;
 } MCXReporter  POST_ALIGN(32);
 
-void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle);
+void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer);
 
 #ifdef  __cplusplus
 }

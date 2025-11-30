@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -31,8 +31,14 @@
 
 #include <set>
 #include <list>
+#include <vector>
+#include <unordered_map>
+#include <array>
 #include <algorithm>
+#include <string>
 #include <string.h>
+#include <sstream>
+
 #include "mmc_mesh.h"
 #include "mmc_highorder.h"
 #include "mmc_utils.h"
@@ -40,6 +46,8 @@
 #define TETEDGE 6
 
 const int edgepair[TETEDGE][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+
+const int facelist[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
 
 #ifdef __cplusplus
     extern "C"
@@ -86,16 +94,66 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
     pos = 0;
 
     mesh->nn += edgelist.size();
-    mesh->node = (MMCfloat3*)realloc((void*)mesh->node, sizeof(MMCfloat3) * (mesh->nn));
+    mesh->node = (FLOAT3*)realloc((void*)mesh->node, sizeof(FLOAT3) * (mesh->nn));
     mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * mesh->nn * cfg->maxgate);
     memset(mesh->weight, 0, sizeof(double)*mesh->nn * cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
 
     for (it = edgelist.begin(); it != edgelist.end(); it++) {
         for (int i = 0; i < 3; i++) {
             ((float*)(&mesh->node[oldnn + pos]))[i] =
-                (((float*)(&mesh->node[(*it).first]))[i] + ((float*)(&mesh->node[(*it).second]))[i]) * 0.5f;
+                (((float*)(&mesh->node[it->first]))[i] + ((float*)(&mesh->node[it->second]))[i]) * 0.5f;
         }
 
         pos++;
+    }
+}
+
+
+class Vec3Hash {
+  public:
+    std::size_t operator()(std::array<int, 3> const& vec) const {
+        std::size_t seed = 3;
+
+        for (int i = 0; i < 3; i++) {
+            seed ^= vec[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+
+        return seed;
+    }
+};
+
+#ifdef __cplusplus
+    extern "C"
+#endif
+void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg) {
+    std::unordered_map< std::array<int, 3>, std::pair<unsigned int, unsigned int>, Vec3Hash > facenb;
+    std::unordered_map< std::array<int, 3>, std::pair<unsigned int, unsigned int>, Vec3Hash > ::iterator it;
+
+    for (int i = 0; i < mesh->ne; i++) {
+        int* ee = mesh->elem + i * mesh->elemlen;
+
+        for (int j = 0; j < 4; j++) {
+            std::array<int, 3> facevec = { ee[facelist[j][0]], ee[facelist[j][1]], ee[facelist[j][2]] };
+            std::sort (facevec.begin(), facevec.end());
+
+            if (facenb.find(facevec) != facenb.end()) {
+                facenb[facevec].second = (i << 2) + j + 1;
+            } else {
+                facenb[facevec] = std::make_pair((i << 2) + j, 0);
+            }
+        }
+    }
+
+    if (mesh->facenb) {
+        free(mesh->facenb);
+    }
+
+    mesh->facenb = (int*)calloc(sizeof(int) * mesh->elemlen, mesh->ne);
+
+    for (it = facenb.begin(); it != facenb.end(); it++) {
+        if (it->second.second != 0) {
+            mesh->facenb[it->second.first] = ((it->second.second - 1) >> 2) + 1;
+            mesh->facenb[it->second.second - 1] = (it->second.first >> 2) + 1;
+        }
     }
 }

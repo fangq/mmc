@@ -1,6 +1,6 @@
 ########################################################
 #  MMC: Mesh-based Monte Carlo
-#  Copyright (C) 2009 Qianqian Fang 
+#  Copyright (C) 2009-2025 Qianqian Fang
 #                    <q.fang at neu.edu>
 #
 #  $Id$
@@ -13,59 +13,72 @@
 # and linking
 ########################################################
 
-ROOTDIR ?= .
+ROOTDIR ?= ..
 MMCDIR  ?= $(ROOTDIR)
 
 MMCSRC :=$(MMCDIR)/src
 
 CUDAHOME ?= /usr/local/cuda
-OPTIXHOME ?= /pub/optix-7.5
+OPTIXHOME ?= /usr/local/optix
 
 CXX        := g++
 AR         := $(CC)
 CUDACC     :=nvcc
-BIN        := bin
+BIN        := $(MMCDIR)/bin
 BUILT      := built
 BINDIR     := $(BIN)
 OBJDIR 	   := $(BUILT)
-CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -MMD -MP#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
-PTXFLAGS   += -O3 -Xptxas -allow-expensive-optimizations -ptx --expt-relaxed-constexpr -use_fast_math -MMD -MP
-INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj -I$(CUDAHOME)/include -I$(OPTIXHOME)/include -I$(OPTIXHOME)/SDK -I$(OPTIXHOME)/SDK/support
+CCFLAGS    += -c -Wall -g -DMCX_EMBED_CL -fno-strict-aliasing#-pedantic -std=c99 -mfpmath=sse -ffast-math -mtune=core2
+CXXFLAGS   += -std=c++11
+PTXFLAGS   += -O3 -ptx --expt-relaxed-constexpr -use_fast_math
+INCLUDEDIR := $(MMCDIR)/src -I$(MMCDIR)/src/zmat/easylzma -I$(MMCDIR)/src/ubj
 AROUTPUT   += -o
 MAKE       ?= make
 
-ZMATLIB    :=libzmat.a
-USERARFLAGS?=$(ZMATLIB) -lz
+ZMATLIB    :=lib/libzmat.a
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL  ?=-lOpenCL
-EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR) -lcudart -lcuda -ldl
+EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
 
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
 FASTMATH   := #-ffast-math
-CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v -Xcompiler -fPIC -MMD -MP
+CUCCOPT    +=-Xcompiler $(OPENMP) -use_fast_math -Xptxas -O3,-v
 CUDA_STATIC=--cudart static -Xcompiler "-static-libgcc -static-libstdc++"
+SSEFLAGS   :=-DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
 
 ECHO	   := echo
 MKDIR      := mkdir
 
+ifneq (,$(filter $(MAKECMDGOALS),mex oct mexomp octomp cudamex cudaoct optixmex optixoct))
+    ZMATLIB=
+else
+    FILES+=mmc cjson/cJSON ubj/ubjw mmc_neurojson
+endif
+
+USERARFLAGS?=$(ZMATLIB)
+
+MEXLINKLIBS=-L"\$$MATLABROOT/extern/lib/\$$ARCH" -L"\$$MATLABROOT/bin/\$$ARCH" -lmx -lmex $(ZMATLIB)
+
 ARCH = $(shell uname -m)
 ifeq ($(findstring x86_64,$(ARCH)), x86_64)
      CCFLAGS+=-m64
-     PTXFLAGS+=-Xcompiler -m64
+     PTXFLAGS+=-m64
 endif
+
+ISCLANG = $(shell $(CC) --version | grep clang)
 
 MEXLINKOPT +=$(OPENMPLIB)
 MKMEX      :=mex
-MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' CXXLIBS='$$CXXLIBS $(LIBOPENCL)' CXXFLAGS='$(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='-L$$TMW_ROOT$$MATLABROOT/sys/os/$$ARCH $$LDFLAGS $(MEXLINKOPT)' $(FASTMATH) -cxx -outdir $(BINDIR)
+MKMEXOPT    =CC='$(CC)' CXX='$(CXX)' LINKLIBS="$(MEXLINKLIBS) $(MEXLINKOPT)" COMPFLAGS='' DEFINES='' CXXLIBS='$$CXXLIBS $(MEXLINKOPT) $(LIBOPENCL) $(LIBCUDART)' CXXFLAGS='$$CXXFLAGS $(CCFLAGS) $(USERCCFLAGS)' $(FASTMATH) -cxx -outdir $(BINDIR)
 MKOCT      :=mkoctfile -v
 
 DLLFLAG=-fPIC
 
 PLATFORM = $(shell uname -s)
 ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
-    MW_MINGW64_LOC=/c/msys64/usr/
+    MW_MINGW64_LOC?=/c/msys64/usr/
     MKMEX      :=cmd //c mex.bat
     INCLUDEDIRS+=-I"./mingw64/include"
     LIBOPENCL   ="c:\Windows\System32\OpenCL.dll"
@@ -73,6 +86,7 @@ ifeq ($(findstring MINGW64,$(PLATFORM)), MINGW64)
     EXTRALIB   +=-static
     CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG    =
+    MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring MSYS,$(PLATFORM)), MSYS)
     MKMEX      :=cmd //c mex.bat
     INCLUDEDIRS+=-I"./mingw64/include"
@@ -81,6 +95,7 @@ else ifeq ($(findstring MSYS,$(PLATFORM)), MSYS)
     EXTRALIB   +=-static
     CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG    =
+    MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     MKMEX      :=cmd /c mex.bat
     MKMEXOPT    =-f mexopts_msys2_gcc.xml COMPFLAGS='$$COMPFLAGS $(CCFLAGS) $(USERCCFLAGS)' LDFLAGS='$$LDFLAGS -static $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' $(FASTMATH) -outdir ../mmclab
@@ -89,12 +104,38 @@ else ifeq ($(findstring CYGWIN,$(PLATFORM)), CYGWIN)
     EXTRALIB   +=-static
     CCFLAGS    +=-D__USE_MINGW_ANSI_STDIO=1
     DLLFLAG     =
+    MEXLINKLIBS="\$$LINKLIBS"
 else ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers
+    INCLUDEDIRS=-I/System/Library/Frameworks/OpenCL.framework/Headers -I/usr/local/include -I/opt/homebrew/opt/libomp/include
     LIBOPENCL=-framework OpenCL
     LIBOPENCLDIR=/System/Library/Frameworks/OpenCL.framework/Versions/A
-    OPENMPLIB=-static-libgcc /usr/local/lib/libgomp.a
+    ifeq ($(ISCLANG),)
+        OPENMPLIB=-static-libgcc -static-libstdc++ $(shell $(CC) --print-file-name=libgomp.a)
+        OPENMP=-fopenmp
+    else
+        ifneq (,$(wildcard /opt/homebrew/opt/libomp/lib/libomp.a))  # brew on arm64 Apple installs libomp to /opt/homebrew/opt
+            ifneq (,$(filter mex,$(MAKECMDGOALS)))
+                OPENMPLIB=-lomp
+            else
+                OPENMPLIB=/opt/homebrew/opt/libomp/lib/libomp.a
+            endif
+        else
+            OPENMPLIB=/usr/local/lib/libomp.a
+        endif
+        OPENMP=-Xclang -fopenmp
+    endif
     CUDA_STATIC=--cudart static
+endif
+
+.DEFAULT_GOAL := ssemath
+
+ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
+    ifeq ($(findstring arm64,$(ARCH)), arm64)
+       .DEFAULT_GOAL := omp
+       ifneq (,$(filter $(MAKECMDGOALS),mex oct))
+           SSEFLAGS=
+       endif
+    endif
 endif
 
 ifeq ($(BACKEND),ocelot)
@@ -102,7 +143,11 @@ ifeq ($(BACKEND),ocelot)
   CUCCOPT=-D__STRICT_ANSI__ -g #--maxrregcount 32
 else ifeq ($(BACKEND),cudastatic)
   ifeq ($(findstring Darwin,$(PLATFORM)), Darwin)
-      CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+      ifeq ($(ISCLANG),)
+          CUDART=-lcudadevrt -lcudart_static -ldl -static-libgcc -static-libstdc++
+      else
+          CUDART=-lcudadevrt -lcudart_static -ldl /usr/local/lib/libomp.a
+      endif
   else
       CUDART=-lcudadevrt -lcudart_static -ldl -lrt -static-libgcc -static-libstdc++
   endif
@@ -133,48 +178,37 @@ ifeq ($(CC),icc)
 endif
 
 ifeq ($(CC),clang)
-	OPENMP   := -fopenmp
-        OPENMPLIB:= -fopenmp=libiomp5
+        OPENMP   := -Xpreprocessor -fopenmp
+        OPENMPLIB:= -lomp
 endif
 
-ARFLAGS    := 
+ifneq (,$(filter $(MAKECMDGOALS),mex cudamex optixmex))
+        CCFLAGS+=-DMATLAB_MEX_FILE
+endif
+
+ARFLAGS    :=
 
 OBJSUFFIX  := .o
-BINSUFFIX  := 
-CLHEADER=.clh
-DEPSUFFIX := .d
-OPTIXOBJSUFFIX := .ptx.o
-PTXSUFFIX := .ptx
+BINSUFFIX  :=
+CLHEADER   :=.clh
+PTXSUFFIX  :=.ptx
 
 OBJS       := $(addprefix $(OBJDIR)/, $(FILES))
-DEPENDS    := $(addsuffix $(DEPSUFFIX), $(OBJS))
 OBJS       := $(subst $(OBJDIR)/$(MMCSRC)/,$(MMCSRC)/,$(OBJS))
 OBJS       := $(addsuffix $(OBJSUFFIX), $(OBJS))
-CLSOURCE  := $(addsuffix $(CLHEADER), $(CLPROGRAM))
+CLSOURCE   := $(addsuffix $(CLHEADER), $(CLPROGRAM))
 
-OPTIXOBJS  := $(addprefix $(OBJDIR)/, $(OPTIXFILES))
-DEPENDS    += $(addsuffix $(DEPSUFFIX), $(OPTIXOBJS))
-OPTIXOBJS  := $(addsuffix $(OPTIXOBJSUFFIX), $(OPTIXOBJS))
-
-PTXSOURCE := $(addprefix $(OBJDIR)/, $(OPTIXPROGRAM))
-DEPENDS   += $(addsuffix $(DEPSUFFIX), $(PTXSOURCE))
-PTXSOURCE := $(addsuffix $(PTXSUFFIX), $(PTXSOURCE))
+PTXFILE    := $(addprefix $(OBJDIR)/, $(OPTIXPROGRAM))
+PTXFILE    := $(addsuffix $(PTXSUFFIX), $(PTXFILE))
 
 release:   CCFLAGS+= -O3
-sse ssemath mex oct: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1
+sse ssemath mex oct: CCFLAGS+=$(SSEFLAGS)
 sse ssemath omp mex oct mexomp octomp:   CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
 sse ssemath omp:   ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
 ssemath:   CCFLAGS+=-DUSE_SSE2 -DMMC_USE_SSE_MATH
 mex mexomp:        ARFLAGS+=$(MKMEXOPT)
 prof:      CCFLAGS+= -O3 -pg
 prof:      ARFLAGS+= -O3 -g -pg
-
-pnacl:     CC=$(PNACL_TC_PATH)/bin/pnacl-clang++
-pnacl:     AR=$(PNACL_TC_PATH)/bin/pnacl-ar
-pnacl:	   ARFLAGS= cr
-pnacl:	   EXTRALIB   :=
-pnacl:     INCLUDEDIR+= -I$(NACL_SDK_ROOT)/include/pnacl
-pnacl:     BINARY=libmmc-pnacl.a
 
 web: CCFLAGS+= -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3
 web: CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
@@ -185,17 +219,20 @@ web: BINDIR:=webmmc
 web: AR=emcc
 web: EXTRALIB=-s SIMD=1 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
-mex oct mexomp octomp:   EXTRALIB=-L/usr/local/cuda/lib64 -lcudart -ldl -lcuda
+mex oct mexomp octomp:   EXTRALIB=
 mex oct mexomp octomp:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp:   CUCCOPT+=-DMCX_CONTAINER
 mex oct mexomp octomp:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
 mex oct mexomp octomp:   BINDIR=../mmclab
 mex mexomp:     AR=$(MKMEX)
 mex mexomp:     AROUTPUT=-output
 mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)
 
+OCT_LDFLAGS := $(shell mkoctfile -p LDFLAGS)
+
 oct:            BINARY=mmc.mex
 oct octomp:     ARFLAGS+=--mex -DMATLAB_MEX_FILE mmclab.cpp -I$(INCLUDEDIR)
-oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
+oct octomp:     AR=CC=$(CC) CXX=$(CXX) LFLAGS='$(LIBOPENCL)' LDFLAGS='$(OCT_LDFLAGS) $(OPENMPLIB) $(LIBOPENCL) $(MEXLINKOPT)' CPPFLAGS='$(CCFLAGS) $(USERCCFLAGS) -std=c++11' $(USEROCTOPT) $(MKOCT)
 oct octomp:     USERARFLAGS+=-o $(BINDIR)/mmc
 
 debug:     sse
@@ -204,8 +241,8 @@ debug:     CUCCOPT+=-DMCX_DEBUG
 TARGETSUFFIX:=$(suffix $(BINARY))
 
 ifeq ($(TARGETSUFFIX),.so)
-	CCFLAGS+= $(DLLFLAG) 
-	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1 
+	CCFLAGS+= $(DLLFLAG)
+	ARFLAGS+= -shared -Wl,-soname,$(BINARY).1
 endif
 
 ifeq ($(TARGETSUFFIX),.a)
@@ -217,9 +254,15 @@ ifeq ($(TARGETSUFFIX),.a)
 	OPENMPLIB  :=
 endif
 
-cuda: sse
+cuda: ssemath
+cudamex: mex
+cudaoct: oct
+optix: cuda
+optixmex: cudamex
+optixoct: cudaoct
+trinity: cuda
 
-all release sse ssemath prof omp mex oct mexomp octomp pnacl web debug cuda: $(SUBDIRS) $(BINDIR)/$(BINARY)
+all release sse ssemath prof omp mex oct mexomp octomp web debug cuda optix optixmex optixoct: $(SUBDIRS) $(BINDIR)/$(BINARY)
 
 $(SUBDIRS):
 	$(MAKE) -C $@ --no-print-directory
@@ -234,25 +277,27 @@ makedocdir:
 
 .SUFFIXES : $(OBJSUFFIX) .cpp
 
-.PRECIOUS: $(PTXSOURCE)
-
-##  Compile ptx-embedded .cpp files ##
-$(OBJDIR)/%$(OPTIXOBJSUFFIX): %.cpp $(PTXSOURCE)
-	@$(ECHO) Building $@
-	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
-
 ##  Compile .cu files to .ptx ##
 $(OBJDIR)/%$(PTXSUFFIX): %.cu
 	@$(ECHO) Building $@
-	$(CUDACC) -c $(PTXFLAGS) -I$(INCLUDEDIR) -o $@  $<
+	$(CUDACC) $(PTXFLAGS) $(USERCCFLAGS) -o $@  $<
+
+##  Ensure ptx-embedded .cpp depends on .ptx file ##
+ifneq ($(PTXSOURCE),)
+$(OBJDIR)/$(PTXSOURCE)$(OBJSUFFIX): $(PTXFILE)
+endif
 
 ##  Compile .cu files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cu
-	@$(ECHO) Building $@
 	$(CUDACC) -c $(CUCCOPT) -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
+	@$(ECHO) Building $@
+	$(CXX) $(CCFLAGS) $(CXXFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
+
+##  Compile .cpp files ##
+%$(OBJSUFFIX): %.cpp
 	@$(ECHO) Building $@
 	$(CXX) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -o $@  $<
 
@@ -265,11 +310,10 @@ $(OBJDIR)/%$(OBJSUFFIX): %.c
 	xxd -i $(CLPROGRAM).cl | sed 's/\([0-9a-f]\)$$/\0, 0x00/' > $(CLPROGRAM).clh
 
 ##  Link  ##
-$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS) $(OPTIXOBJS)
+$(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	@$(ECHO) Building $@
-	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(OPTIXOBJS) $(USERARFLAGS) $(EXTRALIB)
+	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
 
--include $(DEPENDS)
 
 $(ZMATLIB):
 	-$(MAKE) -C zmat lib AR=ar CPPOPT="$(DLLFLAG)" CCOPT="$(DLLFLAG)" USERLINKOPT=
@@ -281,7 +325,7 @@ doc: makedocdir
 ## Clean
 clean:
 	-$(MAKE) -C zmat clean
-	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(DEPENDS) $(PTXSOURCE) $(OPTIXOBJS)
+	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(PTXFILE)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
 endif
@@ -307,9 +351,7 @@ pretty:
 	    --suffix=none \
 	    --formatted \
 	    --break-blocks \
-	    --exclude=mmc_bench.h \
+	    --exclude=mmc_bench.c \
 	   "*.c" "*.h" "*.cpp" "*.cu" "*.cl"
 
 .PHONY: regression clean arch makedirs dep $(SUBDIRS)
-
-.DEFAULT_GOAL := sse

@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -40,7 +40,7 @@
 #include "mmc_cl_utils.h"
 #include "mmc_cl_host.h"
 
-const char* VendorList[] = {"Unknown", "NVIDIA", "AMD", "Intel", "IntelGPU"};
+const char* VendorList[] = {"Unknown", "NVIDIA", "AMD", "Intel", "IntelGPU", "AppleCPU", "AppleGPU"};
 
 char* print_cl_errstring(cl_int err) {
     switch (err) {
@@ -214,12 +214,10 @@ int mcx_nv_corecount(int v1, int v2) {
         return 48;
     } else if (v < 50) {
         return 192;
-    } else if (v < 60) {
+    } else if (v < 60 || v == 61) {
         return 128;
-    } else if (v < 61) {
-        return 64;
     } else {
-        return 128;
+        return 64;
     }
 }
 
@@ -323,17 +321,27 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
                         } else if (strstr(pbuf, "Intel") && strstr(cuinfo.name, "Graphics") && j == 0) {
                             cuinfo.autoblock = 64;
                             cuinfo.vendor = dvIntelGPU;
-                        } else if (strstr(pbuf, "Intel")) {
+                        } else if (strstr(pbuf, "Intel") || strstr(cuinfo.name, "Intel")) {
                             cuinfo.vendor = dvIntel;
                         }
 
-                        cuinfo.autothread = cuinfo.autoblock * cuinfo.core;
+                        if (strstr(cuinfo.name, "Apple M")) {
+                            cuinfo.vendor = dvAppleGPU;
+                            cuinfo.autoblock = 64;
+                            cuinfo.autothread = cuinfo.core * (16 * 48); // each Apple GPU core has 16 EU
+                        } else if (strstr(cuinfo.name, "Apple")) {
+                            cuinfo.vendor = dvAppleCPU;
+                            cuinfo.autoblock = 1;
+                            cuinfo.autothread = 2048;
+                        } else {
+                            cuinfo.autothread = cuinfo.autoblock * cuinfo.core;
+                        }
 
                         if (cfg->isgpuinfo) {
                             MMC_FPRINTF(cfg->flog, "============ %s device ID %d [%d of %d]: %s  ============\n", devname[j], cuid, k + 1, devnum, cuinfo.name);
                             MMC_FPRINTF(cfg->flog, " Device %d of %d:\t\t%s\n", cuid + 1, devnum, cuinfo.name);
                             MMC_FPRINTF(cfg->flog, " Compute units   :\t%d core(s)\n", (uint)cuinfo.sm);
-                            MMC_FPRINTF(cfg->flog, " Global memory   :\t%ld B\n", (unsigned long)cuinfo.globalmem);
+                            MMC_FPRINTF(cfg->flog, " Global memory   :\t%.0f B\n", (double)cuinfo.globalmem);
                             MMC_FPRINTF(cfg->flog, " Local memory    :\t%ld B\n", (unsigned long)cuinfo.sharedmem);
                             MMC_FPRINTF(cfg->flog, " Constant memory :\t%ld B\n", (unsigned long)cuinfo.constmem);
                             MMC_FPRINTF(cfg->flog, " Clock speed     :\t%d MHz\n", cuinfo.clock);

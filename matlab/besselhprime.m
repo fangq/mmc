@@ -1,8 +1,8 @@
-function hp=besselhprime(n,k,z)
+function hp = besselhprime(n, k, z)
 %
 % hp=besselhprime(n,k,z)
 %
-% Hankel function first order derivative 
+% Hankel function first order derivative
 %
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
@@ -12,14 +12,14 @@ function hp=besselhprime(n,k,z)
 %     z: input variable
 %
 % output:
-%     hn: Hankel function first order derivative 
+%     hn: Hankel function first order derivative
 %
 % example:
 %     hn=besselhprime(0,1,1)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-hp=besselh(n-1,k,z)-n/z.*besselh(n,k,z);
+hp = besselh(n - 1, k, z) - n / z .* besselh(n, k, z);

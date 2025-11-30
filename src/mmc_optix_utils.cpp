@@ -8,15 +8,14 @@
     #include <omp.h>
 #endif
 
-#include "mmc_cuda_query_gpu.h"
 #include "mmc_optix_utils.h"
+#include "mmc_cuda_query_gpu.h"
 #include "mmc_tictoc.h"
 #include "incbin.h"
 
 INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
 
-void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu,
-    void (*progressfun)(float, void*), void* handle) {
+void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu) {
     uint tic0 = StartTimer();
     // ==================================================================
     // prepare optix pipeline
@@ -105,9 +104,17 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     // ==================================================================
     // normalize output
     // ==================================================================
+/*
     if (cfg->isnormalized) {
         MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
         fflush(cfg->flog);
+
+        float* energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
+
+        CUDA_ASSERT(cudaMemcpy(energy, genergy,
+                               sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
+                               cudaMemcpyDeviceToHost));
+        optixcfg.outputBuffer.download(optixcfg.outputHostBuffer, optixcfg.outputBufferSize);
 
         // not used if cfg->method == rtBLBadouelGrid
         cfg->energyabs = 0.0f;
@@ -119,7 +126,7 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
             GetTimeMillis() - tic0);
         fflush(cfg->flog);
     }
-
+*/
     #pragma omp master
     {
         if (cfg->issave2pt && cfg->parentid == mpStandalone) {

@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -29,6 +29,12 @@
 **          GPL v3, see LICENSE.txt for details
 *******************************************************************************/
 
+/***************************************************************************//**
+\file    mmc_tictoc.c
+
+\brief   Interface of the timing unit
+*******************************************************************************/
+
 #include "mmc_tictoc.h"
 
 #define _DEFAULT_SOURCE
@@ -42,7 +48,7 @@
 static cl_ulong timerStart, timerStop;
 cl_event kernelevent;
 
-unsigned int GetTimeMillis () {
+unsigned int GetTimeMillis (void) {
     float elapsedTime;
     clGetEventProfilingInfo(kernelevent, CL_PROFILING_COMMAND_START,
                             sizeof(cl_ulong), &timerStart, NULL);
@@ -52,7 +58,7 @@ unsigned int GetTimeMillis () {
     return (unsigned int)(elapsedTime);
 }
 
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     return 0;
 }
 
@@ -64,7 +70,7 @@ unsigned int StartTimer () {
 /* use CUDA timer */
 static cudaEvent_t timerStart, timerStop;
 
-unsigned int GetTimeMillis () {
+unsigned int GetTimeMillis (void) {
     float elapsedTime;
     cudaEventRecord(timerStop, 0);
     cudaEventSynchronize(timerStop);
@@ -72,7 +78,7 @@ unsigned int GetTimeMillis () {
     return (unsigned int)(elapsedTime);
 }
 
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     cudaEventCreate(&timerStart);
     cudaEventCreate(&timerStop);
 
@@ -103,10 +109,10 @@ long GetTime (void) {
     temp += tv.tv_sec * 1000000;
     return temp;
 }
-unsigned int GetTimeMillis () {
+unsigned int GetTimeMillis (void) {
     return (unsigned int)(GetTime () / 1000);
 }
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     return GetTimeMillis();
 }
 
@@ -167,7 +173,7 @@ void SetupMillisTimer(void) {
         fprintf(stderr, "(* Set timer resolution to %d ms. *)\n", timeCaps.wPeriodMin);
     }
 }
-unsigned int StartTimer () {
+unsigned int StartTimer (void) {
     SetupMillisTimer();
     return 0;
 }
@@ -205,3 +211,35 @@ void sleep_ms(int milliseconds) {
     usleep(milliseconds * 1000);
 #endif
 }
+
+
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+
+int EnableVTMode(void) {
+    // Set output mode to handle virtual terminal sequences
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    if (hOut == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    DWORD dwMode = 0;
+
+    if (!GetConsoleMode(hOut, &dwMode)) {
+        return 0;
+    }
+
+    dwMode |= ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+    if (!SetConsoleMode(hOut, dwMode)) {
+        return 0;
+    }
+
+    return 1;
+}
+
+#endif

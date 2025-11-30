@@ -1,11 +1,13 @@
 #ifndef _MMC_OPTIX_UTILS_H
 #define _MMC_OPTIX_UTILS_H
 
+#include <vector_types.h>
+
 #include "mmc_utils.h"
 #include "mmc_mesh.h"
+#include "optix7.h"
 #include "CUDABuffer.h"
 #include "mmc_optix_launchparam.h"
-#include "optix7.h"
 
 /*! SBT record for a raygen program */
 struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) RaygenRecord
@@ -86,8 +88,7 @@ struct OptixParams {
 extern "C" {
 #endif
 
-void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer,
-    GPUInfo* gpu, void (*progressfun)(float, void*), void* handle);
+void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu);
 
 void initOptix();
 void createContext(mcconfig* cfg, OptixParams* optixcfg);

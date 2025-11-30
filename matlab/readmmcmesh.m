@@ -1,4 +1,4 @@
-function varargout=readmmcmesh(key)
+function varargout = readmmcmesh(key)
 %
 % [node elem]=readmmcmesh(key)
 %
@@ -7,7 +7,7 @@ function varargout=readmmcmesh(key)
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
 % input:
-%     key: the file name stub to the node coordinate file. The full 
+%     key: the file name stub to the node coordinate file. The full
 %          file names are {node,elem}_key.dat
 %
 % output:
@@ -19,15 +19,15 @@ function varargout=readmmcmesh(key)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-if(nargout>=1)
-    varargout{1}=readmmcnode(['node_',key,'.dat']);
+if (nargout >= 1)
+    varargout{1} = readmmcnode(['node_', key, '.dat']);
 end
-if(nargout>=2)
-    varargout{2}=readmmcelem(['elem_',key,'.dat']);
+if (nargout >= 2)
+    varargout{2} = readmmcelem(['elem_', key, '.dat']);
 end
-if(nargout>=3)
-    varargout{3}=readmmcelem(['elem_',key,'.dat']);
+if (nargout >= 3)
+    varargout{3} = readmmcelem(['elem_', key, '.dat']);
 end

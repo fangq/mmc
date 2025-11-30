@@ -1,0 +1,115 @@
+name: Build+Upload Windows Python Wheels
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - master
+
+
+jobs:
+  build_windows_wheels:
+    name: Build Windows wheels
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        python_version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', 'pypy3.7', 'pypy3.8', 'pypy3.9', 'pypy3.10' ]
+    outputs:
+      perform_pypi_upload: ${{ steps.perform_pypi_upload_check.outputs.perform_pypi_upload }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - name: Update RCS keywords
+        shell: bash
+        run: |
+          printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
+          rm -rf src/*.c
+          git checkout src/*.c
+      - name: Update pybind11 for specific python version
+        if: ${{ matrix.python-version == '3.13' }}
+        shell: bash
+        run: |
+          git submodule update --init --remote .
+          cd src/pybind11
+          git fetch --tags
+          git checkout v3.0.0
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python_version }}
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-opencl-icd
+            mingw-w64-x86_64-opencl-headers
+      - name: Put MSYS2_MinGW64 on PATH
+        run: echo "D:/a/_temp/msys64/mingw64/bin" >> $GITHUB_PATH
+      - name: Install OpenCL and xxd
+        run: |
+          vcpkg --triplet=x64-windows install opencl
+          cp 'c:\vcpkg\packages\opencl_x64-windows\bin\OpenCL.dll' 'c:\Windows\System32'
+          choco install -y xxd
+          echo 'C:\ProgramData\chocolatey\lib\xxd\tools\bin' >> $GITHUB_PATH
+      - name: Install Zlib Dev (Windows Only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          curl.exe --retry 3 -kL https://www.bruot.org/hp/media/files/libraries/zlib_1_2_11_msvc2017_64.zip --output zlib.zip
+          unzip zlib.zip -d zlib
+          mv zlib/msvc2017_64/* zlib/
+          mv zlib/include/zlib/* zlib/include
+          mv zlib/lib/zlib/* zlib/lib
+          perl -pi -e 's/#if 1\s+.*HAVE_UNISTD_H.*/#if 0/g' zlib/include/zconf.h
+          echo "OPENCL_ROOT=C:\vcpkg\packages\opencl_x64-windows" >> $GITHUB_ENV
+          echo "CMAKE_INCLUDE_PATH=$PWD\zlib\include" >> $GITHUB_ENV
+          echo "CMAKE_LIBRARY_PATH=$PWD\zlib\lib" >> $GITHUB_ENV
+          rm zlib.zip
+      - name: Build Wheels
+        env:
+          OPENCL_ROOT: C:\vcpkg\packages\opencl_x64-windows
+          CMAKE_ARGS: -GNinja
+        run: |
+          cd pmmc/
+          pip install wheel setuptools
+          VERBOSE=1 python setup.py bdist_wheel
+          ls dist/
+          mv dist/ ../
+          cd ../
+      - name: Check If the Build Version Exists on PyPI
+        id: perform_pypi_upload_check
+        run: |
+          ./.github/check-pypi-upload.sh
+      - name: Prepare Wheels for Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-wheels-${{ matrix.python_version }}
+          path: dist/
+
+  upload_windows_wheels:
+    needs: build_windows_wheels
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'fangq' && needs.build_windows_wheels.outputs.perform_pypi_upload == 1 && github.event_name != 'pull_request'}}
+    steps:
+      - name: Download Wheels from Build Job
+        uses: actions/download-artifact@v4
+        with:
+          pattern: windows-wheels-*
+          merge-multiple: true
+          path: dist/
+      - name: Upload packages to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          verify_metadata: false
+          verbose: true
+          skip_existing: true

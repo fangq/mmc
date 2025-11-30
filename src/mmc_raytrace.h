@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,7 +30,7 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    tettracing.h
+\file    mmc_raytrace.h
 
 \brief   Definition of the core ray-tracing functions
 *******************************************************************************/
@@ -51,9 +51,14 @@
 *******************************************************************************/
 
 typedef struct MMC_ray {
-    MMCfloat3 p0;                 /**< current photon position */
-    MMCfloat3 vec;                /**< current photon direction vector */
-    MMCfloat3 pout;               /**< the intersection position of the ray to the enclosing tet */
+#if defined(MMC_USE_SSE) || defined(USE_OPENCL)
+    float4 p0;                    /**< current photon position */
+    float4 vec;                   /**< current photon direction vector */
+#else
+    float3 p0;                    /**< current photon position */
+    float3 vec;                   /**< current photon direction vector */
+#endif
+    FLOAT3 pout;                  /**< the intersection position of the ray to the enclosing tet */
     float4 bary0;                 /**< the Barycentric coordinate of the intersection with the tet */
     int eid;                      /**< the index of the enclosing tet (starting from 1) */
     int faceid;                   /**< the index of the face at which ray intersects with tet */
@@ -103,23 +108,23 @@ typedef struct MMC_visitor {
 #ifdef  __cplusplus
 extern "C" {
 #endif
-void interppos(MMCfloat3* w, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3, MMCfloat3* pout);
-void getinterp(float w1, float w2, float w3, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3, MMCfloat3* pout);
-void fixphoton(MMCfloat3* p, MMCfloat3* nodes, int* ee);
+void interppos(float3* w, float3* p1, float3* p2, float3* p3, float3* pout);
+void getinterp(float w1, float w2, float w3, FLOAT3* p1, FLOAT3* p2, FLOAT3* p3, FLOAT3* pout);
+void fixphoton(FLOAT3* p, FLOAT3* nodes, int* ee);
 void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg, RandType* ran, RandType* ran0, visitor* visit);
 void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType* ran0);
-float reflectray(mcconfig* cfg, MMCfloat3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi);
-float reflectrayroi(mcconfig* cfg, MMCfloat3* c0, MMCfloat3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid);
+float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi);
+float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid);
 void save_scatter_events(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit);
 void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit);
 void visitor_init(mcconfig* cfg, visitor* visit);
 void visitor_clear(visitor* visit);
 void updateroi(int immctype, ray* r, tetmesh* mesh);
 void traceroi(ray* r, raytracer* tracer, int roitype, int doinit);
-void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], MMCfloat3 p2d[2], int* hitstatus);
-void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, MMCfloat3** center, int* hitstatus);
-float ray_cylinder_intersect(ray* r, int index, float d2d[2], MMCfloat3 p2d[2], int hitstatus);
-float ray_sphere_intersect(ray* r, int index, MMCfloat3* center, float nr, int hitstatus);
+void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], FLOAT3 p2d[2], int* hitstatus);
+void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, FLOAT3** center, int* hitstatus);
+float ray_cylinder_intersect(ray* r, int index, float d2d[2], FLOAT3 p2d[2], int hitstatus);
+float ray_sphere_intersect(ray* r, int index, FLOAT3* center, float nr, int hitstatus);
 float ray_face_intersect(ray* r, raytracer* tracer, int* ee, int index, int baseid, int eid, int* hitstatus);
 
 #ifdef MCX_CONTAINER

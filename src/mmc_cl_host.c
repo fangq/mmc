@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,9 +30,9 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    mmc_host.c
+\file    mmc_cl_host.c
 
-\brief   << Driver program of MMC >>
+\brief   OpenCL host code for OpenCL based MMC simulations
 *******************************************************************************/
 
 #include <stdlib.h>
@@ -43,8 +43,10 @@
 #include "mmc_const.h"
 #include "mmc_tictoc.h"
 
-#define IPARAM_TO_MACRO(macro,a,b) sprintf(macro+strlen(macro)," -Dgcfg%s=%u ",    #b,(a.b))
-#define FPARAM_TO_MACRO(macro,a,b) sprintf(macro+strlen(macro)," -Dgcfg%s=%.10ef ",#b,(a.b))
+#define MAX_JIT_OPT_LEN  (MAX_PATH_LENGTH << 1)
+
+#define IPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%u ",    #b,(a.b))
+#define FPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%.10ef ",#b,(a.b))
 
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the
@@ -65,7 +67,7 @@ extern cl_event kernelevent;
    master driver code to run MC simulations
 */
 
-void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
+void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     cl_uint i, j, iter;
     cl_float t, twindow0, twindow1;
@@ -74,7 +76,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     cl_uint* progress = NULL;
     cl_uint detected = 0, workdev;
 
-    cl_uint tic, tic0, tic1, toc = 0, fieldlen;
+    cl_uint tic, tic0, tic1, toc = 0, fieldlen, debuglen = MCX_DEBUG_REC_LEN;
 
     cl_context mcxcontext;                 // compute mcxcontext
     cl_command_queue* mcxqueue;          // compute command queue
@@ -89,29 +91,36 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     cl_uint  devid = 0;
     cl_mem* gnode = NULL, *gelem = NULL, *gtype = NULL, *gfacenb = NULL, *gsrcelem = NULL, *gnormal = NULL;
     cl_mem* gproperty = NULL, *gparam = NULL, *gsrcpattern = NULL, *greplayweight = NULL, *greplaytime = NULL, *greplayseed = NULL; /*read-only buffers*/
-    cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter;     /*read-write buffers*/
+    cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter, *gdebugdata;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
-    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) << cfg->nbuffer; // use 4 copies to reduce racing
-    cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
+    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;    /**< total output data length in float count per time-frame */
+    cfg->crop0.w = meshlen * cfg->maxgate;    /**< total output data length, before double-buffer expansion */
 
     cl_float*  field, *dref = NULL;
 
     cl_uint*   Pseed = NULL;
     float*     Pdet = NULL;
     RandType*  Pphotonseed = NULL;
-    char opt[MAX_PATH_LENGTH] = {'\0'};
+    char opt[MAX_JIT_OPT_LEN] = {'\0'};
     cl_uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop + (cfg->issaveexit > 0) * 6 + 1;
     cl_uint hostdetreclen = detreclen + 1;
+    int sharedmemsize = 0;
+
     GPUInfo* gpu = NULL;
     float4* propdet;
+    double energytot = 0.0, energyesc = 0.0;
 
-    MCXParam param = {{{cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z}}, {{cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z}},
+    MCXParam param = {{{cfg->srcparam1.x, cfg->srcparam1.y, cfg->srcparam1.z, cfg->srcparam1.w}},
+        {{cfg->srcparam2.x, cfg->srcparam2.y, cfg->srcparam2.z, cfg->srcparam2.w}},
+        {{cfg->crop0.x, cfg->crop0.y, cfg->crop0.z, cfg->crop0.w}},
+        {{cfg->bary0.x, cfg->bary0.y, cfg->bary0.z, cfg->bary0.w}},
+        {{cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z}},
+        {{cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z}},
+        {{mesh->nmin.x, mesh->nmin.y, mesh->nmin.z}},
         cfg->tstart, cfg->tend, (uint)cfg->isreflect, (uint)cfg->issavedet, (uint)cfg->issaveexit,
         (uint)cfg->ismomentum, (uint)cfg->isatomic, (uint)cfg->isspecular, 1.f / cfg->tstep, cfg->minenergy,
         cfg->maxdetphoton, mesh->prop, cfg->detnum, (uint)cfg->voidtime, (uint)cfg->srctype,
-        {{cfg->srcparam1.x, cfg->srcparam1.y, cfg->srcparam1.z, cfg->srcparam1.w}},
-        {{cfg->srcparam2.x, cfg->srcparam2.y, cfg->srcparam2.z, cfg->srcparam2.w}},
         cfg->issaveref, cfg->maxgate, (uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen,
         cfg->mcmethod, cfg->method, 1.f / cfg->steps.x,
 #if defined(MMC_USE_SSE) || defined(USE_OPENCL)
@@ -119,27 +128,33 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
 #else
         0.f,
 #endif
-        mesh->nn, mesh->ne, mesh->nf, {{mesh->nmin.x, mesh->nmin.y, mesh->nmin.z}}, cfg->nout,
-        cfg->roulettesize, cfg->srcnum, {{cfg->crop0.x, cfg->crop0.y, cfg->crop0.z, cfg->crop0.w}},
-        mesh->srcelemlen, {{cfg->bary0.x, cfg->bary0.y, cfg->bary0.z, cfg->bary0.w}},
-        cfg->e0, cfg->isextdet, meshlen, cfg->nbuffer, (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+        mesh->nn, mesh->ne, mesh->nf, cfg->nout, cfg->roulettesize, cfg->srcnum, mesh->srcelemlen,
+        cfg->e0, cfg->isextdet, (meshlen / cfg->srcnum), (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
-        cfg->issaveseed, cfg->seed
+        cfg->issaveseed, cfg->seed, cfg->maxjumpdebug
     };
 
-    MCXReporter reporter = {0.f};
+    MCXReporter reporter = {0.f, 0};
     platform = mcx_list_cl_gpu(cfg, &workdev, devices, &gpu);
-
-    if (progressfun == NULL) {
-        cfg->debuglevel = cfg->debuglevel & (~MCX_DEBUG_PROGRESS);
-    }
 
     if (workdev > MAX_DEVICE) {
         workdev = MAX_DEVICE;
     }
 
-    if (devices == NULL || workdev == 0) {
+    if (workdev == 0) {
         mcx_error(-99, (char*)("Unable to find devices!"), __FILE__, __LINE__);
+    }
+
+    if (cfg->issavedet) {
+        sharedmemsize = sizeof(cl_float) * detreclen;
+    }
+
+    param.reclen = sharedmemsize / sizeof(float);
+
+    sharedmemsize += sizeof(cl_float) * (cfg->srcnum << 1);   /**< store energyesc/energytot */
+
+    if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+        sharedmemsize += sizeof(cl_float) * cfg->srcnum;
     }
 
     cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0};
@@ -159,6 +174,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     gdetected = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     gphotonseed = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     greporter = (cl_mem*)malloc(workdev * sizeof(cl_mem));
+    gdebugdata = (cl_mem*)malloc(workdev * sizeof(cl_mem));
 
     gnode = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     gelem = (cl_mem*)malloc(workdev * sizeof(cl_mem));
@@ -190,8 +206,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
             gpu[i].maxgate = cfg->maxgate;
         } else {
             // persistent thread mode
-            if (gpu[i].vendor == dvIntelGPU) { // Intel HD graphics GPU
-                gpu[i].autoblock  = 64;
+            if (gpu[i].vendor == dvIntelGPU || gpu[i].vendor == dvIntel) { // Intel HD graphics GPU
+                gpu[i].autoblock  = (gpu[i].vendor == dvIntelGPU) ? 64 : 1;
                 gpu[i].autothread = gpu[i].autoblock * 7 * gpu[i].sm; // 7 thread x SIMD-16 per Exec Unit (EU)
             } else if (gpu[i].vendor == dvAMD) { // AMD GPU
                 gpu[i].autoblock  = 64;
@@ -247,12 +263,16 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         Pphotonseed = (RandType*)calloc(cfg->maxdetphoton, (sizeof(RandType) * RAND_BUF_LEN));
     }
 
-    fieldlen = meshlen * cfg->maxgate;
+    fieldlen = cfg->crop0.w;  /**< total float counts of the output buffer, before double-buffer expansion (x2) for improving saving accuracy */
 
     if (cfg->seed > 0) {
         srand(cfg->seed);
     } else {
         srand(time(0));
+    }
+
+    if (cfg->debuglevel & dlTraj && cfg->exportdebugdata == NULL) {
+        cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
     }
 
     cl_mem (*clCreateBufferNV)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*) = (cl_mem (*)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*)) clGetExtensionFunctionAddressForPlatform(platform, "clCreateBufferNV");
@@ -280,7 +300,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     memcpy(propdet + param.maxpropdet, tracer->n, (param.normbuf << 2)*sizeof(float4));
 
     for (i = 0; i < workdev; i++) {
-        OCL_ASSERT(((gnode[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float3) * (mesh->nn), mesh->node, &status), status)));
+        OCL_ASSERT(((gnode[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(FLOAT3) * (mesh->nn), mesh->node, &status), status)));
         OCL_ASSERT(((gelem[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int4) * (mesh->ne), mesh->elem, &status), status)));
         OCL_ASSERT(((gtype[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int) * (mesh->ne), mesh->type, &status), status)));
         OCL_ASSERT(((gfacenb[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int4) * (mesh->ne), mesh->facenb, &status), status)));
@@ -297,7 +317,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         OCL_ASSERT(((gparam[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(MCXParam), &param, &status), status)));
 
         Pseed = (cl_uint*)malloc(sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN);
-        energy = (cl_float*)calloc(sizeof(cl_float), gpu[i].autothread << 1);
+        energy = (cl_float*)calloc(sizeof(cl_float) * cfg->srcnum, gpu[i].autothread << 1);
 
         for (j = 0; j < gpu[i].autothread * RAND_SEED_WORD_LEN; j++) {
             Pseed[j] = rand();
@@ -314,14 +334,18 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
             gphotonseed[i] = NULL;
         }
 
-        OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1), energy, &status), status)));
+        if (cfg->debuglevel & dlTraj) {
+            OCL_ASSERT(((gdebugdata[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (debuglen * cfg->maxjumpdebug), cfg->exportdebugdata, &status), status)));
+        }
+
+        OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1) * cfg->srcnum, energy, &status), status)));
         OCL_ASSERT(((gdetected[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint), &detected, &status), status)));
         OCL_ASSERT(((greporter[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(MCXReporter), &reporter, &status), status)));
 
         if (cfg->srctype == MCX_SRC_PATTERN) {
-            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w), cfg->srcpattern, &status), status)));
+            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w * cfg->srcnum), cfg->srcpattern, &status), status)));
         } else if (cfg->srctype == MCX_SRC_PATTERN3D) {
-            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y * cfg->srcparam1.z), cfg->srcpattern, &status), status)));
+            OCL_ASSERT(((gsrcpattern[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y * cfg->srcparam1.z * cfg->srcnum), cfg->srcpattern, &status), status)));
         } else {
             gsrcpattern[i] = NULL;
         }
@@ -358,62 +382,66 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     MMC_FPRINTF(cfg->flog, "initializing streams ...\t");
 
     MMC_FPRINTF(cfg->flog, "init complete : %d ms\n", GetTimeMillis() - tic);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     OCL_ASSERT(((mcxprogram = clCreateProgramWithSource(mcxcontext, 1, (const char**) & (cfg->clsource), NULL, &status), status)));
 
     if (cfg->optlevel >= 1) {
-        sprintf(opt, "%s ", "-cl-mad-enable -DMCX_USE_NATIVE");
+        snprintf(opt, MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-cl-mad-enable -DMCX_USE_NATIVE");
+    }
+
+    if (cfg->optlevel >= 2) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
     }
 
     if (cfg->optlevel >= 3) {
-        sprintf(opt + strlen(opt), "%s ", "-DMCX_SIMPLIFY_BRANCH -DMCX_VECTOR_INDEX");
-    }
-
-    if (cfg->optlevel >= 4) {
-        sprintf(opt + strlen(opt), "%s ", "-DUSE_MACRO_CONST");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-DUSE_MACRO_CONST");
     }
 
     if ((uint)cfg->srctype < sizeof(sourceflag) / sizeof(sourceflag[0])) {
-        sprintf(opt + strlen(opt), "%s ", sourceflag[(uint)cfg->srctype]);
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", sourceflag[(uint)cfg->srctype]);
     }
 
-    sprintf(opt + strlen(opt), "%s ", cfg->compileropt);
+    snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", cfg->compileropt);
 
     if (cfg->isatomic) {
-        sprintf(opt + strlen(opt), " -DUSE_ATOMIC");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_ATOMIC");
     }
 
     if (cfg->issave2pt == 0) {
-        sprintf(opt + strlen(opt), " -DMCX_SKIP_VOLUME");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SKIP_VOLUME");
     }
 
     if (cfg->issavedet) {
-        sprintf(opt + strlen(opt), " -DMCX_SAVE_DETECTORS");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_DETECTORS");
     }
 
     if (cfg->issaveref) {
-        sprintf(opt + strlen(opt), " -DMCX_SAVE_DREF");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_DREF");
     }
 
     if (cfg->issaveseed) {
-        sprintf(opt + strlen(opt), " -DMCX_SAVE_SEED");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_SEED");
     }
 
     if (cfg->isreflect) {
-        sprintf(opt + strlen(opt), " -DMCX_DO_REFLECTION");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_DO_REFLECTION");
     }
 
     if (cfg->method == rtBLBadouelGrid) {
-        sprintf(opt + strlen(opt), " -DUSE_DMMC");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_DMMC");
     }
 
     if (cfg->method == rtBLBadouel) {
-        sprintf(opt + strlen(opt), " -DUSE_BLBADOUEL");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_BLBADOUEL");
+    }
+
+    if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_PHOTON_SHARING");
     }
 
     if (gpu[0].vendor == dvNVIDIA) {
-        sprintf(opt + strlen(opt), " -DUSE_NVIDIA_GPU");
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_NVIDIA_GPU");
     }
 
     if (strstr(opt, "USE_MACRO_CONST")) {
@@ -421,7 +449,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         FPARAM_TO_MACRO(opt, param, dstep);
         IPARAM_TO_MACRO(opt, param, e0);
         IPARAM_TO_MACRO(opt, param, elemlen);
-        FPARAM_TO_MACRO(opt, param, focus);
         IPARAM_TO_MACRO(opt, param, framelen);
         IPARAM_TO_MACRO(opt, param, isextdet);
         IPARAM_TO_MACRO(opt, param, ismomentum);
@@ -431,6 +458,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         IPARAM_TO_MACRO(opt, param, issaveref);
         IPARAM_TO_MACRO(opt, param, isspecular);
         IPARAM_TO_MACRO(opt, param, maxdetphoton);
+        IPARAM_TO_MACRO(opt, param, maxjumpdebug);
         IPARAM_TO_MACRO(opt, param, maxmedia);
         IPARAM_TO_MACRO(opt, param, maxgate);
         IPARAM_TO_MACRO(opt, param, maxpropdet);
@@ -440,11 +468,26 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         FPARAM_TO_MACRO(opt, param, nout);
         IPARAM_TO_MACRO(opt, param, outputtype);
         IPARAM_TO_MACRO(opt, param, reclen);
-        IPARAM_TO_MACRO(opt, param, roulettesize);
+        FPARAM_TO_MACRO(opt, param, roulettesize);
         FPARAM_TO_MACRO(opt, param, Rtstep);
         IPARAM_TO_MACRO(opt, param, srcelemlen);
         IPARAM_TO_MACRO(opt, param, srctype);
         IPARAM_TO_MACRO(opt, param, voidtime);
+        IPARAM_TO_MACRO(opt, param, seed);
+        IPARAM_TO_MACRO(opt, param, srcnum);
+        IPARAM_TO_MACRO(opt, param, detnum);
+        IPARAM_TO_MACRO(opt, param, issaveseed);
+        IPARAM_TO_MACRO(opt, param, nf);
+
+        if (param.focus != param.focus) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=NAN");
+        } else if (param.focus == INFINITY) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=INFINITY");
+        } else if (param.focus == -INFINITY) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=-INFINITY");
+        } else {
+            FPARAM_TO_MACRO(opt, param, focus);
+        }
     }
 
     MMC_FPRINTF(cfg->flog, "Building kernel with option: %s\n", opt);
@@ -474,7 +517,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
     }
 
     MMC_FPRINTF(cfg->flog, "build program complete : %d ms\n", GetTimeMillis() - tic);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     mcxkernel = (cl_kernel*)malloc(workdev * sizeof(cl_kernel));
 
@@ -487,11 +530,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         MMC_FPRINTF(cfg->flog, "- [device %d(%d): %s] threadph=%d oddphotons=%d np=%.1f nthread=%d nblock=%d repetition=%d\n", i, gpu[i].id, gpu[i].name, threadphoton, oddphotons,
                     cfg->nphoton * cfg->workload[i] / fullload, (int)gpu[i].autothread, (int)gpu[i].autoblock, cfg->respin);
 
+        MMC_FPRINTF(cfg->flog, "requesting %d bytes of shared memory\n", sharedmemsize * (int)gpu[i].autoblock);
+
         OCL_ASSERT(((mcxkernel[i] = clCreateKernel(mcxprogram, "mmc_main_loop", &status), status)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 0, sizeof(cl_uint), (void*)&threadphoton)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 1, sizeof(cl_uint), (void*)&oddphotons)));
         //OCL_ASSERT((clSetKernelArg(mcxkernel[i], 2, sizeof(cl_mem), (void*)(gparam+i))));
-        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, cfg->issavedet ? sizeof(cl_float) * ((int)gpu[i].autoblock)*detreclen : sizeof(int), NULL)));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 3, sharedmemsize * (int)gpu[i].autoblock, NULL)));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 4, sizeof(cl_mem), (void*)(gproperty + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 5, sizeof(cl_mem), (void*)(gnode + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 6, sizeof(cl_mem), (void*)(gelem + i))));
@@ -512,10 +557,11 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 21, sizeof(cl_mem), (void*)(greplaytime + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 22, sizeof(cl_mem), (void*)(greplayseed + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 23, sizeof(cl_mem), (void*)(gphotonseed + i))));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 24, sizeof(cl_mem), ((cfg->debuglevel & dlTraj) ? (void*)(gdebugdata + i) : NULL) )));
     }
 
     MMC_FPRINTF(cfg->flog, "set kernel arguments complete : %d ms %d\n", GetTimeMillis() - tic, param.method);
-    fflush(cfg->flog);
+    mcx_fflush(cfg->flog);
 
     if (cfg->exportfield == NULL) {
         cfg->exportfield = mesh->weight;
@@ -529,8 +575,14 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         cfg->exportseed = (unsigned char*)malloc(cfg->maxdetphoton * (sizeof(RandType) * RAND_BUF_LEN));
     }
 
-    cfg->energytot = 0.f;
-    cfg->energyesc = 0.f;
+    if (cfg->debuglevel & dlTraj && cfg->exportdebugdata == NULL) {
+        cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
+    }
+
+    cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
+    cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
+    energytot = 0.0;
+    energyesc = 0.0;
     cfg->runtime = 0;
 
     //simulate for all time-gates in maxgate groups per run
@@ -543,13 +595,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
 
         MMC_FPRINTF(cfg->flog, "lauching mcx_main_loop for time window [%.1fns %.1fns] ...\n"
                     , twindow0 * 1e9, twindow1 * 1e9);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
 
         //total number of repetition for the simulations, results will be accumulated to field
         for (iter = 0; iter < cfg->respin; iter++) {
             MMC_FPRINTF(cfg->flog, "simulation run#%2d ... \n", iter + 1);
-            fflush(cfg->flog);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
             param.tstart = twindow0;
             param.tend = twindow1;
 
@@ -569,20 +621,20 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
             if ((cfg->debuglevel & MCX_DEBUG_PROGRESS)) {
                 int p0 = 0, ndone = -1;
 
-                progressfun(-0.f, handle);
+                mcx_progressbar(-0.f);
 
                 do {
                     ndone = *progress;
 
                     if (ndone > p0) {
-                        progressfun((float)ndone / gpu[0].autothread, handle);
+                        mcx_progressbar((float)ndone / gpu[0].autothread);
                         p0 = ndone;
                     }
 
                     sleep_ms(100);
                 } while (p0 < gpu[0].autothread);
 
-                progressfun(cfg->nphoton, handle);
+                mcx_progressbar(cfg->nphoton);
                 MMC_FPRINTF(cfg->flog, "\n");
             }
 
@@ -596,7 +648,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
             tic1 = GetTimeMillis();
             toc += tic1 - tic0;
             MMC_FPRINTF(cfg->flog, "kernel complete:  \t%d ms\nretrieving flux ... \t", tic1 - tic);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
 
             if (cfg->runtime < tic1 - tic) {
                 cfg->runtime = tic1 - tic;
@@ -607,6 +659,42 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], greporter[devid], CL_TRUE, 0, sizeof(MCXReporter),
                                                 &rep, 0, NULL, waittoread + devid)));
                 reporter.raytet += rep.raytet;
+                reporter.jumpdebug += rep.jumpdebug;
+
+                energy = (cl_float*)calloc(sizeof(cl_float) * cfg->srcnum, gpu[devid].autothread << 1);
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1) * cfg->srcnum,
+                                                energy, 0, NULL, NULL)));
+
+                for (i = 0; i < gpu[devid].autothread; i++) {
+                    for (j = 0; j < cfg->srcnum; j++) {
+                        cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
+                        cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
+                        energyesc += energy[(i << 1) * cfg->srcnum + j];
+                        energytot += energy[((i << 1) + 1) * cfg->srcnum + j];
+                    }
+                }
+
+                free(energy);
+
+                if (cfg->debuglevel & dlTraj) {
+                    uint debugrec = rep.jumpdebug;
+
+                    if (debugrec > 0) {
+                        if (debugrec > cfg->maxjumpdebug) {
+                            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
+  are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
+                                        , debugrec, cfg->maxjumpdebug);
+                        } else {
+                            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", debugrec, cfg->debugdatalen + debugrec);
+                        }
+
+                        debugrec = MIN(debugrec, cfg->maxjumpdebug);
+                        cfg->exportdebugdata = (float*)realloc(cfg->exportdebugdata, (cfg->debugdatalen + debugrec) * debuglen * sizeof(float));
+                        OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdebugdata[devid], CL_FALSE, 0, sizeof(float)*debuglen * debugrec,
+                                                        cfg->exportdebugdata + cfg->debugdatalen, 0, NULL, waittoread + devid)));
+                        cfg->debugdatalen += debugrec;
+                    }
+                }
 
                 if (cfg->issavedet) {
                     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdetected[devid], CL_FALSE, 0, sizeof(uint),
@@ -648,6 +736,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdref[devid], CL_TRUE, 0, sizeof(float)*nflen,
                                                     rawdref, 0, NULL, NULL)));
 
+                    //TODO: saving dref has not yet adopting double-buffer
                     for (i = 0; i < nflen; i++) { //accumulate field, can be done in the GPU
                         dref[i] += rawdref[i];    //+rawfield[i+fieldlen];
                     }
@@ -662,35 +751,13 @@ is more than what your have specified (%d), please use the -H option to specify 
                     OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gweight[devid], CL_TRUE, 0, sizeof(cl_float)*fieldlen * 2,
                                                     rawfield, 0, NULL, NULL)));
                     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic);
-                    fflush(cfg->flog);
+                    mcx_fflush(cfg->flog);
 
                     for (i = 0; i < fieldlen; i++) { //accumulate field, can be done in the GPU
-                        field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
+                        field[i] += rawfield[i] + rawfield[i + fieldlen];
                     }
 
                     free(rawfield);
-
-                    /*          if(cfg->respin>1){
-                                        for(i=0;i<fieldlen;i++)  //accumulate field, can be done in the GPU
-                                           field[fieldlen+i]+=field[i];
-                                }
-                                if(iter+1==cfg->respin){
-                                        if(cfg->respin>1)  //copy the accumulated fields back
-                                        memcpy(field,field+fieldlen,sizeof(cl_float)*fieldlen);
-                                }
-                    */
-
-                    energy = (cl_float*)calloc(sizeof(cl_float), gpu[devid].autothread << 1);
-                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1),
-                                                    energy, 0, NULL, NULL)));
-
-                    for (i = 0; i < gpu[devid].autothread; i++) {
-                        cfg->energyesc += energy[(i << 1)];
-                        cfg->energytot += energy[(i << 1) + 1];
-                        //eabsorp+=Plen[i].z;  // the accumulative absorpted energy near the source
-                    }
-
-                    free(energy);
                 }
 
                 if (cfg->respin > 1 && RAND_SEED_WORD_LEN > 1) {
@@ -711,24 +778,26 @@ is more than what your have specified (%d), please use the -H option to specify 
         }// iteration
     }// time gates
 
-    fieldlen = (fieldlen >> cfg->nbuffer);
-    field = realloc(field, sizeof(field[0]) * fieldlen);
-
     if (cfg->exportfield) {
         if (cfg->basisorder == 0 || cfg->method == rtBLBadouelGrid) {
             for (i = 0; i < fieldlen; i++) {
                 cfg->exportfield[i] += field[i];
             }
         } else {
-            for (i = 0; i < cfg->maxgate; i++)
-                for (j = 0; j < mesh->ne; j++) {
-                    float ww = field[i * mesh->ne + j] * 0.25f;
-                    int k;
+            int srcid;
 
-                    for (k = 0; k < mesh->elemlen; k++) {
-                        cfg->exportfield[i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1] += ww;
+            for (i = 0; i < cfg->maxgate; i++) {
+                for (j = 0; j < mesh->ne; j++) {
+                    for (srcid = 0; srcid < cfg->srcnum; srcid++) {
+                        float ww = field[(i * mesh->ne + j) * cfg->srcnum + srcid] * 0.25f;
+                        int k;
+
+                        for (k = 0; k < mesh->elemlen; k++) {
+                            cfg->exportfield[(i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1) * cfg->srcnum + srcid] += ww;
+                        }
                     }
                 }
+            }
         }
     }
 
@@ -739,38 +808,58 @@ is more than what your have specified (%d), please use the -H option to specify 
     }
 
     if (cfg->isnormalized) {
-        MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-        fflush(cfg->flog);
+        double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
-        cfg->energyabs = cfg->energytot - cfg->energyesc;
-        mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
+        for (j = 0; j < cfg->srcnum; j++) {
+            energyabs =  cfg->energytot[j] - cfg->energyesc[j];
+            cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
+            sum_normalizer += cur_normalizer;
+            MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
+                                   j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
+        }
+
+        cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
     }
+
+#ifndef MCX_CONTAINER
 
     if (cfg->issave2pt && cfg->parentid == mpStandalone) {
         MMC_FPRINTF(cfg->flog, "saving data to file ...\t");
         mesh_saveweight(mesh, cfg, 0);
         MMC_FPRINTF(cfg->flog, "saving data complete : %d ms\n\n", GetTimeMillis() - tic);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
     }
 
     if (cfg->issavedet && cfg->parentid == mpStandalone && cfg->exportdetected) {
+        cfg->his.totalphoton = cfg->nphoton;
         cfg->his.unitinmm = cfg->unitinmm;
         cfg->his.savedphoton = cfg->detectedcount;
         cfg->his.detected = cfg->detectedcount;
+        cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /*column count=maxmedia+3*/
         mesh_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount, (sizeof(RandType)*RAND_BUF_LEN), cfg);
     }
 
-    if (cfg->issaveref) {
+    if ((cfg->debuglevel & dlTraj) && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+        cfg->his.colcount = MCX_DEBUG_REC_LEN;
+        cfg->his.savedphoton = cfg->debugdatalen;
+        cfg->his.totalphoton = cfg->nphoton;
+        cfg->his.detected = 0;
+        mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
+    }
+
+    if (cfg->issaveref && cfg->parentid == mpStandalone) {
         MMC_FPRINTF(cfg->flog, "saving surface diffuse reflectance ...");
         mesh_saveweight(mesh, cfg, 1);
     }
+
+#endif
 
     // total energy here equals total simulated photons+unfinished photons for all threads
     MMC_FPRINTF(cfg->flog, "simulated %zu photons (%zu) with %d devices (ray-tet %.0f)\nMCX simulation speed: %.2f photon/ms\n",
                 cfg->nphoton, cfg->nphoton, workdev, reporter.raytet, (double)cfg->nphoton / toc);
     MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
-                cfg->energytot, (cfg->energytot - cfg->energyesc) / cfg->energytot * 100.f);
-    fflush(cfg->flog);
+                energytot, (energytot - energyesc) / energytot * 100.f);
+    mcx_fflush(cfg->flog);
 
     OCL_ASSERT(clReleaseMemObject(gprogress[0]));
 
@@ -805,6 +894,10 @@ is more than what your have specified (%d), please use the -H option to specify 
             OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
         }
 
+        if (cfg->debuglevel & dlTraj) {
+            OCL_ASSERT(clReleaseMemObject(gdebugdata[i]));
+        }
+
         if (greplayweight[i]) {
             OCL_ASSERT(clReleaseMemObject(greplayweight[i]));
         }
@@ -828,6 +921,7 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(gprogress);
     free(gdetected);
     free(gphotonseed);
+    free(gdebugdata);
     free(greporter);
 
     free(gnode);
@@ -846,6 +940,10 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(mcxkernel);
 
     free(waittoread);
+    free(cfg->energytot);
+    free(cfg->energyesc);
+    cfg->energytot = NULL;
+    cfg->energyesc = NULL;
 
     if (gpu) {
         free(gpu);

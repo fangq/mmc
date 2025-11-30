@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -47,8 +47,13 @@
 #include "mmc_utils.h"
 #include "mmc_const.h"
 #include "mmc_bench.h"
+#include "mmc_neurojson.h"
 #include "zmat/zmatlib.h"
 #include "ubj/ubj.h"
+
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+    #include "mmc_tictoc.h"
+#endif
 
 #ifdef MCX_EMBED_CL
     #include "mmc_core.clh"
@@ -101,7 +106,8 @@
 const char shortopt[] = {'h', 'E', 'f', 'n', 'A', 't', 'T', 's', 'a', 'g', 'b', 'D', 'G',
                          'd', 'r', 'S', 'e', 'U', 'R', 'l', 'L', 'I', '-', 'u', 'C', 'M',
                          'i', 'V', 'O', '-', 'F', 'q', 'x', 'P', 'k', 'v', 'm', '-', '-',
-                         'J', 'o', 'H', '-', 'W', 'X', '-', 'c', '-', '-', 'Z', '\0'
+                         'J', 'o', 'H', '-', 'W', 'X', '-', 'c', 'Q', '-', 'Z', 'N', 'j',
+                         '\0'
                         };
 
 /**
@@ -120,7 +126,7 @@ const char* fullopt[] = {"--help", "--seed", "--input", "--photon", "--autopilot
                          "--replaydet", "--voidtime", "--version", "--mc", "--atomic",
                          "--debugphoton", "--compileropt", "--optlevel", "--maxdetphoton",
                          "--buffer", "--workload", "--saveref", "--gridsize", "--compute",
-                         "--bench", "--dumpjson", "--zip", ""
+                         "--bench", "--dumpjson", "--zip", "--net", "--json", ""
                         };
 
 extern char pathsep;
@@ -132,7 +138,7 @@ extern char pathsep;
  * P: show progress bar
  */
 
-const char debugflag[] = {'M', 'C', 'B', 'W', 'D', 'I', 'O', 'X', 'A', 'T', 'R', 'P', 'E', '\0'};
+const char debugflag[] = {'S', 'C', 'B', 'W', 'D', 'I', 'O', 'X', 'A', 'T', 'R', 'P', 'E', 'M', '\0'};
 
 /**
  * Selecting mesh-based ray-tracing algorithm:
@@ -232,6 +238,7 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->zipid = zmZlib;
     memset(cfg->jsonfile, 0, MAX_PATH_LENGTH);
     cfg->shapedata = NULL;
+    cfg->extrajson = NULL;
 
 #if defined(USE_OPENCL) || defined(USE_CUDA) || defined(USE_OPTIX)
     cfg->method = rtBLBadouelGrid;
@@ -317,13 +324,21 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->exportdetected = NULL;
     cfg->exportseed = NULL;
     cfg->detectedcount = 0;
-    cfg->energytot = 0.f;
-    cfg->energyabs = 0.f;
-    cfg->energyesc = 0.f;
+    cfg->energytot = NULL;
+    cfg->energyesc = NULL;
     cfg->runtime = 0;
     cfg->autopilot = 1;
-    cfg->nbuffer = 0;
     cfg->gpuid = 0;
+    cfg->maxjumpdebug = 10000000;
+    cfg->exportdebugdata = NULL;
+    cfg->debugdatalen = 0;
+    cfg->nodenum = 0;
+    cfg->elemnum = 0;
+    cfg->elemlen = 0;
+    cfg->node = NULL;
+    cfg->elem = NULL;
+    cfg->roitype = rtNone;
+    cfg->roidata = NULL;
 
 #ifdef MCX_EMBED_CL
     cfg->clsource = (char*)mmc_core_cl;
@@ -384,12 +399,40 @@ void mcx_clearcfg(mcconfig* cfg) {
         free(cfg->exportdetected);
     }
 
+    if (cfg->exportdebugdata) {
+        free(cfg->exportdebugdata);
+    }
+
     if (cfg->flog && cfg->flog != stdout && cfg->flog != stderr) {
         fclose(cfg->flog);
     }
 
     if (cfg->shapedata) {
         free(cfg->shapedata);
+    }
+
+    if (cfg->extrajson) {
+        free(cfg->extrajson);
+    }
+
+    if (cfg->node) {
+        free(cfg->node);
+    }
+
+    if (cfg->elem) {
+        free(cfg->elem);
+    }
+
+    if (cfg->roidata) {
+        free(cfg->roidata);
+    }
+
+    if (cfg->energytot) {
+        free(cfg->energytot);
+    }
+
+    if (cfg->energyesc) {
+        free(cfg->energyesc);
     }
 
 #ifndef MCX_EMBED_CL
@@ -414,6 +457,9 @@ void mcx_cleargpuinfo(GPUInfo** gpuinfo) {
         *gpuinfo = NULL;
     }
 }
+
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Save volumetric output (fluence etc) to an Nifty format binary file
@@ -533,25 +579,53 @@ void mcx_savenii(OutputType* dat, size_t len, char* name, int type32bit, int out
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, mcconfig* cfg) {
+void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg) {
     FILE* fp;
     char fname[MAX_FULL_PATH] = {'\0'};
     int affine[] = {0, 0, 1, 0, 0, 0};
     size_t datalen = sizeof(int), outputlen = 0;
-    int i;
 
     ubjw_context_t* root = NULL;
     uchar* jsonstr = NULL;
 
-    for (i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         datalen *= dims[i];
     }
 
     jsonstr = malloc(datalen << 1);
     root = ubjw_open_memory(jsonstr, jsonstr + (datalen << 1));
 
-    /* the "NIFTIHeader" section */
     ubjw_begin_object(root, UBJ_MIXED, 0);
+    /* the "_DataInfo_" section */
+    ubjw_write_key(root, "_DataInfo_");
+    ubjw_begin_object(root, UBJ_MIXED, 0);
+    UBJ_WRITE_KEY(root, "JNIFTIVersion", string, "0.5");
+    UBJ_WRITE_KEY(root, "Comment", string, "Created by MCX (https://mcx.space)");
+    UBJ_WRITE_KEY(root, "AnnotationFormat", string, "https://neurojson.org/jnifti/draft1");
+    UBJ_WRITE_KEY(root, "SerialFormat", string, "https://neurojson.org/bjdata/draft2");
+    ubjw_write_key(root, "Parser");
+    ubjw_begin_object(root, UBJ_MIXED, 0);
+    ubjw_write_key(root, "Python");
+    ubjw_begin_array(root, UBJ_STRING, 2);
+    ubjw_write_string(root, "https://pypi.org/project/jdata");
+    ubjw_write_string(root, "https://pypi.org/project/bjdata");
+    ubjw_end(root);
+    ubjw_write_key(root, "MATLAB");
+    ubjw_begin_array(root, UBJ_STRING, 2);
+    ubjw_write_string(root, "https://github.com/NeuroJSON/jnifty");
+    ubjw_write_string(root, "https://github.com/NeuroJSON/jsonlab");
+    ubjw_end(root);
+    ubjw_write_key(root, "JavaScript");
+    ubjw_begin_array(root, UBJ_STRING, 2);
+    ubjw_write_string(root, "https://www.npmjs.com/package/jda");
+    ubjw_write_string(root, "https://www.npmjs.com/package/bjd");
+    ubjw_end(root);
+    UBJ_WRITE_KEY(root, "CPP", string, "https://github.com/NeuroJSON/json");
+    UBJ_WRITE_KEY(root, "C", string, "https://github.com/NeuroJSON/ubj");
+    ubjw_end(root);
+    ubjw_end(root);
+
+    /* the "NIFTIHeader" section */
     ubjw_write_key(root, "NIFTIHeader");
     ubjw_begin_object(root, UBJ_MIXED, 0);
     UBJ_WRITE_KEY(root, "NIIHeaderSize", uint16, 348);
@@ -561,8 +635,8 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     UBJ_WRITE_KEY(root, "Param2", uint8, 0);
     UBJ_WRITE_KEY(root, "Param3", uint8, 0);
     UBJ_WRITE_KEY(root, "Intent", uint8, 0);
-    UBJ_WRITE_KEY(root, "DataType", string, ((isfloat ? "single" : "uint32")));
-    UBJ_WRITE_KEY(root, "BitDepth", uint8, 32);
+    UBJ_WRITE_KEY(root, "DataType", string, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")));
+    UBJ_WRITE_KEY(root, "BitDepth", uint8, sizeof(OutputType) * 8);
     UBJ_WRITE_KEY(root, "FirstSliceID", uint8, 0);
     ubjw_write_key(root, "VoxelSize");
     UBJ_WRITE_ARRAY(root, single, ndim, voxelsize);
@@ -587,13 +661,13 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     UBJ_WRITE_KEY(root, "TimeOffset", uint8, 0);
 
     if (cfg->outputtype >= 0) {
-        const char* typestr[] = {"MCX volumetric output: Fluence rate (W/mm^2)", "MCX volumetric output: Fluence (J/mm^2)",
-                                 "MCX volumetric output: Energy density (J/mm^3)", "MCX volumetric output: Jacobian for mua (J/mm)", "MCX volumetric output: Scattering count",
-                                 "MCX volumetric output: Partial momentum transfer"
+        const char* typestr[] = {"MMC volumetric output: Fluence rate (W/mm^2)", "MMC volumetric output: Fluence (J/mm^2)",
+                                 "MMC volumetric output: Voxel-wise energy deposit (J)", "MMC volumetric output: Jacobian for mua (J/mm)", "MMC volumetric output: Scattering count",
+                                 "MMC volumetric output: Partial momentum transfer"
                                 };
         UBJ_WRITE_KEY(root, "Description", string, typestr[(int)cfg->outputtype]);
     } else {
-        UBJ_WRITE_KEY(root, "Description", string, "MCX volumetric output");
+        UBJ_WRITE_KEY(root, "Description", string, "MMC volumetric output");
     }
 
     UBJ_WRITE_KEY(root, "AuxFile", string, "");
@@ -618,7 +692,7 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     UBJ_WRITE_ARRAY(root, int32, 4, affine);
     ubjw_end(root);
     UBJ_WRITE_KEY(root, "Name", string, cfg->session);
-    UBJ_WRITE_KEY(root, "NIIFormat", string, "JNIfTI v0.4");
+    UBJ_WRITE_KEY(root, "NIIFormat", string, "jnifti");
     ubjw_end(root);
 
     ubjw_write_key(root, "NIFTIData");
@@ -626,7 +700,7 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     /* the "NIFTIData" section stores volumetric data */
     ubjw_begin_object(root, UBJ_MIXED, 0);
 
-    if (mcx_jdataencode(vol, ndim, dims, (isfloat ? "single" : "uint32"), 4, cfg->zipid, root, 1, cfg)) {
+    if (mcx_jdataencode(vol, ndim, dims, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")), sizeof(OutputType), cfg->zipid, root, 1, iscol, cfg)) {
         MMC_ERROR(-1, "error when converting to JSON");
     }
 
@@ -668,14 +742,31 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, mcconfig* cfg) {
+void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg) {
     FILE* fp;
     char fname[MAX_FULL_PATH] = {'\0'};
     int affine[] = {0, 0, 1, 0, 0, 0};
+    const char* libpy[] = {"https://pypi.org/project/jdata", "https://pypi.org/project/bjdata"};
+    const char* libmat[] = {"https://github.com/NeuroJSON/jnifty", "https://github.com/NeuroJSON/jsonlab"};
+    const char* libjs[] = {"https://www.npmjs.com/package/jda", "https://www.npmjs.com/package/bjd"};
+    const char* libc[]  = {"https://github.com/DaveGamble/cJSON", "https://github.com/NeuroJSON/ubj"};
 
-    cJSON* root = NULL, *hdr = NULL, *dat = NULL, *sub = NULL;
+    cJSON* root = NULL, *hdr = NULL, *dat = NULL, *sub = NULL, *info = NULL, *parser = NULL;
     char* jsonstr = NULL;
     root = cJSON_CreateObject();
+
+    /* the "_DataInfo_" section */
+    cJSON_AddItemToObject(root, "_DataInfo_", info = cJSON_CreateObject());
+    cJSON_AddStringToObject(info, "JNIFTIVersion", "0.5");
+    cJSON_AddStringToObject(info, "Comment", "Created by MCX (https://mcx.space)");
+    cJSON_AddStringToObject(info, "AnnotationFormat", "https://neurojson.org/jnifti/draft1");
+    cJSON_AddStringToObject(info, "SerialFormat", "https://json.org");
+    cJSON_AddItemToObject(info, "Parser", parser = cJSON_CreateObject());
+    cJSON_AddItemToObject(parser, "Python", cJSON_CreateStringArray(libpy, 2));
+    cJSON_AddItemToObject(parser, "MATLAB", cJSON_CreateStringArray(libmat, 2));
+    cJSON_AddItemToObject(parser, "JavaScript", cJSON_CreateStringArray(libjs, 2));
+    cJSON_AddStringToObject(parser, "CPP", "https://github.com/NeuroJSON/json");
+    cJSON_AddItemToObject(parser, "C", cJSON_CreateStringArray(libc, 2));
 
     /* the "NIFTIHeader" section */
     cJSON_AddItemToObject(root, "NIFTIHeader", hdr = cJSON_CreateObject());
@@ -685,8 +776,8 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     cJSON_AddNumberToObject(hdr, "Param2", 0);
     cJSON_AddNumberToObject(hdr, "Param3", 0);
     cJSON_AddNumberToObject(hdr, "Intent", 0);
-    cJSON_AddStringToObject(hdr, "DataType", (isfloat ? "single" : "uint32"));
-    cJSON_AddNumberToObject(hdr, "BitDepth", 32);
+    cJSON_AddStringToObject(hdr, "DataType", (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")));
+    cJSON_AddNumberToObject(hdr, "BitDepth", sizeof(OutputType) * 8);
     cJSON_AddNumberToObject(hdr, "FirstSliceID", 0);
     cJSON_AddItemToObject(hdr, "VoxelSize", cJSON_CreateFloatArray(voxelsize, ndim));
     cJSON_AddItemToObject(hdr, "Orientation", sub = cJSON_CreateObject());
@@ -706,13 +797,13 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     cJSON_AddNumberToObject(hdr, "TimeOffset", 0);
 
     if (cfg->outputtype >= 0) {
-        const char* typestr[] = {"MCX volumetric output: Fluence rate (W/mm^2)", "MCX volumetric output: Fluence (J/mm^2)",
-                                 "MCX volumetric output: Energy density (J/mm^3)", "MCX volumetric output: Jacobian for mua (J/mm)", "MCX volumetric output: Scattering count",
-                                 "MCX volumetric output: Partial momentum transfer"
+        const char* typestr[] = {"MMC volumetric output: Fluence rate (W/mm^2)", "MMC volumetric output: Fluence (J/mm^2)",
+                                 "MMC volumetric output: Voxel-wise energy deposit (J)", "MMC volumetric output: Jacobian for mua (J/mm)", "MMC volumetric output: Scattering count",
+                                 "MMC volumetric output: Partial momentum transfer"
                                 };
         cJSON_AddStringToObject(hdr, "Description", typestr[(int)cfg->outputtype]);
     } else {
-        cJSON_AddStringToObject(hdr, "Description", "MCX volumetric output");
+        cJSON_AddStringToObject(hdr, "Description", "MMC volumetric output");
     }
 
     cJSON_AddStringToObject(hdr, "AuxFile", "");
@@ -731,12 +822,12 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     cJSON_AddItemToArray(sub, cJSON_CreateIntArray(affine + 1, 4));
     cJSON_AddItemToArray(sub, cJSON_CreateIntArray(affine, 4));
     cJSON_AddStringToObject(hdr, "Name", cfg->session);
-    cJSON_AddStringToObject(hdr, "NIIFormat", "JNIfTI v0.4");
+    cJSON_AddStringToObject(hdr, "NIIFormat", "jnifti");
 
     /* the "NIFTIData" section stores volumetric data */
     cJSON_AddItemToObject(root, "NIFTIData",   dat = cJSON_CreateObject());
 
-    if (mcx_jdataencode(vol, ndim, dims, (isfloat ? "single" : "uint32"), 4, cfg->zipid, dat, 0, cfg)) {
+    if (mcx_jdataencode(vol, ndim, dims, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")), sizeof(OutputType), cfg->zipid, dat, 0, iscol, cfg)) {
         MMC_ERROR(-1, "error when converting to JSON");
     }
 
@@ -797,37 +888,29 @@ void mcx_savedata(OutputType* dat, size_t len, mcconfig* cfg, int isref) {
         mcx_savenii(dat, len, name, NIFTI_TYPE_FLOAT64, cfg->outputformat, cfg);
         return;
     } else if (cfg->outputformat == ofJNifti || cfg->outputformat == ofBJNifti) {
-        int d1 = (cfg->maxgate == 1);
+        uint dims[6] = {cfg->dim.x, cfg->dim.y, cfg->dim.z, cfg->maxgate, cfg->srcnum, 1}, lastdim = 5;
+        float voxelsize[6] = {cfg->steps.x, cfg->steps.y, cfg->steps.z, cfg->tstep, 1, 1};
 
-        if (cfg->seed == SEED_FROM_FILE && cfg->replaydet == -1 && (cfg->detnum > 1 || cfg->srcnum > 1)) {
-            uint dims[5] = {cfg->detnum* cfg->srcnum, cfg->maxgate, cfg->dim.z, cfg->dim.y, cfg->dim.x};
-            float voxelsize[] = {1, cfg->tstep, cfg->steps.z, cfg->steps.y, cfg->steps.x};
+        if (cfg->method != rtBLBadouelGrid) {
+            dims[0] = cfg->nodenum;
+            dims[1] = cfg->maxgate;
+            dims[2] = cfg->srcnum;
+            dims[3] = 1;
+            lastdim = 3;
+            voxelsize[0] = 1.f;
+            voxelsize[1] = cfg->tstep;
+            voxelsize[2] = 1.f;
+            voxelsize[3] = 1.f;
+        }
 
-            if (cfg->outputformat == ofJNifti) {
-                mcx_savejnii(dat, 5, dims, voxelsize, name, 1, cfg);
-            } else {
-                mcx_savebnii(dat, 5, dims, voxelsize, name, 1, cfg);
-            }
+        if (cfg->seed == SEED_FROM_FILE && (cfg->replaydet == -1 && cfg->detnum > 1)) {
+            dims[lastdim] *= cfg->detnum;
+        }
+
+        if (cfg->outputformat == ofJNifti) {
+            mcx_savejnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), cfg);
         } else {
-            uint dims[] = {cfg->dim.x, cfg->dim.y, cfg->dim.z, cfg->maxgate};
-            float voxelsize[] = {cfg->steps.x, cfg->steps.y, cfg->steps.z, cfg->tstep};
-            size_t datalen = cfg->dim.x * cfg->dim.y * cfg->dim.z * cfg->maxgate;
-            uint* buf = (uint*)malloc(datalen * sizeof(float));
-            memcpy(buf, dat, datalen * sizeof(float));
-
-            if (d1) {
-                mcx_convertcol2row(&buf, (uint3*)dims);
-            } else {
-                mcx_convertcol2row4d(&buf, (uint4*)dims);
-            }
-
-            if (cfg->outputformat == ofJNifti) {
-                mcx_savejnii((OutputType*)buf, 4 - d1, dims, voxelsize, name, 1, cfg);
-            } else {
-                mcx_savebnii((OutputType*)buf, 4 - d1, dims, voxelsize, name, 1, cfg);
-            }
-
-            free(buf);
+            mcx_savebnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), cfg);
         }
 
         return;
@@ -911,7 +994,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
 
             cJSON_AddItemToObject(dat, dname[id], sub = cJSON_CreateObject());
 
-            if (mcx_jdataencode(buf, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, cfg)) {
+            if (mcx_jdataencode(buf, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 1, cfg)) {
                 MMC_ERROR(-1, "error when converting to JSON");
             }
 
@@ -954,7 +1037,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
 
                 cJSON_AddItemToObject(dat, dname[id], sub = cJSON_CreateObject());
 
-                if (mcx_jdataencode(val, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, cfg)) {
+                if (mcx_jdataencode(val, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 1, cfg)) {
                     MMC_ERROR(-1, "error when converting to JSON");
                 }
 
@@ -968,7 +1051,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
         uint dims[2] = {count, cfg->his.seedbyte};
         cJSON_AddItemToObject(dat, "seed", sub = cJSON_CreateObject());
 
-        if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, sub, 0, cfg)) {
+        if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, sub, 0, 1, cfg)) {
             MMC_ERROR(-1, "error when converting to JSON");
         }
     }
@@ -1009,6 +1092,8 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
         cJSON_Delete(root);
     }
 }
+
+#endif
 
 /**
  * @brief Print a message to the console or a log file
@@ -1079,6 +1164,8 @@ void mcx_assert(const int ret, const char* file, const int linenum) {
         mcx_error(ret, "input error", file, linenum);
     }
 }
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Read simulation settings from a configuration file (.inp or .json)
@@ -1188,24 +1275,245 @@ int mcx_loadfromjson(char* jbuf, mcconfig* cfg) {
 
 int mcx_loadjson(cJSON* root, mcconfig* cfg) {
     int i;
-    cJSON* Mesh, *Optode, *Forward, *Session, *tmp, *subitem;
+    cJSON* Mesh, *Optode, *Forward, *Session, *Domain, *tmp, *subitem;
 
     Mesh    = cJSON_GetObjectItem(root, "Mesh");
 
     if (!Mesh) {
-        Mesh    = cJSON_GetObjectItem(root, "Domain");
+        Mesh    = cJSON_GetObjectItem(root, "Shapes");
     }
 
     Optode  = cJSON_GetObjectItem(root, "Optode");
     Session = cJSON_GetObjectItem(root, "Session");
     Forward = cJSON_GetObjectItem(root, "Forward");
+    Domain  = cJSON_GetObjectItem(root, "Domain");
 
     if (Mesh) {
-        strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID", "Mesh.MeshID", Mesh, (MMC_ERROR(-1, "You must specify mesh files"), ""), valuestring), MAX_SESSION_LENGTH - 1);
+        subitem = FIND_JSON_OBJ("MeshID", "Mesh.MeshID", Mesh);
+
+        if (subitem) {
+            strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID", "Mesh.MeshID", Mesh, (MMC_ERROR(-1, "You must specify mesh files"), ""), valuestring), MAX_SESSION_LENGTH - 1);
+        }
+
+        //< reading mesh node and elem mesh data from JSON file
+        {
+            int ndim;
+            uint dims[3] = {1, 1, 1};
+            char* type = NULL;
+
+            subitem = FIND_JSON_OBJ("MeshNode", "Mesh.MeshNode", Mesh);
+
+            if (subitem) {
+                if (cfg->node) {
+                    free(cfg->node);
+                    cfg->node = NULL;
+                }
+
+                if (cJSON_IsArray(subitem)) {
+                    cfg->nodenum = cJSON_GetArraySize(subitem);
+                    subitem = subitem->child;
+                    cfg->node = (FLOAT3*)malloc(sizeof(FLOAT3) * cfg->nodenum);
+
+                    for (int i = 0; i < cfg->nodenum; i++) {
+                        if (cJSON_GetArraySize(subitem) != 3) {
+                            MMC_ERROR(-1, "Each element in MeshNode must have 3 numbers");
+                        }
+
+                        cfg->node[i].x = subitem->child->valuedouble;
+                        cfg->node[i].y = subitem->child->next->valuedouble;
+                        cfg->node[i].z = subitem->child->next->next->valuedouble;
+                        subitem = subitem->next;
+                    }
+                } else {
+                    mcx_jdatadecode((void**)&cfg->node, &ndim, dims, 2, &type, subitem, cfg);
+
+                    if (strcmp(type, "single") || ndim != 2 || (ndim >= 2 && dims[1] != 3)) {
+                        if (cfg->node) {
+                            free(cfg->node);
+                        }
+
+                        MMC_ERROR(-1, "Mesh.MeshNode JData-annotated array must be in the 'single' format");
+                    } else {
+                        cfg->nodenum = dims[0];
+                    }
+                }
+            }
+
+            subitem = FIND_JSON_OBJ("MeshElem", "Mesh.MeshElem", Mesh);
+
+            if (subitem) {
+                if (cfg->elem) {
+                    free(cfg->elem);
+                    cfg->elem = NULL;
+                }
+
+                if (cJSON_IsArray(subitem)) {
+                    cfg->elemnum = cJSON_GetArraySize(subitem);
+                    subitem = subitem->child;
+                    cfg->elemlen = cJSON_GetArraySize(subitem);
+                    cfg->elem = (int*)malloc(sizeof(int) * cfg->elemnum * cfg->elemlen);
+
+                    for (int i = 0; i < cfg->elemnum; i++) {
+                        if (cJSON_GetArraySize(subitem) != 5) {
+                            MMC_ERROR(-1, "Each element in MeshElem must have 5 integers");
+                        }
+
+                        tmp = subitem->child;
+
+                        for (int j = 0; j < 5; j++) {
+                            cfg->elem[ i * cfg->elemlen + j ] = tmp->valueint;
+                            tmp = tmp->next;
+                        }
+
+                        subitem = subitem->next;
+                    }
+
+                    cfg->elemlen--; // to make cfg->elemlen and mesh->elemlen the same - cfg->elem contains 1 extra column for mesh->type
+                } else {
+                    mcx_jdatadecode((void**)&cfg->elem, &ndim, dims, 2, &type, subitem, cfg);
+
+                    if (!strstr(type, "int32") || ndim != 2 || (ndim >= 2 && dims[1] != 5 && dims[1] != 11)) {
+                        if (cfg->elem) {
+                            free(cfg->elem);
+                        }
+
+                        MMC_ERROR(-1, "Mesh.MeshElem JData-annotated array must be in the 'int32' format");
+                    } else {
+                        cfg->elemnum = dims[0];
+                        cfg->elemlen = dims[1] - 1;
+                    }
+                }
+            }
+
+            subitem = FIND_JSON_OBJ("MeshROI", "Mesh.MeshROI", Mesh);
+
+            if (subitem) {
+                if (cfg->roidata) {
+                    free(cfg->roidata);
+                    cfg->roidata = NULL;
+                }
+
+                if (cJSON_IsArray(subitem)) {
+                    int collen, rowlen = cJSON_GetArraySize(subitem);
+                    subitem = subitem->child;
+
+                    if (cJSON_IsArray(subitem)) {
+                        collen = cJSON_GetArraySize(subitem);
+                    } else {
+                        collen = rowlen;
+                        rowlen = 1;
+                    }
+
+                    cfg->roitype = (collen == 6) ? rtEdge : ((collen == 1 || rowlen == 1) ? rtNode : (collen == 4 ? rtFace : rtNone));
+                    cfg->roidata = (float*)malloc(sizeof(float) * rowlen * collen);
+                    cfg->implicit = (cfg->roitype != rtNone) + (cfg->roitype == rtFace);
+
+                    for (int i = 0; i < rowlen; i++) {
+                        if (cJSON_GetArraySize(subitem) != collen) {
+                            MMC_ERROR(-1, "Each element in MeshROI must have the same length");
+                        }
+
+                        tmp = subitem->child;
+
+                        for (int j = 0; j < collen; j++) {
+                            cfg->roidata[ i * collen + j ] = tmp->valuedouble;
+                            tmp = tmp->next;
+                        }
+
+                        subitem = subitem->next;
+                    }
+                } else {
+                    mcx_jdatadecode((void**)&cfg->roidata, &ndim, dims, 2, &type, subitem, cfg);
+
+                    if (strcmp(type, "single") || ndim > 2 || (ndim >= 2 && dims[1] != 6 && dims[1] != 4)) {
+                        free(cfg->roidata);
+                        MMC_ERROR(-1, "Mesh.MeshROI JData-annotated array must be in the 'single' format");
+                    } else {
+                        cfg->roitype = (dims[1] == 6) ? rtEdge : ((ndim == 1 || dims[0] == 1 || dims[1] == 1) ? rtNode : (dims[1] == 4 ? rtFace : rtNone));
+                    }
+                }
+            }
+        }
+
         cfg->e0 = FIND_JSON_KEY("InitElem", "Mesh.InitElem", Mesh, (MMC_ERROR(-1, "InitElem must be given"), 0.0), valueint);
 
         if (!flagset['u']) {
             cfg->unitinmm = FIND_JSON_KEY("LengthUnit", "Mesh.LengthUnit", Mesh, 1.0, valuedouble);
+        }
+    }
+
+    if (Domain) {
+        cJSON* val, *meds = FIND_JSON_OBJ("Media", "Domain.Media", Domain);
+
+        if (meds) {
+            cJSON* med = meds->child;
+
+            if (med) {
+                cfg->medianum = cJSON_GetArraySize(meds);
+
+                if (cfg->prop) {
+                    free(cfg->prop);
+                }
+
+                cfg->prop = (medium*)malloc(sizeof(medium) * cfg->medianum);
+
+                for (i = 0; i < cfg->medianum; i++) {
+                    if (cJSON_IsObject(med)) {
+                        val = FIND_JSON_OBJ("mua", (MMC_ERROR(-1, "You must specify absorption coeff, default in 1/mm"), ""), med);
+
+                        if (val) {
+                            cfg->prop[i].mua = val->valuedouble;
+                        }
+
+                        val = FIND_JSON_OBJ("mus", (MMC_ERROR(-1, "You must specify scattering coeff, default in 1/mm"), ""), med);
+
+                        if (val) {
+                            cfg->prop[i].mus = val->valuedouble;
+                        }
+
+                        val = FIND_JSON_OBJ("g", (MMC_ERROR(-1, "You must specify anisotropy [0-1]"), ""), med);
+
+                        if (val) {
+                            cfg->prop[i].g = val->valuedouble;
+                        }
+
+                        val = FIND_JSON_OBJ("n", (MMC_ERROR(-1, "You must specify refractive index"), ""), med);
+
+                        if (val) {
+                            cfg->prop[i].n = val->valuedouble;
+                        }
+                    } else if (cJSON_IsArray(med)) {
+                        cfg->prop[i].mua = med->child->valuedouble;
+                        cfg->prop[i].mus = med->child->next->valuedouble;
+                        cfg->prop[i].g = med->child->next->next->valuedouble;
+                        cfg->prop[i].n = med->child->next->next->next->valuedouble;
+                    } else {
+                        MMC_ERROR(-1, "Session.Media must be either an array of objects or array of 4-elem numerical arrays");
+                    }
+
+                    med = med->next;
+
+                    if (med == NULL) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        val = FIND_JSON_OBJ("Step", "Domain.Step", Domain);
+
+        if (val) {
+            if (cJSON_GetArraySize(val) >= 1) {
+                cfg->steps.x = val->child->valuedouble;
+                cfg->steps.y = cfg->steps.x;
+                cfg->steps.z = cfg->steps.x;
+            } else {
+                MMC_ERROR(-1, "Domain::Step has incorrect element numbers");
+            }
+        }
+
+        if (!flagset['u']) {
+            cfg->unitinmm = FIND_JSON_KEY("LengthUnit", "Domain.LengthUnit", Domain, 1.0, valuedouble);
         }
     }
 
@@ -1229,7 +1537,18 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 cfg->srcdir.z = subitem->child->next->next->valuedouble;
 
                 if (subitem->child->next->next->next) {
-                    cfg->srcdir.w = subitem->child->next->next->next->valuedouble;
+                    if (cJSON_IsString(subitem->child->next->next->next)) {
+                        if (strcmp(subitem->child->next->next->next->valuestring, "_NaN_") == 0) {
+                            printf("isnan\n");
+                            cfg->srcdir.w = NAN;
+                        } else if (strcmp(subitem->child->next->next->next->valuestring, "_Inf_") == 0) {
+                            cfg->srcdir.w = INFINITY;
+                        } else if (strcmp(subitem->child->next->next->next->valuestring, "-_Inf_") == 0) {
+                            cfg->srcdir.w = -INFINITY;
+                        }
+                    } else {
+                        cfg->srcdir.w = subitem->child->next->next->next->valuedouble;
+                    }
                 }
             }
 
@@ -1270,6 +1589,81 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                         if (subitem->child->next->next->next) {
                             cfg->srcparam2.w = subitem->child->next->next->next->valuedouble;
+                        }
+                    }
+                }
+            }
+
+            subitem = FIND_JSON_OBJ("Pattern", "Optode.Source.Pattern", src);
+
+            if (subitem) {
+                if (FIND_JSON_OBJ("_ArrayZipData_", "Optode.Source.Pattern._ArrayZipData_", subitem)) {
+                    int ndim;
+                    uint dims[3] = {1, 1, 1};
+                    char* type = NULL;
+
+                    if (cfg->srcpattern) {
+                        free(cfg->srcpattern);
+                    }
+
+                    mcx_jdatadecode((void**)&cfg->srcpattern, &ndim, dims, 3, &type, subitem, cfg);
+
+                    if (strcmp(type, "single")) {
+                        if (cfg->srcpattern) {
+                            free(cfg->srcpattern);
+                        }
+
+                        MMC_ERROR(-1, "Optode.Source.Pattern JData-annotated array must be in the 'single' format");
+                    }
+
+                    if (ndim == 3 && dims[2] > 1 && dims[0] > 1 && cfg->srctype == MCX_SRC_PATTERN) {
+                        cfg->srcnum = dims[0];
+                    }
+
+                    mcx_convertrow2col(cfg->srcpattern, (uint3*)dims);
+                } else {
+                    int nx = FIND_JSON_KEY("Nx", "Optode.Source.Pattern.Nx", subitem, 0, valueint);
+                    int ny = FIND_JSON_KEY("Ny", "Optode.Source.Pattern.Ny", subitem, 0, valueint);
+                    int nz = FIND_JSON_KEY("Nz", "Optode.Source.Pattern.Nz", subitem, 1, valueint);
+
+                    if (nx > 0 && ny > 0) {
+                        cJSON* pat = FIND_JSON_OBJ("Data", "Optode.Source.Pattern.Data", subitem);
+
+                        if (pat && pat->child) {
+                            int i;
+                            pat = pat->child;
+
+                            if (cfg->srcpattern) {
+                                free(cfg->srcpattern);
+                            }
+
+                            cfg->srcpattern = (float*)calloc(nx * ny * nz * cfg->srcnum, sizeof(float));
+
+                            for (i = 0; i < nx * ny * nz * cfg->srcnum; i++) {
+                                if (pat == NULL) {
+                                    MMC_ERROR(-1, "Incomplete pattern data");
+                                }
+
+                                cfg->srcpattern[i] = pat->valuedouble;
+                                pat = pat->next;
+                            }
+                        } else if (pat) {
+                            FILE* fid = fopen(pat->valuestring, "rb");
+
+                            if (fid != NULL) {
+                                if (cfg->srcpattern) {
+                                    free(cfg->srcpattern);
+                                }
+
+                                cfg->srcpattern = (float*)calloc(nx * ny * nz * cfg->srcnum, sizeof(float));
+
+                                if (fread((void*)cfg->srcpattern, sizeof(float) * nx * ny * nz * cfg->srcnum, 1, fid) != 1) {
+                                    fclose(fid);
+                                    MMC_ERROR(-1, "Fail to read pattern input file");
+                                }
+
+                                fclose(fid);
+                            }
                         }
                     }
                 }
@@ -1369,7 +1763,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             cfg->basisorder = FIND_JSON_KEY("BasisOrder", "Session.BasisOrder", Session, cfg->basisorder, valueint);
         }
 
-        if (!cfg->outputformat) {
+        if (!flagset['F']) {
             cfg->outputformat = mcx_keylookup((char*)FIND_JSON_KEY("OutputFormat", "Session.OutputFormat", Session, "ascii", valuestring), outputformat);
         }
 
@@ -1377,8 +1771,12 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             MMC_ERROR(-2, "the specified output format is not recognized");
         }
 
-        if (cfg->debuglevel == 0) {
-            cfg->debuglevel = mcx_parsedebugopt((char*)FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, "", valuestring));
+        if (!flagset['D']) {
+            if (FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, "", valuestring)) {
+                cfg->debuglevel = mcx_parsedebugopt(FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, "", valuestring), debugflag);
+            } else {
+                cfg->debuglevel = FIND_JSON_KEY("DebugFlag", "Session.DebugFlag", Session, 0, valueint);
+            }
         }
 
         if (!flagset['M']) {
@@ -1427,12 +1825,17 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
     }
 
-    if (cfg->meshtag[0] == '\0') {
+    if (cfg->meshtag[0] == '\0' && cfg->nodenum == 0) {
         MMC_ERROR(-1, "You must specify mesh files");
     }
 
     if (cfg->e0 == 0) {
         MMC_ERROR(-1, "InitElem must be given");
+    }
+
+    if (cfg->isdumpjson == 3) {
+        mcx_savejdata(cfg->jsonfile, cfg);
+        exit(0);
     }
 
     return 0;
@@ -1799,7 +2202,13 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     }
 
     cJSON_AddNumberToObject(obj, "DebugFlag", cfg->debuglevel);
-    cJSON_AddNumberToObject(obj, "SaveDataMask", cfg->savedetflag);
+    cJSON_AddNumberToObject(obj, "BasisOrder", cfg->basisorder);
+
+    {
+        char cflag[2] = {'\0', '\0'};
+        cflag[0] = raytracing[(int)cfg->method];
+        cJSON_AddStringToObject(obj, "RayTracer", cflag);
+    }
 
     if (cfg->outputformat >= 0) {
         cJSON_AddStringToObject(obj, "OutputFormat", outputformat[(int)cfg->outputformat]);
@@ -1817,6 +2226,10 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     cJSON_AddNumberToObject(obj, "T1", cfg->tend);
     cJSON_AddNumberToObject(obj, "Dt", cfg->tstep);
 
+    if (cfg->nout > 1.f) {
+        cJSON_AddNumberToObject(obj, "N0", cfg->nout);
+    }
+
     /* the "Domain" section */
     cJSON_AddItemToObject(root, "Domain", obj = cJSON_CreateObject());
     cJSON_AddNumberToObject(obj, "LengthUnit", cfg->unitinmm);
@@ -1831,7 +2244,6 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     }
 
     cJSON_AddItemToObject(obj, "Dim", cJSON_CreateIntArray((int*) & (cfg->dim.x), 3));
-    cJSON_AddNumberToObject(obj, "OriginType", 1);
 
     /* the "Optode" section */
     cJSON_AddItemToObject(root, "Optode", obj = cJSON_CreateObject());
@@ -1855,22 +2267,46 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
         cJSON_AddNumberToObject(tmp, "R", cfg->detpos[i].w);
     }
 
-    /* save "Shapes" constructs, prioritize over saving volume for smaller size */
-    if (cfg->shapedata) {
-        cJSON* shape = cJSON_Parse(cfg->shapedata), *sp;
+    /* save "Shapes" constructs, containing InitElem, MeshNode, MeshElem, and MeshROI */
+    cJSON_AddItemToObject(root, "Shapes", obj = cJSON_CreateObject());
 
-        if (shape == NULL) {
-            MMC_ERROR(-1, "the input shape construct is not a valid JSON object");
+    if (cfg->meshtag[0] && cfg->nodenum == 0) {
+        cJSON_AddStringToObject(obj, "MeshID", cfg->meshtag);
+    } else if (cfg->nodenum && cfg->elemnum) {
+        uint dims[2] = {0};
+        cJSON_AddItemToObject(obj, "MeshNode", sub = cJSON_CreateObject());
+
+        dims[0] = cfg->nodenum;
+        dims[1] = 3;
+
+        if (mcx_jdataencode((void*)cfg->node, 2, dims, "single", 4, cfg->zipid, sub, 0, 0, cfg)) {
+            MMC_ERROR(-10, "saving node data to JSON failed");
         }
 
-        sp = FIND_JSON_OBJ("Shapes", "Shapes", shape);
+        cJSON_AddItemToObject(obj, "MeshElem", sub = cJSON_CreateObject());
 
-        if (sp == NULL) {
-            sp = shape;
+        dims[0] = cfg->elemnum;
+        dims[1] = cfg->elemlen + 1;
+
+        if (mcx_jdataencode((void*)cfg->elem, 2, dims, "int32", 4, cfg->zipid, sub, 0, 0, cfg)) {
+            MMC_ERROR(-10, "saving elem data to JSON failed");
         }
 
-        cJSON_AddItemToObject(root, "Shapes", sp);
+        if (cfg->roidata) {
+            cJSON_AddItemToObject(obj, "MeshROI", sub = cJSON_CreateObject());
+
+            dims[0] = (cfg->roitype == rtNode ? cfg->nodenum : cfg->elemnum);
+            dims[1] = (cfg->roitype == rtNode ? 1 : (cfg->roitype == rtEdge ? 6 : 4));
+
+            if (mcx_jdataencode((void*)cfg->roidata, 2, dims, "single", 4, cfg->zipid, sub, 0, 0, cfg)) {
+                MMC_ERROR(-10, "saving mesh ROI data to JSON failed");
+            }
+        }
+    } else {
+        MMC_ERROR(-10, "incomplete mesh data");
     }
+
+    cJSON_AddNumberToObject(obj, "InitElem", cfg->e0);
 
     /* now save JSON to file */
     jsonstr = cJSON_Print(root);
@@ -1901,6 +2337,7 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     }
 }
 
+#endif
 
 /**
  * @brief Convert a column-major (MATLAB/FORTRAN) array to a row-major (C/C++) array
@@ -1965,6 +2402,7 @@ void  mcx_convertcol2row4d(unsigned int** vol, uint4* dim) {
     *vol = newvol;
 }
 
+#ifndef MCX_CONTAINER
 
 
 /**
@@ -1985,7 +2423,7 @@ void  mcx_convertcol2row4d(unsigned int** vol, uint4* dim) {
  */
 
 int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type, cJSON* obj, mcconfig* cfg) {
-    int ret = 0, i;
+    int ret = 0;
     cJSON* ztype = NULL;
     cJSON* vsize = cJSON_GetObjectItem(obj, "_ArraySize_");
     cJSON* vtype = cJSON_GetObjectItem(obj, "_ArrayType_");
@@ -1996,9 +2434,8 @@ int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type,
         vdata = cJSON_GetObjectItem(obj, "_ArrayZipData_");
     }
 
-    if (vtype) {
+    if (!flagset['K'] && vtype) {
         *type = vtype->valuestring;
-        cfg->mediabyte = 4;
 
         if (strstr(*type, "int8")) {
             cfg->mediabyte = 1;
@@ -2006,6 +2443,8 @@ int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type,
             cfg->mediabyte = 2;
         } else if (strstr(*type, "double") || strstr(*type, "int64")) {
             MMC_ERROR(-1, "8-byte volume array is not supported");
+        } else {
+            cfg->mediabyte = 4;
         }
     }
 
@@ -2014,7 +2453,7 @@ int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type,
             cJSON* tmp = vsize->child;
             *ndim = cJSON_GetArraySize(vsize);
 
-            for (i = 0; i < MIN(maxdim, *ndim); i++) {
+            for (int i = 0; i < MIN(maxdim, *ndim); i++) {
                 dims[i] = tmp->valueint;
                 tmp = tmp->next;
             }
@@ -2064,31 +2503,38 @@ int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type,
  * @param[in] type: a string of JData data types, such as "uint8" "float32", "int32" etc
  * @param[in] byte: number of byte per voxel
  * @param[in] zipid: zip method: 0:zlib,1:gzip,2:base64,3:lzma,4:lzip,5:lz4,6:lz4hc
- * @param[in] obj: a pre-created cJSON object to store the output JData fields
+ * @param[in] obj: a pre-created cJSON or UBJ object to store the output JData fields
+ * @param[in] isubj: 1 if obj is a binary JSON (UBJ) object, 0 if obj is a cJSON object
+ * @param[in] cfg: mcx config struct
  */
 
-int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int zipid, void* obj, int isubj, mcconfig* cfg) {
+int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int zipid, void* obj, int isubj, int iscol, mcconfig* cfg) {
     uint datalen = 1;
     size_t compressedbytes, totalbytes;
     uchar* compressed = NULL, *buf = NULL;
-    int ret = 0, status = 0, i;
+    int ret = 0, status = 0;
 
-    for (i = 0; i < ndim; i++) {
+    for (int i = 0; i < ndim; i++) {
         datalen *= dims[i];
     }
 
     totalbytes = datalen * byte;
 
     if (!cfg->isdumpjson) {
-        MMC_FPRINTF(stdout, "compressing data [%s] ...", zipformat[zipid]);
+        MMC_FPRINTF(cfg->flog, "compressing data [%s] ...", zipformat[zipid]);
     }
 
     /*compress data using zlib*/
-    ret = zmat_encode(totalbytes, (uchar*)vol, &compressedbytes, (uchar**)&compressed, zipid, &status);
+    if (zipid != zmBase64) {
+        ret = zmat_encode(totalbytes, (uchar*)vol, &compressedbytes, (uchar**)&compressed, zipid, &status);
+    } else {
+        compressed = (uchar*)vol;
+        compressedbytes = totalbytes;
+    }
 
     if (!ret) {
         if (!cfg->isdumpjson) {
-            MMC_FPRINTF(stdout, "compression ratio: %.1f%%\t", compressedbytes * 100.f / totalbytes);
+            MMC_FPRINTF(cfg->flog, "compression ratio: %.1f%%\t", compressedbytes * 100.f / totalbytes);
         }
 
         if (isubj) {
@@ -2096,6 +2542,11 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
             UBJ_WRITE_KEY(item, "_ArrayType_", string, type);
             ubjw_write_key(item, "_ArraySize_");
             UBJ_WRITE_ARRAY(item, uint32, ndim, dims);
+
+            if (iscol) {
+                UBJ_WRITE_KEY(item, "_ArrayOrder_", string, "c");
+            }
+
             UBJ_WRITE_KEY(item, "_ArrayZipType_", string, zipformat[zipid]);
             UBJ_WRITE_KEY(item, "_ArrayZipSize_", uint32, datalen);
             ubjw_write_key(item, "_ArrayZipData_");
@@ -2106,12 +2557,17 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
             ret = zmat_encode(compressedbytes, compressed, &totalbytes, (uchar**)&buf, zmBase64, &status);
 
             if (!cfg->isdumpjson) {
-                MMC_FPRINTF(stdout, "after encoding: %.1f%%\n", totalbytes * 100.f / (datalen * byte));
+                MMC_FPRINTF(cfg->flog, "after encoding: %.1f%%\n", totalbytes * 100.f / (datalen * byte));
             }
 
             if (!ret) {
                 cJSON_AddStringToObject((cJSON*)obj, "_ArrayType_", type);
                 cJSON_AddItemToObject((cJSON*)obj,   "_ArraySize_", cJSON_CreateIntArray((int*)dims, ndim));
+
+                if (iscol) {
+                    cJSON_AddStringToObject((cJSON*)obj, "_ArrayOrder_", "c");
+                }
+
                 cJSON_AddStringToObject((cJSON*)obj, "_ArrayZipType_", zipformat[zipid]);
                 cJSON_AddNumberToObject((cJSON*)obj, "_ArrayZipSize_", datalen);
                 cJSON_AddStringToObject((cJSON*)obj, "_ArrayZipData_", (char*)buf);
@@ -2119,7 +2575,7 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
         }
     }
 
-    if (compressed) {
+    if (compressed && zipid != zmBase64) {
         free(compressed);
     }
 
@@ -2130,6 +2586,7 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
     return ret;
 }
 
+#endif
 
 /**
  * @brief Parse the debug flag in the letter format
@@ -2138,10 +2595,10 @@ int  mcx_jdataencode(void* vol, int ndim, uint* dims, char* type, int byte, int 
  * This function converts the string debug flags into number format
  *
  * @param[in] debugopt: string following the -D parameter
- * @return debugflag: the numerical format of the debug flag
+ * @param[out] debugflag: the numerical format of the debug flag
  */
 
-int mcx_parsedebugopt(char* debugopt) {
+int mcx_parsedebugopt(char* debugopt, const char* debugflag) {
     char* c = debugopt, *p;
     int debuglevel = 0;
 
@@ -2158,6 +2615,23 @@ int mcx_parsedebugopt(char* debugopt) {
     return debuglevel;
 }
 
+
+/**
+ * @brief Flush command line output
+ *
+ * @param[in] out: the stream to be flushed
+ */
+
+void mcx_fflush(FILE* out) {
+#if defined(MCX_CONTAINER) && (defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER))
+    mcx_matlab_flush();
+#elif defined(PYBIND11_VERSION_MAJOR)
+    mcx_python_flush();
+#else
+    fflush(out);
+#endif
+}
+
 /**
  * @brief Print a progress bar
  *
@@ -2167,7 +2641,7 @@ int mcx_parsedebugopt(char* debugopt) {
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_progressbar(float percent, void* cfg) {
+void mcx_progressbar(float percent) {
     unsigned int percentage, j, colwidth = 79;
     static unsigned int oldmarker = 0xFFFFFFFF;
 
@@ -2210,13 +2684,12 @@ void mcx_progressbar(float percent, void* cfg) {
         }
 
         MMC_FPRINTF(stdout, "] %3d%%" S_RESET, (int)(percent * 100));
-#ifdef MCX_CONTAINER
-        mcx_matlab_flush();
-#else
-        fflush(stdout);
-#endif
+
+        mcx_fflush(stdout);
     }
 }
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Function to read a single parameter value followed by a command line option
@@ -2286,6 +2759,7 @@ int mcx_readarg(int argc, char* argv[], int id, void* output, const char* type) 
     return id + 1;
 }
 
+#endif
 
 /**
  * @brief Test if a long command line option is supported
@@ -2346,14 +2820,13 @@ int mcx_lookupindex(char* key, const char* index) {
  * @return if found, return the index of the string in the dictionary, otherwise -1.
  */
 
-int mcx_keylookup(char* key, const char* table[]) {
+int mcx_keylookup(char* origkey, const char* table[]) {
     int i = 0;
+    char* key = malloc(strlen(origkey) + 1);
+    memcpy(key, origkey, strlen(origkey) + 1);
 
     while (key[i]) {
-        if (key[i] >= 'A' && key[i] <= 'Z') {
-            key[i] += ('a' - 'A');
-        }
-
+        key[i] = tolower(key[i]);
         i++;
     }
 
@@ -2361,12 +2834,14 @@ int mcx_keylookup(char* key, const char* table[]) {
 
     while (table[i] && table[i][0] != '\0') {
         if (strcmp(key, table[i]) == 0) {
+            free(key);
             return i;
         }
 
         i++;
     }
 
+    free(key);
     return -1;
 }
 
@@ -2385,6 +2860,35 @@ int mcx_isbinstr(const char* str) {
     return 1;
 }
 
+/**
+ * @brief Convert a row-major (C/C++) array to a column-major (MATLAB/FORTRAN) array
+ *
+ * @param[in,out] vol: a 3D array (wrapped in 1D) to be converted
+ * @param[in] dim: the dimensions of the 3D array
+ */
+
+void  mcx_convertrow2col(float* vol, uint3* dim) {
+    uint x, y, z;
+    unsigned int dimxy, dimyz;
+    float* newvol = NULL;
+
+    if (vol == NULL || dim->x == 0 || dim->y == 0 || dim->z == 0) {
+        return;
+    }
+
+    newvol = (float*)malloc(sizeof(float) * dim->x * dim->y * dim->z);
+    dimxy = dim->x * dim->y;
+    dimyz = dim->y * dim->z;
+
+    for (x = 0; x < dim->x; x++)
+        for (y = 0; y < dim->y; y++)
+            for (z = 0; z < dim->z; z++) {
+                newvol[z * dimxy + y * dim->x + x] = vol[x * dimyz + y * dim->z + z];
+            }
+
+    memcpy(vol, newvol, sizeof(float) * dim->x * dim->y * dim->z);
+    free(newvol);
+}
 
 /**
  * @brief Validate all input fields, and warn incompatible inputs
@@ -2440,14 +2944,163 @@ void mcx_validatecfg(mcconfig* cfg) {
         cfg->method = rtBLBadouel;
     }
 
+#ifndef MMC_USE_SSE
+
+    if (cfg->gpuid > MAX_DEVICE) {
+        cfg->method = rtPlucker;
+    }
+
+#endif
+
     if (cfg->method == rtBLBadouelGrid) {
         cfg->basisorder = 0;
+    }
+
+    if (cfg->implicit && (int)(cfg->gpuid) >= 0) {
+        MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
     }
 
     for (i = 0; i < MAX_DEVICE; i++)
         if (cfg->deviceid[i] == '0') {
             cfg->deviceid[i] = '\0';
         }
+}
+
+/**
+ * @brief Initialize the replay data structure from detected photon data - in embedded mode (MATLAB/Python)
+ *
+ * @param[in,out] cfg: simulation configuration
+ * @param[in] detps: detected photon data
+ * @param[in] dimdetps: the dimension vector of the detected photon data
+ * @param[in] seedbyte: the number of bytes per RNG seed
+ */
+
+void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
+    int i, j, hasdetid = 0, offset;
+    float plen;
+
+    if (cfg->seed == SEED_FROM_FILE && detps == NULL) {
+        MMC_ERROR(-6, "you give cfg.seed for replay, but did not specify cfg.detphotons.\nPlease define it as the detphoton output from the baseline simulation\n");
+    }
+
+    if (detps == NULL || cfg->seed != SEED_FROM_FILE) {
+        return;
+    }
+
+    if (cfg->nphoton != dimdetps[1]) {
+        MMC_ERROR(-6, "the column numbers of detphotons and seed do not match\n");
+    }
+
+    if (seedbyte == 0) {
+        MMC_ERROR(-6, "the seed input is empty");
+    }
+
+    hasdetid = SAVE_DETID(cfg->savedetflag);
+    offset = SAVE_NSCAT(cfg->savedetflag) * (cfg->medianum - 1);
+
+    if (((!hasdetid) && cfg->detnum > 1) || !SAVE_PPATH(cfg->savedetflag)) {
+        MMC_ERROR(-6, "please rerun the baseline simulation and save detector ID (D) and partial-path (P) using cfg.savedetflag='dp' ");
+    }
+
+    cfg->replayweight = (float*) malloc(cfg->nphoton * sizeof(float));
+    cfg->replaytime = (float*) calloc(cfg->nphoton, sizeof(float));
+
+    cfg->nphoton = 0;
+
+    for (i = 0; i < dimdetps[1]; i++) {
+        if (cfg->replaydet <= 0 || cfg->replaydet == (int) (detps[i * dimdetps[0]])) {
+            if (i != cfg->nphoton) {
+                memcpy((char*) (cfg->photonseed) + cfg->nphoton * seedbyte,
+                       (char*) (cfg->photonseed) + i * seedbyte,
+                       seedbyte);
+            }
+
+            cfg->replayweight[cfg->nphoton] = 1.f;
+            cfg->replaytime[cfg->nphoton] = 0.f;
+
+            for (j = hasdetid; j < cfg->medianum - 1 + hasdetid; j++) {
+                plen = detps[i * dimdetps[0] + offset + j];
+                cfg->replayweight[cfg->nphoton] *= expf(-cfg->prop[j - hasdetid + 1].mua * plen);
+                plen *= cfg->unitinmm;
+                cfg->replaytime[cfg->nphoton] += plen * R_C0 * cfg->prop[j - hasdetid + 1].n;
+            }
+
+            if (cfg->replaytime[cfg->nphoton] < cfg->tstart
+                    || cfg->replaytime[cfg->nphoton] > cfg->tend) { /*need to consider -g*/
+                continue;
+            }
+
+            cfg->nphoton++;
+        }
+    }
+
+    cfg->replayweight = (float*) realloc(cfg->replayweight, cfg->nphoton * sizeof(float));
+    cfg->replaytime = (float*) realloc(cfg->replaytime, cfg->nphoton * sizeof(float));
+}
+
+/**
+ * @brief Validate all input fields, and warn incompatible inputs
+ *
+ * Perform self-checking and raise exceptions or warnings when input error is detected
+ *
+ * @param[in,out] cfg: the simulation configuration structure
+ * @param[out] mesh: the mesh data structure
+ */
+
+void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
+    if (cfg->nphoton <= 0) {
+        MMC_ERROR(999, "cfg.nphoton must be a positive number");
+    }
+
+    if (cfg->tstart > cfg->tend || cfg->tstep == 0.f) {
+        MMC_ERROR(999, "incorrect time gate settings or missing tstart/tend/tstep fields");
+    }
+
+    if (cfg->tstep > cfg->tend - cfg->tstart) {
+        cfg->tstep = cfg->tend - cfg->tstart;
+    }
+
+    if (ABS(cfg->srcdir.x * cfg->srcdir.x + cfg->srcdir.y * cfg->srcdir.y + cfg->srcdir.z * cfg->srcdir.z - 1.f) > 1e-5) {
+        MMC_ERROR(999, "field 'srcdir' must be a unitary vector");
+    }
+
+    if (cfg->tend <= cfg->tstart) {
+        MMC_ERROR(999, "field 'tend' must be greater than field 'tstart'");
+    }
+
+    cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
+    cfg->tend = cfg->tstart + cfg->tstep * cfg->maxgate;
+
+    if (cfg->srctype == stPattern && cfg->srcpattern == NULL) {
+        MMC_ERROR(999, "the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
+    }
+
+    if (cfg->srcnum > 1 && cfg->seed == SEED_FROM_FILE) {
+        MMC_ERROR(999, "multiple source simulation is currently not supported under replay mode");
+    }
+
+    cfg->his.unitinmm = cfg->unitinmm;
+
+    if (cfg->steps.x != cfg->steps.y || cfg->steps.y != cfg->steps.z) {
+        MMC_ERROR(999, "MMC dual-grid algorithm currently does not support anisotropic voxels");
+    }
+
+    if (cfg->issavedet && cfg->detnum == 0 && cfg->isextdet == 0) {
+        cfg->issavedet = 0;
+    }
+
+    if (cfg->seed < 0 && cfg->seed != SEED_FROM_FILE) {
+        cfg->seed = time(NULL);
+    }
+
+    if (cfg->issavedet == 0) {
+        cfg->ismomentum = 0;
+        cfg->issaveexit = 0;
+    }
+
+    cfg->his.detnum = cfg->detnum;
+    cfg->his.colcount = (1 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 1;
+    mcx_replayinit(cfg, detps, dimdetps, seedbyte);
 }
 
 /**
@@ -2478,7 +3131,10 @@ void mcx_prep(mcconfig* cfg) {
         cfg->savedetflag = SET_SAVE_PEXIT(cfg->savedetflag);
         cfg->savedetflag = SET_SAVE_VEXIT(cfg->savedetflag);
     }
+
 }
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Main function to read user command line options
@@ -2495,6 +3151,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
     char filename[MAX_PATH_LENGTH] = {0}, *jsoninput = NULL;
     char logfile[MAX_PATH_LENGTH] = {0};
     float np = 0.f;
+
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+    EnableVTMode();
+#endif
 
     if (argc <= 1) {
         mcx_usage(argv[0], cfg);
@@ -2533,6 +3193,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     if (i < argc - 1 && argv[i + 1][0] == '{') {
                         jsoninput = argv[i + 1];
                         i++;
+                    } else if (i == argc - 1 || argv[i + 1][0] == '-') {
+                        runcommand("", "", &jsoninput);
+                        isinteractive = 2;
+                        i += (i < argc - 1);
                     } else {
                         i = mcx_readarg(argc, argv, i, filename, "string");
                     }
@@ -2709,7 +3373,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
 
                 case 'D':
                     if (i + 1 < argc && isalpha((int)argv[i + 1][0]) ) {
-                        cfg->debuglevel = mcx_parsedebugopt(argv[++i]);
+                        cfg->debuglevel = mcx_parsedebugopt(argv[++i], debugflag);
                     } else {
                         i = mcx_readarg(argc, argv, i, &(cfg->debuglevel), "int");
                     }
@@ -2722,6 +3386,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
 
                 case 'H':
                     i = mcx_readarg(argc, argv, i, &(cfg->maxdetphoton), "int");
+                    break;
 
                 case 'A':
                     i = mcx_readarg(argc, argv, i, &(cfg->autopilot), "int");
@@ -2755,6 +3420,102 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     i = mcx_readarg(argc, argv, i, cfg->workload, "floatlist");
                     break;
 
+                case 'j':
+                    if (i + 1 < argc) {
+                        int len = strlen(argv[i + 1]);
+
+                        if (cfg->extrajson) {
+                            free(cfg->extrajson);
+                        }
+
+                        cfg->extrajson = (char*)calloc(1, len + 1);
+                        memcpy(cfg->extrajson, argv[++i], len);
+                    } else {
+                        MMC_ERROR(-1, "json fragment is expected after --json");
+                    }
+
+                    break;
+
+                case 'Q':
+                    if (i + 1 < argc && isalpha((int)(argv[i + 1][0])) ) {
+                        int idx = mcx_keylookup(argv[++i], benchname);
+
+                        if (idx == -1) {
+                            MMC_ERROR(-1, "Unsupported bechmark.");
+                        }
+
+                        isinteractive = 0;
+                        jsoninput = (char*)benchjson[idx];
+                    } else {
+                        MMC_FPRINTF(cfg->flog, "Built-in benchmarks:\n");
+
+                        for (i = 0; i < sizeof(benchname) / sizeof(char*) - 1; i++) {
+                            MMC_FPRINTF(cfg->flog, "\t%s\n", benchname[i]);
+                        }
+
+                        exit(0);
+                    }
+
+                    break;
+
+                case 'N':
+                    if (i == argc - 1 || argv[i + 1][0] == '-' || argv[i + 1][0] == '{' || strchr(argv[i + 1], '=')) {
+                        int j, doclen;
+                        char* jbuf = NULL;
+
+                        if (i < argc - 1 && argv[i + 1][0] == '{') {
+                            char cmd[MAX_PATH_LENGTH] = "curl -s -X POST -H 'Content-Type: application/json' -d ";
+                            sprintf(cmd + strlen(cmd), "'%s' \"https://neurojson.io:7777/mmc/_find\"", argv[i + 1]);
+                            runcommand(cmd, "", &jbuf);
+                        } else if (i < argc - 1 && strchr(argv[i + 1], '=')) {
+                            char cmd[MAX_PATH_LENGTH] = "curl -s -X GET 'https://neurojson.io:7777/mmc/_all_docs?";
+                            sprintf(cmd + strlen(cmd), "%s'", argv[i + 1]);
+                            runcommand(cmd, "", &jbuf);
+                        } else {
+                            runcommand("curl -s -X POST -H 'Content-Type: application/json' -d '{\"selector\": {\"Session\": {\"$gt\": null}},\"fields\": [\"_id\"],\"limit\":50}' \"https://neurojson.io:7777/mmc/_find\"", "", &jbuf);
+                        }
+
+                        cJSON* root = cJSON_Parse(jbuf), *docs = cJSON_GetObjectItem(root, "docs"), *subitem, *tmp;
+
+                        if (!docs) {
+                            docs = cJSON_GetObjectItem(root, "rows");
+
+                            if (!docs || !root) {
+                                MMC_ERROR(-1, jbuf);
+                            }
+                        }
+
+                        doclen = cJSON_GetArraySize(docs);
+                        subitem = docs->child;
+                        printf("Downloading %d simulations from NeuroJSON.io (https://neurojson.org/db/mmc)\n", doclen - 1);
+
+                        for (j = 0; j < doclen; j++) {
+                            char* docid = (cJSON_GetObjectItem(subitem, "_id") ? FIND_JSON_KEY("_id", "id", subitem, "", valuestring) : FIND_JSON_KEY("id", "id", subitem, "", valuestring));
+
+                            if (docid && docid[0] != '_' && docid[0] != '.') {
+                                printf("\t%s\n", docid);
+                            }
+
+                            subitem = subitem->next;
+                        }
+
+                        cJSON_Delete(root);
+                        free(jbuf);
+                        exit(0);
+                    } else {
+                        if (strstr(argv[i + 1], "http") == argv[i + 1]) {
+                            runcommand("curl -s -X GET ", argv[i + 1], &jsoninput);
+                        } else if (strchr(argv[i + 1], '/')) {
+                            runcommand("curl -s -X GET https://neurojson.io:7777/", argv[i + 1], &jsoninput);
+                        } else {
+                            runcommand("curl -s -X GET https://neurojson.io:7777/mmc/", argv[i + 1], &jsoninput);
+                        }
+
+                        isinteractive = 2;
+                    }
+
+                    break;
+
                 case '-':  /*additional verbose parameters*/
                     if (strcmp(argv[i] + 2, "momentum") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->ismomentum), "bool");
@@ -2779,31 +3540,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         } else {
                             i = mcx_readarg(argc, argv, i, &(cfg->isdumpjson), "int");
                         }
-                    } else if (strcmp(argv[i] + 2, "bench") == 0) {
-                        if (i + 1 < argc && isalpha((int)(argv[i + 1][0])) ) {
-                            int idx = mcx_keylookup(argv[++i], benchname);
-
-                            if (idx == -1) {
-                                MMC_ERROR(-1, "Unsupported bechmark.");
-                            }
-
-                            isinteractive = 0;
-                            jsoninput = (char*)benchjson[idx];
-                        } else {
-                            MMC_FPRINTF(cfg->flog, "Built-in benchmarks:\n");
-
-                            for (i = 0; i < sizeof(benchname) / sizeof(char*) -1; i++) {
-                                MMC_FPRINTF(cfg->flog, "\t%s\n", benchname[i]);
-                            }
-
-                            exit(0);
-                        }
                     } else if (strcmp(argv[i] + 2, "debugphoton") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->debugphoton), "int");
-                    } else if (strcmp(argv[i] + 2, "buffer") == 0) {
-                        i = mcx_readarg(argc, argv, i, &(cfg->nbuffer), "int");
+                    } else if (strcmp(argv[i] + 2, "maxjumpdebug") == 0) {
+                        i = mcx_readarg(argc, argv, i, &(cfg->maxjumpdebug), "int");
                     } else if (strcmp(argv[i] + 2, "gridsize") == 0) {
-                        i = mcx_readarg(argc, argv, i, &(cfg->steps.x), "int");
+                        i = mcx_readarg(argc, argv, i, &(cfg->steps.x), "float");
                         cfg->steps.y = cfg->steps.x;
                         cfg->steps.z = cfg->steps.x;
                     } else {
@@ -2859,12 +3601,27 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
     }
 
     if (cfg->isgpuinfo != 2) { /*print gpu info only*/
-        if (isinteractive) {
+        if (isinteractive == 2 && jsoninput) {
+            mcx_loadfromjson(jsoninput, cfg);
+            free(jsoninput);
+        } else if (isinteractive) {
             mcx_readconfig("", cfg);
         } else if (jsoninput) {
             mcx_loadfromjson(jsoninput, cfg);
         } else {
             mcx_readconfig(filename, cfg);
+        }
+
+        if (cfg->extrajson) {
+            cJSON* jroot = cJSON_Parse(cfg->extrajson);
+
+            if (jroot) {
+                cfg->extrajson[0] = '_';
+                mcx_loadjson(jroot, cfg);
+                cJSON_Delete(jroot);
+            } else {
+                MMC_ERROR(-1, "invalid json fragment following --json");
+            }
         }
     }
 
@@ -2902,6 +3659,9 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
     fwrite(ppath, sizeof(float), count * cfg->his.colcount, fp);
     fclose(fp);
 }
+
+#endif
+
 /**
  * @brief Print MCX software version
  *
@@ -2909,7 +3669,7 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig* cfg) {
-    MMC_ERROR(MMC_INFO, "MMC $Rev::      $v2021.2");
+    MMC_ERROR(MMC_INFO, "MMC $Rev::      $" MMC_VERSION);
 }
 
 /**
@@ -2919,18 +3679,24 @@ void mcx_version(mcconfig* cfg) {
  */
 
 void mcx_printheader(mcconfig* cfg) {
-    MMC_FPRINTF(cfg->flog, S_YELLOW"\
+    MMC_FPRINTF(cfg->flog, S_YELLOW "\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\
-#          Copyright (c) 2010-2020 Qianqian Fang <q.fang at neu.edu>          #\n\
-#                            http://mcx.space/#mmc                            #\n\
+#          Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          #\n\
+#" S_BLUE "              https://mcx.space/#mmc  &  https://neurojson.io                " S_YELLOW "#\n\
 #                                                                             #\n\
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#\n\
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #\n\
-#                                                                             #\n\
-#                Research funded by NIH/NIGMS grant R01-GM114365              #\n\
 ###############################################################################\n\
-$Rev::      $v2021.2$Date::                       $ by $Author::              $\n\
+#    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #\n\
+###############################################################################\n\
+#  Open-source codes and reusable scientific data are essential for research, #\n\
+# MCX proudly developed human-readable JSON-based data formats for easy reuse.#\n\
+#                                                                             #\n\
+#Please visit our free scientific data sharing portal at " S_BLUE "https://neurojson.io " S_YELLOW "#\n\
+# and consider sharing your public datasets in standardized JSON/JData format #\n\
+###############################################################################\n\
+$Rev::      $" S_GREEN MMC_VERSION S_YELLOW "$Date::                       $ by $Author::             $\n\
 ###############################################################################\n"S_RESET);
 }
 
@@ -2947,7 +3713,14 @@ usage: %s <param1> <param2> ...\n\
 where possible parameters include (the first item in [] is the default value)\n\
 \n"S_BOLD S_CYAN"\
 == Required option ==\n"S_RESET"\
- -f config     (--input)       read an input file in .inp or .json format\n\
+ -f config     (--input)       read an input file in the .json format,if config\n\
+                               string starts with '{',it is parsed as an inline\n\
+                               JSON input file; if -f is followed by nothing or\n\
+                               a single '-', it reads input from stdin via pipe\n\
+ -Q benchmark  (--bench)       run a built-in benchmark, -Q only to list\n\
+ -N benchmark  (--net)         get benchmark from NeuroJSON.io, -N only to list\n\
+                               benchmark can be dataset URL,or dbname/benchname\n\
+                               requires 'curl', install from https://curl.se/\n\
 \n"S_BOLD S_CYAN"\
 == MC options ==\n"S_RESET"\
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1\n\
@@ -2962,12 +3735,12 @@ where possible parameters include (the first item in [] is the default value)\n\
                                to calculate the mua/mus Jacobian matrices\n\
  -P [0|int]    (--replaydet)   replay only the detected photons from a given \n\
                                detector (det ID starts from 1), use with -E \n\
- -M [%c|SG] (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
+ -M [%c|SG]    (--method)      choose ray-tracing algorithm (only use 1 letter)\n\
                                P - Plucker-coordinate ray-tracing algorithm\n\
-			       H - Havel's SSE4 ray-tracing algorithm\n\
-			       B - partial Badouel's method (used by TIM-OS)\n\
-			       S - branch-less Badouel's method with SSE\n\
-			       G - dual-grid MMC (DMMC) with voxel data output\n\
+                               H - Havel's SSE4 ray-tracing algorithm\n\
+                               B - partial Badouel's method (used by TIM-OS)\n\
+                               S - branch-less Badouel's method with SSE\n\
+                               G - dual-grid MMC (DMMC) with voxel data output\n\
  -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette\n\
  -V [0|1]      (--specular)    1 source located in the background,0 inside mesh\n\
  -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void\n\
@@ -2977,7 +3750,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -c [opencl,sse,cuda](--compute) select compute backend (default to opencl)\n\
                                can also use 0: sse, 1: opencl, 2: cuda\n\
  -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto\n\
-      or\n\
+      or                       if set to -1, CPU-based SSE mmc will be used\n\
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\
  -W '50,30,20' (--workload)    workload for active devices; normalized by sum\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
@@ -2995,55 +3768,55 @@ where possible parameters include (the first item in [] is the default value)\n\
  -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the \n\
                                exterior surface. The output is stored in a \n\
                                file named *_dref.dat, and the 2nd column of \n\
-			       the data is resized to [#Nf, #time_gate] where\n\
-			       #Nf is the number of triangles on the surface; \n\
-			       #time_gate is the number of total time gates. \n\
-			       To plot the surface diffuse reflectance, the \n\
-			       output triangle surface mesh can be extracted\n\
-			       by faces=faceneighbors(cfg.elem,'rowmajor');\n\
+                               the data is resized to [#Nf, #time_gate] where\n\
+                               #Nf is the number of triangles on the surface; \n\
+                               #time_gate is the number of total time gates. \n\
+                               To plot the surface diffuse reflectance, the \n\
+                               output triangle surface mesh can be extracted\n\
+                               by faces=faceneighbors(cfg.elem,'rowmajor');\n\
                                where 'faceneighbors' is part of Iso2Mesh.\n\
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay\n\
- -F format     (--outputformat)'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
+ -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double) \n\
                                'hdr' (Analyze) or 'nii' (nifti, double)\n\
-                               mc2 - MCX mc2 format (binary 32bit float)\n\
-                               jnii - JNIfTI format (http://openjdata.org)\n\
-                               bnii - Binary JNIfTI (http://openjdata.org)\n\
+                               mc2 - MCX mc2 format (binary 64bit float)\n\
+                               jnii - JNIfTI format (https://neurojson.org)\n\
+                               bnii - Binary JNIfTI (https://neurojson.org)\n\
                                nii - NIfTI format\n\
                                hdr - Analyze 7.5 hdr/img format\n\
-	the bnii/jnii formats support compression (-Z) and generate small files\n\
-	load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:\n\
-	  MATLAB/Octave: JNIfTI toolbox   https://github.com/fangq/jnifti, \n\
-	  MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, \n\
-	  Python:        PyJData:         https://pypi.org/project/jdata\n\
-	  JavaScript:    JSData:          https://github.com/fangq/jsdata\n\
- -Z [zlib|...] (--zip)         set compression method if -F jnii or --dumpjson\n\
-                               is used (when saving data to JSON/JNIfTI format)\n\
-			       0 zlib: zip format (moderate compression,fast) \n\
-			       1 gzip: gzip format (compatible with *.gz)\n\
-			       2 base64: base64 encoding with no compression\n\
-			       3 lzip: lzip format (high compression,very slow)\n\
-			       4 lzma: lzma format (high compression,very slow)\n\
-			       5 lz4: LZ4 format (low compression,extrem. fast)\n\
-			       6 lz4hc: LZ4HC format (moderate compression,fast)\n\
- --dumpjson [-,2,'file.json']  export all settings, including volume data using\n\
-                               JSON/JData (http://openjdata.org) format for \n\
-			       easy sharing; can be reused using -f\n\
-			       if followed by nothing or '-', mcx will print\n\
-			       the JSON to the console; write to a file if file\n\
-			       name is specified; by default, prints settings\n\
-			       after pre-processing; '--dumpjson 2' prints \n\
-			       raw inputs before pre-processing\n\
+    the bnii/jnii formats support compression (-Z) and generate small files\n\
+    load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:\n\
+      MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, \n\
+      MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, \n\
+      Python:        PyJData:         https://pypi.org/project/jdata\n\
+      JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata\n\
+ -Z [zlib|...] (--zip)      set compression method if -F jnii or --dumpjson\n\
+                            is used (when saving data to JSON/JNIfTI format)\n\
+                            0 zlib: zip format (moderate compression,fast) \n\
+                            1 gzip: gzip format (compatible with *.gz)\n\
+                            2 base64: base64 encoding with no compression\n\
+                            3 lzip: lzip format (high compression,very slow)\n\
+                            4 lzma: lzma format (high compression,very slow)\n\
+                            5 lz4: LZ4 format (low compression,extrem. fast)\n\
+                            6 lz4hc: LZ4HC format (moderate compression,fast)\n\
+ --dumpjson [-,2,'file.json'] export all settings, including volume data using\n\
+                          JSON/JData (https://neurojson.org) format for \n\
+                          easy sharing; can be reused using -f\n\
+                          if followed by nothing or '-', mmc will print\n\
+                          the JSON to the console; write to a file if file\n\
+                          name is specified; by default, prints settings\n\
+                          after pre-processing; '--dumpjson 2' prints \n\
+                          raw inputs before pre-processing\n\
 \n"S_BOLD S_CYAN"\
 == User IO options ==\n"S_RESET"\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
  -l            (--log)         print messages to a log file instead\n\
- -i 	       (--interactive) interactive mode\n\
+ -i            (--interactive) interactive mode\n\
 \n"S_BOLD S_CYAN"\
 == Debug options ==\n"S_RESET"\
  -D [0|int]    (--debug)       print debug information (you can use an integer\n\
   or                           or a string by combining the following flags)\n\
- -D [''|MCBWDIOXATRPE]         1 M  photon movement info\n\
+ -D [''|SCBWDIOXATRPEM]        1 S  photon movement info\n\
                                2 C  print ray-polygon testing details\n\
                                4 B  print Bary-centric coordinates\n\
                                8 W  print photon weight changes\n\
@@ -3056,6 +3829,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                             1024 R  debugging reflection\n\
                             2048 P  show progress bar\n\
                             4096 E  exit photon info\n\
+                            8192 M  return photon trajectories\n\
       combine multiple items by using a string, or add selected numbers together\n\
  --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
                                a single photon, followed by its index (start 0)\n\
@@ -3063,9 +3837,27 @@ where possible parameters include (the first item in [] is the default value)\n\
 == Additional options ==\n"S_RESET"\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
  --gridsize     [1|float]      if -M G is used, this sets the grid size in mm\n\
+ --maxjumpdebug [10000000|int] when trajectory is requested (i.e. -D S),\n\
+                               use this parameter to set the maximum positions\n\
+                               stored (default: 1e7)\n\
 \n"S_BOLD S_CYAN"\
 == Example ==\n"S_RESET"\
-       %s -n 1000000 -f input.json -s test -b 0 -D TP -G -1\n", exename,
+example: (list built-in benchmarks: -Q/--bench)\n"S_CYAN"\
+       %s -Q\n" S_RESET"\
+or (use multiple devices - 1st,2nd and 4th GPUs - together with equal load)\n"S_CYAN"\
+       %s -Q dmmc-cube60 -n 1e7 -G 1101 -W 10,10,10\n" S_RESET"\
+or (use inline json setting modifier)\n"S_CYAN"\
+       %s -f input.json -j '{\"Optode\":{\"Source\":{\"Type\":\"isotropic\"}}}'\n" S_RESET"\
+or (dump simulation in a single json file)\n"S_CYAN"\
+       %s -Q dmmc-cube60 --dumpjson\n" S_RESET"\
+or (use -N/--net to browse community-contributed mmc simulations at https://neurojson.io)\n"S_CYAN"\
+       %s -N\n" S_RESET"\
+or (run user-shared mmc simulations, see full list at https://neurojson.org/db/mmc)\n"S_CYAN"\
+       %s -N dmmc-cube60\n" S_RESET"\
+or (use -f - to read piped input file modified by shell text processing utilities)\n"S_CYAN"\
+       %s -Q dmmc-cube60 --dumpjson | sed -e 's/pencil/isotropic/g' | %s -f -\n" S_RESET"\
+or (download/modify simulations from NeuroJSON.io and run with mmc -f)\n"S_CYAN"\
+       curl -s -X GET https://neurojson.io:7777/mmc/dmmc-cube60 | jq '.Forward.Dt = 1e-9' | %s -f\n", exename,
 #ifdef USE_OPENCL
            'G',
 #else
@@ -3075,5 +3867,5 @@ where possible parameters include (the first item in [] is the default value)\n\
            'P',
 #endif
 #endif
-           exename);
+           exename, exename, exename, exename, exename, exename, exename, exename, exename);
 }

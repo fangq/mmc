@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,12 +30,13 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    simpmesh.c
+\file    mmc_mesh.c
 
 \brief   Basic vector math and mesh operations
 *******************************************************************************/
 
 #include <stdlib.h>
+#include "mmc_const.h"
 #include "mmc_mesh.h"
 #include <string.h>
 #include "mmc_highorder.h"
@@ -127,7 +128,6 @@ void mesh_init(tetmesh* mesh) {
     mesh->facenb = NULL;
     mesh->type = NULL;
     mesh->med = NULL;
-    mesh->atte = NULL;
     mesh->weight = NULL;
     mesh->evol = NULL;
     mesh->nvol = NULL;
@@ -148,6 +148,100 @@ void mesh_init(tetmesh* mesh) {
     mesh->back = NULL;
 }
 
+
+/**
+ * @brief Clearing the mesh data structure
+ *
+ * Destructor of the mesh data structure, delete all dynamically allocated members
+ */
+
+
+void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
+    mesh->nn = 0;
+    mesh->ne = 0;
+    mesh->nf = 0;
+    mesh->srcelemlen = 0;
+    mesh->detelemlen = 0;
+
+    if (mesh->node && cfg->node == NULL) {
+        free(mesh->node);
+        mesh->node = NULL;
+    }
+
+    if (mesh->elem) {
+        free(mesh->elem);
+        mesh->elem = NULL;
+    }
+
+    if (mesh->elem2) {
+        free(mesh->elem2);
+        mesh->elem2 = NULL;
+    }
+
+    if (mesh->facenb) {
+        free(mesh->facenb);
+        mesh->facenb = NULL;
+    }
+
+    if (mesh->dref) {
+        free(mesh->dref);
+        mesh->dref = NULL;
+    }
+
+    if (mesh->type) {
+        free(mesh->type);
+        mesh->type = NULL;
+    }
+
+    if (mesh->med) {
+        free(mesh->med);
+        mesh->med = NULL;
+    }
+
+    if (mesh->weight) {
+        free(mesh->weight);
+        mesh->weight = NULL;
+    }
+
+    if (mesh->evol) {
+        free(mesh->evol);
+        mesh->evol = NULL;
+    }
+
+    if (mesh->nvol) {
+        free(mesh->nvol);
+        mesh->nvol = NULL;
+    }
+
+    if (mesh->srcelem) {
+        free(mesh->srcelem);
+        mesh->srcelem = NULL;
+    }
+
+    if (mesh->detelem) {
+        free(mesh->detelem);
+        mesh->detelem = NULL;
+    }
+
+    if (mesh->noderoi) {
+        free(mesh->noderoi);
+        mesh->noderoi = NULL;
+    }
+
+    if (mesh->edgeroi) {
+        free(mesh->edgeroi);
+        mesh->edgeroi = NULL;
+    }
+
+    if (mesh->faceroi) {
+        free(mesh->faceroi);
+        mesh->faceroi = NULL;
+    }
+}
+
+
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Loading user-specified mesh data
  *
@@ -158,20 +252,57 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
     mesh_init(mesh);
     mesh_loadnode(mesh, cfg);
     mesh_loadelem(mesh, cfg);
+    mesh_loadmedia(mesh, cfg);
+
+    if (cfg->isdumpjson == 1) {
+        int i, j, *elem = NULL;
+
+        if (cfg->medianum == 0) {
+            cfg->medianum = mesh->prop + 1;
+            cfg->prop = mesh->med;
+        }
+
+        if (cfg->nodenum == 0 && cfg->elemnum == 0) {
+            cfg->nodenum = mesh->nn;
+            cfg->elemnum = mesh->ne;
+            cfg->elemlen = mesh->elemlen;
+            cfg->node = mesh->node;
+            elem = (int*)malloc(mesh->ne * (mesh->elemlen + 1) * sizeof(int));
+
+            for (i = 0; i < mesh->ne; i++) {
+                for (j = 0; j < mesh->elemlen; j++) {
+                    elem[i * (mesh->elemlen + 1) + j] = mesh->elem[i * mesh->elemlen + j];
+                }
+
+                elem[i * (mesh->elemlen + 1) + mesh->elemlen] = mesh->type[i];
+            }
+
+            cfg->elem = elem;
+        }
+
+        mcx_savejdata(cfg->jsonfile, cfg);
+
+        if (elem) {
+            free(elem);
+        }
+
+        exit(0);
+    }
 
     if (cfg->basisorder == 2) {
         mesh_10nodetet(mesh, cfg);
     }
 
-    mesh_loadfaceneighbor(mesh, cfg);
-    mesh_loadmedia(mesh, cfg);
     mesh_loadelemvol(mesh, cfg);
+    mesh_loadfaceneighbor(mesh, cfg);
     mesh_loadroi(mesh, cfg);
 
     if (cfg->seed == SEED_FROM_FILE && cfg->seedfile[0]) {
         mesh_loadseedfile(mesh, cfg);
     }
 }
+
+#endif
 
 /**
  * @brief Error-handling in mesh operations
@@ -198,7 +329,7 @@ void mesh_error(const char* msg, const char* file, const int linenum) {
  * @param[in] cfg: the simulation configuration structure
  */
 
-void mesh_filenames(const char format[64], char* foutput, mcconfig* cfg) {
+void mesh_filenames(const char* format, char* foutput, mcconfig* cfg) {
     char filename[MAX_PATH_LENGTH];
     sprintf(filename, format, cfg->meshtag);
 
@@ -206,44 +337,6 @@ void mesh_filenames(const char format[64], char* foutput, mcconfig* cfg) {
         sprintf(foutput, "%s%c%s", cfg->rootpath, pathsep, filename);
     } else {
         sprintf(foutput, "%s", filename);
-    }
-}
-
-/**
- * @brief Load node file and initialize the related mesh properties
- *
- * @param[in] mesh: the mesh object
- * @param[in] cfg: the simulation configuration structure
- */
-
-void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
-    FILE* fp;
-    int tmp, len, i;
-    char fnode[MAX_FULL_PATH];
-    mesh_filenames("node_%s.dat", fnode, cfg);
-
-    if ((fp = fopen(fnode, "rt")) == NULL) {
-        MESH_ERROR("can not open node file");
-    }
-
-    len = fscanf(fp, "%d %d", &tmp, &(mesh->nn));
-
-    if (len != 2 || mesh->nn <= 0) {
-        MESH_ERROR("node file has wrong format");
-    }
-
-    mesh->node = (MMCfloat3*)calloc(sizeof(MMCfloat3), mesh->nn);
-
-    for (i = 0; i < mesh->nn; i++) {
-        if (fscanf(fp, "%d %f %f %f", &tmp, &(mesh->node[i].x), &(mesh->node[i].y), &(mesh->node[i].z)) != 4) {
-            MESH_ERROR("node file has wrong format");
-        }
-    }
-
-    fclose(fp);
-
-    if (cfg->method == rtBLBadouelGrid) {
-        mesh_createdualmesh(mesh, cfg);
     }
 }
 
@@ -282,6 +375,105 @@ void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg) {
 }
 
 /**
+ * @brief Identify wide-field source and detector-related elements (type=-1 for source, type=-2 for det)
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
+    int i;
+
+    mesh->srcelemlen = 0;
+    mesh->detelemlen = 0;
+
+    for (i = 0; i < mesh->ne; i++) {
+        if (mesh->type[i] == -1) { /*number of elements in the initial candidate list*/
+            mesh->srcelemlen++;
+            cfg->e0 = (cfg->e0 == 0) ? i + 1 : cfg->e0;
+        }
+
+        if (mesh->type[i] == -2) { /*number of elements in the initial candidate list*/
+            mesh->detelemlen++;
+            cfg->isextdet = 1;
+            cfg->detnum = 0; // when detecting wide-field detectors, suppress point detectors
+        }
+    }
+
+    /*Record the index of inital elements to initiate source search*/
+    /*Then change the type of initial elements back to 0 to continue propogation*/
+    if (mesh->srcelemlen > 0 ||  mesh->detelemlen > 0) {
+        int is = 0, id = 0;
+        mesh->srcelem = (int*)calloc(mesh->srcelemlen, sizeof(int));
+        mesh->detelem = (int*)calloc(mesh->detelemlen, sizeof(int));
+
+        for (i = 0; i < mesh->ne; i++) {
+            if (mesh->type[i] < 0) {
+                if (mesh->type[i] == -1) {
+                    mesh->srcelem[is++] = i + 1;
+                    mesh->type[i] = 0;
+                } else if (mesh->type[i] == -2) { /*keep -2, will be replaced to medianum+1 in loadmedia*/
+                    mesh->detelem[id++] = i + 1;
+                }
+            }
+        }
+    }
+}
+
+
+#ifndef MCX_CONTAINER
+
+/**
+ * @brief Load node file and initialize the related mesh properties
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ */
+
+void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
+    FILE* fp;
+    int tmp, len, i;
+    char fnode[MAX_FULL_PATH];
+
+    if (cfg->node && cfg->nodenum > 0) {
+        mesh->node = cfg->node;
+        mesh->nn = cfg->nodenum;
+
+        if (cfg->method == rtBLBadouelGrid) {
+            mesh_createdualmesh(mesh, cfg);
+        }
+
+        return;
+    }
+
+    mesh_filenames("node_%s.dat", fnode, cfg);
+
+    if ((fp = fopen(fnode, "rt")) == NULL) {
+        MESH_ERROR("can not open node file");
+    }
+
+    len = fscanf(fp, "%d %d", &tmp, &(mesh->nn));
+
+    if (len != 2 || mesh->nn <= 0) {
+        MESH_ERROR("node file has wrong format");
+    }
+
+    mesh->node = (FLOAT3*)calloc(sizeof(FLOAT3), mesh->nn);
+
+    for (i = 0; i < mesh->nn; i++) {
+        if (fscanf(fp, "%d %f %f %f", &tmp, &(mesh->node[i].x), &(mesh->node[i].y), &(mesh->node[i].z)) != 4) {
+            MESH_ERROR("node file has wrong format");
+        }
+    }
+
+    fclose(fp);
+
+    if (cfg->method == rtBLBadouelGrid) {
+        mesh_createdualmesh(mesh, cfg);
+    }
+}
+
+/**
  * @brief Load optical property file and initialize the related mesh properties
  *
  * @param[in] mesh: the mesh object
@@ -289,24 +481,28 @@ void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg) {
  */
 
 void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg) {
-    FILE* fp;
+    FILE* fp = NULL;
     int tmp, len, i;
     char fmed[MAX_FULL_PATH];
-    mesh_filenames("prop_%s.dat", fmed, cfg);
 
-    if ((fp = fopen(fmed, "rt")) == NULL) {
-        MESH_ERROR("can not open media property file");
-    }
+    if (cfg->medianum == 0) {
+        mesh_filenames("prop_%s.dat", fmed, cfg);
 
-    len = fscanf(fp, "%d %d", &tmp, &(mesh->prop));
+        if ((fp = fopen(fmed, "rt")) == NULL) {
+            MESH_ERROR("can not open media property file");
+        }
 
-    if (len != 2 || mesh->prop <= 0) {
-        MESH_ERROR("property file has wrong format");
+        len = fscanf(fp, "%d %d", &tmp, &(mesh->prop));
+
+        if (len != 2 || mesh->prop <= 0) {
+            MESH_ERROR("property file has wrong format");
+        }
+    } else {
+        mesh->prop = cfg->medianum - 1;
     }
 
     /*when there is an external detector, reindex the property to medianum+1*/
     mesh->med = (medium*)calloc(sizeof(medium), mesh->prop + 1 + cfg->isextdet);
-    mesh->atte = (float*)calloc(sizeof(float), mesh->prop + 1 + cfg->isextdet);
 
     mesh->med[0].mua = 0.f;
     mesh->med[0].mus = 0.f;
@@ -324,16 +520,18 @@ void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg) {
         }
     }
 
-    for (i = 1; i <= mesh->prop; i++) {
-        if (fscanf(fp, "%d %f %f %f %f", &tmp, &(mesh->med[i].mua), &(mesh->med[i].mus),
-                   &(mesh->med[i].g), &(mesh->med[i].n)) != 5) {
-            MESH_ERROR("property file has wrong format");
+    if (cfg->medianum == 0) {
+        for (i = 1; i <= mesh->prop; i++) {
+            if (fscanf(fp, "%d %f %f %f %f", &tmp, &(mesh->med[i].mua), &(mesh->med[i].mus),
+                       &(mesh->med[i].g), &(mesh->med[i].n)) != 5) {
+                MESH_ERROR("property file has wrong format");
+            }
         }
 
-        /*mesh->atte[i]=expf(-cfg->minstep*mesh->med[i].mua);*/
+        fclose(fp);
+    } else {
+        memcpy(mesh->med, cfg->prop, sizeof(medium) * cfg->medianum);
     }
-
-    fclose(fp);
 
     if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
         for (i = 1; i <= mesh->prop; i++) {
@@ -358,6 +556,32 @@ void mesh_loadroi(tetmesh* mesh, mcconfig* cfg) {
     float* pe = NULL;
     char froi[MAX_FULL_PATH];
 
+    if (cfg->roidata && cfg->roitype != rtNone) {
+        if (cfg->roitype == rtEdge) {
+            row = mesh->ne;
+            col = 6;
+            mesh->edgeroi = (float*)malloc(sizeof(float) * row * col);
+            pe = mesh->edgeroi;
+            cfg->implicit = 1;
+        } else if (cfg->roitype == rtNode) {
+            row = mesh->nn;
+            col = 1;
+            mesh->noderoi = (float*)malloc(sizeof(float) * row * col);
+            pe = mesh->noderoi;
+            cfg->implicit = 1;
+        } else {
+            row = mesh->ne;
+            col = 4;
+            mesh->faceroi = (float*)malloc(sizeof(float) * row * col);
+            pe = mesh->faceroi;
+            cfg->implicit = 2;
+        }
+
+        memcpy(pe, cfg->roidata, sizeof(float) * row * col);
+
+        return;
+    }
+
     mesh_filenames("roi_%s.dat", froi, cfg);
 
     if ((fp = fopen(froi, "rt")) == NULL) {
@@ -373,12 +597,15 @@ void mesh_loadroi(tetmesh* mesh, mcconfig* cfg) {
     if (col == 6) {
         mesh->edgeroi = (float*)malloc(sizeof(float) * 6 * mesh->ne);
         pe = mesh->edgeroi;
+        cfg->implicit = 1;
     } else if (col == 1) {
         mesh->noderoi = (float*)malloc(sizeof(float) * mesh->nn);
         pe = mesh->noderoi;
+        cfg->implicit = 1;
     } else if (col == 4) {
         mesh->faceroi = (float*)malloc(sizeof(float) * 4 * mesh->ne);
         pe = mesh->faceroi;
+        cfg->implicit = 2;
     }
 
     for (i = 0; i < row; i++) {
@@ -409,6 +636,28 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
     int tmp, len, i, j, datalen;
     int* pe;
     char felem[MAX_FULL_PATH];
+
+    if (cfg->node && cfg->nodenum > 0) {
+        mesh->ne = cfg->elemnum;
+        mesh->elemlen = cfg->elemlen;
+
+        mesh->elem = (int*)malloc(sizeof(int) * mesh->elemlen * mesh->ne);
+        mesh->type = (int*)malloc(sizeof(int ) * mesh->ne);
+
+        datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+        mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * cfg->srcnum);
+
+        for (i = 0; i < mesh->ne; i++) {
+            for (j = 0; j < mesh->elemlen; j++) {
+                mesh->elem[i * mesh->elemlen + j] = cfg->elem[i * (mesh->elemlen + 1) + j];
+            }
+
+            mesh->type[i] = cfg->elem[i * (mesh->elemlen + 1) + mesh->elemlen];
+        }
+
+        mesh_srcdetelem(mesh, cfg);
+        return;
+    }
 
     mesh_filenames("elem_%s.dat", felem, cfg);
 
@@ -459,52 +708,6 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
 }
 
 /**
- * @brief Identify wide-field source and detector-related elements (type=-1 for source, type=-2 for det)
- *
- * @param[in] mesh: the mesh object
- * @param[in] cfg: the simulation configuration structure
- */
-
-void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
-    int i;
-
-    mesh->srcelemlen = 0;
-    mesh->detelemlen = 0;
-
-    for (i = 0; i < mesh->ne; i++) {
-        if (mesh->type[i] == -1) { /*number of elements in the initial candidate list*/
-            mesh->srcelemlen++;
-            cfg->e0 = (cfg->e0 == 0) ? i + 1 : cfg->e0;
-        }
-
-        if (mesh->type[i] == -2) { /*number of elements in the initial candidate list*/
-            mesh->detelemlen++;
-            cfg->isextdet = 1;
-            cfg->detnum = 0; // when detecting wide-field detectors, suppress point detectors
-        }
-    }
-
-    /*Record the index of inital elements to initiate source search*/
-    /*Then change the type of initial elements back to 0 to continue propogation*/
-    if (mesh->srcelemlen > 0 ||  mesh->detelemlen > 0) {
-        int is = 0, id = 0;
-        mesh->srcelem = (int*)calloc(mesh->srcelemlen, sizeof(int));
-        mesh->detelem = (int*)calloc(mesh->detelemlen, sizeof(int));
-
-        for (i = 0; i < mesh->ne; i++) {
-            if (mesh->type[i] < 0) {
-                if (mesh->type[i] == -1) {
-                    mesh->srcelem[is++] = i + 1;
-                    mesh->type[i] = 0;
-                } else if (mesh->type[i] == -2) { /*keep -2, will be replaced to medianum+1 in loadmedia*/
-                    mesh->detelem[id++] = i + 1;
-                }
-            }
-        }
-    }
-}
-
-/**
  * @brief Load tet element volume file and initialize the related mesh properties
  *
  * @param[in] mesh: the mesh object
@@ -515,10 +718,12 @@ void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg) {
     FILE* fp;
     int tmp, len, i, j, *ee;
     char fvelem[MAX_FULL_PATH];
+
     mesh_filenames("velem_%s.dat", fvelem, cfg);
 
-    if ((fp = fopen(fvelem, "rt")) == NULL) {
-        MESH_ERROR("can not open element volume file");
+    if ((cfg->elem && cfg->elemnum && cfg->node && cfg->nodenum) || (fp = fopen(fvelem, "rt")) == NULL) {
+        mesh_getvolume(mesh, cfg);
+        return;
     }
 
     len = fscanf(fp, "%d %d", &tmp, &(mesh->ne));
@@ -549,6 +754,7 @@ void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg) {
     fclose(fp);
 }
 
+
 /**
  * @brief Load face-neightbor element list and initialize the related mesh properties
  *
@@ -561,10 +767,12 @@ void mesh_loadfaceneighbor(tetmesh* mesh, mcconfig* cfg) {
     int len, i, j;
     int* pe;
     char ffacenb[MAX_FULL_PATH];
+
     mesh_filenames("facenb_%s.dat", ffacenb, cfg);
 
-    if ((fp = fopen(ffacenb, "rt")) == NULL) {
-        MESH_ERROR("can not open face-neighbor list file");
+    if ((cfg->elem && cfg->elemnum) || (fp = fopen(ffacenb, "rt")) == NULL) {
+        mesh_getfacenb(mesh, cfg);
+        return;
     }
 
     len = fscanf(fp, "%d %d", &(mesh->elemlen), &(mesh->ne));
@@ -683,98 +891,54 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
     fclose(fp);
 }
 
+#endif
+
 /**
- * @brief Clearing the mesh data structure
+ * @brief Compute the tetrahedron and nodal volumes if not provided
  *
- * Destructor of the mesh data structure, delete all dynamically allocated members
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
  */
 
 
-void mesh_clear(tetmesh* mesh) {
-    mesh->nn = 0;
-    mesh->ne = 0;
-    mesh->nf = 0;
-    mesh->srcelemlen = 0;
-    mesh->detelemlen = 0;
+void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
+    float dx, dy, dz;
+    int i, j;
 
-    if (mesh->node) {
-        free(mesh->node);
-        mesh->node = NULL;
-    }
+    mesh->evol = (float*)calloc(sizeof(float), mesh->ne);
+    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
 
-    if (mesh->elem) {
-        free(mesh->elem);
-        mesh->elem = NULL;
-    }
+    for (i = 0; i < mesh->ne; i++) {
+        int* ee = (int*)(mesh->elem + i * mesh->elemlen);
 
-    if (mesh->elem2) {
-        free(mesh->elem2);
-        mesh->elem2 = NULL;
-    }
+        dx = mesh->node[ee[2] - 1].x - mesh->node[ee[3] - 1].x;
+        dy = mesh->node[ee[2] - 1].y - mesh->node[ee[3] - 1].y;
+        dz = mesh->node[ee[2] - 1].z - mesh->node[ee[3] - 1].z;
 
-    if (mesh->facenb) {
-        free(mesh->facenb);
-        mesh->facenb = NULL;
-    }
+        mesh->evol[i] = mesh->node[ee[1] - 1].x * (mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y)
+                        - mesh->node[ee[1] - 1].y * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x)
+                        + mesh->node[ee[1] - 1].z * (mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x);
+        mesh->evol[i] += -mesh->node[ee[0] - 1].x * ((mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].y) + mesh->node[ee[1] - 1].y * dz - mesh->node[ee[1] - 1].z * dy);
+        mesh->evol[i] += +mesh->node[ee[0] - 1].y * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].z - mesh->node[ee[2] - 1].z * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dz - mesh->node[ee[1] - 1].z * dx);
+        mesh->evol[i] += -mesh->node[ee[0] - 1].z * ((mesh->node[ee[2] - 1].x * mesh->node[ee[3] - 1].y - mesh->node[ee[2] - 1].y * mesh->node[ee[3] - 1].x) + mesh->node[ee[1] - 1].x * dy - mesh->node[ee[1] - 1].y * dx);
+        mesh->evol[i] = -mesh->evol[i];
 
-    if (mesh->dref) {
-        free(mesh->dref);
-        mesh->dref = NULL;
-    }
+        if (mesh->evol[i] < 0.f) {
+            int e1 = ee[3];
+            ee[3] = ee [2];
+            ee[2] = e1;
+            mesh->evol[i] = -mesh->evol[i];
+        }
 
-    if (mesh->type) {
-        free(mesh->type);
-        mesh->type = NULL;
-    }
+        mesh->evol[i] *= (1.f / 6.f);
 
-    if (mesh->med) {
-        free(mesh->med);
-        mesh->med = NULL;
-    }
+        if (mesh->type[i] == 0) {
+            continue;
+        }
 
-    if (mesh->atte) {
-        free(mesh->atte);
-        mesh->atte = NULL;
-    }
-
-    if (mesh->weight) {
-        free(mesh->weight);
-        mesh->weight = NULL;
-    }
-
-    if (mesh->evol) {
-        free(mesh->evol);
-        mesh->evol = NULL;
-    }
-
-    if (mesh->nvol) {
-        free(mesh->nvol);
-        mesh->nvol = NULL;
-    }
-
-    if (mesh->srcelem) {
-        free(mesh->srcelem);
-        mesh->srcelem = NULL;
-    }
-
-    if (mesh->detelem) {
-        free(mesh->detelem);
-        mesh->detelem = NULL;
-    }
-
-    if (mesh->noderoi) {
-        free(mesh->noderoi);
-        mesh->noderoi = NULL;
-    }
-
-    if (mesh->edgeroi) {
-        free(mesh->edgeroi);
-        mesh->edgeroi = NULL;
-    }
-
-    if (mesh->faceroi) {
-        free(mesh->faceroi);
-        mesh->faceroi = NULL;
+        for (j = 0; j < mesh->elemlen; j++) {
+            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
+        }
     }
     if (mesh->fnode) {
         free(mesh->fnode);
@@ -798,6 +962,96 @@ void mesh_clear(tetmesh* mesh) {
     }
 }
 
+/**
+ * @brief Scan all tetrahedral elements to find the one enclosing the source
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration structure
+ *
+ * @return 0 if an enclosing element is found, 1 if not found
+ */
+
+int mesh_initelem(tetmesh* mesh, mcconfig* cfg) {
+    FLOAT3* nodes = mesh->node;
+    int i, j;
+
+    for (i = 0; i < mesh->ne; i++) {
+        double pmin[3] = {VERY_BIG, VERY_BIG, VERY_BIG}, pmax[3] = {-VERY_BIG, -VERY_BIG, -VERY_BIG};
+        int* elems = (int*)(mesh->elem + i * mesh->elemlen); // convert int4* to int*
+
+        for (j = 0; j < mesh->elemlen; j++) {
+            pmin[0] = MIN(nodes[elems[j] - 1].x, pmin[0]);
+            pmin[1] = MIN(nodes[elems[j] - 1].y, pmin[1]);
+            pmin[2] = MIN(nodes[elems[j] - 1].z, pmin[2]);
+
+            pmax[0] = MAX(nodes[elems[j] - 1].x, pmax[0]);
+            pmax[1] = MAX(nodes[elems[j] - 1].y, pmax[1]);
+            pmax[2] = MAX(nodes[elems[j] - 1].z, pmax[2]);
+        }
+
+        if (cfg->srcpos.x <= pmax[0] && cfg->srcpos.x >= pmin[0] &&
+                cfg->srcpos.y <= pmax[1] && cfg->srcpos.y >= pmin[1] &&
+                cfg->srcpos.z <= pmax[2] && cfg->srcpos.z >= pmin[2]) {
+
+            if (mesh_barycentric(i + 1, &(cfg->bary0.x), (FLOAT3*) & (cfg->srcpos), mesh) == 0) {
+                cfg->e0 = i + 1;
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
+
+/**
+ * @brief Compute the barycentric coordinate of the source in the initial element
+ *
+ * @param[in] e0: the index (start from 1) of the initial element
+ * @param[in] bary: the index (start from 1) of the initial element
+ * @param[in] srcpos: the source position
+ * @param[in] mesh: the mesh of the domain
+ *
+ * @return 0 if all barycentric coordinates are computed and all positive, or 1 any of those is negative
+ */
+
+int mesh_barycentric(int e0, float* bary, FLOAT3* srcpos, tetmesh* mesh) {
+    int eid = e0 - 1, i;
+    FLOAT3 vecS = {0.f}, vecAB, vecAC, vecN;
+    FLOAT3* nodes = mesh->node;
+    int ea, eb, ec;
+    float s = 0.f;
+    int* elems = (int*)(mesh->elem + eid * mesh->elemlen); // convert int4* to int*
+
+    if (eid >= mesh->ne) {
+        MESH_ERROR("initial element index exceeds total element count");
+    }
+
+    for (i = 0; i < 4; i++) {
+        ea = elems[out[i][0]] - 1;
+        eb = elems[out[i][1]] - 1;
+        ec = elems[out[i][2]] - 1;
+        vec_diff3(&nodes[ea], &nodes[eb], &vecAB);
+        vec_diff3(&nodes[ea], &nodes[ec], &vecAC);
+        vec_diff3(&nodes[ea], srcpos, &vecS);
+        vec_cross3(&vecAB, &vecAC, &vecN);
+        bary[facemap[i]] = -vec_dot3(&vecS, &vecN);
+    }
+
+    for (i = 0; i < 4; i++) {
+        if (bary[i] < 0.f) {
+            return 1;
+        }
+
+        s += bary[i];
+    }
+
+    for (i = 0; i < 4; i++) {
+        bary[i] /= s;
+    }
+
+    return 0;
+}
 
 /**
  * @brief Initialize a data structure storing all pre-computed ray-tracing related data
@@ -821,6 +1075,7 @@ void tracer_init(raytracer* tracer, tetmesh* pmesh, char methodid) {
     tracer_build(tracer);
 }
 
+
 /**
  * @brief Preparing for the ray-tracing calculations
  *
@@ -832,7 +1087,7 @@ void tracer_init(raytracer* tracer, tetmesh* pmesh, char methodid) {
  */
 
 void tracer_prep(raytracer* tracer, mcconfig* cfg) {
-    int i, j, ne = tracer->mesh->ne;
+    int i, j, k, ne = tracer->mesh->ne;
 
     if (cfg->compute == cbOptiX) {
         tetmesh *pmesh = tracer->mesh;
@@ -866,11 +1121,11 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                     v0 = pmesh->fnode[pmesh->face[pmesh->nface].x];
                     v1 = pmesh->fnode[pmesh->face[pmesh->nface].y];
                     v2 = pmesh->fnode[pmesh->face[pmesh->nface].z];
-                    vec_diff((MMCfloat3*)&v0, (MMCfloat3*)&v1, (MMCfloat3*)&vec01);
-                    vec_diff((MMCfloat3*)&v0, (MMCfloat3*)&v2, (MMCfloat3*)&vec02);
-                    vec_cross((MMCfloat3*)&vec01, (MMCfloat3*)&vec02, (MMCfloat3*)&vnorm);
-                    float mag = 1.0f / sqrtf(vec_dot((MMCfloat3*)&vnorm, (MMCfloat3*)&vnorm));
-                    vec_mult((MMCfloat3*)&vnorm, mag, (MMCfloat3*)&vnorm);
+                    vec_diff((float3*)&v0, (float3*)&v1, (float3*)&vec01);
+                    vec_diff((float3*)&v0, (float3*)&v2, (float3*)&vec02);
+                    vec_cross((float3*)&vec01, (float3*)&vec02, (float3*)&vnorm);
+                    float mag = 1.0f / sqrtf(vec_dot((float3*)&vnorm, (float3*)&vnorm));
+                    vec_mult((float3*)&vnorm, mag, (float3*)&vnorm);
                     pmesh->fnorm[pmesh->nface] = vnorm;
                     // front and back media types
                     pmesh->front[pmesh->nface] = ((nexteid == 0) ? 0 : pmesh->type[nexteid - 1]);
@@ -902,42 +1157,128 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         } else {
             MESH_ERROR("tracer is not associated with a mesh");
         }
-    } else if ( (cfg->srctype == stPencil || cfg->srctype == stIsotropic || cfg->srctype == stCone || cfg->srctype == stArcSin)  && cfg->e0 > 0) {
-        int eid = cfg->e0 - 1;
-        MMCfloat3 vecS = {0.f}, *nodes = tracer->mesh->node, vecAB, vecAC, vecN;
-        int ea, eb, ec;
-        float s = 0.f, *bary = &(cfg->bary0.x);
-        int* elems = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen); // convert int4* to int*
-
-        if (eid >= tracer->mesh->ne) {
-            MESH_ERROR("initial element index exceeds total element count");
-        }
-
-        for (i = 0; i < 4; i++) {
-            ea = elems[out[i][0]] - 1;
-            eb = elems[out[i][1]] - 1;
-            ec = elems[out[i][2]] - 1;
-            vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-            vec_diff(&nodes[ea], &nodes[ec], &vecAC);
-            vec_diff(&nodes[ea], &(cfg->srcpos), &vecS);
-            vec_cross(&vecAB, &vecAC, &vecN);
-            bary[facemap[i]] = -vec_dot(&vecS, &vecN);
+    } else if ( (cfg->srctype == stPencil || cfg->srctype == stIsotropic || cfg->srctype == stCone || cfg->srctype == stArcSin) ) {
+        if (cfg->e0 <= 0 || mesh_barycentric(cfg->e0, &cfg->bary0.x, (FLOAT3*) & (cfg->srcpos), tracer->mesh)) {
+            if (mesh_initelem(tracer->mesh, cfg)) {
+                MESH_ERROR("initial element does not enclose the source!");
+            }
         }
 
         if (cfg->debuglevel & dlWeight)
             fprintf(cfg->flog, "initial bary-centric volumes [%e %e %e %e]\n",
-                    bary[0] / 6., bary[1] / 6., bary[2] / 6., bary[3] / 6.);
+                    cfg->bary0.x / 6., cfg->bary0.y / 6., cfg->bary0.z / 6., cfg->bary0.w / 6.);
+    }
 
-        for (i = 0; i < 4; i++) {
-            if (bary[i] < 0.f) {
-                MESH_ERROR("initial element does not enclose the source!");
+    // TODO: this is a partial fix to the normalization bug described in https://github.com/fangq/mmc/issues/82
+    // basically, mmc surface node fluence is about 2x higher than expected, due to the division to the nodal-volume
+    // of surface nodes that is roughtly half of that in an interior node.
+    // To more carefully handle this, one should calculate the solid-angle S of any surface nodes and use the
+    // ratio (4*Pi/S) to scale nvol. Here, we simply multiply surface node nvol by 2x. Should work fine for
+    // flat surfaces, but will not be accurate for edge or corner nodes.
+    // one can disable this fix (i.e. restore to the old behavior) by setting cfg.isnormalized to 2
+
+    if (cfg->isnormalized == 1 && cfg->method != rtBLBadouelGrid && cfg->basisorder) {
+        float* Reff = (float*)calloc(tracer->mesh->prop + 1, sizeof(float));
+
+        if (cfg->isreflect) {
+            for (i = 1; i <= tracer->mesh->prop; i++) { // precompute the Reff for each non-zero label
+                for (j = 1; j < i; j++) {
+                    if (tracer->mesh->med[j].n == tracer->mesh->med[i].n) { // if such reflective index has been computed, copy the value
+                        Reff[i] = Reff[j];
+                        break;
+                    }
+                }
+
+                if (Reff[i] == 0.f) {
+                    Reff[i] = mesh_getreff(tracer->mesh->med[i].n, tracer->mesh->med[0].n);
+                }
             }
-
-            s += bary[i];
         }
 
-        for (i = 0; i < 4; i++) {
-            bary[i] /= s;
+        for (i = 0; i < ne; i++) {
+            int* elems = tracer->mesh->elem + i * tracer->mesh->elemlen;   // element node indices
+            int* enb = tracer->mesh->facenb + i * tracer->mesh->elemlen;   // check facenb, find surface faces
+
+            for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
+                if (enb[j] == 0) {                        // 0-valued face neighbor indicates an exterior triangle
+                    for (k = 0; k < 3; k++) {
+                        int nid = elems[out[ifaceorder[j]][k]] - 1;
+
+                        if (tracer->mesh->nvol[nid] > 0.f && tracer->mesh->type[i] >= 0) {  // change sign to prevent it from changing again
+                            tracer->mesh->nvol[nid] *= -(2.f / (1.0 + Reff[tracer->mesh->type[i]])); // 2 accounts for the missing half of the solid angle, Reff is the effective reflection coeff
+                        }
+                    }
+                }
+            }
+        }
+
+        free(Reff);
+
+        for (i = 0; i < tracer->mesh->nn; i++) {
+            if (tracer->mesh->nvol[i] < 0.f) {
+                tracer->mesh->nvol[i] = -tracer->mesh->nvol[i];
+            }
+        }
+    }
+
+    // build acceleration data structure to speed up first-neighbor immc edge-roi calculation
+    // loop over each edgeroi, count how many roi in each elem, and write to the first elem as negative integer
+    if (tracer->mesh->edgeroi) {
+        for (i = 0; i < ne; i++) {
+            int count = 0;
+
+            for (j = 0; j < 6; j++)
+                if (tracer->mesh->edgeroi[(i * 6) + j] > 0.f) {
+                    count++;
+                }
+
+            if (count && fabs(tracer->mesh->edgeroi[i * 6]) < EPS) {
+                tracer->mesh->edgeroi[i * 6] = -count;    // number -1 to -6 indicates how many faces have ROIs
+            }
+        }
+
+        for (i = 0; i < ne; i++) {
+            if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
+                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
+                    int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
+                    float roilabel = tracer->mesh->edgeroi[(id - 1) * 6];
+
+                    if (id > 0 && fabs(roilabel) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
+                        if (roilabel < -6) {
+                            tracer->mesh->edgeroi[i * 6] = roilabel;
+                        } else {
+                            tracer->mesh->edgeroi[i * 6] = -id - 6;
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
+                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
+                    int firstnbid = tracer->mesh->facenb[i * tracer->mesh->elemlen + j] - 1; // loop over neighboring elements
+
+                    if (firstnbid < 0) {
+                        continue;
+                    }
+
+                    for (k = 0; k < tracer->mesh->elemlen; k++) { // loop over my j-th neighbor's neighbors
+                        int id = tracer->mesh->facenb[firstnbid * tracer->mesh->elemlen + k]; // loop over 2nd order neighboring elements
+                        float roilabel = tracer->mesh->edgeroi[(id - 1) * 6];
+
+                        if (id > 0 && fabs(roilabel) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
+                            if (roilabel < -6) {
+                                tracer->mesh->edgeroi[i * 6] = roilabel;
+                            } else {
+                                tracer->mesh->edgeroi[i * 6] = -id - 6;
+                            }
+
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -962,7 +1303,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                 for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
                     int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
 
-                    if (id > 0 && tracer->mesh->faceroi[(id - 1) << 2] < 0.f) { // if I don't have roi, but neighbor has, set ref id as -elemid-4, only handle 1 roi neighbor case
+                    if (id > 0 && fabs(tracer->mesh->faceroi[(id - 1) << 2]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-4, only handle 1 roi neighbor case
                         tracer->mesh->faceroi[i << 2] = -id - 4;
                         break;
                     }
@@ -1002,10 +1343,10 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
  */
 
 void tracer_build(raytracer* tracer) {
-    int ne, i, j;
+    unsigned int ne, i, j;
     const int pairs[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 
-    MMCfloat3* nodes;
+    FLOAT3* nodes;
     int* elems, ebase;
     int e1, e0;
     float Rn2;
@@ -1024,12 +1365,8 @@ void tracer_build(raytracer* tracer) {
     elems = (int*)(tracer->mesh->elem); // convert int4* to int*
 
     if (tracer->method == rtPlucker) {
-        int ea, eb, ec;
-        MMCfloat3 vecAB = {0.f}, vecAC = {0.f};
-
-        tracer->d = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 6); // 6 edges/elem
-        tracer->m = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 6); // 6 edges/elem
-        tracer->n = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 4); // 4 face norms
+        tracer->d = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
+        tracer->m = (float3*)calloc(sizeof(float3), ne * 6); // 6 edges/elem
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
@@ -1037,39 +1374,28 @@ void tracer_build(raytracer* tracer) {
             for (j = 0; j < 6; j++) {
                 e1 = elems[ebase + pairs[j][1]] - 1;
                 e0 = elems[ebase + pairs[j][0]] - 1;
-                vec_diff(&nodes[e0], &nodes[e1], tracer->d + i * 6 + j);
-                vec_cross(&nodes[e0], &nodes[e1], tracer->m + i * 6 + j);
-            }
-
-            for (j = 0; j < 4; j++) {
-                ea = elems[ebase + out[j][0]] - 1;
-                eb = elems[ebase + out[j][1]] - 1;
-                ec = elems[ebase + out[j][2]] - 1;
-                vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff(&nodes[ea], &nodes[ec], &vecAC);
-                vec_cross(&vecAB, &vecAC, tracer->n + ebase + j);
-                Rn2 = 1.f / sqrt(vec_dot(tracer->n + ebase + j, tracer->n + ebase + j));
-                vec_mult(tracer->n + ebase + j, Rn2, tracer->n + ebase + j);
+                vec_diff3(&nodes[e0], &nodes[e1], (FLOAT3*)(tracer->d + i * 6 + j));
+                vec_cross3(&nodes[e0], &nodes[e1], (FLOAT3*)(tracer->m + i * 6 + j));
             }
         }
     } else if (tracer->method == rtHavel || tracer->method == rtBadouel) {
         int ea, eb, ec;
-        MMCfloat3 vecAB = {0.f}, vecAC = {0.f};
+        float3 vecAB = {0.f}, vecAC = {0.f};
 
         tracer->d = NULL;
-        tracer->m = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 12);
+        tracer->m = (float3*)calloc(sizeof(float3), ne * 12);
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
 
             for (j = 0; j < 4; j++) {
-                MMCfloat3* vecN = tracer->m + 3 * (ebase + j);
+                float4* vecN = tracer->m + 3 * (ebase + j);
 
                 ea = elems[ebase + out[j][0]] - 1;
                 eb = elems[ebase + out[j][1]] - 1;
                 ec = elems[ebase + out[j][2]] - 1;
-                vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff(&nodes[ea], &nodes[ec], &vecAC);
+                vec_diff3(&nodes[ea], &nodes[eb], (FLOAT3*)&vecAB);
+                vec_diff3(&nodes[ea], &nodes[ec], (FLOAT3*)&vecAC);
                 vec_cross(&vecAB, &vecAC, vecN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
                 vec_cross(&vecAC, vecN, vecN + 1);
                 vec_cross(vecN, &vecAB, vecN + 2);
@@ -1082,18 +1408,21 @@ void tracer_build(raytracer* tracer) {
                 vec_mult(vecN + 1, Rn2, vecN + 1);
                 vec_mult(vecN + 2, Rn2, vecN + 2);
 #if defined(MMC_USE_SSE) || defined(USE_OPENCL)
-                vecN->w    = vec_dot(vecN,  &nodes[ea]);
-                (vecN + 1)->w = -vec_dot(vecN + 1, &nodes[ea]);
-                (vecN + 2)->w = -vec_dot(vecN + 2, &nodes[ea]);
+                vecN->w    = vec_dot3((FLOAT3*)vecN,  &nodes[ea]);
+                (vecN + 1)->w = -vec_dot3((FLOAT3*)(vecN + 1), &nodes[ea]);
+                (vecN + 2)->w = -vec_dot3((FLOAT3*)(vecN + 2), &nodes[ea]);
 #endif
             }
         }
     } else if (tracer->method == rtBLBadouel || tracer->method == rtBLBadouelGrid) {
-        int ea, eb, ec;
-        MMCfloat3 vecAB = {0.f}, vecAC = {0.f}, vN = {0.f};
-
         tracer->d = NULL;
-        tracer->n = (MMCfloat3*)calloc(sizeof(MMCfloat3), ne * 4);
+    }
+
+    if (tracer->method == rtPlucker || tracer->method == rtBLBadouel || tracer->method == rtBLBadouelGrid) {
+        int ea, eb, ec;
+        float3 vecAB = {0.f}, vecAC = {0.f}, vN = {0.f};
+
+        tracer->n = (float3*)calloc(sizeof(float3), ne * 4);
 
         for (i = 0; i < ne; i++) {
             ebase = i << 2;
@@ -1103,8 +1432,8 @@ void tracer_build(raytracer* tracer) {
                 ea = elems[ebase + out[j][0]] - 1;
                 eb = elems[ebase + out[j][1]] - 1;
                 ec = elems[ebase + out[j][2]] - 1;
-                vec_diff(&nodes[ea], &nodes[eb], &vecAB);
-                vec_diff(&nodes[ea], &nodes[ec], &vecAC);
+                vec_diff3(&nodes[ea], &nodes[eb], (FLOAT3*)&vecAB);
+                vec_diff3(&nodes[ea], &nodes[ec], (FLOAT3*)&vecAC);
 
                 vec_cross(&vecAB, &vecAC, &vN); /*N is defined as ACxAB in Jiri's code, but not the paper*/
 
@@ -1114,7 +1443,7 @@ void tracer_build(raytracer* tracer) {
                 vecN[j + 4] = vN.y;
                 vecN[j + 8] = vN.z;
 #if defined(MMC_USE_SSE) || defined(USE_OPENCL)
-                vecN[j + 12]    = vec_dot(&vN, &nodes[ea]);
+                vecN[j + 12]    = vec_dot3((FLOAT3*)&vN, &nodes[ea]);
 #endif
             }
         }
@@ -1161,11 +1490,11 @@ void tracer_clear(raytracer* tracer) {
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-float mc_next_scatter(float g, MMCfloat3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom) {
+float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom) {
 
     float nextslen;
     float sphi = 0.f, cphi = 0.f, tmp0, theta, stheta, ctheta, tmp1;
-    MMCfloat3 p;
+    float3 p;
 
     rand_need_more(ran, ran0);
 
@@ -1233,6 +1562,8 @@ float mc_next_scatter(float g, MMCfloat3* dir, RandType* ran, RandType* ran0, mc
     dir->z = p.z;
     return nextslen;
 }
+
+#ifndef MCX_CONTAINER
 
 /**
  * @brief Save the fluence output to a file
@@ -1311,27 +1642,26 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
 
 void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcconfig* cfg) {
     FILE* fp;
-    char fhistory[MAX_FULL_PATH];
+    char fhistory[MAX_FULL_PATH], filetag;
+
+    filetag = ((cfg->his.detected == 0  && cfg->his.savedphoton) ? 't' : 'h');
 
     if (cfg->rootpath[0]) {
-        sprintf(fhistory, "%s%c%s.mch", cfg->rootpath, pathsep, cfg->session);
+        sprintf(fhistory, "%s%c%s.mc%c", cfg->rootpath, pathsep, cfg->session, filetag);
     } else {
-        sprintf(fhistory, "%s.mch", cfg->session);
+        sprintf(fhistory, "%s.mc%c", cfg->session, filetag);
     }
 
     if ((fp = fopen(fhistory, "wb")) == NULL) {
         MESH_ERROR("can not open history file to write");
     }
 
-    cfg->his.totalphoton = cfg->nphoton;
     cfg->his.unitinmm = 1.f;
 
     if (cfg->method != rtBLBadouelGrid) {
         cfg->his.unitinmm = cfg->unitinmm;
     }
 
-    cfg->his.detected = count;
-    cfg->his.savedphoton = count;
     cfg->his.srcnum = cfg->srcnum;
     cfg->his.detnum = cfg->detnum;
 
@@ -1339,17 +1669,16 @@ void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcco
         cfg->his.seedbyte = seedbyte;
     }
 
-    cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /*column count=maxmedia+3*/
+    /*
+        if (count > 0 && cfg->exportdetected == NULL) {
+            cfg->detectedcount = count;
+            cfg->exportdetected = (float*)malloc(cfg->his.colcount * cfg->detectedcount * sizeof(float));
+        }
 
-    if (count > 0 && cfg->exportdetected == NULL) {
-        cfg->detectedcount = count;
-        cfg->exportdetected = (float*)malloc(cfg->his.colcount * cfg->detectedcount * sizeof(float));
-    }
-
-    if (cfg->exportdetected != ppath) {
-        memcpy(cfg->exportdetected, ppath, count * cfg->his.colcount * sizeof(float));
-    }
-
+        if (cfg->exportdetected != ppath) {
+            memcpy(cfg->exportdetected, ppath, count * cfg->his.colcount * sizeof(float));
+        }
+    */
     fwrite(&(cfg->his), sizeof(history), 1, fp);
     fwrite(ppath, sizeof(float), count * cfg->his.colcount, fp);
 
@@ -1360,6 +1689,7 @@ void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcco
     fclose(fp);
 }
 
+#endif
 
 /**
  * @brief Save binned detected photon data over an area-detector as time-resolved 2D images
@@ -1423,6 +1753,8 @@ void mesh_getdetimage(float* detmap, float* ppath, int count, mcconfig* cfg, tet
     }
 }
 
+#ifndef MCX_CONTAINER
+
 /**
  * @brief Save binned detected photon data over an area-detector
  *
@@ -1450,6 +1782,8 @@ void mesh_savedetimage(float* detmap, mcconfig* cfg) {
     fwrite(detmap, sizeof(float), cfg->detparam1.w * cfg->detparam2.w * cfg->maxgate, fp);
     fclose(fp);
 }
+
+#endif
 
 /**
  * @brief Recompute the detected photon weight from the partial-pathlengths
@@ -1589,4 +1923,135 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
         }
 
     return normalizor;
+}
+
+
+/**
+ * @brief Compute the effective reflection coefficient Reff using approximated formula
+ *
+ * accuracy is limited
+ * see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4482362/
+ *
+ * @param[out] tracer: the ray-tracer data structure
+ * @param[in] pmesh: the mesh object
+ * @param[in] methodid: the ray-tracing algorithm to be used
+ */
+
+double mesh_getreff_approx(double n_in, double n_out) {
+    double nn = n_in / n_out;
+    return -1.440 / (nn * nn) + 0.710 / nn + 0.668 + 0.0636 * nn;
+}
+
+/**
+ * @brief Compute the effective reflection coefficient Reff
+ *
+ * @param[in] n_in: refractive index of the diffusive medium
+ * @param[in] n_out: refractive index of the non-diffusive medium
+ */
+
+double mesh_getreff(double n_in, double n_out) {
+    double oc = asin(1.0 / n_in); // critical angle
+    const double count = 1000.0;
+    const double ostep = (M_PI / (2.0 * count));
+    double r_phi = 0.0, r_j = 0.0;
+    double o, cosop, coso, r_fres, tmp;
+    int i;
+
+    for (i = 0; i < count; i++) {
+        o = i * ostep;
+        coso = cos(o);
+
+        if (o < oc) {
+            cosop = n_in * sin(o);
+            cosop = sqrt(1. - cosop * cosop);
+            tmp = (n_in * cosop - n_out * coso) / (n_in * cosop + n_out * coso);
+            r_fres = 0.5 * tmp * tmp;
+            tmp = (n_in * coso - n_out * cosop) / (n_in * coso + n_out * cosop);
+            r_fres += 0.5 * tmp * tmp;
+        } else {
+            r_fres = 1.f;
+        }
+
+        r_phi += 2.0 * sin(o) * coso * r_fres;
+        r_j += 3.0 * sin(o) * coso * coso * r_fres;
+    }
+
+    r_phi *= ostep;
+    r_j *= ostep;
+    return (r_phi + r_j) / (2.0 - r_phi + r_j);
+}
+
+
+/**
+ * @brief Validate all input fields, and warn incompatible inputs
+ *
+ * Perform self-checking and raise exceptions or warnings when input error is detected
+ *
+ * @param[in,out] cfg: the simulation configuration structure
+ * @param[out] mesh: the mesh data structure
+ */
+
+void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
+    int i, j, *ee, datalen;
+
+    if (mesh->prop == 0) {
+        MMC_ERROR(999, "you must define the 'prop' field in the input structure");
+    }
+
+    if (mesh->nn == 0 || mesh->ne == 0 || mesh->evol == NULL || mesh->facenb == NULL) {
+        MMC_ERROR(999, "a complete input mesh include 'node','elem','facenb' and 'evol'");
+    }
+
+    if (mesh->node == NULL || mesh->elem == NULL || mesh->prop == 0) {
+        MMC_ERROR(999, "You must define 'mesh' and 'prop' fields.");
+    }
+
+    if (mesh->nvol) {
+        free(mesh->nvol);
+    }
+
+    mesh->nvol = (float*)calloc(sizeof(float), mesh->nn);
+
+    for (i = 0; i < mesh->ne; i++) {
+        if (mesh->type[i] <= 0) {
+            continue;
+        }
+
+        ee = (int*)(mesh->elem + i * mesh->elemlen);
+
+        for (j = 0; j < 4; j++) {
+            mesh->nvol[ee[j] - 1] += mesh->evol[i] * 0.25f;
+        }
+    }
+
+    if (mesh->weight) {
+        free(mesh->weight);
+    }
+
+    if (cfg->method == rtBLBadouelGrid) {
+        mesh_createdualmesh(mesh, cfg);
+        cfg->basisorder = 0;
+    }
+
+    datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+    mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
+
+    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
+        for (i = 1; i <= mesh->prop; i++) {
+            mesh->med[i].mus *= cfg->unitinmm;
+            mesh->med[i].mua *= cfg->unitinmm;
+        }
+    }
+
+    /*make medianum+1 the same as medium 0*/
+    if (cfg->isextdet) {
+        mesh->med = (medium*)realloc(mesh->med, sizeof(medium) * (mesh->prop + 2));
+        memcpy(mesh->med + mesh->prop + 1, mesh->med, sizeof(medium));
+
+        for (i = 0; i < mesh->ne; i++) {
+            if (mesh->type[i] == -2) {
+                mesh->type[i] = mesh->prop + 1;
+            }
+        }
+    }
 }

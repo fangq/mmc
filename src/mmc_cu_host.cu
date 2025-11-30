@@ -21,13 +21,18 @@
  **          GPL v3, see LICENSE.txt for details
  *******************************************************************************/
 
-/**
-  \file    mmc_host.c
-  \brief   << Driver program of MMC >>
-*/
+/***************************************************************************//**
+\file    mmc_cu_host.c
+
+\brief   CUDA host code for NVIDIA GPUs
+*******************************************************************************/
+
 
 #define inlinefun __device__
 
+#include "mmc_const.h"
+#include "mmc_cu_host.h"
+#include "mmc_tictoc.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,20 +40,168 @@
 #ifdef _OPENMP
     #include <omp.h>
 #endif
+#include "mmc_const.h"
 
-#include "mmc_const.h"
-#include "mmc_cu_host.h"
-#include "mmc_cuda_query_gpu.h"
-#include "mmc_tictoc.h"
-#include "mmc_const.h"
 #include "mmc_core.cu"
 
-/************************************************************************** In
-this unit, we first launch a master thread and initialize the necessary data
+/******************************************************************************
+In this unit, we first launch a master thread and initialize the necessary data
 structures.This include the command line options(cfg), tetrahedral mesh(mesh)
 and the ray tracer precomputed data (tracer).
 ******************************************************************************/
-void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu, void (*progressfun)(float, void*), void* handle) {
+#define CUDA_ASSERT(a)                                                         \
+    mcx_cu_assess((a), __FILE__, __LINE__) ///< macro to report CUDA error
+
+/**
+ * @brief Utility function to calculate the GPU stream processors (cores) per SM
+ *
+ * Obtain GPU core number per MP, this replaces
+ * ConvertSMVer2Cores() in libcudautils to avoid
+ * extra dependency.
+ *
+ * @param[in] v1: the major version of an NVIDIA GPU
+ * @param[in] v2: the minor version of an NVIDIA GPU
+ */
+
+int mcx_corecount(int v1, int v2) {
+    int v = v1 * 10 + v2;
+
+    if (v < 20) {
+        return 8;
+    } else if (v < 21) {
+        return 32;
+    } else if (v < 30) {
+        return 48;
+    } else if (v < 50) {
+        return 192;
+    } else if (v < 60 || v == 61 || v >= 89) {
+        return 128;
+    } else {
+        return 64;
+    }
+}
+
+int mcx_smxblock(int v1, int v2) {
+    int v = v1 * 10 + v2;
+
+    if (v < 30) {
+        return 8;
+    } else if (v < 50) {
+        return 16;
+    } else {
+        return 32;
+    }
+}
+
+/**
+  assert cuda memory allocation result
+ */
+void mcx_cu_assess(cudaError_t cuerr, const char* file, const int linenum) {
+    if (cuerr != cudaSuccess) {
+        mcx_error(-(int)cuerr, (char*)cudaGetErrorString(cuerr), file, linenum);
+    }
+}
+
+/*
+   master driver code to run MC simulations
+*/
+int mcx_list_cu_gpu(mcconfig* cfg, GPUInfo** info) {
+#if __DEVICE_EMULATION__
+    return 1;
+#else
+    int dev;
+    int deviceCount, activedev = 0;
+
+    CUDA_ASSERT(cudaGetDeviceCount(&deviceCount));
+
+    if (deviceCount == 0) {
+        MMC_FPRINTF(stderr,
+                    S_RED "ERROR: No CUDA-capable GPU device found\n" S_RESET);
+        return 0;
+    }
+
+    *info = (GPUInfo*)calloc(deviceCount, sizeof(GPUInfo));
+
+    if (cfg->gpuid && cfg->gpuid > (uint)deviceCount) {
+        MMC_FPRINTF(stderr,
+                    S_RED "ERROR: Specified GPU ID is out of range\n" S_RESET);
+        return 0;
+    }
+
+    // scan from the first device
+    for (dev = 0; dev < deviceCount; dev++) {
+        cudaDeviceProp dp;
+        CUDA_ASSERT(cudaGetDeviceProperties(&dp, dev));
+
+        if (cfg->isgpuinfo == 3) {
+            activedev++;
+        } else if (cfg->deviceid[dev] == '1') {
+            cfg->deviceid[dev] = '\0';
+            cfg->deviceid[activedev] = dev + 1;
+            activedev++;
+        }
+
+        strncpy((*info)[dev].name, dp.name, MAX_SESSION_LENGTH);
+        (*info)[dev].id = dev + 1;
+        (*info)[dev].devcount = deviceCount;
+        (*info)[dev].major = dp.major;
+        (*info)[dev].minor = dp.minor;
+        (*info)[dev].globalmem = dp.totalGlobalMem;
+        (*info)[dev].constmem = dp.totalConstMem;
+        (*info)[dev].sharedmem = dp.sharedMemPerBlock;
+        (*info)[dev].regcount = dp.regsPerBlock;
+        (*info)[dev].clock = dp.clockRate;
+        (*info)[dev].sm = dp.multiProcessorCount;
+        (*info)[dev].core =
+            dp.multiProcessorCount * mcx_corecount(dp.major, dp.minor);
+        (*info)[dev].maxmpthread = dp.maxThreadsPerMultiProcessor;
+        (*info)[dev].maxgate = cfg->maxgate;
+        (*info)[dev].autoblock =
+            (*info)[dev].maxmpthread / mcx_smxblock(dp.major, dp.minor);
+        (*info)[dev].autothread = (*info)[dev].autoblock *
+                                  mcx_smxblock(dp.major, dp.minor) *
+                                  (*info)[dev].sm;
+
+        if (strncmp(dp.name, "Device Emulation", 16)) {
+            if (cfg->isgpuinfo) {
+                MMC_FPRINTF(stdout,
+                            S_BLUE "=============================   GPU Infomation  ================================\n" S_RESET);
+                MMC_FPRINTF(stdout, "Device %d of %d:\t\t%s\n", (*info)[dev].id,
+                            (*info)[dev].devcount, (*info)[dev].name);
+                MMC_FPRINTF(stdout, "Compute Capability:\t%u.%u\n", (*info)[dev].major,
+                            (*info)[dev].minor);
+                MMC_FPRINTF(stdout,
+                            "Global Memory:\t\t%u B\nConstant Memory:\t%u B\n"
+                            "Shared Memory:\t\t%u B\nRegisters:\t\t%u\nClock "
+                            "Speed:\t\t%.2f GHz\n",
+                            (unsigned int)(*info)[dev].globalmem,
+                            (unsigned int)(*info)[dev].constmem,
+                            (unsigned int)(*info)[dev].sharedmem,
+                            (unsigned int)(*info)[dev].regcount,
+                            (*info)[dev].clock * 1e-6f);
+#if CUDART_VERSION >= 2000
+                MMC_FPRINTF(stdout, "Number of MPs:\t\t%u\nNumber of Cores:\t%u\n",
+                            (*info)[dev].sm, (*info)[dev].core);
+#endif
+                MMC_FPRINTF(stdout, "SMX count:\t\t%u\n", (*info)[dev].sm);
+            }
+        }
+    }
+
+    if (cfg->isgpuinfo == 2 &&
+            cfg->parentid == mpStandalone) { // list GPU info only
+        exit(0);
+    }
+
+    if (activedev < MAX_DEVICE) {
+        cfg->deviceid[activedev] = '\0';
+    }
+
+    return activedev;
+#endif
+}
+
+void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu) {
     uint i, j;
     float t, twindow0, twindow1;
     float fullload = 0.f;
@@ -56,7 +209,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     uint detected = 0;
     int gpuid, threadid = 0;
-    uint tic, tic0, tic1, toc = 0, fieldlen;
+    uint tic, tic0, tic1, toc = 0, fieldlen, debuglen = MCX_DEBUG_REC_LEN;
     int threadphoton, oddphotons;
     dim3 mcgrid, mcblock;
 
@@ -66,13 +219,12 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     int* gtype, *gsrcelem;
     uint* gseed, *gdetected;
     volatile int* progress, *gprogress;
-    float* gweight, *gdref, *gdetphoton, *genergy, *gsrcpattern;
+    float* gweight, *gdref, *gdetphoton, *genergy, *gsrcpattern, *gdebugdata;
     RandType* gphotonseed = NULL, *greplayseed = NULL;
     float*  greplayweight = NULL, *greplaytime = NULL;
 
     MCXReporter* greporter;
-    uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne)
-                   << cfg->nbuffer; // use 4 copies to reduce racing
+    uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;
     cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second buffer
 
     float* field, *dref = NULL;
@@ -84,61 +236,77 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop +
                      (cfg->issaveexit > 0) * 6 + 1;
     uint hostdetreclen = detreclen + 1;
+    // launch mcxkernel
+    size_t sharedmemsize = 0;
+    double energytot = 0.0, energyesc = 0.0;
 
-    MCXParam param = {make_float3(cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z),
-                      make_float3(cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z),
-                      cfg->tstart,
-                      cfg->tend,
-                      (uint)cfg->isreflect,
-                      (uint)cfg->issavedet,
-                      (uint)cfg->issaveexit,
-                      (uint)cfg->ismomentum,
-                      (uint)cfg->isatomic,
-                      (uint)cfg->isspecular,
-                      1.f / cfg->tstep,
-                      cfg->minenergy,
-                      cfg->maxdetphoton,
-                      (uint)mesh->prop,
-                      (uint)cfg->detnum,
-                      (int)cfg->voidtime,
-                      (int)cfg->srctype,
-                      cfg->srcparam1,
-                      cfg->srcparam2,
-                      (uint)cfg->issaveref,
-                      (uint)cfg->maxgate,
-                      (uint)cfg->debuglevel,
-                      (int)detreclen,
-                      cfg->outputtype,
-                      mesh->elemlen,
-                      cfg->mcmethod,
-                      cfg->method,
-                      1.f / cfg->unitinmm,
-                      cfg->srcdir.w,
-                      mesh->nn,
-                      mesh->ne,
-                      mesh->nf,
-                      make_float3(mesh->nmin.x, mesh->nmin.y, mesh->nmin.z),
-                      cfg->nout,
-                      cfg->roulettesize,
-                      cfg->srcnum,
-                      cfg->crop0,
-                      mesh->srcelemlen,
-                      cfg->bary0,
-                      cfg->e0,
-                      cfg->isextdet,
-                      (int)meshlen,
-                      cfg->nbuffer,
-                      (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
-                      (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
-                      cfg->issaveseed,
-                      cfg->seed
-                     };
+    MCXParam param = {
+        cfg->srcparam1,
+        cfg->srcparam2,
+        cfg->crop0,
+        cfg->bary0,
+        make_float3(cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z),
+        make_float3(cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z),
+        make_float3(mesh->nmin.x, mesh->nmin.y, mesh->nmin.z),
+        cfg->tstart,
+        cfg->tend,
+        (uint)cfg->isreflect,
+        (uint)cfg->issavedet,
+        (uint)cfg->issaveexit,
+        (uint)cfg->ismomentum,
+        (uint)cfg->isatomic,
+        (uint)cfg->isspecular,
+        1.f / cfg->tstep,
+        cfg->minenergy,
+        cfg->maxdetphoton,
+        (uint)mesh->prop,
+        (uint)cfg->detnum,
+        (int)cfg->voidtime,
+        (int)cfg->srctype,
+        (uint)cfg->issaveref,
+        (uint)cfg->maxgate,
+        (uint)cfg->debuglevel,
+        (int)detreclen,
+        cfg->outputtype,
+        mesh->elemlen,
+        cfg->mcmethod,
+        cfg->method,
+        1.f / cfg->steps.x,
+        cfg->srcdir.w,
+        mesh->nn,
+        mesh->ne,
+        mesh->nf,
+        cfg->nout,
+        cfg->roulettesize,
+        cfg->srcnum,
+        mesh->srcelemlen,
+        cfg->e0,
+        cfg->isextdet,
+        (uint)(meshlen / cfg->srcnum),
+        (uint)(mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+        (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
+        cfg->issaveseed,
+        cfg->seed,
+        cfg->maxjumpdebug
+    };
 
-    MCXReporter reporter = {0.f};
+    MCXReporter reporter = {0.f, 0};
 
-    if (progressfun == NULL) {
-        cfg->debuglevel = cfg->debuglevel & (~MCX_DEBUG_PROGRESS);
+    if (cfg->issavedet) {
+        sharedmemsize = sizeof(float) * detreclen;
     }
+
+    param.reclen = sharedmemsize / sizeof(float);  //< the shared memory buffer length associated with detected photon
+
+    sharedmemsize += sizeof(float) * (cfg->srcnum << 1);   /**< store energyesc/energytot */
+
+    if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+        sharedmemsize += sizeof(float) * cfg->srcnum;
+    }
+
+    gpuid = cfg->deviceid[threadid] - 1;
+
+    sharedmemsize *= ((int)gpu[gpuid].autoblock);
 
 #ifdef _OPENMP
     threadid = omp_get_thread_num();
@@ -147,8 +315,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     if (threadid < MAX_DEVICE && cfg->deviceid[threadid] == '\0') {
         return;
     }
-
-    gpuid = cfg->deviceid[threadid] - 1;
 
     if (gpuid < 0) {
         mcx_error(-1, "GPU ID must be non-zero", __FILE__, __LINE__);
@@ -170,8 +336,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             cfg->exportseed = (unsigned char*)malloc(cfg->maxdetphoton * (sizeof(RandType) * RAND_BUF_LEN));
         }
 
-        cfg->energytot = 0.f;
-        cfg->energyesc = 0.f;
+        cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
+        cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
         cfg->runtime = 0;
     }
     #pragma omp barrier
@@ -199,9 +365,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         gpu[gpuid].maxgate = cfg->maxgate;
     }
 
-    if (gpu[gpuid].autothread % gpu[gpuid].autoblock)
+    if (gpu[gpuid].autothread % gpu[gpuid].autoblock) {
         gpu[gpuid].autothread =
             (gpu[gpuid].autothread / gpu[gpuid].autoblock) * gpu[gpuid].autoblock;
+    }
 
     param.maxgate = gpu[gpuid].maxgate;
 
@@ -223,13 +390,13 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     #pragma omp barrier
     fullload = 0.f;
 
-    for (i = 0; cfg->deviceid[i]; i++)
+    for (i = 0; cfg->deviceid[i]; i++) {
         if (cfg->workload[i] > 0.f) {
             fullload += cfg->workload[i];
         } else {
             mcx_error(-1, "workload was unspecified for an active device", __FILE__, __LINE__);
         }
-
+    }
 
     threadphoton = (int)(cfg->nphoton * cfg->workload[gpuid] /
                          (fullload * gpu[gpuid].autothread * cfg->respin));
@@ -309,7 +476,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     *progress = 0;
 
     Pseed = (uint*)malloc(sizeof(uint) * gpu[gpuid].autothread * RAND_SEED_WORD_LEN);
-    energy = (float*)calloc(sizeof(float), gpu[gpuid].autothread << 1);
+    energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
 
     for (j = 0; j < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; j++) {
         Pseed[j] = rand();
@@ -336,9 +503,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&genergy,
-                           sizeof(float) * (gpu[gpuid].autothread << 1)));
+                           sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum));
     CUDA_ASSERT(cudaMemcpy(genergy, energy,
-                           sizeof(float) * (gpu[gpuid].autothread << 1),
+                           sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&gdetected, sizeof(uint)));
@@ -350,17 +517,17 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     if (cfg->srctype == MCX_SRC_PATTERN) {
         CUDA_ASSERT(cudaMalloc((void**)&gsrcpattern,
-                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w)));
+                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w * cfg->srcnum)));
         CUDA_ASSERT(cudaMemcpy(gsrcpattern, cfg->srcpattern,
-                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w),
+                               sizeof(float) * (int)(cfg->srcparam1.w * cfg->srcparam2.w * cfg->srcnum),
                                cudaMemcpyHostToDevice));
     } else if (cfg->srctype == MCX_SRC_PATTERN3D) {
         CUDA_ASSERT(cudaMalloc((void**)&gsrcpattern,
                                sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y*
-                                       cfg->srcparam1.z)));
+                                       cfg->srcparam1.z * cfg->srcnum)));
         CUDA_ASSERT(cudaMemcpy(gsrcpattern, cfg->srcpattern,
                                sizeof(float) * (int)(cfg->srcparam1.x * cfg->srcparam1.y*
-                                       cfg->srcparam1.z),
+                                       cfg->srcparam1.z * cfg->srcnum),
                                cudaMemcpyHostToDevice));
     } else {
         gsrcpattern = NULL;
@@ -369,6 +536,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     if (cfg->issaveseed) {
         Pphotonseed = (RandType*)calloc(cfg->maxdetphoton, (sizeof(RandType) * RAND_BUF_LEN));
         CUDA_ASSERT(cudaMalloc((void**)&gphotonseed, cfg->maxdetphoton * (sizeof(RandType)*RAND_BUF_LEN)));
+    }
+
+    if (cfg->debuglevel & dlTraj) {
+        CUDA_ASSERT(cudaMalloc((void**) &gdebugdata, sizeof(float) * (debuglen * cfg->maxjumpdebug)));
     }
 
     if (cfg->seed == SEED_FROM_FILE) {
@@ -392,16 +563,16 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
 #ifdef MCX_TARGET_NAME
         MMC_FPRINTF(
-            cfg->flog, "- variant name: [%s] compiled by nvcc [%d.%d] with CUDA [%d]\n",
-            "Fermi", __CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__, CUDART_VERSION);
+            cfg->flog, "- code name: [%s] compiled by nvcc [%d.%d] with CUDA [%d]\n",
+            "MMC-Trinity", __CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__, CUDART_VERSION);
 #else
         MMC_FPRINTF(
-            cfg->flog, "- code name: [Vanilla MCX] compiled by nvcc [%d.%d] with CUDA [%d]\n",
+            cfg->flog, "- code name: [MMC-Trinity] compiled by nvcc [%d.%d] with CUDA [%d]\n",
             __CUDACC_VER_MAJOR__, __CUDACC_VER_MINOR__, CUDART_VERSION);
 #endif
         MMC_FPRINTF(cfg->flog, "- compiled with: [RNG] %s [Seed Length] %d\n",
                     MCX_RNG_NAME, RAND_SEED_WORD_LEN);
-        fflush(cfg->flog);
+        mcx_fflush(cfg->flog);
     }
     #pragma omp barrier
 
@@ -424,50 +595,46 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         MMC_FPRINTF(cfg->flog,
                     "lauching mcx_main_loop for time window [%.1fns %.1fns] ...\n",
                     twindow0 * 1e9, twindow1 * 1e9);
-        fflush(cfg->flog);
+
+        MMC_FPRINTF(cfg->flog, "requesting %ld bytes of shared memory\n", sharedmemsize);
+
+        mcx_fflush(cfg->flog);
 
         // total number of repetition for the simulations, results will be
         // accumulated to field
         for (int iter = 0; iter < cfg->respin; iter++) {
             MMC_FPRINTF(cfg->flog, "simulation run#%2d ... \n", iter + 1);
-            fflush(cfg->flog);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
             param.tstart = twindow0;
             param.tend = twindow1;
 
-            // launch mcxkernel
-            size_t sharedMemSize = sizeof(int);
 
-            if (cfg->issavedet) {
-                sharedMemSize = sizeof(float) * ((int)gpu[gpuid].autoblock) * detreclen;
-            }
-
-            mmc_main_loop <<< mcgrid, mcblock, sharedMemSize>>>(
+            mmc_main_loop <<< mcgrid, mcblock, sharedmemsize>>>(
                 threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
                 gtype, (int*)gfacenb, gsrcelem, gnormal,
                 gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
-                gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed);
+                gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata);
 
             #pragma omp master
             {
                 if ((cfg->debuglevel & MCX_DEBUG_PROGRESS)) {
                     int p0 = 0, ndone = -1;
 
-                    progressfun(-0.f, handle);
+                    mcx_progressbar(-0.f);
 
                     do {
                         ndone = *progress;
 
                         if (ndone > p0) {
-                            progressfun((float)ndone / gpu[0].autothread,
-                                        handle);
+                            mcx_progressbar((float)ndone / gpu[0].autothread);
                             p0 = ndone;
                         }
 
                         sleep_ms(100);
                     } while (p0 < (int)gpu[0].autothread);
 
-                    progressfun(1.f, handle);
+                    mcx_progressbar(1.f);
                     MMC_FPRINTF(cfg->flog, "\n");
                 }
             }
@@ -477,7 +644,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             MMC_FPRINTF(cfg->flog,
                         "kernel complete:  \t%d ms\nretrieving flux ... \t",
                         tic1 - tic);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
             #pragma omp critical
 
             if (cfg->runtime < tic1 - tic) {
@@ -488,6 +655,52 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             CUDA_ASSERT(cudaMemcpy(&rep, greporter, sizeof(MCXReporter),
                                    cudaMemcpyDeviceToHost));
             reporter.raytet += rep.raytet;
+            reporter.jumpdebug += rep.jumpdebug;
+
+            energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
+
+            CUDA_ASSERT(cudaMemcpy(energy, genergy,
+                                   sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
+                                   cudaMemcpyDeviceToHost));
+            #pragma omp critical
+            {
+
+                for (i = 0; i < gpu[gpuid].autothread; i++) {
+                    for (j = 0; j < (uint) cfg->srcnum; j++) {
+                        cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
+                        cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
+                        energyesc += energy[(i << 1) * cfg->srcnum + j];
+                        energytot += energy[((i << 1) + 1) * cfg->srcnum + j];
+                    }
+                }
+            }
+
+            free(energy);
+
+            /**
+             * If '-D M' is specified, we retrieve photon trajectory data and store those to \c cfg.exportdebugdata and \c cfg.debugdatalen
+             */
+            if (cfg->debuglevel & dlTraj) {
+                uint debugrec = reporter.jumpdebug;
+
+                #pragma omp critical
+                {
+                    if (debugrec > 0) {
+                        if (debugrec > cfg->maxjumpdebug) {
+                            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
+are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
+                                        , debugrec, cfg->maxjumpdebug);
+                        } else {
+                            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", debugrec, cfg->debugdatalen + debugrec);
+                        }
+
+                        debugrec = min(debugrec, cfg->maxjumpdebug);
+                        cfg->exportdebugdata = (float*)realloc(cfg->exportdebugdata, (cfg->debugdatalen + debugrec) * debuglen * sizeof(float));
+                        CUDA_ASSERT(cudaMemcpy(cfg->exportdebugdata + cfg->debugdatalen, gdebugdata, sizeof(float)*debuglen * debugrec, cudaMemcpyDeviceToHost));
+                        cfg->debugdatalen += debugrec;
+                    }
+                }
+            }
 
             if (cfg->issavedet) {
                 CUDA_ASSERT(cudaMemcpy(&detected, gdetected, sizeof(uint), cudaMemcpyDeviceToHost));
@@ -553,29 +766,13 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                                        cudaMemcpyDeviceToHost));
                 MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n",
                             GetTimeMillis() - tic);
-                fflush(cfg->flog);
+                mcx_fflush(cfg->flog);
 
                 for (i = 0; i < fieldlen; i++) { // accumulate field, can be done in the GPU
-                    field[(i >> cfg->nbuffer)] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
+                    field[i] += rawfield[i] + rawfield[i + fieldlen];    //+rawfield[i+fieldlen];
                 }
 
                 free(rawfield);
-
-                energy = (float*)calloc(sizeof(float), gpu[gpuid].autothread << 1);
-
-                CUDA_ASSERT(cudaMemcpy(energy, genergy,
-                                       sizeof(float) * (gpu[gpuid].autothread << 1),
-                                       cudaMemcpyDeviceToHost));
-                #pragma omp critical
-                {
-                    for (i = 0; i < gpu[gpuid].autothread; i++) {
-                        cfg->energyesc += energy[(i << 1)];
-                        cfg->energytot += energy[(i << 1) + 1];
-                        // eabsorp+=Plen[i].z;  // the accumulative absorpted energy near
-                        // the source
-                    }
-                }
-                free(energy);
             }
 
             if (cfg->respin > 1 && RAND_SEED_WORD_LEN > 1) {
@@ -599,9 +796,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     #pragma omp master
     {
-        int i, j;
-        fieldlen = (fieldlen >> cfg->nbuffer);
-        field = (float*)realloc(field, sizeof(field[0]) * fieldlen);
+        int i, j, srcid;
 
         if (cfg->exportfield) {
             if (cfg->basisorder == 0 || cfg->method == rtBLBadouelGrid) {
@@ -609,14 +804,18 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                     #pragma omp atomic
                     cfg->exportfield[i] += field[i];
             } else {
-                for (i = 0; i < cfg->maxgate; i++)
+                for (i = 0; i < cfg->maxgate; i++) {
                     for (j = 0; j < mesh->ne; j++) {
-                        float ww = field[i * mesh->ne + j] * 0.25f;
+                        for (srcid = 0; srcid < cfg->srcnum; srcid++) {
+                            float ww = field[(i * mesh->ne + j) * cfg->srcnum + srcid] * 0.25f;
+                            int k;
 
-                        for (int k = 0; k < mesh->elemlen; k++)
-                            cfg->exportfield[i * mesh->nn +
-                                               mesh->elem[j * mesh->elemlen + k] - 1] += ww;
+                            for (k = 0; k < mesh->elemlen; k++) {
+                                cfg->exportfield[(i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1) * cfg->srcnum + srcid] += ww;
+                            }
+                        }
                     }
+                }
             }
         }
 
@@ -627,34 +826,59 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         }
 
         if (cfg->isnormalized) {
-            MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-            fflush(cfg->flog);
+            double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
-            cfg->energyabs = cfg->energytot - cfg->energyesc;
-            mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
+            for (j = 0; j < cfg->srcnum; j++) {
+                energyabs =  cfg->energytot[j] - cfg->energyesc[j];
+                cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
+                sum_normalizer += cur_normalizer;
+                MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
+                                       j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
+            }
+
+            cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
         }
+
+#ifndef MCX_CONTAINER
 
         if (cfg->issave2pt && cfg->parentid == mpStandalone) {
             MMC_FPRINTF(cfg->flog, "saving data to file ...\t");
             mesh_saveweight(mesh, cfg, 0);
             MMC_FPRINTF(cfg->flog, "saving data complete : %d ms\n\n",
                         GetTimeMillis() - tic);
-            fflush(cfg->flog);
+            mcx_fflush(cfg->flog);
         }
 
         if (cfg->issavedet && cfg->parentid == mpStandalone &&
                 cfg->exportdetected) {
+            cfg->his.totalphoton = cfg->nphoton;
             cfg->his.unitinmm = cfg->unitinmm;
             cfg->his.savedphoton = cfg->detectedcount;
             cfg->his.detected = cfg->detectedcount;
+            cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /*column count=maxmedia+3*/
             mesh_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount,
                                (sizeof(uint64_t) * RAND_BUF_LEN), cfg);
+        }
+
+        /**
+         * If not running as a mex file, we need to save photon trajectory data, if enabled, as
+         * a file, either as a .mct file, or a .jdat/.jbat file
+         */
+
+        if ((cfg->debuglevel & dlTraj) && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+            cfg->his.colcount = MCX_DEBUG_REC_LEN;
+            cfg->his.savedphoton = cfg->debugdatalen;
+            cfg->his.totalphoton = cfg->nphoton;
+            cfg->his.detected = 0;
+            mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
         }
 
         if (cfg->issaveref) {
             MMC_FPRINTF(cfg->flog, "saving surface diffuse reflectance ...");
             mesh_saveweight(mesh, cfg, 1);
         }
+
+#endif
 
         // total energy here equals total simulated photons+unfinished photons for
         // all threads
@@ -666,9 +890,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         MMC_FPRINTF(cfg->flog,
                     "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to "
                     "initial specular reflection is excluded in the total)\n",
-                    cfg->energytot,
-                    (cfg->energytot - cfg->energyesc) / cfg->energytot * 100.f);
-        fflush(cfg->flog);
+                    energytot,
+                    (energytot - energyesc) / energytot * 100.f);
+        mcx_fflush(cfg->flog);
     }
     #pragma omp barrier
     CUDA_ASSERT(cudaFree(gnode));
@@ -704,12 +928,22 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         CUDA_ASSERT(cudaFree(gphotonseed));
     }
 
+    if (cfg->debuglevel & dlTraj) {
+        CUDA_ASSERT(cudaFree(gdebugdata));
+    }
+
     CUDA_ASSERT(cudaFree(greporter));
 
     #pragma omp master
+    {
+        if (gpu) {
+            free(gpu);
+        }
 
-    if (gpu) {
-        free(gpu);
+        free(cfg->energytot);
+        free(cfg->energyesc);
+        cfg->energytot = NULL;
+        cfg->energyesc = NULL;
     }
 
     free(field);
@@ -725,9 +959,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     free(dref);
 }
 
-void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
+void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     GPUInfo* gpuinfo = NULL;      /** gpuinfo: structure to store GPU information */
     unsigned int activedev = 0;   /** activedev: count of total active GPUs to be used */
+
     if (!(activedev = mcx_list_cu_gpu(cfg, &gpuinfo))) {
         mcx_error(-1, "No GPU device found\n", __FILE__, __LINE__);
     }
@@ -744,7 +979,7 @@ void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progress
         /**
             This line runs the main MCX simulation for each GPU inside each thread
          */
-        mmc_run_simulation(cfg, mesh, tracer, gpuinfo, progressfun, handle);
+        mmc_run_simulation(cfg, mesh, tracer, gpuinfo);
 
 #ifdef _OPENMP
     }

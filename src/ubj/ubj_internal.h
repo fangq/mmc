@@ -10,7 +10,7 @@
 #endif
 
 
-static const uint8_t UBJI_TYPEC_convert[UBJ_NUM_TYPES] = "\x00ZNTFCSHiUIlLdD[{";
+static const uint8_t UBJI_TYPEC_convert[UBJ_NUM_TYPES] = "\x00ZNTFCSHiUIulmLMhdD[{";
 
 static const int UBJI_TYPE_size[UBJ_NUM_TYPES] =
 	{ -1,	 //MIXED
@@ -24,8 +24,12 @@ static const int UBJI_TYPE_size[UBJ_NUM_TYPES] =
 	1,					//INT8
 	1,					//UINT8
 	2,					//int16
+	2,					//uint16
 	4,					//int32
+	4,					//uint32
 	8,					//int64
+	8,					//uint64
+	2,					//float16
 	4,					//float32
 	8,					//float64
 	-1,					//array
@@ -45,8 +49,12 @@ static const size_t UBJR_TYPE_localsize[UBJ_NUM_TYPES] =
 	sizeof(int8_t),					//INT8
 	sizeof(uint8_t),					//UINT8
 	sizeof(int16_t),					//int16
+	sizeof(uint16_t),					//int16
 	sizeof(int32_t),					//int32
+	sizeof(uint32_t),					//int32
 	sizeof(int64_t),					//int64
+	sizeof(uint64_t),					//int64
+	sizeof(short),					//float16
 	sizeof(float),					//float32
 	sizeof(double),					//float64
 	sizeof(ubjr_array_t),					//array
@@ -85,9 +93,9 @@ static inline uint8_t _is_bigendian()
 		}										\
 	}											\
 
-static inline void buf_endian_swap(uint8_t* buf, size_t sz, size_t n)
+static inline void buf_endian_swap(uint8_t* buf, size_t sz, size_t n, int isbjdata)
 {
-	if (!_is_bigendian())
+	if (isbjdata == _is_bigendian())
 	{
 		switch (sz)
 		{
@@ -112,7 +120,7 @@ static inline ubjr_dynamic_t priv_ubjr_pointer_to_dynamic(UBJ_TYPE typ, const vo
 {
 	ubjr_dynamic_t outdyn;
 	outdyn.type = typ;
-	switch ((int)typ)
+	switch (typ)
 	{
 	case UBJ_NULLTYPE:
 	case UBJ_NOOP:
@@ -135,11 +143,23 @@ static inline ubjr_dynamic_t priv_ubjr_pointer_to_dynamic(UBJ_TYPE typ, const vo
 	case UBJ_INT16:
 		outdyn.integer = *(const int16_t*)dat;
 		break;
+	case UBJ_UINT16:
+		outdyn.integer = *(const uint16_t*)dat;
+		break;
 	case UBJ_INT32:
 		outdyn.integer = *(const int32_t*)dat;
 		break;
+	case UBJ_UINT32:
+		outdyn.integer = *(const uint32_t*)dat;
+		break;
 	case UBJ_INT64:
 		outdyn.integer = *(const int64_t*)dat;
+		break;
+	case UBJ_UINT64:
+		outdyn.integer = *(const uint64_t*)dat;
+		break;
+	case UBJ_FLOAT16:
+		outdyn.half = *(const uint16_t*)dat;
 		break;
 	case UBJ_FLOAT32:
 		outdyn.real = *(const float*)dat;
@@ -155,6 +175,8 @@ static inline ubjr_dynamic_t priv_ubjr_pointer_to_dynamic(UBJ_TYPE typ, const vo
 		break;
 	case UBJ_MIXED:
 		outdyn = *(const ubjr_dynamic_t*)dat;
+        default:
+                {}
 	};
 	return outdyn;
 }

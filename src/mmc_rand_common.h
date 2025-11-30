@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,13 +30,17 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    rng_common.h
+\file    mmc_rand_common.h
 
 \brief   random number generator (RNG) independent interface functions
 *******************************************************************************/
 
 #ifndef _MMC_RNG_COMMON_H
 #define _MMC_RNG_COMMON_H
+
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
 
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f

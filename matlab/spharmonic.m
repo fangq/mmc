@@ -1,4 +1,4 @@
-function Y=spharmonic(l,m,theta,phi)
+function Y = spharmonic(l, m, theta, phi)
 %
 % Y=spharmonic(l,m,theta,phi)
 %
@@ -19,20 +19,20 @@ function Y=spharmonic(l,m,theta,phi)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-coeff=1;
-oldm=m;
-if(m<0)
-    coeff=(-1)^m*prod(1:(l-m))/prod(1:(l+m));
-    m=-m;
+coeff = 1;
+oldm = m;
+if (m < 0)
+    coeff = (-1)^m * prod(1:(l - m)) / prod(1:(l + m));
+    m = -m;
 end
-Lmn=legendre(l,cos((theta(:))'));
-if l~=0
-  Lmn=squeeze(Lmn(m+1,:))';
+Lmn = legendre(l, cos((theta(:))'));
+if l ~= 0
+    Lmn = squeeze(Lmn(m + 1, :))';
 end
-Lmn=reshape(Lmn,size(theta));
-m=oldm;
-Y=coeff*sqrt((2*l+1)*prod(1:(l-m))/(prod(1:(l+m))*4*pi)) ...
-  *Lmn.*exp(i*m*phi);
+Lmn = reshape(Lmn, size(theta));
+m = oldm;
+Y = coeff * sqrt((2 * l + 1) * prod(1:(l - m)) / (prod(1:(l + m)) * 4 * pi)) * ...
+   Lmn .* exp(i * m * phi);

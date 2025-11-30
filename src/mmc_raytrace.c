@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,7 +30,7 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    tettracing.c
+\file    mmc_raytrace.c
 
 \brief   Core unit for mash-based photon transport using ray tracing algorithms
 *******************************************************************************/
@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mmc_raytrace.h"
+#include "mmc_const.h"
 
 /**<  Macro to enable SSE4 based ray-tracers */
 
@@ -87,7 +88,7 @@ const int nc[4][3] = {{3, 0, 1}, {3, 1, 2}, {2, 0, 3}, {1, 0, 2}};
  * the normal vec of each face pointing outwards.
  */
 
-extern const int out[4][3];     /**< defined in simpmesh.c, node orders for each face, in counter-clock-wise orders*/
+extern const int out[4][3];     /**< defined in mmc_mesh.c, node orders for each face, in counter-clock-wise orders*/
 
 /**
  * \brief The local index of the node with an opposite face to the i-th face defined in nc[][]
@@ -150,7 +151,7 @@ const char maskmap[16] = {4, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3};
  * \param[out] pout: output 3D position
  */
 
-inline void interppos(MMCfloat3* w, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3, MMCfloat3* pout) {
+inline void interppos(float3* w, float3* p1, float3* p2, float3* p3, float3* pout) {
     pout->x = w->x * p1->x + w->y * p2->x + w->z * p3->x;
     pout->y = w->x * p1->y + w->y * p2->y + w->z * p3->y;
     pout->z = w->x * p1->z + w->y * p2->z + w->z * p3->z;
@@ -169,7 +170,7 @@ inline void interppos(MMCfloat3* w, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3,
  * \param[out] pout: output 3D position
  */
 
-inline void getinterp(float w1, float w2, float w3, MMCfloat3* p1, MMCfloat3* p2, MMCfloat3* p3, MMCfloat3* pout) {
+inline void getinterp(float w1, float w2, float w3, FLOAT3* p1, FLOAT3* p2, FLOAT3* p3, FLOAT3* pout) {
     pout->x = w1 * p1->x + w2 * p2->x + w3 * p3->x;
     pout->y = w1 * p1->y + w2 * p2->y + w3 * p3->y;
     pout->z = w1 * p1->z + w2 * p2->z + w3 * p3->z;
@@ -186,13 +187,13 @@ inline void getinterp(float w1, float w2, float w3, MMCfloat3* p1, MMCfloat3* p2
  * \param[in] ee: indices of the 4 nodes ee=elem[eid]
  */
 
-void fixphoton(MMCfloat3* p, MMCfloat3* nodes, int* ee) {
-    MMCfloat3 c0 = {0.f, 0.f, 0.f};
+void fixphoton(FLOAT3* p, FLOAT3* nodes, int* ee) {
+    FLOAT3 c0 = {0.f, 0.f, 0.f};
     int i;
 
     /*calculate element centroid*/
     for (i = 0; i < 4; i++) {
-        vec_add(&c0, nodes + ee[i] - 1, &c0);
+        vec_add3(&c0, nodes + ee[i] - 1, &c0);
     }
 
     p->x += (c0.x * 0.25f - p->x) * FIX_PHOTON;
@@ -214,7 +215,7 @@ void fixphoton(MMCfloat3* p, MMCfloat3* nodes, int* ee) {
 
 float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    MMCfloat3 pcrx = {0.f}, p1 = {0.f};
+    float3 pcrx = {0.f}, p1 = {0.f};
     medium* prop;
     int* ee;
     int i, tshift, eid, faceidx = -1;
@@ -234,7 +235,13 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
     vec_add(&(r->p0), &(r->vec), &p1);
     vec_cross(&(r->p0), &p1, &pcrx);
     ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
-    prop = tracer->mesh->med + (tracer->mesh->type[eid]);
+
+    if (cfg->implicit && r->inroi) {
+        prop = tracer->mesh->med + tracer->mesh->prop;
+    } else {
+        prop = tracer->mesh->med + (tracer->mesh->type[eid]);
+    }
+
     rc = prop->n * R_C0;
     currweight = r->weight;
     mus = (cfg->mcmethod == mmMCX) ? prop->mus : (prop->mua + prop->mus);
@@ -298,7 +305,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             //if(cfg->debuglevel&dlTracingExit) MMC_FPRINTF(cfg->flog,"exit point %f %f %f\n",r->pout.x,r->pout.y,r->pout.z);
 
-            Lp0 = dist(&(r->p0), &(r->pout));
+            Lp0 = dist_3((FLOAT3*) & (r->p0), &(r->pout));
             dlen = (mus <= EPS) ? R_MIN_MUS : r->slen / mus;
             faceidx = i;
             r->faceid = faceorder[i];
@@ -322,6 +329,11 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->Lmove = ((r->isend) ? dlen : Lp0);
             break;
         }
+    }
+
+    // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
+    if (cfg->implicit) {
+        traceroi(r, tracer, cfg->implicit, 0);
     }
 
     visit->raytet++;
@@ -381,24 +393,15 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             }
 
             if (cfg->mcmethod == mmMCX) {
-                if (cfg->srctype != stPattern) {
-                    if (cfg->isatomic)
-                        #pragma omp atomic
-                        tracer->mesh->weight[eid + tshift] += ww;
-                    else {
-                        tracer->mesh->weight[eid + tshift] += ww;
-                    }
-                } else {
-                    int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
+                if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                    #pragma omp atomic
+                    tracer->mesh->weight[eid + tshift] += ww;
+                } else if (cfg->srctype == stPattern) { // must be pattern and srcnum more than 1
                     int pidx; // pattern index
 
                     for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                        if (cfg->isatomic)
-                            #pragma omp atomic
-                            tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
-                        else {
-                            tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
-                        }
+                        #pragma omp atomic
+                        tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                     }
                 }
             }
@@ -424,39 +427,33 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                         tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->nn;
                     }
 
-                    if (cfg->debuglevel & dlAccum) MMC_FPRINTF(cfg->flog, "A %f %f %f %e %d %e\n",
-                                r->p0.x - (r->Lmove * 0.5f)*r->vec.x, r->p0.y - (r->Lmove * 0.5f)*r->vec.y, r->p0.z - (r->Lmove * 0.5f)*r->vec.z, ww, eid + 1, dlen);
+                    if (cfg->debuglevel & dlAccum) {
+                        MMC_FPRINTF(cfg->flog, "A %f %f %f %e %d %e\n",
+                                    r->p0.x - (r->Lmove * 0.5f)*r->vec.x, r->p0.y - (r->Lmove * 0.5f)*r->vec.y, r->p0.z - (r->Lmove * 0.5f)*r->vec.z, ww, eid + 1, dlen);
+                    }
 
                     ww *= 0.5f;
 
-                    if (r->isend)
+                    if (r->isend) {
                         for (i = 0; i < 4; i++) {
                             baryout[i] = (1.f - ratio) * baryp0[i] + ratio * baryout[i];
                         }
+                    }
 
                     if (cfg->mcmethod == mmMCX) {
-                        if (cfg->srctype != stPattern) {
-                            if (cfg->isatomic)
-                                for (i = 0; i < 4; i++)
-                                    #pragma omp atomic
-                                    tracer->mesh->weight[ee[i] - 1 + tshift] += ww * (baryp0[i] + baryout[i]);
-                            else
-                                for (i = 0; i < 4; i++) {
-                                    tracer->mesh->weight[ee[i] - 1 + tshift] += ww * (baryp0[i] + baryout[i]);
-                                }
-                        } else {
-                            int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
+                        if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                            for (i = 0; i < 4; i++) {
+                                #pragma omp atomic
+                                tracer->mesh->weight[ee[i] - 1 + tshift] += ww * (baryp0[i] + baryout[i]);
+                            }
+                        } else if (cfg->srctype == stPattern) { // must be pattern and srcnum more than 1
                             int pidx; // pattern index
 
                             for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                                if (cfg->isatomic)
-                                    for (i = 0; i < 4; i++)
-                                        #pragma omp atomic
-                                        tracer->mesh->weight[(ee[i] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx] * (baryp0[i] + baryout[i]);
-                                else
-                                    for (i = 0; i < 4; i++) {
-                                        tracer->mesh->weight[(ee[i] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx] * (baryp0[i] + baryout[i]);
-                                    }
+                                for (i = 0; i < 4; i++) {
+                                    #pragma omp atomic
+                                    tracer->mesh->weight[(ee[i] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx] * (baryp0[i] + baryout[i]);
+                                }
                             }
                         }
                     }
@@ -465,7 +462,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                 if (r->isend) {
                     memcpy(baryp0, baryout, sizeof(float4));
                 } else {
-                    if (r->nexteid && faceidx >= 0) {
+                    if (r->nexteid > 0 && faceidx >= 0) {
                         int j, k, *nextenb = (int*)(tracer->mesh->elem + (r->nexteid - 1) * tracer->mesh->elemlen);
                         memset(baryp0, 0, sizeof(float4));
 
@@ -510,7 +507,7 @@ inline __m128 rcp_nr(const __m128 a) {
  * \param[out] d: current ray direction
  */
 
-inline int havel_sse4(MMCfloat3* vecN, MMCfloat3* bary, const __m128 o, const __m128 d) {
+inline int havel_sse4(float3* vecN, float3* bary, const __m128 o, const __m128 d) {
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
 
@@ -556,7 +553,7 @@ inline int havel_sse4(MMCfloat3* vecN, MMCfloat3* bary, const __m128 o, const __
 
 float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    MMCfloat3 bary = {1e10f, 0.f, 0.f, 0.f};
+    float3 bary = {1e10f, 0.f, 0.f, 0.f};
     float barypout[4] __attribute__ ((aligned(16)));
     float rc, currweight, dlen, ww, Lp0, mus;
     int i, j, k, tshift, *enb = NULL, *nextenb = NULL, eid;
@@ -724,52 +721,34 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             //    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
             if (cfg->mcmethod == mmMCX) {
                 if (!cfg->basisorder) {
-                    if (cfg->srctype != stPattern) {
-                        if (cfg->isatomic)
-                            #pragma omp atomic
-                            tracer->mesh->weight[eid + tshift] += ww;
-                        else {
-                            tracer->mesh->weight[eid + tshift] += ww;
-                        }
-                    } else {
-                        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
+                    if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                        #pragma omp atomic
+                        tracer->mesh->weight[eid + tshift] += ww;
+                    } else if (cfg->srctype == stPattern) { // must be pattern and srcnum more than 1
                         int pidx; // pattern index
 
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                            if (cfg->isatomic)
-                                #pragma omp atomic
-                                tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
-                            else {
-                                tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
-                            }
+                            #pragma omp atomic
+                            tracer->mesh->weight[(eid + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                         }
                     }
                 } else {
                     T = _mm_mul_ps(_mm_add_ps(O, S), _mm_set1_ps(ww * 0.5f));
                     _mm_store_ps(barypout, T);
 
-                    if (cfg->srctype != stPattern) {
-                        if (cfg->isatomic)
-                            for (j = 0; j < 4; j++)
-                                #pragma omp atomic
-                                tracer->mesh->weight[ee[j] - 1 + tshift] += barypout[j];
-                        else
-                            for (j = 0; j < 4; j++) {
-                                tracer->mesh->weight[ee[j] - 1 + tshift] += barypout[j];
-                            }
-                    } else {
-                        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
+                    if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                        for (j = 0; j < 4; j++) {
+                            #pragma omp atomic
+                            tracer->mesh->weight[ee[j] - 1 + tshift] += barypout[j];
+                        }
+                    } else if (cfg->srctype == stPattern) {
                         int pidx; // pattern index
 
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                            if (cfg->isatomic)
-                                for (j = 0; j < 4; j++)
-                                    #pragma omp atomic
-                                    tracer->mesh->weight[(ee[j] - 1 + tshift)*cfg->srcnum + pidx] += barypout[j] * cfg->srcpattern[pidx * psize + r->posidx];
-                            else
-                                for (j = 0; j < 4; j++) {
-                                    tracer->mesh->weight[(ee[j] - 1 + tshift)*cfg->srcnum + pidx] += barypout[j] * cfg->srcpattern[pidx * psize + r->posidx];
-                                }
+                            for (j = 0; j < 4; j++) {
+                                #pragma omp atomic
+                                tracer->mesh->weight[(ee[j] - 1 + tshift)*cfg->srcnum + pidx] += barypout[j] * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
+                            }
                         }
                     }
                 }
@@ -809,7 +788,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
 float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    MMCfloat3 bary = {1e10f, 0.f, 0.f, 0.f};
+    float3 bary = {1e10f, 0.f, 0.f, 0.f};
     float Lp0 = 0.f, rc, currweight, dlen, ww, t[4] = {1e10f, 1e10f, 1e10f, 1e10f};
     int i, tshift, faceidx = -1, eid;
 
@@ -973,41 +952,44 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 }
 #endif  /* #if !defined(__EMSCRIPTEN__) */
 
+#endif
+
 
 /**
- * \brief Compute distances to edge (cylindrical) ROIs in the element
+ * \brief Compute distances to edge (infinite cylindrical) ROIs in the element
  *
- * Commpute the distance between P0 and the labeled edge
- * and the distance between P1 and the labeled edge.
+ * Commpute the distance between P0 (ray-start) and the labeled edge
+ * and the distance between P1 (ray-end) and the labeled edge.
  * P0 is the entry point and P1 is the exit point
  */
-void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], MMCfloat3 p2d[2], int* hitstatus) {
-    MMCfloat3 u, OP;
-    float r2;
+void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], FLOAT3 p2d[2], int* hitstatus) {
+    FLOAT3 u, OP;
+    float r2, d1;
 
-    p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1];
-    p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]] - 1];
+    p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1]; // end id of the edge, E1
+    p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]] - 1]; // start id of the edge, E0
 
-    vec_diff(p2d + 1, p2d, &u);
-    r2 = dist(p2d + 1, p2d); // get coordinates and compute distance between two nodes
+    vec_diff3(p2d + 1, p2d, &u); // vector of the edge u = <E0 -> E1>
+    r2 = dist_3(p2d + 1, p2d); // get coordinates and compute edge length between E0-E1
     r2 = 1.0f / r2;
-    vec_mult(&u, r2, &u); // normalized vector of the edge
+    vec_mult3(&u, r2, &u); // normalized vector of the edge, u is now unitary
 
-    vec_diff(p2d + 1, &r->p0, &OP);
-    r2 = vec_dot(&OP, &u);
-    vec_mult(&u, r2, p2d);
-    vec_diff(p2d, &OP, p2d);    // PP0: P0 projection on plane
-    d2d[0] = vec_dot(p2d, p2d);
+    vec_diff3(p2d + 1, (FLOAT3*)(&r->p0), &OP); // ray-start to edge-end, OP = <P0 -> E1>
+    d1 = vec_dot3(&OP, &u);      // projection of OP to u
+    vec_mult3(&u, d1, p2d);      // p2d now stores the vector starts with edge-start, ends with the orthogonal projection of vector OP=<P0->E1>
+    vec_diff3(p2d, &OP, p2d);    // PP0: P0 projection on plane, computed by OP - p2d
+    d2d[0] = vec_dot3(p2d, p2d); // ray-start (P0) distance to the edge squared
 
-    vec_mult(&r->vec, r->Lmove, &OP);
-    vec_add(&r->p0, &OP, &OP);      // P1
-    vec_diff(p2d + 1, &OP, &OP);
-    r2 = vec_dot(&OP, &u);
-    vec_mult(&u, r2, p2d + 1);
-    vec_diff(p2d + 1, &OP, p2d + 1); // PP1: P1 projection on plane
-    d2d[1] = vec_dot(p2d + 1, p2d + 1);
+    vec_mult3((FLOAT3*)&r->vec, r->Lmove, &OP);
+    vec_add3((FLOAT3*)&r->p0, &OP, &OP);      // P1, ray-end
+    vec_diff3(p2d + 1, &OP, &OP);    // OP = <P1 -> E1> vector from ray-end to edge-end
+    d1 = vec_dot3(&OP, &u);
+    vec_mult3(&u, d1, p2d + 1);
+    vec_diff3(p2d + 1, &OP, p2d + 1); // PP1: P1 projection on plane
+    d2d[1] = vec_dot3(p2d + 1, p2d + 1); // ray-end (P1) distance to the edge squared
 
-    r2 = r->roisize[edgeid] * r->roisize[edgeid];
+    r2 = r->roisize[edgeid] * r->roisize[edgeid]; // squared radius of the edge-roi
+
     *hitstatus = htNone;
 
     if (d2d[0] > r2 + EPS2 && d2d[1] < r2 - EPS2) {
@@ -1015,16 +997,16 @@ void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, f
     } else if (d2d[0] < r2 - EPS2 && d2d[1] > r2 + EPS2) {
         *hitstatus = htInOut;
     } else if (d2d[1] > r2 + EPS2) {
-        *hitstatus = htNoHitOut;
+        *hitstatus = (r->inroi == 1) ? htInOut : htNoHitOut; // check for photons on edge of ROI
     } else if (d2d[1] < r2 - EPS2) {
-        *hitstatus = htNoHitIn;
+        *hitstatus = (r->inroi == 0) ? htOutIn : htNoHitIn;
     }
 }
 
 /**
  * \brief Compute the next step length for edge-based iMMC
  */
-float ray_cylinder_intersect(ray* r, int index, float d2d[2], MMCfloat3 p2d[2], int hitstatus) {
+float ray_cylinder_intersect(ray* r, int index, float d2d[2], FLOAT3 p2d[2], int hitstatus) {
     float pt0[2], pt1[2], ph0[2], ph1[2], Lratio, theta;
 
     // update Lmove and reflection
@@ -1036,7 +1018,7 @@ float ray_cylinder_intersect(ray* r, int index, float d2d[2], MMCfloat3 p2d[2], 
         d2d[0] = sqrtf(d2d[0]);
         d2d[1] = sqrtf(d2d[1]);
 
-        theta = vec_dot(p2d, p2d + 1);
+        theta = vec_dot3(p2d, p2d + 1);
 
         theta = theta / (d2d[0] * d2d[1] + EPS);
         pt0[0] = d2d[0];
@@ -1091,26 +1073,26 @@ float ray_cylinder_intersect(ray* r, int index, float d2d[2], MMCfloat3 p2d[2], 
  * P0 is the entry point and P1 is the exit point
  */
 
-void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, MMCfloat3** center, int* hitstatus) {
+void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, FLOAT3** center, int* hitstatus) {
     float npdist0, npdist1;
-    MMCfloat3 PP;
+    FLOAT3 PP;
 
     nr = nr * nr;
     *center = tracer->mesh->node + ee[index] - 1;
 
-    npdist0 = dist2(&r->p0, *center);   // P0
-    vec_mult(&r->vec, r->Lmove, &PP);
-    vec_add(&r->p0, &PP, &PP);
-    npdist1 = dist2(&PP, *center);      // P1
+    npdist0 = dist2_3((FLOAT3*)&r->p0, *center);   // P0
+    vec_mult3((FLOAT3*)&r->vec, r->Lmove, &PP);
+    vec_add3((FLOAT3*)&r->p0, &PP, &PP);
+    npdist1 = dist2_3(&PP, *center);      // P1
 
     if (npdist0 > nr + EPS2 && npdist1 < nr - EPS2) {
         *hitstatus = htOutIn;
     } else if (npdist0 < nr - EPS2 && npdist1 > nr + EPS2) {
         *hitstatus = htInOut;
     } else if (npdist1 > nr + EPS2) {
-        *hitstatus = htNoHitOut;
+        *hitstatus = (r->inroi == 1) ? htInOut : htNoHitOut; // check for borderline photons very close to edge
     } else if (npdist1 < nr - EPS2) {
-        *hitstatus = htNoHitIn;
+        *hitstatus = (r->inroi == 0) ? htOutIn : htNoHitIn; // check for borderline photons very close to edge
     } else {
         *hitstatus = htNone;
     }
@@ -1119,13 +1101,13 @@ void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, fl
 /**
  * \brief Compute the next step length for node-based iMMC
  */
-float ray_sphere_intersect(ray* r, int index, MMCfloat3* center, float nr, int hitstatus) {
+float ray_sphere_intersect(ray* r, int index, FLOAT3* center, float nr, int hitstatus) {
     float temp1, temp2, d1, d2;
-    MMCfloat3 oc;
+    FLOAT3 oc;
 
     if (hitstatus == htOutIn || hitstatus == htInOut) {
-        vec_diff(center, &r->p0, &oc);
-        temp1 = vec_dot(&r->vec, &oc);
+        vec_diff3(center, (FLOAT3*)&r->p0, &oc);
+        temp1 = vec_dot3((FLOAT3*)&r->vec, &oc);
         temp2 = oc.x * oc.x + oc.y * oc.y + oc.z * oc.z - (nr * nr);
         temp2 = sqrtf(fabs(temp1 * temp1 - temp2));
         d1 = -temp1 + temp2;
@@ -1140,24 +1122,24 @@ float ray_sphere_intersect(ray* r, int index, MMCfloat3* center, float nr, int h
  * \brief Compute the next step length for the face-based iMMC
  */
 float ray_face_intersect(ray* r, raytracer* tracer, int* ee, int faceid, int baseid, int eid, int* hitstatus) {
-    MMCfloat3 pf1, pv, fnorm, ptemp;
+    FLOAT3 pf1, pv, fnorm, ptemp;
     float distf0, distf1, thick, ratio = 1.f;
 
     thick = r->roisize[faceid];
 
-    vec_mult(&r->vec, r->Lmove, &ptemp);
-    vec_add(&r->p0, &ptemp, &ptemp);    // P1: ptemp
+    vec_mult3((FLOAT3*)&r->vec, r->Lmove, &ptemp);
+    vec_add3((FLOAT3*)&r->p0, &ptemp, &ptemp);    // P1: ptemp
 
     pf1 = tracer->mesh->node[ee[nc[ifaceorder[faceid]][0]] - 1]; // any point on face
     fnorm.x = (&(tracer->n[baseid].x))[ifaceorder[faceid]];     // normal vector of the face
     fnorm.y = (&(tracer->n[baseid].x))[ifaceorder[faceid] + 4];
     fnorm.z = (&(tracer->n[baseid].x))[ifaceorder[faceid] + 8];
 
-    vec_diff(&r->p0, &pf1, &pv);
-    distf0 = vec_dot(&pv, &fnorm);
+    vec_diff3((FLOAT3*)&r->p0, &pf1, &pv);
+    distf0 = vec_dot3(&pv, &fnorm);
 
-    vec_diff(&ptemp, &pf1, &pv);
-    distf1 = vec_dot(&pv, &fnorm);
+    vec_diff3(&ptemp, &pf1, &pv);
+    distf1 = vec_dot3(&pv, &fnorm);
 
     *hitstatus = htNone;
 
@@ -1187,7 +1169,9 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
     int eid = r->eid - 1;
     int* ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
 
-    if (roitype == 1) { /** edge and node immc - edge also depends on node */
+    if (roitype == 1) { /** edge and node immc - edge also depends on node, only test intersection with an infinite cylinder */
+        int neweid = -1;
+        int* newee;
         int i;
         float minratio = 1.f;
         int hitstatus = htNone, firsthit = htNone, firstinout = htNone;
@@ -1195,56 +1179,72 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
         if (tracer->mesh->edgeroi) { /** if edge roi is defined */
             // edge-based iMMC  - ray-cylinder intersection test
             float distdata[2];
-            MMCfloat3 projdata[2];
+            FLOAT3 projdata[2];
 
-            for (i = 0; i < 6; i++) { /** loop over each edge in current element */
-                if (r->roisize[i] > 0.f) {
-                    /** decide if photon is in the roi or not */
-                    compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
+            if (r->roisize[0] != 0.f) {
+                // test if this is a reference element, indicated by a negative radius
+                if (r->roisize[0] < -6.f) {
+                    neweid = (int)(-r->roisize[0]) - 6;
+                    r->refeid = neweid;
+                    newee = (int*)(tracer->mesh->elem + (neweid - 1) * tracer->mesh->elemlen);
+                    r->roisize = (float*)(tracer->mesh->edgeroi + (neweid - 1) * 6); // update r->roisize array to the referenced element
+                }
 
-                    /**
-                       hitstatus has 4 possible outputs:
-                       htInOut: photon path intersects with cylinder, moving from in to out
-                       htOutIn: photon path intersects with cylinder, moving from out to in
-                       htNoHitIn: both ends of photon path are inside cylinder, no intersection
-                       htNoHitOut: both ends of photon path are outside cylinder, no intersection
-                       htNone: unexpected, should never happen
-                     */
-                    if (doinit) {
-                        r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn);
-                    } else {
-                        if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
-                            /** calculate the first intersection distance normalied by path seg length */
-                            float lratio = ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
+                for (i = 0; i < 6; i++) { /** loop over each edge in current element, find the closest hit */
+                    if (r->roisize[i] > 0.f) {
+                        /** decide if photon is in the roi or not */
+                        if (neweid < 0) {
+                            compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
+                        } else {
+                            compute_distances_to_edge(r, tracer, newee, i, distdata, projdata, &hitstatus);
+                        }
 
-                            if (lratio < minratio) {
-                                minratio = lratio;
-                                firsthit = hitstatus;
-                                r->roiidx = i;
+
+                        /**
+                         *  hitstatus has 4 possible outputs:
+                         *  htInOut: photon path intersects with cylinder, moving from in to out
+                         *  htOutIn: photon path intersects with cylinder, moving from out to in
+                         *  htNoHitIn: both ends of photon path are inside cylinder, no intersection
+                         *  htNoHitOut: both ends of photon path are outside cylinder, no intersection
+                         *  htNone: unexpected, should never happen
+                         */
+                        if (doinit) {
+                            r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn); /** start position is in ROI - initialize state */
+                        } else {
+                            if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
+                                /** calculate the first intersection distance normalied by path seg length */
+                                float lratio = ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
+
+                                if (lratio < minratio) { /** find the closest hit */
+                                    minratio = lratio;
+                                    firsthit = hitstatus; /** closest hit status  */
+                                    r->roiidx = i;
+                                }
+                            } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
+                                firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
                             }
-                        } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
-                            firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
                         }
                     }
                 }
-            }
 
-            if (minratio < 1.f) {
-                r->Lmove *= minratio;
-            }
+                if (minratio < 1.f) {
+                    r->Lmove *= minratio;
+                }
 
-            if (!doinit) {
-                r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
-                r->inroi = (firsthit == htNone && firstinout == htNone) ? 0 : r->inroi;
-            }
+                if (!doinit) {
+                    r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
+                    // update inroi to 0 only if no endcaps need to be tested
+                    r->inroi = (firsthit == htNone && firstinout == htNone && !tracer->mesh->noderoi) ? 0 : r->inroi;
+                }
 
-            r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
+                r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
+            }
         }
 
         if (firsthit == htNone && firstinout != htNoHitIn && tracer->mesh->noderoi) {
             // not hit any edgeroi in the current element, then go for node-based iMMC
             float nr;
-            MMCfloat3* center;
+            FLOAT3* center;
 
             minratio = r->Lmove;
             hitstatus = htNone;
@@ -1287,6 +1287,10 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
             r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtNode : rtNone;
         }
 
+        // prevent stuck photons when intersection is <EPS2 from current origin
+        if ((firsthit == htInOut || firsthit == htOutIn) && r->Lmove < EPS2) {
+            r->Lmove = EPS2;
+        }
     } else if (tracer->mesh->faceroi) {
         int neweid = -1, newbaseid = 0;
         int* newee;
@@ -1337,8 +1341,15 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
         }
 
         r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtFace : rtNone;
+
+        // prevent stuck photons if intersections is <EPS2 from current origin
+        if ((firsthit == htInOut || firsthit == htOutIn) && r->Lmove < EPS2) {
+            r->Lmove = EPS2;
+        }
     }
 }
+
+#ifdef MMC_USE_SSE
 
 /**
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
@@ -1357,7 +1368,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit) {
 
 float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
-    MMCfloat3 bary = {1e10f, 0.f, 0.f, 0.f};
+    float3 bary = {1e10f, 0.f, 0.f, 0.f};
     float Lp0 = 0.f, rc, currweight, dlen, ww, totalloss = 0.f;
     int tshift, faceidx = -1, baseid, eid;
     __m128 O, T, S;
@@ -1415,6 +1426,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
         medium* prop;
         int* enb, *ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
         float mus;
+        int pidx; // pattern index
 
         if (cfg->implicit && r->inroi) {
             prop = tracer->mesh->med + tracer->mesh->prop;
@@ -1524,24 +1536,13 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         r->oldidx = (r->oldidx == 0xFFFFFFFF) ? newidx : r->oldidx;
 
                         if (newidx != r->oldidx) {
-                            if (cfg->srctype != stPattern) {
-                                if (cfg->isatomic)
-                                    #pragma omp atomic
-                                    tracer->mesh->weight[r->oldidx] += r->oldweight;
-                                else {
-                                    tracer->mesh->weight[r->oldidx] += r->oldweight;
-                                }
-                            } else {
-                                int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
-                                int pidx; // pattern index
-
+                            if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                                #pragma omp atomic
+                                tracer->mesh->weight[r->oldidx] += r->oldweight;
+                            } else if (cfg->srctype == stPattern) {
                                 for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                                    if (cfg->isatomic)
-                                        #pragma omp atomic
-                                        tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
-                                    else {
-                                        tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
-                                    }
+                                    #pragma omp atomic
+                                    tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                                 }
                             }
 
@@ -1552,24 +1553,13 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         }
 
                         if (r->faceid == -2 || !r->isend) {
-                            if (cfg->srctype != stPattern) {
-                                if (cfg->isatomic)
-                                    #pragma omp atomic
-                                    tracer->mesh->weight[newidx] += r->oldweight;
-                                else {
-                                    tracer->mesh->weight[newidx] += r->oldweight;
-                                }
-                            } else {
-                                int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
-                                int pidx; // pattern index
-
+                            if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                                #pragma omp atomic
+                                tracer->mesh->weight[newidx] += r->oldweight;
+                            } else if (cfg->srctype == stPattern) {
                                 for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                                    if (cfg->isatomic)
-                                        #pragma omp atomic
-                                        tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
-                                    else {
-                                        tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[pidx * psize + r->posidx];
-                                    }
+                                    #pragma omp atomic
+                                    tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
                                 }
                             }
 
@@ -1596,11 +1586,16 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             r->oldidx = (r->oldidx == 0xFFFFFFFF) ? newidx : r->oldidx;
 
                             if (newidx != r->oldidx) {
-                                if (cfg->isatomic)
+                                if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                                     #pragma omp atomic
                                     tracer->mesh->weight[r->oldidx] += r->oldweight;
-                                else {
-                                    tracer->mesh->weight[r->oldidx] += r->oldweight;
+                                } else if (cfg->srctype == stPattern) {
+                                    for (pidx = 0; pidx < cfg->srcnum; pidx++) {
+                                        for (pidx = 0; pidx < cfg->srcnum; pidx++) {
+                                            #pragma omp atomic
+                                            tracer->mesh->weight[r->oldidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
+                                        }
+                                    }
                                 }
 
                                 r->oldidx = newidx;
@@ -1610,11 +1605,16 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             }
 
                             if (r->faceid == -2 || !r->isend) {
-                                if (cfg->isatomic)
+                                if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                                     #pragma omp atomic
                                     tracer->mesh->weight[newidx] += r->oldweight;
-                                else {
-                                    tracer->mesh->weight[newidx] += r->oldweight;
+                                } else if (cfg->srctype == stPattern) {
+                                    for (pidx = 0; pidx < cfg->srcnum; pidx++) {
+                                        for (pidx = 0; pidx < cfg->srcnum; pidx++) {
+                                            #pragma omp atomic
+                                            tracer->mesh->weight[newidx * cfg->srcnum + pidx] += r->oldweight * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
+                                        }
+                                    }
                                 }
 
                                 r->oldweight = 0.f;
@@ -1628,28 +1628,17 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                     int i;
                     ww *= 1.f / 3.f;
 
-                    if (cfg->srctype != stPattern) {
-                        if (cfg->isatomic)
-                            for (i = 0; i < 3; i++)
-                                #pragma omp atomic
-                                tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
-                        else
-                            for (i = 0; i < 3; i++) {
-                                tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
-                            }
-                    } else {
-                        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w; // total number of pixels in each pattern
-                        int pidx; // pattern index
-
+                    if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+                        for (i = 0; i < 3; i++) {
+                            #pragma omp atomic
+                            tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
+                        }
+                    } else if (cfg->srctype == stPattern) {
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                            if (cfg->isatomic)
-                                for (i = 0; i < 3; i++)
-                                    #pragma omp atomic
-                                    tracer->mesh->weight[(ee[out[faceidx][i]] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
-                            else
-                                for (i = 0; i < 3; i++) {
-                                    tracer->mesh->weight[(ee[out[faceidx][i]] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[pidx * psize + r->posidx];
-                                }
+                            for (i = 0; i < 3; i++) {
+                                #pragma omp atomic
+                                tracer->mesh->weight[(ee[out[faceidx][i]] - 1 + tshift)*cfg->srcnum + pidx] += ww * cfg->srcpattern[r->posidx * cfg->srcnum + pidx];
+                            }
                         }
                     }
                 }
@@ -1692,6 +1681,31 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
     return MMC_UNDEFINED;
 }
 #endif
+
+/**
+ * @brief Saving photon trajectory data for debugging purposes
+ * @param[in] p: the position/weight of the current photon packet
+ * @param[in] id: the global index of the photon
+ * @param[in] gdebugdata: pointer to the global-memory buffer to store the trajectory info
+ */
+
+void savedebugdata(ray* r, unsigned int id, mcconfig* cfg) {
+    unsigned int pos;
+    float* gdebugdata = cfg->exportdebugdata;
+
+    #pragma omp atomic capture
+    pos = cfg->debugdatalen++;
+
+    if (pos < cfg->maxjumpdebug) {
+        pos *= MCX_DEBUG_REC_LEN;
+        ((unsigned int*)gdebugdata)[pos++] = id;
+        gdebugdata[pos++] = r->p0.x;
+        gdebugdata[pos++] = r->p0.y;
+        gdebugdata[pos++] = r->p0.z;
+        gdebugdata[pos++] = r->weight;
+        ((unsigned int*)gdebugdata)[pos++] = r->eid;
+    }
+}
 
 /**
  * @brief The core Monte Carlo function simulating a single photon (!!!Important!!!)
@@ -1739,13 +1753,18 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 
     /*initialize the photon parameters*/
     launchphoton(cfg, &r, mesh, ran, ran0);
-    r.partialpath[visit->reclen - 2] = r.weight; /*last record in partialpath is the initial photon weight*/
+
+    if (cfg->debuglevel & dlTraj) {
+        savedebugdata(&r, (unsigned int)id, cfg);
+    }
 
     /*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
     int pidx;
 
-    if (cfg->srctype != stPattern) {
+    if (cfg->srctype != stPattern || cfg->srcnum == 1) {
+        r.partialpath[visit->reclen - 2] = r.weight;
+
         if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) {
             kahany = cfg->replayweight[r.photonid] - visit->kahanc0[0];    /* when replay mode, accumulate detected photon weight */
         } else {
@@ -1755,34 +1774,32 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         kahant = visit->launchweight[0] + kahany;
         visit->kahanc0[0] = (kahant - visit->launchweight[0]) - kahany;
         visit->launchweight[0] = kahant;
-    } else {
-        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
-        #pragma omp critical
-        {
-            for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) {
-                    kahany = cfg->replayweight[r.photonid] - visit->kahanc0[pidx];    /* when replay mode, accumulate detected photon weight */
-                } else {
-                    kahany = r.weight * cfg->srcpattern[pidx * psize + r.posidx] - visit->kahanc0[pidx];
-                }
+    } else if (cfg->srctype == stPattern) {
+        *((int*)(r.partialpath + visit->reclen - 2)) = r.posidx;
 
-                kahant = visit->launchweight[pidx] + kahany;
-                visit->kahanc0[pidx] = (kahant - visit->launchweight[pidx]) - kahany;
-                visit->launchweight[pidx] = kahant;
+        for (pidx = 0; pidx < cfg->srcnum; pidx++) {
+            if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) {
+                kahany = cfg->replayweight[r.photonid] - visit->kahanc0[pidx];    /* when replay mode, accumulate detected photon weight */
+            } else {
+                kahany = r.weight * cfg->srcpattern[r.posidx * cfg->srcnum + pidx] - visit->kahanc0[pidx];
             }
+
+            kahant = visit->launchweight[pidx] + kahany;
+            visit->kahanc0[pidx] = (kahant - visit->launchweight[pidx]) - kahany;
+            visit->launchweight[pidx] = kahant;
         }
     }
 
 #ifdef MMC_USE_SSE
     const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
     int_coef = _mm_load_ps(int_coef_arr);
+#endif
 
+    /** retrieve the iMMC ROI size and ray location at initial launch */
     if (cfg->implicit) {
         updateroi(cfg->implicit, &r, tracer->mesh);
         traceroi(&r, tracer, cfg->implicit, 1);
     }
-
-#endif
 
     while (1) { /*propagate a photon until exit*/
         if (cfg->implicit) {
@@ -1797,7 +1814,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             }
 
             if (fixcount++ < MAX_TRIAL) {
-                fixphoton(&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
+                fixphoton((FLOAT3*)&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
                 continue;
             }
 
@@ -1806,11 +1823,11 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0 && r.faceid >= 0) {
-            r.partialpath[mesh->prop - 1 + mesh->type[r.eid - 1]] += r.Lmove;    /*second medianum block is the partial path*/
+            r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
         }
 
         if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
-            reflectrayroi(cfg, &r.vec, &r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+            reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
             vec_mult_add(&r.p0, &r.vec, 1.0f, 10 * EPS, &r.p0);
             continue;
         } else if (cfg->implicit && r.roitype) {
@@ -1878,7 +1895,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
             if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                r.partialpath[mesh->prop - 1 + mesh->type[r.eid - 1]] += r.Lmove;
+                r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
             }
 
             if (r.faceid == -2) {
@@ -1888,11 +1905,11 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             fixcount = 0;
 
             while (r.pout.x == MMC_UNDEFINED && fixcount++ < MAX_TRIAL) {
-                fixphoton(&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
+                fixphoton((FLOAT3*)&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
                 r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
                 if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                    r.partialpath[mesh->prop - 1 + mesh->type[r.eid - 1]] += r.Lmove;
+                    r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
                 }
             }
 
@@ -1964,7 +1981,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
-            reflectrayroi(cfg, &r.vec, &r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+            reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
             vec_mult_add(&r.p0, &r.vec, 1.0f, 10 * EPS, &r.p0);
             continue;
         } else if (cfg->implicit && r.roitype) {
@@ -1975,15 +1992,19 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         r.slen0 = mc_next_scatter(mesh->med[mesh->type[r.eid - 1]].g, &r.vec, ran, ran0, cfg, &mom);
         r.slen = r.slen0;
 
+        if (cfg->debuglevel & dlTraj) {
+            savedebugdata(&r, (unsigned int)id, cfg);
+        }
+
         if (cfg->mcmethod != mmMCX) {
             albedoweight(&r, mesh, cfg, visit);
         }
 
         if (cfg->ismomentum && mesh->type[r.eid - 1] > 0) {              /*when ismomentum is set to 1*/
-            r.partialpath[(mesh->prop << 1) - 1 + mesh->type[r.eid - 1]] += mom;    /*the third medianum block stores the momentum transfer*/
+            r.partialpath[(mesh->prop << 1) - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += mom;    /*the third medianum block stores the momentum transfer*/
         }
 
-        r.partialpath[mesh->type[r.eid - 1] - 1]++;                      /*the first medianum block stores the scattering event counts*/
+        r.partialpath[(r.inroi ? mesh->prop : mesh->type[r.eid - 1]) - 1]++;                      /*the first medianum block stores the scattering event counts*/
     }
 
     if (cfg->issavedet && exitdet > 0) {
@@ -2015,21 +2036,21 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         free(r.photonseed);
     }
 
-    if (cfg->srctype != stPattern) {
+    if (cfg->debuglevel & dlTraj) {
+        savedebugdata(&r, (unsigned int)id, cfg);
+    }
+
+    if (cfg->srctype != stPattern || cfg->srcnum == 1) {
         kahany = r.Eabsorb - visit->kahanc1[0];
         kahant = visit->absorbweight[0] + kahany;
         visit->kahanc1[0] = (kahant - visit->absorbweight[0]) - kahany;
         visit->absorbweight[0] = kahant;
-    } else {
-        int psize = (int)cfg->srcparam1.w * (int)cfg->srcparam2.w;
-        #pragma omp critical
-        {
-            for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-                kahany = r.Eabsorb * cfg->srcpattern[pidx * psize + r.posidx] - visit->kahanc1[pidx];
-                kahant = visit->absorbweight[pidx] + kahany;
-                visit->kahanc1[pidx] = (kahant - visit->absorbweight[pidx]) - kahany;
-                visit->absorbweight[pidx] = kahant;
-            }
+    } else if (cfg->srctype == stPattern) {
+        for (pidx = 0; pidx < cfg->srcnum; pidx++) {
+            kahany = r.Eabsorb * cfg->srcpattern[r.posidx * cfg->srcnum + pidx] - visit->kahanc1[pidx];
+            kahant = visit->absorbweight[pidx] + kahany;
+            visit->kahanc1[pidx] = (kahant - visit->absorbweight[pidx]) - kahany;
+            visit->absorbweight[pidx] = kahant;
         }
     }
 }
@@ -2049,26 +2070,26 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectrayroi(mcconfig* cfg, MMCfloat3* c0, MMCfloat3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid) {
+float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid) {
 
     /*to handle refractive index mismatch*/
-    MMCfloat3 pnorm = {0.f}, *pn = &pnorm, EH, ut;
+    FLOAT3 pnorm = {0.f}, *pn = &pnorm, EH, ut;
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
 
     if (roitype == rtEdge) { // hit edge roi
-        MMCfloat3 u, E0;
+        FLOAT3 u, E0;
         E0 = tracer->mesh->node[tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][0]] - 1];
-        vec_diff(&E0, tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][1]] - 1), &u);
-        vec_diff(&E0, ph, &EH);
-        tmp0 = vec_dot(&EH, &u);
-        vec_mult(&u, tmp0, &ut);
-        vec_diff(&ut, &EH, pn);
-        tmp0 = 1.f / sqrtf(vec_dot(pn, pn));
-        vec_mult(pn, tmp0, pn);
+        vec_diff3(&E0, tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][1]] - 1), &u);
+        vec_diff3(&E0, ph, &EH);
+        tmp0 = vec_dot3(&EH, &u);
+        vec_mult3(&u, tmp0, &ut);
+        vec_diff3(&ut, &EH, pn);
+        tmp0 = 1.f / sqrtf(vec_dot3(pn, pn));
+        vec_mult3(pn, tmp0, pn);
     } else if (roitype == rtNode) { // hit node roi
-        vec_diff(tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + roiidx] - 1), ph, pn);
-        tmp0 = 1.f / sqrtf(vec_dot(pn, pn));
-        vec_mult(pn, tmp0, pn);
+        vec_diff3(tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + roiidx] - 1), ph, pn);
+        tmp0 = 1.f / sqrtf(vec_dot3(pn, pn));
+        vec_mult3(pn, tmp0, pn);
     } else {         // hit face roi
         int baseid;
 
@@ -2086,21 +2107,21 @@ float reflectrayroi(mcconfig* cfg, MMCfloat3* c0, MMCfloat3* ph, raytracer* trac
     /*pn pointing outward*/
 
     // /*compute the cos of the incidence angle*/
-    Icos = fabs(vec_dot(c0, pn));
+    Icos = fabs(vec_dot3(c0, pn));
 
     if (*inroi) { // out->in
         n1 = tracer->mesh->med[tracer->mesh->type[*eid - 1]].n;
         n2 = tracer->mesh->med[cfg->his.maxmedia].n;
 
         if (roitype == rtEdge || roitype == rtNode) {
-            vec_mult(pn, -1.f, pn);
+            vec_mult3(pn, -1.f, pn);
         }
     } else {     // in->out
         n1 = tracer->mesh->med[cfg->his.maxmedia].n;
         n2 = tracer->mesh->med[tracer->mesh->type[*eid - 1]].n;
 
         if (roitype == rtFace) {
-            vec_mult(pn, -1.f, pn);
+            vec_mult3(pn, -1.f, pn);
         }
     }
 
@@ -2118,22 +2139,22 @@ float reflectrayroi(mcconfig* cfg, MMCfloat3* c0, MMCfloat3* ph, raytracer* trac
 
         // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
         if (rand_next_reflect(ran) <= Rtotal) { /*do reflection*/
-            vec_mult_add(pn, c0, -2.f * Icos, 1.f, c0);
+            vec_mult_add3(pn, c0, -2.f * Icos, 1.f, c0);
             *inroi = !(*inroi);
             //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
         } else if (cfg->isspecular == 2 && *eid == 0) {
             // if do transmission, but next neighbor is 0, terminate
         } else {                             /*do transmission*/
-            vec_mult_add(pn, c0, -Icos, 1.f, c0);
-            vec_mult_add(pn, c0, tmp2, n1 / n2, c0);
+            vec_mult_add3(pn, c0, -Icos, 1.f, c0);
+            vec_mult_add3(pn, c0, tmp2, n1 / n2, c0);
         }
     } else { /*total internal reflection*/
-        vec_mult_add(pn, c0, -2.f * Icos, 1.f, c0);
+        vec_mult_add3(pn, c0, -2.f * Icos, 1.f, c0);
         *inroi = !(*inroi);
     }
 
-    tmp0 = 1.f / sqrtf(vec_dot(c0, c0));
-    vec_mult(c0, tmp0, c0);
+    tmp0 = 1.f / sqrtf(vec_dot3(c0, c0));
+    vec_mult3(c0, tmp0, c0);
     return 1.f;
 }
 
@@ -2152,23 +2173,21 @@ float reflectrayroi(mcconfig* cfg, MMCfloat3* c0, MMCfloat3* ph, raytracer* trac
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig* cfg, MMCfloat3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi) {
+float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi) {
     /*to handle refractive index mismatch*/
-    MMCfloat3 pnorm = {0.f}, *pn = &pnorm;
+    float3 pnorm = {0.f}, *pn = &pnorm;
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
     int offs = (*oldeid - 1) << 2;
 
     faceid = ifaceorder[faceid];
 
     /*calculate the normal direction of the intersecting triangle*/
-    if (cfg->method == rtPlucker) { //Plucker ray-tracing
-        pn = tracer->n + (offs) + faceid;
-    } else if (cfg->method < rtBLBadouel) {
-        pn = tracer->m + (offs + faceid) * 3;
-    } else if (cfg->method == rtBLBadouel || cfg->method == rtBLBadouelGrid) {
+    if (cfg->method == rtPlucker || cfg->method == rtBLBadouel || cfg->method == rtBLBadouelGrid) { //Plucker ray-tracing
         pnorm.x = (&(tracer->n[offs].x))[faceid];
         pnorm.y = (&(tracer->n[offs].x))[faceid + 4];
         pnorm.z = (&(tracer->n[offs].x))[faceid + 8];
+    } else if (cfg->method == rtHavel || cfg->method == rtBadouel) {
+        pn = tracer->m + (offs + faceid) * 3;
     }
 
     /*pn pointing outward*/
@@ -2236,7 +2255,7 @@ float reflectray(mcconfig* cfg, MMCfloat3* c0, raytracer* tracer, int* oldeid, i
 
 void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType* ran0) {
     int canfocus = 1;
-    MMCfloat3 origin = {r->p0.x, r->p0.y, r->p0.z};
+    float3 origin = {r->p0.x, r->p0.y, r->p0.z};
 
     r->slen = rand_next_scatlen(ran);
     r->inroi = 0;
@@ -2257,6 +2276,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
             int xsize = (int)cfg->srcparam1.w;
             int ysize = (int)cfg->srcparam2.w;
             r->posidx = MIN((int)(ry * ysize), ysize - 1) * xsize + MIN((int)(rx * xsize), xsize - 1);
+            r->weight = (cfg->srcnum == 1) ? cfg->srcpattern[r->posidx] : 1.f;
 
             if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) { // replay mode currently doesn't support multiple source patterns
                 r->weight = cfg->srcpattern[MIN( (int)(ry * cfg->srcparam2.w), (int)cfg->srcparam2.w - 1 ) * (int)(cfg->srcparam1.w) + MIN( (int)(rx * cfg->srcparam1.w), (int)cfg->srcparam1.w - 1 )];
@@ -2367,12 +2387,12 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
             t = 1.f - 2.f * rand_uniform01(ran);
             s = 1.f - 2.f * rand_uniform01(ran);
             p = sqrtf(1.f - r->vec.x * r->vec.x - r->vec.y * r->vec.y) * (rand_uniform01(ran) > 0.5f ? 1.f : -1.f);
-            MMCfloat3 vv;
+            float4 vv;
             vv.x = r->vec.y * p - r->vec.z * s;
             vv.y = r->vec.z * t - r->vec.x * p;
             vv.z = r->vec.x * s - r->vec.y * t;
             r->vec = vv;
-            //*((MMCfloat3*)&(r->vec))=(MMCfloat3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
+            //*((float3*)&(r->vec))=(float3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
         }
 
         origin.x += (cfg->srcparam1.x) * 0.5f;
@@ -2404,23 +2424,34 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
     vec_mult_add(&(r->p0), &(r->vec), 1.f, EPS, &(r->p0));
 
     /*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
-    MMCfloat3 vecS = {0.f}, *nodes = mesh->node, vecAB, vecAC, vecN;
+    FLOAT3 vecS = {0.f}, vecAB, vecAC, vecN;
+    FLOAT3* nodes = mesh->node;
     int is, i, ea, eb, ec;
     float bary[4] = {0.f};
 
-    for (is = 0; is < mesh->srcelemlen; is++) {
+    for (is = -1; is < mesh->srcelemlen; is++) {
         int include = 1;
-        int* elems = (int*)(mesh->elem + (mesh->srcelem[is] - 1) * mesh->elemlen);
+        int* elems = NULL;
+
+        if (is < 0) {
+            if (r->eid >= 0) {
+                elems = (int*)(mesh->elem + (r->eid - 1) * mesh->elemlen);
+            } else {
+                continue;
+            }
+        } else {
+            elems = (int*)(mesh->elem + (mesh->srcelem[is] - 1) * mesh->elemlen);
+        }
 
         for (i = 0; i < 4; i++) {
             ea = elems[out[i][0]] - 1;
             eb = elems[out[i][1]] - 1;
             ec = elems[out[i][2]] - 1;
-            vec_diff(&nodes[ea], &nodes[eb], &vecAB); //repeated for all photons
-            vec_diff(&nodes[ea], &nodes[ec], &vecAC); //repeated for all photons
-            vec_diff(&nodes[ea], &(r->p0), &vecS);
-            vec_cross(&vecAB, &vecAC, &vecN); //repeated for all photons, vecN can be precomputed
-            bary[facemap[i]] = -vec_dot(&vecS, &vecN);
+            vec_diff3(&nodes[ea], &nodes[eb], &vecAB); //repeated for all photons
+            vec_diff3(&nodes[ea], &nodes[ec], &vecAC); //repeated for all photons
+            vec_diff3(&nodes[ea], (FLOAT3*) & (r->p0), &vecS);
+            vec_cross3(&vecAB, &vecAC, &vecN); //repeated for all photons, vecN can be precomputed
+            bary[facemap[i]] = -vec_dot3(&vecS, &vecN);
         }
 
         for (i = 0; i < 4; i++) {
@@ -2430,7 +2461,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         }
 
         if (include) {
-            r->eid = mesh->srcelem[is];
+            r->eid = (is >= 0 ? mesh->srcelem[is] : r->eid);
             float s = 0.f;
 
             for (i = 0; i < 4; i++) {
@@ -2540,6 +2571,16 @@ void visitor_clear(visitor* visit) {
     free(visit->kahanc1);
     visit->kahanc1 = NULL;
 }
+
+/**
+ * @brief Retrieve the roisize (radius of node or edge or thickness of face) if present in the current element
+ *
+ * This function returns ROI size for iMMC simulations
+ *
+ * \param[in] immctype: cfg->implicit = 1: node or edge iMMC, 2: face iMMC
+ * \param[in,out] r: the current ray, r->roisize is the output
+ * \param[in] mesh: the mesh data structure
+ */
 
 void updateroi(int immctype, ray* r, tetmesh* mesh) {
     if (immctype == 1 && mesh->edgeroi) {

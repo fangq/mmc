@@ -3,8 +3,8 @@
     #include <omp.h>
 #endif
 
-#include "mmc_optix_host.h"
 #include "mmc_optix_utils.h"
+#include "mmc_optix_host.h"
 #include "mmc_cuda_query_gpu.h"
 
 /************************************************************************** In
@@ -12,8 +12,7 @@ this unit, we first launch a master thread and initialize the necessary data
 structures.This include the command line options(cfg), tetrahedral mesh(mesh)
 and the ray tracer precomputed data (tracer).
 ******************************************************************************/
-void mmc_run_optix(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, 
-    void (*progressfun)(float, void*), void* handle) {
+void mmc_run_optix(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     GPUInfo* gpuinfo = NULL;      /** gpuinfo: structure to store GPU information */
     unsigned int activedev = 0;   /** activedev: count of total active GPUs to be used */
 
@@ -32,7 +31,7 @@ void mmc_run_optix(mcconfig* cfg, tetmesh* mesh, raytracer* tracer,
         /**
             This line runs the main MCX simulation for each GPU inside each thread
          */
-        optix_run_simulation(cfg, mesh, tracer, gpuinfo, progressfun, handle);
+        optix_run_simulation(cfg, mesh, tracer, gpuinfo);
 
 #ifdef _OPENMP
     }

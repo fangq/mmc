@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -39,6 +39,7 @@
 #include <string.h>
 #include "mmc_host.h"
 #include "mmc_tictoc.h"
+#include "mmc_const.h"
 
 #ifdef _OPENMP
     #include <omp.h>
@@ -49,6 +50,9 @@ In this unit, we first launch a master thread and initialize the
 necessary data structures. This include the command line options (cfg),
 tetrahedral mesh (mesh) and the ray-tracer precomputed data (tracer).
 *******************************************************************************/
+
+#ifndef MCX_CONTAINER
+
 
 /**
  * \brief Initialize simulation configuration structure cfg using command line options
@@ -89,6 +93,8 @@ int mmc_init_from_json(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, char* jc
     return 0;
 }
 
+#endif
+
 /**
  * \brief Rest simulation related data structures
  *
@@ -114,7 +120,7 @@ int mmc_reset(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
 int mmc_cleanup(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     tracer_clear(tracer);
-    mesh_clear(mesh);
+    mesh_clear(mesh, cfg);
     mcx_clearcfg(cfg);
     return 0;
 }
@@ -135,7 +141,7 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 }
 
 /**
- * \brief Main function to launch MMC photon simulation
+ * \brief Main function to launch CPU based MMC photon simulation
  *
  * This is the main loop of the Monte Carlo photon simulation. This function
  * run a complete photon simulation session based on one set of user input.
@@ -145,7 +151,7 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
  * \param[out] tracer: the ray-tracer data structure
  */
 
-int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressfun)(float, void*), void* handle) {
+int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
     RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
     unsigned int i, j;
@@ -153,10 +159,6 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     unsigned int threadid = 0, ncomplete = 0, t0, dt, debuglevel = 0;
     visitor master = {0.f, 0.f, 0.f, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL};
     visitor_init(cfg, &master);
-
-    if (progressfun == NULL) {
-        cfg->debuglevel = cfg->debuglevel & (~dlProgress);
-    }
 
     t0 = StartTimer();
 
@@ -177,6 +179,14 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     }
 
     unsigned int* seeds = NULL;
+
+    if (cfg->debuglevel & dlTraj) {
+        if (cfg->exportdebugdata == NULL) {
+            cfg->exportdebugdata = (float*)malloc(sizeof(float) * MCX_DEBUG_REC_LEN * cfg->maxjumpdebug);
+        }
+
+        cfg->debugdatalen = 0;
+    }
 
     /***************************************************************************//**
     The master thread then spawn multiple work-threads depending on your
@@ -229,7 +239,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
         rng_init(ran0, ran1, seeds, threadid);
 
         if ((cfg->debuglevel & dlProgress) && threadid == 0) {
-            progressfun(-0.f, handle);
+            mcx_progressbar(-0.f);
         }
 
         /*launch photons*/
@@ -260,7 +270,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
             ncomplete++;
 
             if ((cfg->debuglevel & dlProgress) && threadid == 0) {
-                progressfun((float)ncomplete / cfg->nphoton, handle);
+                mcx_progressbar((float)ncomplete / cfg->nphoton);
             }
         }
 
@@ -296,6 +306,8 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
 
                 master.bufpos += visit.bufpos;
             }
+            #pragma omp master
+            cfg->detectedcount = master.detcount;
         }
 
         #pragma omp barrier
@@ -317,7 +329,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     /** \subsection sreport Post simulation */
 
     if ((cfg->debuglevel & dlProgress)) {
-        progressfun(1.f, handle);
+        mcx_progressbar(1.f);
     }
 
     dt = GetTimeMillis() - dt;
@@ -326,7 +338,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
     MMCDEBUG(cfg, dlTime, (cfg->flog, "speed ...\t"S_BOLD""S_BLUE"%.2f photon/ms"S_RESET", %.0f ray-tetrahedron tests (%.0f overhead, %.2f test/ms)\n", (double)cfg->nphoton / dt, raytri, raytri0, raytri / dt));
 
     if (cfg->issavedet) {
-        MMC_FPRINTF(cfg->flog, "detected %d photons\n", master.detcount);
+        MMC_FPRINTF(cfg->flog, "detected %d photons\n", cfg->detectedcount);
     }
 
     if (cfg->isnormalized) {
@@ -342,7 +354,9 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
         cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
     }
 
-    if (cfg->issave2pt) {
+#ifndef MCX_CONTAINER
+
+    if (cfg->issave2pt && cfg->parentid == mpStandalone) {
         switch (cfg->outputtype) {
             case otFlux:
                 MMCDEBUG(cfg, dlTime, (cfg->flog, "saving flux ..."));
@@ -360,33 +374,66 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, void (*progressf
         mesh_saveweight(mesh, cfg, 0);
     }
 
-    if (cfg->issavedet) {
+#endif
+
+    if (cfg->exportdetected == NULL) {
+        cfg->exportdetected = master.partialpath;
+    }
+
+    if (cfg->issaveseed && master.photonseed) {
+        cfg->exportseed = (unsigned char*)malloc(cfg->detectedcount * sizeof(RandType) * RAND_BUF_LEN);
+        memcpy(cfg->exportseed, master.photonseed, cfg->detectedcount * sizeof(RandType)*RAND_BUF_LEN);
+        free(master.photonseed);
+    }
+
+    if (cfg->issavedet && cfg->parentid == mpStandalone) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving detected photons ..."));
 
+#ifndef MCX_CONTAINER
+
         if (cfg->issaveexit) {
-            mesh_savedetphoton(master.partialpath, master.photonseed, master.bufpos, (sizeof(RandType)*RAND_BUF_LEN), cfg);
+            mesh_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount, (sizeof(RandType)*RAND_BUF_LEN), cfg);
         }
+
+#endif
 
         if (cfg->issaveexit == 2) {
             float* detimage = (float*)calloc(cfg->detparam1.w * cfg->detparam2.w * cfg->maxgate, sizeof(float));
-            mesh_getdetimage(detimage, master.partialpath, master.bufpos, cfg, mesh);
+            mesh_getdetimage(detimage, cfg->exportdetected, cfg->detectedcount, cfg, mesh);
+#ifndef MCX_CONTAINER
             mesh_savedetimage(detimage, cfg);
+#endif
             free(detimage);
         }
+    }
 
-        free(master.partialpath);
-
-        if (cfg->issaveseed && master.photonseed) {
-            cfg->exportseed = (unsigned char*)malloc(cfg->detectedcount * sizeof(RandType) * RAND_BUF_LEN);
-            memcpy(cfg->exportseed, master.photonseed, cfg->detectedcount * sizeof(RandType)*RAND_BUF_LEN);
-            free(master.photonseed);
+    if ((cfg->debuglevel & dlTraj) && cfg->exportdebugdata) {
+        if (cfg->debugdatalen > cfg->maxjumpdebug) {
+            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%d) \
+  are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET
+                        , cfg->debugdatalen, cfg->maxjumpdebug);
+            cfg->debugdatalen = cfg->maxjumpdebug;
+        } else {
+            MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\t", cfg->debugdatalen, cfg->debugdatalen);
         }
     }
+
+#ifndef MCX_CONTAINER
 
     if (cfg->issaveref) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving surface diffuse reflectance ..."));
         mesh_saveweight(mesh, cfg, 1);
     }
+
+    if ((cfg->debuglevel & dlTraj) && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+        cfg->his.colcount = MCX_DEBUG_REC_LEN;
+        cfg->his.savedphoton = cfg->debugdatalen;
+        cfg->his.totalphoton = cfg->nphoton;
+        cfg->his.detected = 0;  // this flag tells mcx_savedetphoton that the data is trajectory
+        mesh_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
+    }
+
+#endif
 
     MMCDEBUG(cfg, dlTime, (cfg->flog, "\tdone\t%d\n", GetTimeMillis() - t0));
     visitor_clear(&master);

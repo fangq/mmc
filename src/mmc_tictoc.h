@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,7 +30,7 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    tictoc.h
+\file    mmc_tictoc.h
 
 \brief   Interface of the timing unit
 *******************************************************************************/
@@ -42,9 +42,13 @@
 extern "C" {
 #endif
 
-unsigned int StartTimer ();
-unsigned int GetTimeMillis ();
+unsigned int StartTimer (void);
+unsigned int GetTimeMillis (void);
 void sleep_ms(int milliseconds);
+
+#if defined(_WIN32) && defined(USE_OS_TIMER) && !defined(MCX_CONTAINER)
+int EnableVTMode(void);
+#endif
 
 #ifdef  __cplusplus
 }

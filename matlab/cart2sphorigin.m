@@ -1,4 +1,4 @@
-function [T,P,R]=cart2sphorigin(xi,yi,zi,x0,y0,z0)
+function [T, P, R] = cart2sphorigin(xi, yi, zi, x0, y0, z0)
 %
 % [T,P,R]=cart2sphorigin(xi,yi,zi,x0,y0,z0)
 %
@@ -20,10 +20,10 @@ function [T,P,R]=cart2sphorigin(xi,yi,zi,x0,y0,z0)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-xi=xi-x0;
-yi=yi-y0;
-zi=zi-z0;
-[T,P,R]=cart2sph(xi(:),yi(:),zi(:));
+xi = xi - x0;
+yi = yi - y0;
+zi = zi - z0;
+[T, P, R] = cart2sph(xi(:), yi(:), zi(:));

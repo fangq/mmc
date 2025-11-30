@@ -1,8 +1,8 @@
-function yn=spbessely(n,z)
+function yn = spbessely(n, z)
 %
 % yn=spbessely(n,z)
 %
-% spherical Neumann function 
+% spherical Neumann function
 %
 % author: Qianqian Fang (q.fang <at> neu.edu)
 %
@@ -11,14 +11,14 @@ function yn=spbessely(n,z)
 %     z: input variable
 %
 % output:
-%     yn:  spherical Neumann function first order derivative 
+%     yn:  spherical Neumann function first order derivative
 %
 % example:
 %     yn=spbessely(0,1)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-yn=bessely(n+1/2,z).*sqrt(pi./(2*z));
+yn = bessely(n + 1 / 2, z) .* sqrt(pi ./ (2 * z));

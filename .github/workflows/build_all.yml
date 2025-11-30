@@ -1,0 +1,237 @@
+name: build_mmc
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build_all:
+    name: Build All
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, macos-13, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - name: Install dependencies (Linux only)
+        if: ${{ runner.os == 'Linux' && matrix.os != 'ubuntu-24.04' }}
+        run: |
+          sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev liboctave-dev gcc-7 g++-7 gcc-9 g++-9 upx-ucl pocl-opencl-icd
+      - name: Install dependencies (Linux only)
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        run: |
+          sudo add-apt-repository -s "deb [arch=amd64] http://archive.ubuntu.com/ubuntu focal main universe"
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev octave-dev gcc-7 g++-7 gcc-9 g++-9 upx-ucl pocl-opencl-icd
+      - name: Install dependencies (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 7
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
+      - name: Install dependencies (MacOS only)
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          brew install octave gcc@12
+          #brew install upx
+          if [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+            echo 'OMPONLY=omp' >> $GITHUB_ENV
+          fi
+      - name: Link libgomp.a (MacOS only)
+        if: ${{ runner.os == 'macOS' && matrix.os != 'macos-14' }}
+        run: |
+          sudo ln -s /usr/local/lib/gcc/11/libgomp.a /usr/local/lib/libgomp.a
+      - name: Install dependencies (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          #choco install octave.portable --version=8.3.0
+          curl --retry 3 -kL https://ftpmirror.gnu.org/octave/windows/octave-9.2.0-w64.7z --output octave_9.2.7z
+          7z x octave_9.2.7z -ooctave -y
+          rm -rf octave_9.2.7z
+          echo "$PWD/octave/octave-9.2.0-w64/mingw64/bin" >> $GITHUB_PATH
+          choco install upx
+          choco install mingw --version=8.1.0
+          #echo 'C:\ProgramData\chocolatey\lib\octave.portable\tools\octave\mingw64\bin' >> $GITHUB_PATH
+          echo 'C:\ProgramData\Chocolatey\lib\mingw\tools\install\mingw64\bin\' >> $GITHUB_PATH
+          echo 'MW_MINGW64_LOC=/c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/' >> $GITHUB_ENV
+      - name: Install OpenCL.dll and static libraries (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          mkdir opencl
+          cd opencl
+          curl http://mcx.space/wiki/upload/opencl.zip --output opencl.zip
+          unzip opencl.zip
+          cp bin/OpenCL.dll 'c:\Windows\System32'
+          cd ..
+          rm -rf opencl
+      - name: Install OpenCL (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          choco install opencl-intel-cpu-runtime --yes --no-progress
+      - name: Set up MATLAB (non MacOS-14)
+        if: ${{ matrix.os != 'macos-14' }}
+        uses: matlab-actions/setup-matlab@v1
+      - name: Set up MATLAB (MacOS-14)
+        if: ${{ matrix.os == 'macos-14' }}
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2023b
+      - name: Update RCS keywords
+        run: |
+          printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
+          rm -rf src/*.c
+          git checkout src/*.c
+      - name: Build mmclab for Octave
+        run: |
+          cd src
+          which gcc
+          gcc -v
+          mkoctfile --version
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 9
+            make oct MEXLINKOPT="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lc -lm -lstdc++ -lpthread -Wl,-Bdynamic"
+            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 7
+            ldd ../mmclab/mmc.mex
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            make oct${{ env.OMPONLY }} CC=gcc-12 CXX=g++-12 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
+            otool -L ../mmclab/mmc.mex
+          else
+            PATH="$PWD/../octave/octave-9.2.0-w64/mingw64/bin":$PATH
+            which g++
+            g++ --version
+            make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose' LFLAGS='-static-libgcc -static-libstdc++'
+            objdump -p ../mmclab/mmc.mex | grep "DLL Name:"
+            make clean
+          fi
+          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])"
+          octave-cli --eval "fprintf(1,['OCTAVE_ARCH=' regexprep(computer('arch'), 'darwin[0-9.]+-', 'darwin-')])" >> $GITHUB_ENV
+      - name: Build mmclab for MATLAB
+        run: |
+          cd src
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            alias cc=gcc
+            make mex CC=gcc CXX=g++ LDFLAGS="-static lib/libzmat.a" EXTRALIB="-Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib -v"
+            objdump -p ../mmclab/mmc.mexw* | grep "DLL Name:"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            which mex
+            if [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+              perl -pi -e 's/maci64/maca64/g' mexopts_maci64_gcc.xml
+              perl -pi -e 's/MACI64/MACA64/g' mexopts_maci64_gcc.xml
+            fi
+            make mex${{ env.OMPONLY }} CC=gcc-12 CXX=g++-12 MEXLINKOPT="-static-libstdc++ -static-libgcc -fopenmp" EXTRALIB="-v -f mexopts_maci64_gcc.xml"
+            otool -L ../mmclab/mmc.mex*
+          else
+            make mex MEXLINKOPT="-static-libstdc++ -static-libgcc -Wl,-Bstatic -lstdc++ -lpthread -fopenmp -Wl,-Bdynamic" EXTRALIB="-v"
+            ldd ../mmclab/mmc.mex*
+          fi
+      - name: Build binary
+        run: |
+          cd src
+          make clean
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            make AR=c++ EXTRALIB="-static-libstdc++ -static-libgcc -Wl,-Bdynamic -lOpenCL -Wl,-Bstatic -lc -lm -lstdc++ -lpthread -fopenmp"
+            ldd ../bin/mmc
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            make ${{ env.OMPONLY }} CC=gcc-12 CXX=g++-12
+            otool -L ../bin/mmc
+          else
+            make CC=gcc CXX=g++ USERARFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic lib/libzmat.a -Lc:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/x86_64-w64-mingw32/lib"
+            ldd ../bin/mmc
+          fi
+      - name: Run binary tests
+        run: |
+          cd bin
+          ./mmc -L
+          ./mmc --bench
+          ./mmc --bench dmmc-cube60 -S 0 -D T -G -1
+          ./mmc --bench dmmc-cube60b -S 0 -D T -G -1
+          ./mmc --bench edgeimmc -S 0 -D T -G -1
+          ./mmc --bench nodeimmc -S 0 -D T -G -1
+          ./mmc --bench faceimmc -S 0 -D T -G -1
+      - name: Create package folder
+        run: |
+          mkdir packages
+          mkdir -p mmclab/octave/${{ env.OCTAVE_ARCH }}
+      - name: Create release tag
+        run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
+      - name: Zip mmclab
+        run: |
+          if [[ "$RUNNER_OS" != "macOS" ]]; then
+            upx -9 mmclab/mmc.mex* || true
+          fi
+          mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cp "$PWD/octave/octave-9.2.0-w64/mingw64/bin/libgomp-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
+            cp "$PWD/octave/octave-9.2.0-w64/mingw64/bin/libwinpthread-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
+            upx -9 mmclab/octave/${{ env.OCTAVE_ARCH }}/* || true
+            7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
+          else
+            zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
+          fi
+      - name: Upload mmclab package
+        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'windows-2022' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-mmclab-packages-${{ env.RELEASE_TAG }}
+          path: packages/mmclab-${{ env.RELEASE_TAG }}.zip
+      - name: Prepare mmc package
+        run: |
+          rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
+      - name: Zip mmc
+        run: |
+          cd .. && pwd
+          if [[ "$RUNNER_OS" != "macOS" ]]; then
+            upx -9 mmc/bin/* || true
+          fi
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a -tzip mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -xr!mmc/packages
+          else
+            zip -FSr --symlink mmc/packages/mmc-${{ env.RELEASE_TAG }}.zip mmc -x 'mmc/packages*'
+          fi
+      - name: Upload mmc package
+        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'windows-2022' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-mmc-packages-${{ env.RELEASE_TAG }}
+          path: packages/mmc-${{ env.RELEASE_TAG }}.zip
+
+  upload_package:
+    name: Upload Packages
+    needs: build_all
+    runs-on: ubuntu-22.04
+    if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+    steps:
+      - name: Download mmclab
+        uses: actions/download-artifact@v4
+        with:
+          pattern: all-mmc*-packages-*
+          merge-multiple: true
+          path: packages
+      - name: Create all-in-one octave mmclab
+        run: |
+          cd packages
+          unzip -n 'mmclab*.zip'
+          tree .
+          zip -FSr --symlink mmclab-allinone-github-latest.zip mmclab
+          rm -rf mmclab
+      - name: Display structure of downloaded files
+        run: ls -R packages
+      - name: Copy package to server
+        if: ${{ github.repository_owner == 'fangq' && github.event_name != 'pull_request'}}
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.MCX_SERVER }}
+          username: ${{ secrets.MCX_SERVER_USER }}
+          ssh_private_key: ${{ secrets.MCX_SERVER_SSH_KEY }}
+          local_path: "packages/*"
+          remote_path: ${{ secrets.MCX_CI_PATH }}

@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,7 +30,7 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    drand48_r_libgw32c.h
+\file    mmc_rand_drand48.h
 
 \brief   Windows 32 port of drand48_r random number generator from libgw2c
 *******************************************************************************/

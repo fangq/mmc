@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<config
+    Name="g++"
+    ShortName="g++"
+    Manufacturer="GNU"
+    Version="$GCC_VERSION"
+    Language="C++"
+    Priority="A"
+    Location="$GCC_DIR" >
+    <Details
+        CompilerExecutable="$CXX"
+        CompilerDefines="$DEFINES"
+        CompilerFlags="$CXXFLAGS"
+        OptimizationFlags="$CXXOPTIMFLAGS"
+        DebugFlags="$CXXDEBUGFLAGS"
+        IncludeFlags="$INCLUDE"
+        LinkerExecutable="$LDXX"
+        LinkerFlags="$LDFLAGS"
+        LinkerLibraries="$LINKLIBS"
+        LinkerOptimizationFlags="$LDOPTIMFLAGS"
+        LinkerDebugFlags="$LDDEBUGFLAGS"
+        CompilerDefineFormatter="-D%s"
+        LinkerLibrarySwitchFormatter="-l%s"
+        LinkerPathFormatter="-L%s"
+        />
+    <vars
+        CC="gcc"
+        CXX="g++"
+        CMDLINE100="$CXX -c $DEFINES $INCLUDE $CXXFLAGS $OPTIM $SRC -o $OBJ"
+        CMDLINE200="$LDXX $LDFLAGS $LINKOPTIM $LINKEXPORT $LINKEXPORTVER $LINKEXPORTCPP $OBJS $CXXLIBS $LINKLIBS -o $EXE"
+        DEFINES="$MATLABMEX"
+        MATLABMEX="-DMATLAB_MEX_FILE "
+        CFLAGS="-ansi -D_GNU_SOURCE -fno-common -arch x86_64 -fexceptions -fPIC -fno-omit-frame-pointer -pthread"
+        CXXFLAGS="$CFLAGS -std=c++11"
+        INCLUDE="-I&quot;$MATLABROOT/extern/include&quot; -I&quot;$MATLABROOT/simulink/include&quot;"
+        CXXOPTIMFLAGS="-O2 -fwrapv -DNDEBUG"
+        CXXDEBUGFLAGS="-g"
+        LD="$CC"
+        LDXX="$CXX"
+        LDFLAGS="-Wl,-twolevel_namespace -undefined error -arch x86_64 $LDBUNDLE"
+        LDBUNDLE="-bundle "
+        LINKEXPORT="-Wl,-exported_symbols_list,&quot;$MATLABROOT/extern/lib/maci64/mexFunction.map&quot;"
+        LINKEXPORTVER="-Wl,-exported_symbols_list,&quot;$MATLABROOT/extern/lib/maci64/c_exportsmexfileversion.map&quot;"
+        LINKEXPORTCPP="-Wl,-U,_mexCreateMexFunction -Wl,-U,_mexDestroyMexFunction -Wl,-U,_mexFunctionAdapter -Wl,-exported_symbols_list,&quot;$MATLABROOT/extern/lib/maci64/cppMexFunction.map&quot;"
+        LINKLIBS="-L&quot;$MATLABROOT/bin/maci64&quot; -lmx -lmex -lmat -L&quot;$MATLABROOT/extern/bin/$ARCH&quot; -lMatlabDataArray -lMatlabEngine"
+        LDOPTIMFLAGS="-O"
+        LDDEBUGFLAGS="-g"
+        OBJEXT=".o"
+        LDEXT=".mexmaci64"
+        SETENV="CC=&quot;$CC&quot;
+                CXX=&quot;$CXX&quot;
+                CFLAGS=&quot;$CFLAGS $DEFINES&quot;
+                CXXFLAGS=&quot;$CXXFLAGS $DEFINES&quot;
+                COPTIMFLAGS=&quot;$CXXOPTIMFLAGS&quot;
+                CXXOPTIMFLAGS=&quot;$CXXOPTIMFLAGS&quot;
+                CDEBUGFLAGS=&quot;$CXXDEBUGFLAGS&quot;
+                CXXDEBUGFLAGS=&quot;$CXXDEBUGFLAGS&quot;
+                LD=&quot;$LD&quot;
+                LDXX=&quot;$LDXX&quot;
+                LDFLAGS=&quot;$LDFLAGS $LINKLIBS $LINKEXPORT&quot;
+                LDDEBUGFLAGS=&quot;$LDDEBUGFLAGS&quot;"
+    />
+    <client>
+        <engine
+            LINKLIBS="$LINKLIBS -leng -L&quot;$MATLABROOT/extern/bin/$ARCH&quot; -lMatlabDataArray -lMatlabEngine"
+            LDBUNDLE=""
+            LINKEXPORT=""
+            LINKEXPORTVER=""
+            LINKEXPORTCPP=""
+            LDEXT=""
+        />
+
+        <mbuild
+            CMDLINE150="$MATLABROOT/bin/maci64/macbundle $EXENAME &quot;$EXEDIR&quot;"
+            CMDLINE200="$LDXX $LDFLAGS $OBJS $LINKOPTIM $LINKEXPORT $CXXLIBS $LINKLIBS -o &quot;$EXEDIR$EXENAME.app/Contents/MacOS/$EXENAME&quot;"
+            CXXFLAGS="-fexceptions -fno-common -arch x86_64 -std=c++11"
+            DEFINES="-DUNIX -DX11 -DMACI64 -UMX_COMPAT_SC"
+            LDFLAGS="-arch x86_64 $LDTYPE $LINKEXPORT -bind_at_load"
+            LINKLIBS="-L&quot;$MATLABROOT/runtime/maci64&quot; -L&quot;$MATLABROOT/extern/bin/maci64&quot; -lMatlabDataArray -lMatlabCppSharedLib -lmwmclmcrrt"
+            INCLUDE="-I&quot;$MATLABROOT/extern/include&quot; -I&quot;$MATLABROOT/extern/include/cpp&quot;"
+            MATLABMEX=""
+            LDEXT=""
+            LINKEXPORT=""
+            LINKEXPORTVER=""
+            LINKEXPORTCPP=""
+            LDTYPE=""
+        />
+
+    </client>
+    <locationFinder>
+        <GCC_DIR>
+            <and>
+                <cmdReturns name="which g++" />
+                <dirExists name="$$" />
+            </and>
+        </GCC_DIR>
+        <GCC_VERSION>
+            <cmdReturns name="g++ -dumpversion"/>
+        </GCC_VERSION>
+    </locationFinder>
+</config>

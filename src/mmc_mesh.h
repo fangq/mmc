@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -30,7 +30,7 @@
 *******************************************************************************/
 
 /***************************************************************************//**
-\file    simpmesh.h
+\file    mmc_mesh.h
 
 \brief   Definition of basic mesh data structures and inline vector operations
 *******************************************************************************/
@@ -63,18 +63,15 @@
 #endif
 
 #define MMC_UNDEFINED (3.40282347e+38F)
-#define ID_UNDEFINED  0xFFFFFFFF
+#define ID_UNDEFINED  0x7FFFFFFF
 
 #define R_RAND_MAX (1.f/RAND_MAX)
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
 #define LOG_MT_MAX 22.1807097779182f
 #define R_MIN_MUS  1e9f
-#define R_C0       3.335640951981520e-12f  //1/C0 in s/mm
 #define DELTA_MUA  1e-4f
 #define VERY_BIG   1e30f
-#define MIN(a,b)  ((a)<(b)?(a):(b))
-#define MAX(a,b)  ((a)>(b)?(a):(b))
 
 #define MESH_ERROR(a)  mesh_error((a),__FILE__,__LINE__)
 
@@ -93,7 +90,7 @@ typedef struct MMC_mesh {
     int nf;                /**< number of surface triangles */
     int prop;              /**< number of media */
     int elemlen;           /**< number of nodes per element */
-    MMCfloat3* node;       /**< node coordinates */
+    FLOAT3* node;       /**< node coordinates */
     int*  elem;            /**< element indices */
     int*  elem2;           /**< element indices */
     float* edgeroi;        /**< immc: vessel edge radii */
@@ -121,6 +118,7 @@ typedef struct MMC_mesh {
     uint* back;            /**< back face medium */
 } tetmesh;
 
+
 /***************************************************************************//**
 \struct MMC_raytracer simpmesh.h
 \brief  Ray-tracer data structrure for pre-computed data
@@ -134,9 +132,9 @@ moment vectors for each edge in a tetrahedron.
 typedef struct MMC_raytracer {
     tetmesh* mesh;          /**< link to the mesh structure */
     char method;            /**< 1 for Plucker-based ray-tracing, 0 for Havel */
-    MMCfloat3* d;           /**< precomputed data: for Pluckers, this is displacement */
-    MMCfloat3* m;           /**< precomputed data: for Pluckers, this is moment */
-    MMCfloat3* n;           /**< precomputed data: for Pluckers, face norm */
+    float3* d;              /**< precomputed data: for Pluckers, this is displacement */
+    float3* m;              /**< precomputed data: for Pluckers, this is moment */
+    float3* n;              /**< precomputed data: for Pluckers, face norm */
 } raytracer;
 #ifdef  __cplusplus
 extern "C" {
@@ -150,7 +148,7 @@ void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg);
 
-void mesh_clear(tetmesh* mesh);
+void mesh_clear(tetmesh* mesh, mcconfig* cfg);
 float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, int pair);
 void mesh_build(tetmesh* mesh);
 void mesh_error(const char* msg, const char* file, const int linenum);
@@ -163,13 +161,19 @@ float mesh_getdetweight(int photonid, int colcount, float* ppath, mcconfig* cfg)
 void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg);
 void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadroi(tetmesh* mesh, mcconfig* cfg);
+double mesh_getreff_approx(double n_in, double n_out);
+double mesh_getreff(double n_in, double n_out);
+int mesh_barycentric(int e0, float* bary, FLOAT3* srcpos, tetmesh* mesh);
+int mesh_initelem(tetmesh* mesh, mcconfig* cfg);
+void mesh_validate(tetmesh* mesh, mcconfig* cfg);
+void mesh_getvolume(tetmesh* mesh, mcconfig* cfg);
 
 void tracer_init(raytracer* tracer, tetmesh* mesh, char methodid);
 void tracer_build(raytracer* tracer);
 void tracer_prep(raytracer* tracer, mcconfig* cfg);
 void tracer_clear(raytracer* tracer);
 
-float mc_next_scatter(float g, MMCfloat3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom);
+float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom);
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus
 extern "C"
@@ -181,31 +185,31 @@ int mcx_throw_exception(const int id, const char* msg, const char* filename, con
 }
 #endif
 
-static inline void vec_add(MMCfloat3* a, MMCfloat3* b, MMCfloat3* res) {
+static inline void vec_add(float3* a, float3* b, float3* res) {
     res->x = a->x + b->x;
     res->y = a->y + b->y;
     res->z = a->z + b->z;
 }
 
-static inline void vec_diff(MMCfloat3* a, MMCfloat3* b, MMCfloat3* res) {
+static inline void vec_diff(float3* a, float3* b, float3* res) {
     res->x = b->x - a->x;
     res->y = b->y - a->y;
     res->z = b->z - a->z;
 }
 
-static inline void vec_mult(MMCfloat3* a, float sa, MMCfloat3* res) {
+static inline void vec_mult(float3* a, float sa, float3* res) {
     res->x = sa * a->x;
     res->y = sa * a->y;
     res->z = sa * a->z;
 }
 
-static inline void vec_mult_add(MMCfloat3* a, MMCfloat3* b, float sa, float sb, MMCfloat3* res) {
+static inline void vec_mult_add(float3* a, float3* b, float sa, float sb, float3* res) {
     res->x = sb * b->x + sa * a->x;
     res->y = sb * b->y + sa * a->y;
     res->z = sb * b->z + sa * a->z;
 }
 
-static inline void vec_cross(MMCfloat3* a, MMCfloat3* b, MMCfloat3* res) {
+static inline void vec_cross(float3* a, float3* b, float3* res) {
     res->x = a->y * b->z - a->z * b->y;
     res->y = a->z * b->x - a->x * b->z;
     res->z = a->x * b->y - a->y * b->x;
@@ -221,13 +225,14 @@ static inline void mmc_sincosf(float x, float* sine, float* cosine) {
 }
 
 //#ifndef MMC_USE_SSE
-static inline float vec_dot(MMCfloat3* a, MMCfloat3* b) {
+static inline float vec_dot(float3* a, float3* b) {
     return a->x * b->x + a->y * b->y + a->z * b->z;
-}/*
+}
+/*
 #else
 
 #ifndef __SSE4_1__
-static inline float vec_dot(MMCfloat3 *a,MMCfloat3 *b){
+static inline float vec_dot(float3 *a,float3 *b){
         float dot;
         __m128 na,nb,res;
         na=_mm_load_ps(&a->x);
@@ -239,7 +244,7 @@ static inline float vec_dot(MMCfloat3 *a,MMCfloat3 *b){
         return dot;
 }
 #else
-static inline float vec_dot(MMCfloat3 *a,MMCfloat3 *b){
+static inline float vec_dot(float3 *a,float3 *b){
         float dot;
         __m128 na,nb,res;
         na=_mm_load_ps(&a->x);
@@ -252,21 +257,66 @@ static inline float vec_dot(MMCfloat3 *a,MMCfloat3 *b){
 #endif
 */
 
-static inline float pinner(MMCfloat3* Pd, MMCfloat3* Pm, MMCfloat3* Ad, MMCfloat3* Am) {
+static inline float pinner(float3* Pd, float3* Pm, float3* Ad, float3* Am) {
     return vec_dot(Pd, Am) + vec_dot(Pm, Ad);
 }
 
 
-static inline float dist2(MMCfloat3* p0, MMCfloat3* p1) {
+static inline float dist2(float3* p0, float3* p1) {
     return (p1->x - p0->x) * (p1->x - p0->x) + (p1->y - p0->y) * (p1->y - p0->y) + (p1->z - p0->z) * (p1->z - p0->z);
 }
 
-static inline float dist(MMCfloat3* p0, MMCfloat3* p1) {
+static inline float dist(float3* p0, float3* p1) {
     return sqrtf(dist2(p0, p1));
 }
 
 static inline float dist2d2(float* p0, float* p1) {
     return (p1[0] - p0[0]) * (p1[0] - p0[0]) + (p1[1] - p0[1]) * (p1[1] - p0[1]);
+}
+
+/**
+ *  vector functions that strictly accept only 3-element vectors
+ */
+static inline void vec_add3(FLOAT3* a, FLOAT3* b, FLOAT3* res) {
+    res->x = a->x + b->x;
+    res->y = a->y + b->y;
+    res->z = a->z + b->z;
+}
+
+static inline void vec_diff3(FLOAT3* a, FLOAT3* b, FLOAT3* res) {
+    res->x = b->x - a->x;
+    res->y = b->y - a->y;
+    res->z = b->z - a->z;
+}
+
+static inline void vec_mult3(FLOAT3* a, float sa, FLOAT3* res) {
+    res->x = sa * a->x;
+    res->y = sa * a->y;
+    res->z = sa * a->z;
+}
+
+static inline void vec_mult_add3(FLOAT3* a, FLOAT3* b, float sa, float sb, FLOAT3* res) {
+    res->x = sb * b->x + sa * a->x;
+    res->y = sb * b->y + sa * a->y;
+    res->z = sb * b->z + sa * a->z;
+}
+
+static inline void vec_cross3(FLOAT3* a, FLOAT3* b, FLOAT3* res) {
+    res->x = a->y * b->z - a->z * b->y;
+    res->y = a->z * b->x - a->x * b->z;
+    res->z = a->x * b->y - a->y * b->x;
+}
+
+static inline float vec_dot3(FLOAT3* a, FLOAT3* b) {
+    return a->x * b->x + a->y * b->y + a->z * b->z;
+}
+
+static inline float dist2_3(FLOAT3* p0, FLOAT3* p1) {
+    return (p1->x - p0->x) * (p1->x - p0->x) + (p1->y - p0->y) * (p1->y - p0->y) + (p1->z - p0->z) * (p1->z - p0->z);
+}
+
+static inline float dist_3(FLOAT3* p0, FLOAT3* p1) {
+    return sqrtf(dist2_3(p0, p1));
 }
 
 static inline float mmc_rsqrtf(float a) {

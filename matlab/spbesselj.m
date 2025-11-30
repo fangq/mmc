@@ -1,4 +1,4 @@
-function jn=spbesselj(n,z)
+function jn = spbesselj(n, z)
 %
 % jn=spbesselj(n,z)
 %
@@ -18,7 +18,7 @@ function jn=spbesselj(n,z)
 %
 % this file is part of Mesh-based Monte Carlo (MMC)
 %
-% License: GPLv3, see http://mcx.sf.net/mmc/ for details
+% License: GPLv3, see https://mcx.space/mmc/ for details
 %
 
-jn=besselj(n+1/2,z).*sqrt(pi./(2*z));
+jn = besselj(n + 1 / 2, z) .* sqrt(pi ./ (2 * z));

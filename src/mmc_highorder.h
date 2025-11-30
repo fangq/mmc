@@ -2,7 +2,7 @@
 **  \mainpage Mesh-based Monte Carlo (MMC) - a 3D photon simulator
 **
 **  \author Qianqian Fang <q.fang at neu.edu>
-**  \copyright Qianqian Fang, 2010-2021
+**  \copyright Qianqian Fang, 2010-2025
 **
 **  \section sref Reference:
 **  \li \c (\b Fang2010) Qianqian Fang, <a href="http://www.opticsinfobase.org/abstract.cfm?uri=boe-1-1-165">
@@ -33,8 +33,13 @@
 #define _MCEXTREME_LOGISTIC_RAND_H
 
 #ifdef __cplusplus
-    extern "C"
+extern "C" {
 #endif
 void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg);
+void mesh_getfacenb(tetmesh* mesh, mcconfig* cfg);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
