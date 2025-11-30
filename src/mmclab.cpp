@@ -51,7 +51,7 @@
 #ifdef USE_OPENCL
     #include "mmc_cl_host.h"
 #endif
-#if USE_CUDA
+#ifdef USE_CUDA
     #include "mmc_cu_host.h"
 #endif
 #include "mmc_tictoc.h"
