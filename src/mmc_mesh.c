@@ -1100,7 +1100,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         memcpy(fnb, tracer->mesh->facenb, (pmesh->ne * pmesh->elemlen) * sizeof(int));
 
         // copy node from a float4 array into a float3 array
-        pmesh->fnode = (float3*)malloc(pmesh->nn * sizeof(float3));
+        pmesh->fnode = (FLOAT3*)malloc(pmesh->nn * sizeof(FLOAT3));
 
         for (int i = 0; i < pmesh->nn; ++i) {
             pmesh->fnode[i].x = pmesh->node[i].x;
@@ -1111,10 +1111,10 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         // find triangle meshes, front and back medium types
         pmesh->nface = 0;
         pmesh->face = (uint3*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint3));
-        pmesh->fnorm = (float3*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(float3));
+        pmesh->fnorm = (FLOAT3*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(float3));
         pmesh->front = (uint*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint));
         pmesh->back = (uint*)malloc((pmesh->ne * pmesh->elemlen) * sizeof(uint));
-        float3 v0, v1, v2, vec01, vec02, vnorm;
+        FLOAT3 v0, v1, v2, vec01, vec02, vnorm;
 
         for (int i = 0; i < pmesh->ne; ++i) {
             for (int j = 0; j < pmesh->elemlen; ++j) {
@@ -1155,7 +1155,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         }
 
         pmesh->face = (uint3*)realloc(pmesh->face, pmesh->nface * sizeof(uint3));
-        pmesh->fnorm = (float3*)realloc(pmesh->fnorm, pmesh->nface * sizeof(float3));
+        pmesh->fnorm = (FLOAT3*)realloc(pmesh->fnorm, pmesh->nface * sizeof(FLOAT3));
         pmesh->front = (uint*)realloc(pmesh->front, pmesh->nface * sizeof(uint));
         pmesh->back = (uint*)realloc(pmesh->back, pmesh->nface * sizeof(uint));
 

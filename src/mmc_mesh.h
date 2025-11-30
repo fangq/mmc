@@ -111,9 +111,9 @@ typedef struct MMC_mesh {
     float4 nmin;           /**< lower-corner of the mesh bounding box */
     float4 nmax;           /**< upper-corner of the mesh bounding box */
     uint nface;            /**< number of triangular meshes */
-    float3* fnode;         /**< triangular mesh nodes */
+    FLOAT3* fnode;         /**< triangular mesh nodes */
     uint3* face;           /**< triangular meshes */
-    float3* fnorm;         /**< face normal: pointing from back to front */
+    FLOAT3* fnorm;         /**< face normal: pointing from back to front */
     uint* front;           /**< front face medium */
     uint* back;            /**< back face medium */
 } tetmesh;
