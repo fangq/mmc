@@ -105,29 +105,20 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     // ==================================================================
     // normalize output
     // ==================================================================
-    /*
-        if (cfg->isnormalized) {
-            MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-            fflush(cfg->flog);
+    if (cfg->isnormalized) {
+        MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
+        fflush(cfg->flog);
 
-            float* energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
+        // not used if cfg->method == rtBLBadouelGrid
+        // for now assume initial weight of each photon is 1.0
+        float energyabs = 0.0f, energytot = cfg->nphoton;
 
-            CUDA_ASSERT(cudaMemcpy(energy, genergy,
-                                   sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
-                                   cudaMemcpyDeviceToHost));
-            optixcfg.outputBuffer.download(optixcfg.outputHostBuffer, optixcfg.outputBufferSize);
+        mesh_normalize(mesh, cfg, energyabs, energytot, 0);
+        MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
+                    GetTimeMillis() - tic0);
+        fflush(cfg->flog);
+    }
 
-            // not used if cfg->method == rtBLBadouelGrid
-            cfg->energyabs = 0.0f;
-
-            // for now assume initial weight of each photon is 1.0
-            cfg->energytot = cfg->nphoton;
-            mesh_normalize(mesh, cfg, cfg->energyabs, cfg->energytot, 0);
-            MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
-                GetTimeMillis() - tic0);
-            fflush(cfg->flog);
-        }
-    */
 #ifndef MCX_CONTAINER
     #pragma omp master
     {
