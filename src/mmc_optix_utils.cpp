@@ -135,6 +135,13 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     // ==================================================================
     // Free memory
     // ==================================================================
+    #pragma omp master
+    {
+        if (gpu) {
+            free(gpu);
+        }
+    }
+
     clearOptixParams(&optixcfg);
 }
 
@@ -668,6 +675,7 @@ void buildSBT(tetmesh* mesh, OptixParams* optixcfg) {
     optixcfg->faceBuffer.alloc_and_upload(fnorm, mesh->nface);
     rec.data.fnorm = (float4*)optixcfg->faceBuffer.d_pointer();
     hitgroupRecords.push_back(rec);
+    free(fnorm);
 
     optixcfg->hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
     optixcfg->sbt.hitgroupRecordBase          = optixcfg->hitgroupRecordsBuffer.d_pointer();
@@ -690,4 +698,11 @@ void clearOptixParams(OptixParams* optixcfg) {
     optixcfg->seedBuffer.free();
     optixcfg->outputBuffer.free();
     free(optixcfg->outputHostBuffer);
+
+    optixPipelineDestroy(optixcfg->pipeline);
+    optixProgramGroupDestroy(optixcfg->raygenPGs[0]);
+    optixProgramGroupDestroy(optixcfg->missPGs[0]);
+    optixProgramGroupDestroy(optixcfg->hitgroupPGs[0]);
+    optixModuleDestroy(optixcfg->module);
+    optixDeviceContextDestroy(optixcfg->optixContext);
 }
