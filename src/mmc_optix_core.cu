@@ -17,7 +17,9 @@ constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // heuristic to ensure ray cut through triangle
 constexpr float DOUBLE_SAFETY_DISTANCE = SAFETY_DISTANCE * 2.0f;
-
+constexpr float TWO_PI = 6.28318530717959f;       //2*pi
+constexpr float FLT_EPSILON = 1.19209290E-07F;    //round-off limit
+constexpr float EPS = FLT_EPSILON;                //round-off limit
 // simulation configuration and medium optical properties
 extern "C" {
     __constant__ MMCParam gcfg;
@@ -47,18 +49,90 @@ __device__ __forceinline__ void getInitialMediumId(optixray& r, mcx::Random& rng
  * @brief Launch a new photon
  */
 __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
-    if (gcfg.srctype == MCX_SRC_PENCIL) {
-        r.p0 = gcfg.srcpos;
-        r.dir = gcfg.srcdir;
-        r.weight = 1.0f;
-    } else if (gcfg.srctype == MCX_SRC_PLANAR) {
+
+    r.p0 = gcfg.srcpos;
+    r.dir = gcfg.srcdir;
+    r.weight = 1.0f;
+
+    if (gcfg.srctype == MCX_SRC_PLANAR) {
         float rx = rng.uniform(0.0f, 1.0f);
         float ry = rng.uniform(0.0f, 1.0f);
         r.p0.x = gcfg.srcpos.x + rx * gcfg.srcparam1.x + ry * gcfg.srcparam2.x;
         r.p0.y = gcfg.srcpos.y + rx * gcfg.srcparam1.y + ry * gcfg.srcparam2.y;
         r.p0.z = gcfg.srcpos.z + rx * gcfg.srcparam1.z + ry * gcfg.srcparam2.z;
-        r.dir = gcfg.srcdir;
-        r.weight = 1.f;
+    } else if (gcfg.srctype == MCX_SRC_DISK || gcfg.srctype == MCX_SRC_GAUSSIAN) {
+        float sphi, cphi;
+        float phi = TWO_PI * rng.uniform(0.0f, 1.0f);
+        sincosf(phi, &sphi, &cphi);
+
+        float r0;
+
+        if (gcfg.srctype == MCX_SRC_DISK) {
+            r0 = sqrtf(rng.uniform(0.0f, 1.0f)) * gcfg.srcparam1.x;
+        } else {
+            r0 = sqrtf(-logf((rng.uniform(0.0f, 1.0f)))) * gcfg.srcparam1.x;
+        }
+
+        if (gcfg.srcdir.z > -1.f + EPS && gcfg.srcdir.z < 1.f - EPS) {
+            float tmp0 = 1.f - gcfg.srcdir.z * gcfg.srcdir.z;
+            float tmp1 = r0 * rsqrt(tmp0);
+            r.p0.x = gcfg.srcpos.x + tmp1 * (gcfg.srcdir.x * gcfg.srcdir.z * cphi - gcfg.srcdir.y * sphi);
+            r.p0.y = gcfg.srcpos.y + tmp1 * (gcfg.srcdir.y * gcfg.srcdir.z * cphi + gcfg.srcdir.x * sphi);
+            r.p0.z = gcfg.srcpos.z - tmp1 * tmp0 * cphi;
+        } else {
+            r.p0.x += r0 * cphi;
+            r.p0.y += r0 * sphi;
+        }
+    }  else if (gcfg.srctype == MCX_SRC_CONE || gcfg.srctype == MCX_SRC_ISOTROPIC || gcfg.srctype == MCX_SRC_ARCSINE) {
+        float ang, stheta, ctheta, sphi, cphi;
+        ang = TWO_PI * rng.uniform(0.0f, 1.0f); //next arimuth angle
+        sincosf(ang, &sphi, &cphi);
+
+        if (gcfg.srctype == MCX_SRC_CONE) {
+            do {
+                ang = (gcfg.srcparam1.y > 0) ? TWO_PI * rng.uniform(0.0f, 1.0f) : acos(2.f * rng.uniform(0.0f, 1.0f) - 1.f); //sine distribution
+            } while (ang > gcfg.srcparam1.x);
+        } else {
+            if (gcfg.srctype == MCX_SRC_ISOTROPIC) { // uniform sphere
+                ang = acosf(2.f * rng.uniform(0.0f, 1.0f) - 1.f);    //sine distribution
+            } else {
+                ang = M_PI * rng.uniform(0.0f, 1.0f);    //uniform distribution in zenith angle, arcsine
+            }
+        }
+
+        sincosf(ang, &stheta, &ctheta);
+        r.dir.x = stheta * cphi;
+        r.dir.y = stheta * sphi;
+        r.dir.z = ctheta;
+        //canfocus = 0;
+    }  else if (gcfg.srctype == MCX_SRC_ZGAUSSIAN) {
+        float ang, stheta, ctheta, sphi, cphi;
+        ang = TWO_PI * rng.uniform(0.0f, 1.0f); //next arimuth angle
+        sincosf(ang, &sphi, &cphi);
+        ang = sqrtf(-2.f * logf(rng.uniform(0.0f, 1.0f))) * (1.f - 2.f * rng.uniform(0.0f, 1.0f)) * gcfg.srcparam1.x;
+        sincosf(ang, &stheta, &ctheta);
+        r.dir.x = stheta * cphi;
+        r.dir.y = stheta * sphi;
+        r.dir.z = ctheta;
+        //canfocus = 0;
+    } else if (gcfg.srctype == MCX_SRC_LINE || gcfg.srctype == MCX_SRC_SLIT) {
+        float t = rng.uniform(0.0f, 1.0f);
+        r.p0.x += t * gcfg.srcparam1.x;
+        r.p0.y += t * gcfg.srcparam1.y;
+        r.p0.z += t * gcfg.srcparam1.z;
+
+        if (gcfg.srctype == MCX_SRC_LINE) {
+            float s, p;
+            t = 1.f - 2.f * rng.uniform(0.0f, 1.0f);
+            s = 1.f - 2.f * rng.uniform(0.0f, 1.0f);
+            p = sqrtf(1.f - r.dir.x * r.dir.x - r.dir.y * r.dir.y) * (rng.uniform(0.0f, 1.0f) > 0.5f ? 1.f : -1.f);
+            float3 vv;
+            vv.x = r.dir.y * p - r.dir.z * s;
+            vv.y = r.dir.z * t - r.dir.x * p;
+            vv.z = r.dir.x * s - r.dir.y * t;
+            r.dir = vv;
+            //*((float3*)&(r.dir))=(float3)(r.dir.y*p-r.dir.z*s,r.vec.z*t-r.vec.x*p,r.vec.x*s-r.vec.y*t);
+        }
     }
 
     r.slen = rng.rand_next_scatlen();
