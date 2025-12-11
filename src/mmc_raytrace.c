@@ -1827,6 +1827,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
+            if (cfg->debuglevel & dlTraj) {
+                savedebugdata(&r, (unsigned int)id, cfg);
+            }
+
             reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
             vec_mult_add(&r.p0, &r.vec, 1.0f, 10 * EPS, &r.p0);
             continue;
@@ -1981,6 +1985,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
+            if (cfg->debuglevel & dlTraj) {
+                savedebugdata(&r, (unsigned int)id, cfg);
+            }
+
             reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
             vec_mult_add(&r.p0, &r.vec, 1.0f, 10 * EPS, &r.p0);
             continue;
