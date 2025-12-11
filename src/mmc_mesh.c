@@ -528,7 +528,7 @@ void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg) {
         memcpy(mesh->med, cfg->prop, sizeof(medium) * cfg->medianum);
     }
 
-    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
+    if (cfg->unitinmm != 1.f) {
         for (i = 1; i <= mesh->prop; i++) {
             mesh->med[i].mus *= cfg->unitinmm;
             mesh->med[i].mua *= cfg->unitinmm;
@@ -1569,12 +1569,7 @@ void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcco
         MESH_ERROR("can not open history file to write");
     }
 
-    cfg->his.unitinmm = 1.f;
-
-    if (cfg->method != rtBLBadouelGrid) {
-        cfg->his.unitinmm = cfg->unitinmm;
-    }
-
+    cfg->his.unitinmm = cfg->unitinmm;
     cfg->his.srcnum = cfg->srcnum;
     cfg->his.detnum = cfg->detnum;
 
@@ -1628,7 +1623,7 @@ void mesh_getdetimage(float* detmap, float* ppath, int count, mcconfig* cfg, tet
     int xsize = cfg->detparam1.w;
     int ysize = cfg->detparam2.w;
     int i, j, xindex, yindex, ntg, offset;
-    float unitinmm = (cfg->method != rtBLBadouelGrid) ? cfg->his.unitinmm : 1.f;
+    float unitinmm = cfg->his.unitinmm;
 
     float xloc, yloc, weight, path;
 
@@ -1949,7 +1944,7 @@ void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
     datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
     mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
 
-    if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
+    if (cfg->unitinmm != 1.f) {
         for (i = 1; i <= mesh->prop; i++) {
             mesh->med[i].mus *= cfg->unitinmm;
             mesh->med[i].mua *= cfg->unitinmm;
