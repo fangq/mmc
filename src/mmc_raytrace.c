@@ -1836,10 +1836,6 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
         if (r.pout.x == MMC_UNDEFINED) {
-            if (r.faceid == -2) {
-                break;    /*reaches the time limit*/
-            }
-
             if (fixcount++ < MAX_TRIAL) {
                 fixphoton((FLOAT3*)&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
                 continue;
@@ -1850,7 +1846,16 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0 && r.faceid >= 0) {
-            r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
+            r.partialpath[mesh->prop - 1 + ((cfg->implicit && (!(r.inroi) != !(r.roitype))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
+
+            if (cfg->debuglevel & dlMove) {
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"partialpath-1\": {\"l\":%f, \"inroi\":%d, \"roitype\":%d}}\n",
+                            r.photonid, r.Lmove, r.inroi, r.roitype);
+            }
+        }
+
+        if (r.faceid == -2) {
+            break;    /*reaches the time limit*/
         }
 
         if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
@@ -1926,11 +1931,12 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
             if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
-            }
+                r.partialpath[mesh->prop - 1 + ((cfg->implicit && (!(r.inroi) != !(r.roitype))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
 
-            if (r.faceid == -2) {
-                break;
+                if (cfg->debuglevel & dlMove) {
+                    MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"partialpath-2\": {\"l\":%f, \"inroi\":%d, \"roitype\":%d}}\n",
+                                r.photonid, r.Lmove, r.inroi, r.roitype);
+                }
             }
 
             fixcount = 0;
@@ -1940,7 +1946,12 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
                 r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
                 if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                    r.partialpath[mesh->prop - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
+                    r.partialpath[mesh->prop - 1 + ((cfg->implicit && ((!(r.inroi) != !(r.roitype)))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
+
+                    if (cfg->debuglevel & dlMove) {
+                        MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"partialpath-fixphoton\": {\"l\":%f, \"inroi\":%d, \"roitype\":%d}}\n",
+                                    r.photonid, r.Lmove, r.inroi, r.roitype);
+                    }
                 }
             }
 

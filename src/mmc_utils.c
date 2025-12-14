@@ -1539,7 +1539,6 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 if (subitem->child->next->next->next) {
                     if (cJSON_IsString(subitem->child->next->next->next)) {
                         if (strcmp(subitem->child->next->next->next->valuestring, "_NaN_") == 0) {
-                            printf("isnan\n");
                             cfg->srcdir.w = NAN;
                         } else if (strcmp(subitem->child->next->next->next->valuestring, "_Inf_") == 0) {
                             cfg->srcdir.w = INFINITY;
@@ -3832,7 +3831,7 @@ where possible parameters include (the first item in [] is the default value)\n\
                             8192 M  return photon trajectories\n\
       combine multiple items by using a string, or add selected numbers together\n\
  --debugphoton [-1|int]        to print the debug info specified by -D only for\n\
-                               a single photon, followed by its index (start 0)\n\
+                               a single photon, followed by its index (1-based)\n\
 \n"S_BOLD S_CYAN"\
 == Additional options ==\n"S_RESET"\
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save\n\
