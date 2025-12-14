@@ -115,7 +115,7 @@ void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit);
 void visitor_init(mcconfig* cfg, visitor* visit);
 void visitor_clear(visitor* visit);
 void updateroi(int immctype, ray* r, tetmesh* mesh);
-void traceroi(ray* r, raytracer* tracer, int roitype, int doinit);
+void traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg);
 void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], FLOAT3 p2d[2], int* hitstatus);
 void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, FLOAT3** center, int* hitstatus);
 float ray_cylinder_intersect(ray* r, int index, float d2d[2], FLOAT3 p2d[2], int hitstatus);

@@ -170,7 +170,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     dt = GetTimeMillis();
     MMCDEBUG(cfg, dlTime, (cfg->flog, "seed=%u\nsimulating ... \n", cfg->seed));
 
-    if (cfg->debugphoton >= 0) {
+    if (cfg->debugphoton > 0) {
         debuglevel = cfg->debuglevel;
         cfg->debuglevel &= 0xFFFFEA00;
 #ifdef _OPENMP
@@ -249,7 +249,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             visit.raytet = 0.f;
             visit.raytet0 = 0.f;
 
-            if (id == cfg->debugphoton) {
+            if (id == cfg->debugphoton - 1) {
                 cfg->debuglevel = debuglevel;
             }
 
@@ -262,7 +262,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             raytri += visit.raytet;
             raytri0 += visit.raytet0;
 
-            if (id == cfg->debugphoton) {
+            if (id == cfg->debugphoton - 1) {
                 cfg->debuglevel &= 0xFFFFEA00;
             }
 
