@@ -1197,7 +1197,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
 
     // build acceleration data structure to speed up first-neighbor immc face-roi calculation
     // loop over each faceroi, count how many roi in each elem, and write to the first elem as negative integer
-    if (tracer->mesh->faceroi) {
+    /*if (tracer->mesh->faceroi) {
         for (i = 0; i < ne; i++) {
             int count = 0;
 
@@ -1223,7 +1223,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                 }
             }
         }
-    }
+    }*/
 
     // loop over each external surface triangle (facenb[]==0) and sequentially number them as negative integer
     ne = tracer->mesh->ne * tracer->mesh->elemlen;

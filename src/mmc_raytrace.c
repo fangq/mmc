@@ -2657,5 +2657,11 @@ void updateroi(int immctype, ray* r, tetmesh* mesh) {
         r->roisize = (float*)(mesh->edgeroi + (r->eid - 1) * 6);
     } else if (mesh->faceroi) {
         r->roisize = (float*)(mesh->faceroi + (r->eid - 1) * 4);
+       	// set inroi to 0 if the photon leaves a implicitly marked tetrahedron
+		// otherwise do not update 
+		r->inroi &= (r->roisize[0] != 0.0f ||
+             r->roisize[1] != 0.0f ||
+             r->roisize[2] != 0.0f ||
+             r->roisize[3] != 0.0f);
     }
 }
