@@ -1210,19 +1210,6 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                 tracer->mesh->faceroi[i << 2] = -count;    // number -1 to -4 indicates how many faces have ROIs
             }
         }
-
-        for (i = 0; i < ne; i++) {
-            if (fabs(tracer->mesh->faceroi[i << 2]) < EPS) { // if I don't have roi
-                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
-                    int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
-
-                    if (id > 0 && fabs(tracer->mesh->faceroi[(id - 1) << 2]) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-4, only handle 1 roi neighbor case
-                        tracer->mesh->faceroi[i << 2] = -id - 4;
-                        break;
-                    }
-                }
-            }
-        }
     }
 
     // loop over each external surface triangle (facenb[]==0) and sequentially number them as negative integer
