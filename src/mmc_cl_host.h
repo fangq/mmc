@@ -101,6 +101,8 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_int    issaveseed;
     cl_uint   seed;
     cl_uint   maxjumpdebug;         /**< max number of positions to be saved to save photon trajectory when -D M is used */
+    cl_int    implicit;
+    cl_uint   prop;
 } MCXParam POST_ALIGN(32);
 
 typedef struct POST_ALIGN(32) GPU_reporter {

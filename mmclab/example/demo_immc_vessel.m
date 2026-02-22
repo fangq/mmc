@@ -59,7 +59,8 @@ if (nargin == 0)
     cfg.debuglevel = 'TP';
     cfg.method = 'grid';
     cfg.steps = [0.001 0.001 0.001];
-    cfg.gpuid = -1;
+    cfg.gpuid = 1;
+    cfg.compute = 'cuda';
     cfg.isreflect = 1;
     cfg.outputtype = 'energy';
 

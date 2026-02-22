@@ -91,6 +91,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_uint  devid = 0;
     cl_mem* gnode = NULL, *gelem = NULL, *gtype = NULL, *gfacenb = NULL, *gsrcelem = NULL, *gnormal = NULL;
     cl_mem* gproperty = NULL, *gparam = NULL, *gsrcpattern = NULL, *greplayweight = NULL, *greplaytime = NULL, *greplayseed = NULL; /*read-only buffers*/
+    cl_mem* gedgeroi = NULL, *gnoderoi = NULL, *gfaceroi = NULL;
     cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter, *gdebugdata;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
@@ -131,7 +132,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mesh->nn, mesh->ne, mesh->nf, cfg->nout, cfg->roulettesize, cfg->srcnum, mesh->srcelemlen,
         cfg->e0, cfg->isextdet, (meshlen / cfg->srcnum), (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
-        cfg->issaveseed, cfg->seed, cfg->maxjumpdebug
+        cfg->issaveseed, cfg->seed, cfg->maxjumpdebug,
+        cfg->implicit, mesh->prop
     };
 
     MCXReporter reporter = {0.f, 0};
@@ -155,6 +157,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
         sharedmemsize += sizeof(cl_float) * cfg->srcnum;
+    }
+
+    if (cfg->implicit) {
+        sharedmemsize += sizeof(cl_float) * 22;
     }
 
     cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0};
@@ -190,6 +196,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     greplayweight = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     greplaytime = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     greplayseed = (cl_mem*)malloc(workdev * sizeof(cl_mem));
+    gedgeroi  = (cl_mem*)malloc(workdev * sizeof(cl_mem));
+    gnoderoi  = (cl_mem*)malloc(workdev * sizeof(cl_mem));
+    gfaceroi  = (cl_mem*)malloc(workdev * sizeof(cl_mem));
 
     /* The block is to move the declaration of prop closer to its use */
     cl_command_queue_properties prop = CL_QUEUE_PROFILING_ENABLE;
@@ -360,6 +369,24 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             greplayseed[i] = NULL;
         }
 
+        if (cfg->implicit && mesh->edgeroi) {
+            OCL_ASSERT(((gedgeroi[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * mesh->ne * 6, mesh->edgeroi, &status), status)));
+        } else {
+            gedgeroi[i] = NULL;
+        }
+
+        if (cfg->implicit && mesh->noderoi) {
+            OCL_ASSERT(((gnoderoi[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * mesh->nn, mesh->noderoi, &status), status)));
+        } else {
+            gnoderoi[i] = NULL;
+        }
+
+        if (cfg->implicit && mesh->faceroi) {
+            OCL_ASSERT(((gfaceroi[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * mesh->ne * 4, mesh->faceroi, &status), status)));
+        } else {
+            gfaceroi[i] = NULL;
+        }
+
         free(Pseed);
         free(energy);
     }
@@ -440,6 +467,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_PHOTON_SHARING");
     }
 
+    if (cfg->implicit) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_IMPLICIT_MMC");
+    }
+
     if (gpu[0].vendor == dvNVIDIA) {
         snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_NVIDIA_GPU");
     }
@@ -477,6 +508,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         IPARAM_TO_MACRO(opt, param, srcnum);
         IPARAM_TO_MACRO(opt, param, detnum);
         IPARAM_TO_MACRO(opt, param, issaveseed);
+        IPARAM_TO_MACRO(opt, param, implicit);
+        IPARAM_TO_MACRO(opt, param, prop);
         IPARAM_TO_MACRO(opt, param, nf);
 
         if (param.focus != param.focus) {
@@ -558,6 +591,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 22, sizeof(cl_mem), (void*)(greplayseed + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 23, sizeof(cl_mem), (void*)(gphotonseed + i))));
         OCL_ASSERT((clSetKernelArg(mcxkernel[i], 24, sizeof(cl_mem), ((cfg->debuglevel & dlTraj) ? (void*)(gdebugdata + i) : NULL) )));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 25, sizeof(cl_mem), (void*)(gedgeroi + i))));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 26, sizeof(cl_mem), (void*)(gnoderoi + i))));
+        OCL_ASSERT((clSetKernelArg(mcxkernel[i], 27, sizeof(cl_mem), (void*)(gfaceroi + i))));
     }
 
     MMC_FPRINTF(cfg->flog, "set kernel arguments complete : %d ms %d\n", GetTimeMillis() - tic, param.method);
@@ -894,6 +930,18 @@ is more than what your have specified (%d), please use the -H option to specify 
             OCL_ASSERT(clReleaseMemObject(gsrcpattern[i]));
         }
 
+        if (gedgeroi[i])  {
+            OCL_ASSERT(clReleaseMemObject(gedgeroi[i]));
+        }
+
+        if (gnoderoi[i])  {
+            OCL_ASSERT(clReleaseMemObject(gnoderoi[i]));
+        }
+
+        if (gfaceroi[i])  {
+            OCL_ASSERT(clReleaseMemObject(gfaceroi[i]));
+        }
+
         if (cfg->debuglevel & dlTraj) {
             OCL_ASSERT(clReleaseMemObject(gdebugdata[i]));
         }
@@ -934,6 +982,9 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(gparam);
 
     free(gsrcpattern);
+    free(gedgeroi);
+    free(gnoderoi);
+    free(gfaceroi);
     free(greplayweight);
     free(greplayseed);
     free(greplaytime);

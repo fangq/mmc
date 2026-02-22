@@ -2955,10 +2955,6 @@ void mcx_validatecfg(mcconfig* cfg) {
         cfg->basisorder = 0;
     }
 
-    if (cfg->implicit && (int)(cfg->gpuid) >= 0) {
-        MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
-    }
-
     for (i = 0; i < MAX_DEVICE; i++)
         if (cfg->deviceid[i] == '0') {
             cfg->deviceid[i] = '\0';

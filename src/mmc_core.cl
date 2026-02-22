@@ -296,6 +296,10 @@ typedef struct MMC_Ray {
     //float4 bary0;               /**< the Barycentric coordinate of the intersection with the tet */
     float slen0;                  /**< initial unitless scattering length = length*mus */
     unsigned int photonid;        /**< index of the current photon */
+    int   inroi;
+    int   roitype;
+    int   roiidx;
+    int   refeid;
 } ray __attribute__ ((aligned (4)));
 
 
@@ -339,6 +343,8 @@ typedef struct MMC_Parameter {
     int    issaveseed;
     int    seed;
     uint   maxjumpdebug;          /**< max number of positions to be saved to save photon trajectory when -D M is used */
+    int    implicit;
+    uint   prop;
 } MCXParam __attribute__ ((aligned (16)));
 
 typedef struct MMC_Reporter {
@@ -370,15 +376,23 @@ enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/
 
 #endif
 
+/* ================== implicit MMC constants ================== */
+#ifndef __NVCC__
+enum THitStatus {htNone = 0, htOutIn, htInOut, htNoHitIn, htNoHitOut};
+enum TROIType   {rtNone = 0, rtEdge, rtNode, rtFace};
+#endif
+__constant__ int e2n[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+__constant__ int nc[4][3]  = {{3, 0, 1}, {3, 1, 2}, {2, 0, 3}, {1, 0, 2}};
+#define EPS2       1e-7f
+#define IMMC_CACHE 22
+
 __constant__ int faceorder[] = {1, 3, 2, 0, -1};
 __constant__ int ifaceorder[] = {3, 0, 2, 1};
 //__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 //__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-#if defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D)
 __constant__ int out[4][3] = {{0, 3, 1}, {3, 2, 1}, {0, 2, 3}, {0, 1, 2}};
 __constant__ int facemap[] = {2, 0, 1, 3};
 __constant__ int ifacemap[] = {1, 2, 0, 3};
-#endif
 
 #ifndef __NVCC__
 enum TDebugLevel {dlMove = 1, dlTracing = 2, dlBary = 4, dlWeight = 8, dlDist = 16, dlTracingEnter = 32,
@@ -584,6 +598,620 @@ __device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, _
     }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * implicit MMC (iMMC) GPU device functions
+ *
+ * Follows CPU mmc_raytrace.c logic exactly:
+ *   updateroi_gpu()     <-> updateroi()      - called at outer+inner while tops
+ *   load_immc_cache()                        - populate shared-mem (GPU-specific opt)
+ *   traceroi_gpu()      <-> traceroi()       - called inside raytet after Lmove
+ *   reflectrayroi_gpu() <-> reflectrayroi()  - called when ROI hit with n mismatch
+ *
+ * Cache layout per thread (shared memory):
+ *   Edge iMMC: [0..5] edgeroi, [6..17] 4×xyz nodes, [18..21] noderoi
+ *   Face iMMC: [0..3] faceroi, [4..15] 4×xyz nodes
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+__device__ float3 cached_node(__local float* ca, int off, int idx) {
+    int b = off + idx * 3;
+#ifdef __NVCC__
+    return make_float3(ca[b], ca[b + 1], ca[b + 2]);
+#else
+    return (float3)(ca[b], ca[b + 1], ca[b + 2]);
+#endif
+}
+
+/**
+ * @brief GPU equivalent of CPU updateroi().
+ *
+ * Called at the same points as the CPU: top of outer while(1) and after
+ * entering a new element in the inner while.
+ *
+ * For edge iMMC: reads edgeroi tag to check if element has/references ROI.
+ * For face iMMC: reads faceroi tag; clears inroi when entering non-ROI element.
+ *
+ * Only reads 1 float from global memory (the tag).  Does NOT cache nodes etc.
+ * Returns 1 if iMMC intersection tests are needed for this element.
+ */
+__device__ int updateroi_gpu(int imm, ray* r,
+                             __global float* edgeroi, __global float* noderoi, __global float* faceroi,
+                             __global int* elem, int elemlen) {
+    int eid = r->eid - 1;
+
+    if (imm == 1) {
+        /* CPU updateroi: sets roisize pointer from edgeroi if edgeroi exists.
+           But traceroi still runs even if edgeroi is NULL (for node-only iMMC).
+           We return 1 if there's ANY ROI data to test: edge tag nonzero OR noderoi exists. */
+        int has = 0;
+
+        if (edgeroi) {
+            float tag = edgeroi[eid * 6];
+
+            if (tag != 0.f) {
+                has = 1;
+            }
+        }
+
+        /* For node-only iMMC: edgeroi may be NULL or all zeros, but noderoi
+           could still have spheres at this element's nodes. We check if any of
+           the 4 nodes in this element have a nonzero noderoi. */
+        if (!has && noderoi) {
+            __global int* ee = elem + eid * elemlen;
+
+            for (int i = 0; i < 4; i++) {
+                if (noderoi[ee[i] - 1] > 0.f) {
+                    has = 1;
+                    break;
+                }
+            }
+        }
+
+        return has;
+    } else if (imm == 2) {
+        if (faceroi) {
+            float tag = faceroi[eid * 4];
+            r->inroi &= (tag != 0.f);
+            return (tag != 0.f) ? 1 : 0;
+        }
+
+        return 0;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Populate shared-memory cache.  Only called when updateroi_gpu returns 1.
+ *
+ * Handles the preprocessed tag encoding:
+ *   edgeroi: 0=skip, >0=edge0 radius, -1..-6=has ROI(count), <-6=neighbor ref
+ *   faceroi: 0=skip, >0=face0 thick, -1..-4=has ROI(count), <-4=neighbor ref
+ *
+ * Returns the element connectivity to use (may be redirected).
+ */
+__device__ __global int* load_immc_cache(
+    int imm, ray* r, __local float* cache,
+    __global float* edgeroi, __global float* noderoi, __global float* faceroi,
+    __global FLOAT3* node, __global int* elem, int elemlen) {
+    int eid = r->eid - 1;
+    __global int* ee = elem + eid * elemlen;
+    __global int* usee = ee;
+
+    if (imm == 1) {
+        if (edgeroi) {
+            float tag = edgeroi[eid * 6];
+
+            if (tag < -6.f) {
+                int ref = (int)(-tag) - 6;
+                r->refeid = ref;
+                usee = elem + (ref - 1) * elemlen;
+
+                for (int i = 0; i < 6; i++) {
+                    cache[i] = edgeroi[(ref - 1) * 6 + i];
+                }
+
+                if (cache[0] < 0.f) {
+                    cache[0] = 0.f;
+                }
+            } else if (tag != 0.f) {
+                for (int i = 0; i < 6; i++) {
+                    cache[i] = edgeroi[eid * 6 + i];
+                }
+
+                if (cache[0] < 0.f) {
+                    cache[0] = 0.f;
+                }
+            } else {
+                /* tag==0 but we're here because noderoi had data */
+                for (int i = 0; i < 6; i++) {
+                    cache[i] = 0.f;
+                }
+            }
+        } else {
+            /* no edgeroi buffer at all (node-only iMMC) */
+            for (int i = 0; i < 6; i++) {
+                cache[i] = 0.f;
+            }
+        }
+
+        /* cache 4 node positions from usee */
+        for (int i = 0; i < 4; i++) {
+            __global FLOAT3* nd = node + (usee[i] - 1);
+            cache[6 + i * 3]     = nd->x;
+            cache[6 + i * 3 + 1] = nd->y;
+            cache[6 + i * 3 + 2] = nd->z;
+        }
+
+        /* cache noderoi for original element's 4 nodes */
+        if (noderoi) {
+            for (int i = 0; i < 4; i++) {
+                cache[18 + i] = noderoi[ee[i] - 1];
+            }
+        } else {
+            for (int i = 0; i < 4; i++) {
+                cache[18 + i] = 0.f;
+            }
+        }
+
+    } else if (imm == 2) {
+        float tag = faceroi[eid * 4];
+
+        if (tag < -4.f) {
+            int ref = (int)(-tag) - 4;
+            r->refeid = ref;
+            usee = elem + (ref - 1) * elemlen;
+
+            for (int i = 0; i < 4; i++) {
+                cache[i] = faceroi[(ref - 1) * 4 + i];
+            }
+
+            if (cache[0] < 0.f) {
+                cache[0] = 0.f;
+            }
+        } else {
+            for (int i = 0; i < 4; i++) {
+                cache[i] = faceroi[eid * 4 + i];
+            }
+
+            if (cache[0] < 0.f) {
+                cache[0] = 0.f;
+            }
+        }
+
+        for (int i = 0; i < 4; i++) {
+            __global FLOAT3* nd = node + (usee[i] - 1);
+            cache[4 + i * 3]     = nd->x;
+            cache[4 + i * 3 + 1] = nd->y;
+            cache[4 + i * 3 + 2] = nd->z;
+        }
+    }
+
+    return usee;
+}
+
+/* ── Intersection primitives (matching CPU mmc_raytrace.c) ──────── */
+
+/**
+ * @brief Matches CPU compute_distances_to_edge exactly.
+ * CPU: u = E0->E1 (vec_diff3 from E1 endpoint), OP = P->E1.
+ * We replicate: u = node[e2n[1]] - node[e2n[0]], normalised.
+ * Perpendicular = component of (P - E0) orthogonal to u.
+ */
+__device__ float dist2_to_edge(float3 p, float3 E0, float3 E1, float3* perp) {
+    float3 u = E1 - E0;
+    float inv = MCX_MATHFUN(rsqrt)(dot(u, u));
+    u *= FL3(inv);
+    float3 v = p - E0;
+    float t = dot(v, u);
+    *perp = v - u * FL3(t);
+    return dot(*perp, *perp);
+}
+
+__device__ int classify_hit(float d0, float d1, float r2, int inroi) {
+    if (d0 > r2 + EPS2 && d1 < r2 - EPS2) {
+        return htOutIn;
+    }
+
+    if (d0 < r2 - EPS2 && d1 > r2 + EPS2) {
+        return htInOut;
+    }
+
+    if (d1 > r2 + EPS2) {
+        return inroi ? htInOut : htNoHitOut;
+    }
+
+    if (d1 < r2 - EPS2) {
+        return inroi ? htNoHitIn : htOutIn;
+    }
+
+    return htNone;
+}
+
+__device__ float isect_cylinder(float d2_0, float d2_1,
+                                float3 pp0, float3 pp1, float rt, int hs) {
+    if (hs != htOutIn && hs != htInOut) {
+        return 1.f;
+    }
+
+    float d0 = MCX_MATHFUN(sqrt)(d2_0), d1 = MCX_MATHFUN(sqrt)(d2_1);
+    float cs = dot(pp0, pp1) / (d0 * d1 + EPS);
+    float sn = MCX_MATHFUN(sqrt)(fabs(1.f - cs * cs));
+    float dx = d1 * cs - d0, dy = d1 * sn, dr2 = dx * dx + dy * dy;
+    float Dp = d0 * d1 * sn;
+    float disc = rt * rt * dr2 - Dp * Dp;
+
+    if (disc < 0.f) {
+        return 1.f;
+    }
+
+    float delta = MCX_MATHFUN(sqrt)(disc), idr = 1.f / dr2;
+    float sgn = (dy >= 0.f) ? 1.f : -1.f;
+    float h0x = (Dp * dy + sgn * dx * delta) * idr, h0y = (-Dp * dx + fabs(dy) * delta) * idr;
+    float h1x = (Dp * dy - sgn * dx * delta) * idr, h1y = (-Dp * dx - fabs(dy) * delta) * idr;
+    float ax, ay, Lr;
+
+    if (hs == htOutIn) {
+        ax = h1x - d0;
+        ay = h1y;
+        Lr = ax * ax + ay * ay;
+
+        if (dr2 > Lr) {
+            Lr = MCX_MATHFUN(sqrt)(Lr / dr2);
+        } else {
+            ax = h0x - d0;
+            ay = h0y;
+            Lr = MCX_MATHFUN(sqrt)((ax * ax + ay * ay) / dr2);
+        }
+    } else {
+        ax = h1x - d1 * cs;
+        ay = h1y - d1 * sn;
+        Lr = ax * ax + ay * ay;
+
+        if (dr2 > Lr) {
+            Lr = 1.f - MCX_MATHFUN(sqrt)(Lr / dr2);
+        } else {
+            ax = h0x - d1 * cs;
+            ay = h0y - d1 * sn;
+            Lr = 1.f - MCX_MATHFUN(sqrt)((ax * ax + ay * ay) / dr2);
+        }
+    }
+
+    return Lr;
+}
+
+__device__ float isect_sphere(float3 p0, float3 dir, float3 cen, float nr, int hs) {
+    if (hs != htOutIn && hs != htInOut) {
+        return 1e10f;
+    }
+
+    float3 oc = cen - p0;
+    float b = dot(dir, oc), disc = b * b - (dot(oc, oc) - nr * nr);
+
+    if (disc < 0.f) {
+        return 1e10f;
+    }
+
+    float sd = MCX_MATHFUN(sqrt)(fabs(disc));
+    return (hs == htOutIn) ? fmin(-b + sd, -b - sd) : fmax(-b + sd, -b - sd);
+}
+
+__device__ float isect_slab(float3 p0, float3 p1, float3 fpt, float3 fn, float thick, int* hs) {
+    float df0 = dot(fpt - p0, fn), df1 = dot(fpt - p1, fn);
+    *hs = htNone;
+
+    if (df0 > thick + EPS2 && df1 < thick - EPS2) {
+        *hs = htOutIn;
+        return 1.f - (thick - df1) / (df0 - df1);
+    }
+
+    if (df0 < thick - EPS2 && df1 > thick + EPS2) {
+        *hs = htInOut;
+        return (thick - df0) / (df1 - df0);
+    }
+
+    if ((df0 <= thick && df1 >= thick) || (df0 > thick && df1 > thick)) {
+        *hs = htNoHitOut;
+    } else if ((df0 >= thick && df1 <= thick) || (df0 < thick && df1 < thick)) {
+        *hs = htNoHitIn;
+    }
+
+    return 1.f;
+}
+
+/**
+ * @brief Core iMMC tracing - matches CPU traceroi() logic exactly.
+ *
+ * Called from inside raytet after Lmove is computed, same as CPU.
+ * Reads all data from per-thread shared-memory cache.
+ */
+__device__ void traceroi_gpu(ray* r, __constant MCXParam* gcfg,
+                             __local float* cache, __global float4* normal,
+                             __global float* noderoi, int doinit) {
+    int imm = GPU_PARAM(gcfg, implicit);
+
+    if (imm == 1) {
+        /* ═══ Edge (cylinder) + Node (sphere) iMMC ═══
+         * Matches CPU traceroi() roitype==1 logic exactly. */
+        float minratio = 1.f;
+        int fhit = htNone, finout = htNone;
+        float3 p1 = r->p0 + FL3(r->Lmove) * r->vec;
+
+        /* Only test edges if any edgeroi > 0 in cache[0..5] */
+        if (cache[0] > 0.f || cache[1] > 0.f || cache[2] > 0.f ||
+                cache[3] > 0.f || cache[4] > 0.f || cache[5] > 0.f) {
+
+            for (int i = 0; i < 6; i++) {
+                float ri = cache[i];
+
+                if (ri <= 0.f) {
+                    continue;
+                }
+
+                float3 A = cached_node(cache, 6, e2n[i][0]);
+                float3 B = cached_node(cache, 6, e2n[i][1]);
+                float3 pp0, pp1;
+                float d0 = dist2_to_edge(r->p0, A, B, &pp0);
+                float d1 = dist2_to_edge(p1,    A, B, &pp1);
+                float r2 = ri * ri;
+                int hs = classify_hit(d0, d1, r2, r->inroi);
+
+                if (doinit) {
+                    r->inroi |= (hs == htInOut || hs == htNoHitIn);
+                } else if (hs == htInOut || hs == htOutIn) {
+                    float lr = isect_cylinder(d0, d1, pp0, pp1, ri, hs);
+
+                    if (lr < minratio) {
+                        minratio = lr;
+                        fhit = hs;
+                        r->roiidx = i;
+                    }
+                } else if (hs == htNoHitIn || hs == htNoHitOut) {
+                    finout = (finout == htNone) ? hs : (hs == htNoHitIn ? hs : finout);
+                }
+            }
+
+            if (minratio < 1.f) {
+                r->Lmove *= minratio;
+            }
+
+            if (!doinit) {
+                r->inroi = (fhit != htNone) ? (fhit == htOutIn) :
+                           (finout != htNone ? (finout == htNoHitIn) : r->inroi);
+                /* CPU: r->inroi = (fhit==htNone && finout==htNone && !noderoi) ? 0 : r->inroi */
+                int any_nr = (cache[18] > 0.f || cache[19] > 0.f || cache[20] > 0.f || cache[21] > 0.f);
+
+                if (fhit == htNone && finout == htNone && !any_nr) {
+                    r->inroi = 0;
+                }
+            }
+
+            r->roitype = (fhit == htInOut || fhit == htOutIn) ? rtEdge : rtNone;
+
+            if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+                printf("{\"id\":%u, \"implicit-edge\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
+                       r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, fhit);
+            }
+        }
+
+        /* ── Node (sphere) endcaps ──
+         * CPU: runs when fhit==htNone && finout!=htNoHitIn && noderoi exists */
+        if (fhit == htNone && finout != htNoHitIn) {
+            int any_nr = (cache[18] > 0.f || cache[19] > 0.f || cache[20] > 0.f || cache[21] > 0.f);
+
+            if (any_nr) {
+                float minL = r->Lmove;
+                int nhit = htNone, ninout = htNone;
+
+                for (int i = 0; i < 4; i++) {
+                    float nr = cache[18 + i];
+
+                    if (nr <= 0.f) {
+                        continue;
+                    }
+
+                    float3 cen = cached_node(cache, 6, i);
+                    float3 dp = r->p0 - cen;
+                    float dd0 = dot(dp, dp);
+                    float3 q = r->p0 + FL3(r->Lmove) * r->vec;
+                    dp = q - cen;
+                    float dd1 = dot(dp, dp);
+                    float nr2 = nr * nr;
+                    int hs = classify_hit(dd0, dd1, nr2, r->inroi);
+
+                    if (doinit) {
+                        r->inroi |= (hs == htInOut || hs == htNoHitIn);
+                    } else if (hs == htInOut || hs == htOutIn) {
+                        float lm = isect_sphere(r->p0, r->vec, cen, nr, hs);
+
+                        if (lm < minL) {
+                            minL = lm;
+                            nhit = hs;
+                            r->roiidx = i;
+                        }
+                    } else if (hs == htNoHitIn || hs == htNoHitOut) {
+                        ninout = (ninout == htNone) ? hs : (hs == htNoHitIn ? hs : ninout);
+                    }
+                }
+
+                if (minL < r->Lmove) {
+                    r->Lmove = minL;
+                }
+
+                if (!doinit) {
+                    r->inroi = (nhit != htNone) ? (nhit == htOutIn) :
+                               (ninout != htNone ? (ninout == htNoHitIn) : r->inroi);
+
+                    if (nhit == htNone && ninout == htNone) {
+                        r->inroi = 0;
+                    }
+                }
+
+                r->roitype = (nhit == htInOut || nhit == htOutIn) ? rtNode : r->roitype;
+                fhit = (nhit != htNone) ? nhit : fhit;
+
+                if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+                    printf("{\"id\":%u, \"implicit-node\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
+                           r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, nhit);
+                }
+            }
+        }
+
+        if ((fhit == htInOut || fhit == htOutIn) && r->Lmove < EPS2) {
+            r->Lmove = EPS2;
+        }
+
+    } else if (imm == 2) {
+        /* ═══ Face (slab) iMMC ═══ */
+        int eid = r->eid - 1;
+        int base = (r->refeid > 0) ? ((r->refeid - 1) << 2) : (eid << 2);
+        float minratio = 1.f;
+        int fhit = htNone, finout = htNone;
+        float3 p1 = r->p0 + FL3(r->Lmove) * r->vec;
+
+        for (int i = 0; i < 4; i++) {
+            float thick = cache[i];
+
+            if (thick <= 0.f) {
+                continue;
+            }
+
+            float3 fn;
+            fn.x = ((__global float*) & (normal[base]))[ifaceorder[i]];
+            fn.y = ((__global float*) & (normal[base]))[ifaceorder[i] + 4];
+            fn.z = ((__global float*) & (normal[base]))[ifaceorder[i] + 8];
+
+            /* CPU: pf1 = node[ee[nc[ifaceorder[faceid]][0]] - 1] */
+            float3 fpt = cached_node(cache, 4, nc[ifaceorder[i]][0]);
+
+            int hs;
+            float lr = isect_slab(r->p0, p1, fpt, fn, thick, &hs);
+
+            if (doinit) {
+                r->inroi |= (hs == htInOut || hs == htNoHitIn);
+            } else if (hs == htInOut || hs == htOutIn) {
+                if (lr < minratio) {
+                    minratio = lr;
+                    fhit = hs;
+                    r->roiidx = i;
+                }
+            } else if (hs == htNoHitIn || hs == htNoHitOut) {
+                finout = (finout == htNone) ? hs : (hs == htNoHitIn ? hs : finout);
+            }
+        }
+
+        if (minratio < 1.f) {
+            r->Lmove *= minratio;
+        }
+
+        if (!doinit) {
+            r->inroi = (fhit != htNone) ? (fhit == htOutIn) :
+                       (finout != htNone ? (finout == htNoHitIn) : r->inroi);
+
+            if (fhit == htNone && finout == htNone) {
+                r->inroi = 0;
+            }
+        }
+
+        r->roitype = (fhit == htInOut || fhit == htOutIn) ? rtFace : rtNone;
+
+        if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+            printf("{\"id\":%u, \"implicit-face\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
+                   r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, fhit);
+        }
+
+        if ((fhit == htInOut || fhit == htOutIn) && r->Lmove < EPS2) {
+            r->Lmove = EPS2;
+        }
+    }
+}
+
+/** @brief Fresnel at ROI boundary. Reads node coords from cache. */
+__device__ float reflectrayroi_gpu(__constant MCXParam* gcfg,
+                                   float3* c0, float3* ph, __local float* cache,
+                                   __global float4* normal, __constant Medium* gmed, __global int* type,
+                                   int* eid, int* inroi, __private RandType* ran,
+                                   int roitype, int roiidx, int refeid) {
+    float3 pn = {0.f, 0.f, 0.f};
+    int ei = *eid - 1;
+
+    if (roitype == rtEdge) {
+        float3 A = cached_node(cache, 6, e2n[roiidx][0]);
+        float3 B = cached_node(cache, 6, e2n[roiidx][1]);
+        float3 u = B - A, EH = *ph - A;
+        float d = dot(EH, u) / dot(u, u);
+        pn = EH - u * FL3(d);
+        pn *= FL3(MCX_MATHFUN(rsqrt)(dot(pn, pn)));
+    } else if (roitype == rtNode) {
+        pn = *ph - cached_node(cache, 6, roiidx);
+        pn *= FL3(MCX_MATHFUN(rsqrt)(dot(pn, pn)));
+    } else {
+        int base = (refeid < 0) ? (ei << 2) : ((refeid - 1) << 2);
+        pn.x = ((__global float*) & (normal[base]))[roiidx];
+        pn.y = ((__global float*) & (normal[base]))[roiidx + 4];
+        pn.z = ((__global float*) & (normal[base]))[roiidx + 8];
+    }
+
+    float Icos = fabs(dot(*c0, pn));
+    float n1, n2;
+
+    if (*inroi) {
+        n1 = gmed[type[*eid - 1]].n;
+        n2 = gmed[GPU_PARAM(gcfg, prop)].n;
+
+        if (roitype != rtFace) {
+            pn *= FL3(-1.f);
+        }
+    } else {
+        n1 = gmed[GPU_PARAM(gcfg, prop)].n;
+        n2 = gmed[type[*eid - 1]].n;
+
+        if (roitype == rtFace) {
+            pn *= FL3(-1.f);
+        }
+    }
+
+    float t0 = n1 * n1, t1 = n2 * n2, t2 = 1.f - t0 / t1 * (1.f - Icos * Icos);
+
+    if (t2 > 0.f) {
+        float Re = t0 * Icos * Icos + t1 * t2;
+        t2 = MCX_MATHFUN(sqrt)(t2);
+        float Im = 2.f * n1 * n2 * Icos * t2, Rt = (Re - Im) / (Re + Im);
+        Re = t1 * Icos * Icos + t0 * t2 * t2;
+        Rt = (Rt + (Re - Im) / (Re + Im)) * 0.5f;
+
+        if (rand_next_reflect(ran) <= Rt) {
+            *c0 += FL3(-2.f * Icos) * pn;
+            *inroi = !(*inroi);
+
+            if (GPU_PARAM(gcfg, debuglevel) & dlReflect) {
+                printf("{\"implicit-reflect\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n",
+                       pn.x, pn.y, pn.z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
+            }
+        } else {
+            *c0 += FL3(-Icos) * pn;
+            *c0 = FL3(t2) * pn + FL3(n1 / n2) * (*c0);
+
+            if (GPU_PARAM(gcfg, debuglevel) & dlReflect) {
+                printf("{\"implicit-transmit\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n",
+                       pn.x, pn.y, pn.z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
+            }
+        }
+    } else {
+        *c0 += FL3(-2.f * Icos) * pn;
+        *inroi = !(*inroi);
+
+        if (GPU_PARAM(gcfg, debuglevel) & dlReflect) {
+            printf("{\"implicit-totalreflect\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n",
+                   pn.x, pn.y, pn.z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
+        }
+    }
+
+    t0 = MCX_MATHFUN(rsqrt)(dot(*c0, *c0));
+    *c0 *= FL3(t0);
+    return 1.f;
+}
+
 /**
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
  *
@@ -600,7 +1228,8 @@ __device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, _
  */
 
 __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __local float* ppath, __global int* elem, __global float* weight,
-        int type, __global int* facenb, __global float4* normal, __constant Medium* gmed, __global float* replayweight, __global float* replaytime) {
+        int type, __global int* facenb, __global float4* normal, __constant Medium* gmed, __global float* replayweight, __global float* replaytime,
+        __global FLOAT3* node, __global float* edgeroi, __global float* noderoi, __global float* faceroi, __global int* gtype, __local float* immccache, int immcready) {
 
     float Lmin;
     float ww, totalloss = 0.f;
@@ -621,6 +1250,9 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
     r->pout.x = MMC_UNDEFINED;
     r->faceid = -1;
     r->isend = 0;
+    r->roitype = rtNone;
+    r->refeid  = -1;
+    r->roiidx  = -1;
 
     if (r->eid <= GPU_PARAM(gcfg, normbuf)) {
         eid += GPU_PARAM(gcfg, maxpropdet);
@@ -651,12 +1283,18 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
     if (r->faceid >= 0 && Lmin >= 0.f) {
         Medium prop;
 
-        prop = gmed[type];
+        prop = (GPU_PARAM(gcfg, implicit) && r->inroi) ? gmed[GPU_PARAM(gcfg, prop)] : gmed[type];
         currweight.f = r->weight;
 
         r->Lmove = (prop.mus <= EPS) ? R_MIN_MUS : r->slen / prop.mus;
         r->isend = (Lmin > r->Lmove);
         r->Lmove = ((r->isend) ? r->Lmove : Lmin);
+
+        /* iMMC: test ROI boundaries (cache already loaded by caller) */
+        if (GPU_PARAM(gcfg, implicit) && immcready) {
+            traceroi_gpu(r, gcfg, immccache, normal, noderoi, 0);
+        }
+
         r->pout = r->p0 + FL3(Lmin) * r->vec;
 
         if ((int)((r->photontimer + r->Lmove * (prop.n * R_C0) - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep)) > GPU_PARAM(gcfg, maxgate) - 1) { /*exit time window*/
@@ -978,7 +1616,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
 #ifdef MCX_DO_REFLECTION
 
-__device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, int* eid, int faceid, __private RandType* ran, __global int* type, __global float4* normal, __constant Medium* gmed) {
+__device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, int* eid, int faceid, __private RandType* ran, __global int* type, __global float4* normal, __constant Medium* gmed, int r_inroi) {
     /*to handle refractive index mismatch*/
     float3 pnorm = {0.f, 0.f, 0.f};
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
@@ -995,8 +1633,13 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
     /*compute the cos of the incidence angle*/
     Icos = fabs(dot(*c0, pnorm));
 
-    n1 = ((*oldeid != *eid) ? gmed[type[*oldeid - 1]].n : GPU_PARAM(gcfg, nout));
-    n2 = ((*eid > 0) ? gmed[type[*eid - 1]].n : GPU_PARAM(gcfg, nout));
+    if (GPU_PARAM(gcfg, implicit) && r_inroi) {
+        n1 = gmed[GPU_PARAM(gcfg, prop)].n;
+        n2 = n1;
+    } else {
+        n1 = ((*oldeid != *eid) ? gmed[type[*oldeid - 1]].n : GPU_PARAM(gcfg, nout));
+        n2 = ((*eid > 0) ? gmed[type[*eid - 1]].n : GPU_PARAM(gcfg, nout));
+    }
 
     tmp0 = n1 * n1;
     tmp1 = n2 * n2;
@@ -1485,10 +2128,15 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXParam* gcfg, __global FLOAT3* node, __global int* elem, __global float* weight, __global float* dref,
                           __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal, __constant Medium* gmed,
                           __global float* n_det, __global uint* detectedphoton, __local float* energytot, __local float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
-                          __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata) {
+                          __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata,
+                          __global float* edgeroi, __global float* noderoi, __global float* faceroi, __local float* immccache) {
 
     int oldeid, fixcount = 0;
-    ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f};
+    ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0, 0, 0, 0, rtNone, -1};
+    int _immc_ready = 0;  /* 1 when immccache is loaded for current element */
+    int _immc_skip_roi = 0; /* 1 = skip traceroi for one step after ROI reflect */
+    int _dbg_outer_count = 0, _dbg_inner_count = 0, _dbg_roi_bounce = 0;
+
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
     RandType initseed[RAND_BUF_LEN] = {NULL};
 #endif
@@ -1516,6 +2164,22 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     /*initialize the photon parameters*/
     launchnewphoton(gcfg, &r, node, elem, srcelem, ran, srcpattern);
+
+    /* iMMC init: matches CPU updateroi() + traceroi(doinit=1) at launch */
+    if (GPU_PARAM(gcfg, implicit)) {
+        _immc_ready = updateroi_gpu(GPU_PARAM(gcfg, implicit), &r, edgeroi, noderoi, faceroi, elem, GPU_PARAM(gcfg, elemlen));
+
+        if (_immc_ready) {
+            load_immc_cache(GPU_PARAM(gcfg, implicit), &r, immccache,
+                            edgeroi, noderoi, faceroi, node, elem, GPU_PARAM(gcfg, elemlen));
+            traceroi_gpu(&r, gcfg, immccache, normal, noderoi, 1);
+
+            if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+                printf("{\"id\":%u, \"immc-init\": {\"p\"=[%f, %f, %f], \"inroi\":%d}}\n",
+                       r.photonid, r.p0.x, r.p0.y, r.p0.z, r.inroi);
+            }
+        }
+    }
 
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 #ifdef __NVCC__
@@ -1553,7 +2217,25 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 
     while (1) { /*propagate a photon until exit*/
-        r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime);
+        if (++_dbg_outer_count > 100000) {
+            printf("HANG-DETECT: id=%u OUTER LOOP exceeded 100000 iters, eid=%d p=[%f,%f,%f] v=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d faceid=%d isend=%d w=%e\n",
+                   r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.vec.x, r.vec.y, r.vec.z,
+                   r.slen, r.inroi, r.roitype, r.roiidx, r.faceid, r.isend, r.weight);
+            break;
+        }
+
+        _dbg_inner_count = 0;
+
+        /* iMMC: updateroi at outer while top (matches CPU) */
+        if (GPU_PARAM(gcfg, implicit)) {
+            _immc_ready = updateroi_gpu(GPU_PARAM(gcfg, implicit), &r, edgeroi, noderoi, faceroi, elem, GPU_PARAM(gcfg, elemlen));
+
+            if (_immc_ready)
+                load_immc_cache(GPU_PARAM(gcfg, implicit), &r, immccache,
+                                edgeroi, noderoi, faceroi, node, elem, GPU_PARAM(gcfg, elemlen));
+        }
+
+        r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, (_immc_skip_roi ? 0 : _immc_ready));
         (*raytet)++;
 
         if (r.pout.x == MMC_UNDEFINED) {
@@ -1573,13 +2255,33 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
         if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
-            ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;    /*second medianum block is the partial path*/
+            ppath[GPU_PARAM(gcfg, maxmedia) - 1 +
+                                  ((GPU_PARAM(gcfg, implicit) && ((!r.inroi) != (!r.roitype))) ? GPU_PARAM(gcfg, prop) : type[r.eid - 1])] += r.Lmove;
         }
 
 #endif
 
+        if (r.faceid == -2) {
+            break;
+        }
+
+        if (GPU_PARAM(gcfg, implicit) && GPU_PARAM(gcfg, isreflect)
+                && r.roitype && r.roiidx >= 0
+                && (gmed[GPU_PARAM(gcfg, prop)].n != gmed[type[r.eid - 1]].n)) {
+            reflectrayroi_gpu(gcfg, &r.vec, &r.p0, immccache, normal, gmed,
+                              type, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+            r.p0 += r.vec * FL3(10.f * EPS);
+            _immc_skip_roi = 1;
+            continue;
+        }
+
         /*move a photon until the end of the current scattering path*/
         while (r.faceid >= 0 && !r.isend) {
+            /* iMMC: ROI was hit in previous raytet — break before face crossing */
+            if (GPU_PARAM(gcfg, implicit) && r.roitype) {
+                break;
+            }
+
             r.p0 = r.pout;
 
             oldeid = r.eid;
@@ -1587,8 +2289,8 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #ifdef MCX_DO_REFLECTION
 
             if (GPU_PARAM(gcfg, isreflect) && (r.eid <= 0 || (r.eid > 0 && gmed[type[r.eid - 1]].n != gmed[type[oldeid - 1]].n ))) {
-                if (! (r.eid <= 0 && (((gmed[type[oldeid - 1]].n == GPU_PARAM(gcfg, nout)) * (GPU_PARAM(gcfg, isreflect) != (int)bcMirror)) + (GPU_PARAM(gcfg, isreflect) == (int)bcAbsorbExterior)) )) {
-                    reflectray(gcfg, &r.vec, &oldeid, &r.eid, r.faceid, ran, type, normal, gmed);
+                if (! ((!r.inroi) * (r.eid <= 0) && (((gmed[type[oldeid - 1]].n == GPU_PARAM(gcfg, nout)) * (GPU_PARAM(gcfg, isreflect) != (int)bcMirror)) + (GPU_PARAM(gcfg, isreflect) == (int)bcAbsorbExterior)) )) {
+                    reflectray(gcfg, &r.vec, &oldeid, &r.eid, r.faceid, ran, type, normal, gmed, r.inroi);
                 }
             }
 
@@ -1596,6 +2298,15 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
             if (r.eid <= 0) {
                 break;
+            }
+
+            /* iMMC: updateroi for new element (matches CPU inner loop) */
+            if (GPU_PARAM(gcfg, implicit)) {
+                _immc_ready = updateroi_gpu(GPU_PARAM(gcfg, implicit), &r, edgeroi, noderoi, faceroi, elem, GPU_PARAM(gcfg, elemlen));
+
+                if (_immc_ready)
+                    load_immc_cache(GPU_PARAM(gcfg, implicit), &r, immccache,
+                                    edgeroi, noderoi, faceroi, node, elem, GPU_PARAM(gcfg, elemlen));
             }
 
             /*when a photon enters the domain from the background*/
@@ -1626,12 +2337,13 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 GPUDEBUG(("P %f %f %f %d %u %e\n", r.pout.x, r.pout.y, r.pout.z, r.eid, id, r.slen));
             }
 
-            r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime);
+            r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, (_immc_skip_roi ? 0 : _immc_ready));
             (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
             if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
-                ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
+                ppath[GPU_PARAM(gcfg, maxmedia) - 1 +
+                                      ((GPU_PARAM(gcfg, implicit) && ((!r.inroi) != (!r.roitype))) ? GPU_PARAM(gcfg, prop) : type[r.eid - 1])] += r.Lmove;
             }
 
 #endif
@@ -1640,16 +2352,21 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 break;
             }
 
+            if (GPU_PARAM(gcfg, implicit) && r.roitype) {
+                break;
+            }
+
             fixcount = 0;
 
             while (r.pout.x == MMC_UNDEFINED && fixcount++ < MAX_TRIAL) {
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
-                r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime);
+                r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, (_immc_skip_roi ? 0 : _immc_ready));
                 (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
                 if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
-                    ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
+                    ppath[GPU_PARAM(gcfg, maxmedia) - 1 +
+                                          ((GPU_PARAM(gcfg, implicit) && ((!r.inroi) != (!r.roitype))) ? GPU_PARAM(gcfg, prop) : type[r.eid - 1])] += r.Lmove;
                 }
 
 #endif
@@ -1660,6 +2377,31 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 r.eid = ID_UNDEFINED;
                 break;
             }
+        }
+
+        /* iMMC: inner loop broke due to ROI -> reflect + continue outer (no scatter) */
+        if (++_dbg_roi_bounce > 1000) {
+            printf("HANG-DETECT: id=%u ROI BOUNCE exceeded 1000 iters, eid=%d p=[%f,%f,%f] v=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d refeid=%d Lmove=%e\n",
+                   r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.vec.x, r.vec.y, r.vec.z,
+                   r.slen, r.inroi, r.roitype, r.roiidx, r.refeid, r.Lmove);
+            r.eid = 0;
+            break;
+        }
+
+        if (GPU_PARAM(gcfg, implicit) && r.roitype && r.eid > 0 && r.faceid != -2) {
+            if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+                printf("{\"id\":%u, \"immc-roi-handle-post-inner\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n",
+                       r.photonid, r.p0.x, r.p0.y, r.p0.z, r.eid, r.inroi, r.roitype, r.roiidx);
+            }
+
+            if (GPU_PARAM(gcfg, isreflect) && r.roiidx >= 0
+                    && (gmed[GPU_PARAM(gcfg, prop)].n != gmed[type[r.eid - 1]].n)) {
+                reflectrayroi_gpu(gcfg, &r.vec, &r.p0, immccache, normal, gmed, type,
+                                  &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+                r.p0 += r.vec * FL3(10.f * EPS);
+            }
+
+            continue;
         }
 
         if (r.eid <= 0 || r.pout.x == MMC_UNDEFINED) {
@@ -1719,6 +2461,35 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         //if(GPU_PARAM(gcfg,debuglevel)&dlMove)
         GPUDEBUG(("M %f %f %f %d %u %e\n", r.p0.x, r.p0.y, r.p0.z, r.eid, id, r.slen));
 
+        /* iMMC: ROI at end of scattering path */
+        if (++_dbg_roi_bounce > 1000) {
+            printf("HANG-DETECT: id=%u ROI_SCATTER_BOUNCE exceeded 1000 iters, eid=%d p=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d\n",
+                   r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.slen, r.inroi, r.roitype, r.roiidx);
+            r.eid = 0;
+            break;
+        }
+
+        if (GPU_PARAM(gcfg, implicit) && GPU_PARAM(gcfg, isreflect) && r.roitype && r.roiidx >= 0
+                && (gmed[GPU_PARAM(gcfg, prop)].n != gmed[type[r.eid - 1]].n)) {
+            if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+                printf("{\"id\":%u, \"immc-roi-reflect-outer\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n",
+                       r.photonid, r.p0.x, r.p0.y, r.p0.z, r.eid, r.inroi, r.roitype, r.roiidx);
+            }
+
+            reflectrayroi_gpu(gcfg, &r.vec, &r.p0, immccache, normal, gmed, type,
+                              &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+            r.p0 += r.vec * FL3(10.f * EPS);
+            _immc_skip_roi = 1;
+            continue;
+        } else if (GPU_PARAM(gcfg, implicit) && r.roitype) {
+            if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
+                printf("{\"id\":%u, \"immc-roi-continue-outer\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d}}\n",
+                       r.photonid, r.p0.x, r.p0.y, r.p0.z, r.eid, r.inroi, r.roitype);
+            }
+
+            continue;
+        }
+
         if ((GPU_PARAM(gcfg, minenergy) > 0.f) * (r.weight < GPU_PARAM(gcfg, minenergy)) * ((gcfg->tend - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep) <= 1.f)) { /*Russian Roulette*/
             if (rand_do_roulette(ran)*GPU_PARAM(gcfg, roulettesize) <= 1.f) {
                 r.weight *= GPU_PARAM(gcfg, roulettesize);
@@ -1732,6 +2503,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         float mom = 0.f;
         r.slen0 = mc_next_scatter(gmed[type[r.eid - 1]].g, &r.vec, ran, gcfg, &mom);
         r.slen = r.slen0;
+        _dbg_roi_bounce = 0; /* reset after successful scatter */
 
         if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
             savedebugdata(&r, id, reporter, gdebugdata, gcfg);
@@ -1772,7 +2544,8 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
                             __global FLOAT3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
                             __global float* n_det, __global uint* detectedphoton,
                             __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
-                            __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata) {
+                            __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata,
+                            __global float* edgeroi, __global float* noderoi, __global float* faceroi) {
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
@@ -1785,6 +2558,11 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
     if (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE) {
         gpu_rng_init(t, n_seed, idx);
     }
+
+    __local float* immccache = GPU_PARAM(gcfg, implicit) ?
+                               (sharedmem + get_local_size(0) * (GPU_PARAM(gcfg, srcnum) << 1)
+                                + get_local_size(0) * (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum))
+                                + get_local_id(0) * IMMC_CACHE) : ((__local float*)0);
 
     clearpath(sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
     clearpath(sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
@@ -1800,7 +2578,8 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
                   get_local_id(0) * (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)), gcfg, node, elem,
                   weight, dref, type, facenb, srcelem, normal, gmed, n_det, detectedphoton, sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum),
                   sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), t, &raytet,
-                  srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata);
+                  srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata,
+                  edgeroi, noderoi, faceroi, immccache);
     }
 
     for (int i = 0; i < GPU_PARAM(gcfg, srcnum); i++) {

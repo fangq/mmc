@@ -222,6 +222,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     float* gweight, *gdref, *gdetphoton, *genergy, *gsrcpattern, *gdebugdata;
     RandType* gphotonseed = NULL, *greplayseed = NULL;
     float*  greplayweight = NULL, *greplaytime = NULL;
+    float*  gedgeroi = NULL, *gnoderoi = NULL, *gfaceroi = NULL;
 
     MCXReporter* greporter;
     uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;
@@ -287,7 +288,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
         cfg->issaveseed,
         cfg->seed,
-        cfg->maxjumpdebug
+        cfg->maxjumpdebug,
+        cfg->implicit,
+        (int)mesh->prop
     };
 
     MCXReporter reporter = {0.f, 0};
@@ -302,6 +305,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
         sharedmemsize += sizeof(float) * cfg->srcnum;
+    }
+
+    if (cfg->implicit) {
+        sharedmemsize += sizeof(float) * 22;
     }
 
     gpuid = cfg->deviceid[threadid] - 1;
@@ -553,6 +560,21 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         CUDA_ASSERT(cudaMemcpy(greplayseed, cfg->photonseed, (sizeof(RandType)*RAND_BUF_LEN)*cfg->nphoton, cudaMemcpyHostToDevice));
     }
 
+    if (cfg->implicit && mesh->edgeroi) {
+        CUDA_ASSERT(cudaMalloc((void**)&gedgeroi, sizeof(float) * mesh->ne * 6));
+        CUDA_ASSERT(cudaMemcpy(gedgeroi, mesh->edgeroi, sizeof(float) * mesh->ne * 6, cudaMemcpyHostToDevice));
+    }
+
+    if (cfg->implicit && mesh->noderoi) {
+        CUDA_ASSERT(cudaMalloc((void**)&gnoderoi, sizeof(float) * mesh->nn));
+        CUDA_ASSERT(cudaMemcpy(gnoderoi, mesh->noderoi, sizeof(float) * mesh->nn, cudaMemcpyHostToDevice));
+    }
+
+    if (cfg->implicit && mesh->faceroi) {
+        CUDA_ASSERT(cudaMalloc((void**)&gfaceroi, sizeof(float) * mesh->ne * 4));
+        CUDA_ASSERT(cudaMemcpy(gfaceroi, mesh->faceroi, sizeof(float) * mesh->ne * 4, cudaMemcpyHostToDevice));
+    }
+
     free(Pseed);
     free(energy);
     tic = StartTimer();
@@ -614,7 +636,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                 threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
                 gtype, (int*)gfacenb, gsrcelem, gnormal,
                 gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
-                gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata);
+                gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata,
+                gedgeroi, gnoderoi, gfaceroi);
 
             #pragma omp master
             {
@@ -930,6 +953,18 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
     if (cfg->debuglevel & dlTraj) {
         CUDA_ASSERT(cudaFree(gdebugdata));
+    }
+
+    if (gedgeroi) {
+        CUDA_ASSERT(cudaFree(gedgeroi));
+    }
+
+    if (gnoderoi) {
+        CUDA_ASSERT(cudaFree(gnoderoi));
+    }
+
+    if (gfaceroi) {
+        CUDA_ASSERT(cudaFree(gfaceroi));
     }
 
     CUDA_ASSERT(cudaFree(greporter));
