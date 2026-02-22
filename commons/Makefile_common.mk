@@ -179,6 +179,7 @@ endif
 
 ifneq (,$(filter $(MAKECMDGOALS),mex cudamex))
         CCFLAGS+=-DMATLAB_MEX_FILE
+        CUCCOPT+=-DMATLAB_MEX_FILE
 endif
 
 ARFLAGS    :=
@@ -210,11 +211,11 @@ web: BINDIR:=webmmc
 web: AR=emcc
 web: EXTRALIB=-s SIMD=1 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s FORCE_FILESYSTEM=1 -o $(BINDIR)/webmmc.html
 
-mex oct mexomp octomp:   EXTRALIB=
-mex oct mexomp octomp:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
-mex oct mexomp octomp:   CUCCOPT+=-DMCX_CONTAINER
-mex oct mexomp octomp:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
-mex oct mexomp octomp:   BINDIR=../mmclab
+mex oct mexomp octomp cudamex cudaoct:   EXTRALIB=
+mex oct mexomp octomp cudamex cudaoct:   CCFLAGS+=$(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp cudamex cudaoct:   CUCCOPT+=-DMCX_CONTAINER
+mex oct mexomp octomp cudamex cudaoct:   CPPFLAGS+=-g $(DLLFLAG) -DMCX_CONTAINER
+mex oct mexomp octomp cudamex cudaoct:   BINDIR=../mmclab
 mex mexomp:     AR=$(MKMEX)
 mex mexomp:     AROUTPUT=-output
 mex mexomp:     ARFLAGS+=mmclab.cpp -I$(INCLUDEDIR)

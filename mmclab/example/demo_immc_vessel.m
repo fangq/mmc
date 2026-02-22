@@ -60,7 +60,7 @@ if (nargin == 0)
     cfg.method = 'grid';
     cfg.steps = [0.001 0.001 0.001];
     cfg.gpuid = 1;
-    cfg.compute = 'cuda';
+    cfg.compute = 'opencl';
     cfg.isreflect = 1;
     cfg.outputtype = 'energy';
 

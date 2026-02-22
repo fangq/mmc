@@ -202,6 +202,10 @@ int mcx_list_cu_gpu(mcconfig* cfg, GPUInfo** info) {
 }
 
 void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu) {
+#if defined(MCX_CONTAINER) && (defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER))
+    cfg->flog = stderr;  /* redirect log to stderr so MMC_FPRINTF uses mexPrintf */
+#endif
+
     uint i, j;
     float t, twindow0, twindow1;
     float fullload = 0.f;
@@ -290,7 +294,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         cfg->seed,
         cfg->maxjumpdebug,
         cfg->implicit,
-        (int)mesh->prop
+        (uint)mesh->prop
     };
 
     MCXReporter reporter = {0.f, 0};
@@ -630,6 +634,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             mcx_fflush(cfg->flog);
             param.tstart = twindow0;
             param.tend = twindow1;
+
+            CUDA_ASSERT(cudaMemcpyToSymbol(gcfg, &param, sizeof(MCXParam), 0, cudaMemcpyHostToDevice));
 
 
             mmc_main_loop <<< mcgrid, mcblock, sharedmemsize>>>(

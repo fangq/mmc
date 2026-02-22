@@ -2666,23 +2666,23 @@ void mcx_progressbar(float percent) {
     if (percentage != oldmarker) {
         if (percent != -0.f)
             for (j = 0; j < colwidth; j++) {
-                MMC_FPRINTF(stdout, "\b");
+                MMC_FPRINTF(stderr, "\b");
             }
 
         oldmarker = percentage;
-        MMC_FPRINTF(stdout, S_YELLOW"Progress: [");
+        MMC_FPRINTF(stderr, S_YELLOW"Progress: [");
 
         for (j = 0; j < percentage; j++) {
-            MMC_FPRINTF(stdout, "=");
+            MMC_FPRINTF(stderr, "=");
         }
 
-        MMC_FPRINTF(stdout, (percentage < colwidth - 18) ? ">" : "=");
+        MMC_FPRINTF(stderr, (percentage < colwidth - 18) ? ">" : "=");
 
         for (j = percentage; j < colwidth - 18; j++) {
-            MMC_FPRINTF(stdout, " ");
+            MMC_FPRINTF(stderr, " ");
         }
 
-        MMC_FPRINTF(stdout, "] %3d%%" S_RESET, (int)(percent * 100));
+        MMC_FPRINTF(stderr, "] %3d%%" S_RESET, (int)(percent * 100));
 
         mcx_fflush(stdout);
     }

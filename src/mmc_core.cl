@@ -383,7 +383,7 @@ enum TROIType   {rtNone = 0, rtEdge, rtNode, rtFace};
 #endif
 __constant__ int e2n[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 __constant__ int nc[4][3]  = {{3, 0, 1}, {3, 1, 2}, {2, 0, 3}, {1, 0, 2}};
-#define EPS2       1e-7f
+#define EPS2       1e-6f
 #define IMMC_CACHE 22
 
 __constant__ int faceorder[] = {1, 3, 2, 0, -1};
@@ -893,7 +893,7 @@ __device__ float isect_sphere(float3 p0, float3 dir, float3 cen, float nr, int h
     }
 
     float sd = MCX_MATHFUN(sqrt)(fabs(disc));
-    return (hs == htOutIn) ? fmin(-b + sd, -b - sd) : fmax(-b + sd, -b - sd);
+    return (hs == htOutIn) ? (b - sd) : (b + sd);
 }
 
 __device__ float isect_slab(float3 p0, float3 p1, float3 fpt, float3 fn, float thick, int* hs) {
@@ -927,7 +927,8 @@ __device__ float isect_slab(float3 p0, float3 p1, float3 fpt, float3 fn, float t
  */
 __device__ void traceroi_gpu(ray* r, __constant MCXParam* gcfg,
                              __local float* cache, __global float4* normal,
-                             __global float* noderoi, int doinit) {
+                             __global float* noderoi, int doinit,
+                             __global FLOAT3* node, __global int* elem, int elemlen) {
     int imm = GPU_PARAM(gcfg, implicit);
 
     if (imm == 1) {
@@ -1010,7 +1011,13 @@ __device__ void traceroi_gpu(ray* r, __constant MCXParam* gcfg,
                         continue;
                     }
 
-                    float3 cen = cached_node(cache, 6, i);
+                    float3 cen;
+                    {
+                        __global FLOAT3* _nd = node + (elem[(r->eid - 1) * elemlen + i] - 1);
+                        cen.x = _nd->x;
+                        cen.y = _nd->y;
+                        cen.z = _nd->z;
+                    }
                     float3 dp = r->p0 - cen;
                     float dd0 = dot(dp, dp);
                     float3 q = r->p0 + FL3(r->Lmove) * r->vec;
@@ -1131,7 +1138,8 @@ __device__ float reflectrayroi_gpu(__constant MCXParam* gcfg,
                                    float3* c0, float3* ph, __local float* cache,
                                    __global float4* normal, __constant Medium* gmed, __global int* type,
                                    int* eid, int* inroi, __private RandType* ran,
-                                   int roitype, int roiidx, int refeid) {
+                                   int roitype, int roiidx, int refeid,
+                                   __global FLOAT3* node, __global int* elem, int elemlen) {
     float3 pn = {0.f, 0.f, 0.f};
     int ei = *eid - 1;
 
@@ -1143,7 +1151,13 @@ __device__ float reflectrayroi_gpu(__constant MCXParam* gcfg,
         pn = EH - u * FL3(d);
         pn *= FL3(MCX_MATHFUN(rsqrt)(dot(pn, pn)));
     } else if (roitype == rtNode) {
-        pn = *ph - cached_node(cache, 6, roiidx);
+        pn = *ph;
+        {
+            __global FLOAT3* _nd = node + (elem[(*eid - 1) * elemlen + roiidx] - 1);
+            pn.x -= _nd->x;
+            pn.y -= _nd->y;
+            pn.z -= _nd->z;
+        }
         pn *= FL3(MCX_MATHFUN(rsqrt)(dot(pn, pn)));
     } else {
         int base = (refeid < 0) ? (ei << 2) : ((refeid - 1) << 2);
@@ -1292,7 +1306,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
         /* iMMC: test ROI boundaries (cache already loaded by caller) */
         if (GPU_PARAM(gcfg, implicit) && immcready) {
-            traceroi_gpu(r, gcfg, immccache, normal, noderoi, 0);
+            traceroi_gpu(r, gcfg, immccache, normal, noderoi, 0, node, elem, GPU_PARAM(gcfg, elemlen));
         }
 
         r->pout = r->p0 + FL3(Lmin) * r->vec;
@@ -2134,7 +2148,6 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     int oldeid, fixcount = 0;
     ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0, 0, 0, 0, rtNone, -1};
     int _immc_ready = 0;  /* 1 when immccache is loaded for current element */
-    int _immc_skip_roi = 0; /* 1 = skip traceroi for one step after ROI reflect */
     int _dbg_outer_count = 0, _dbg_inner_count = 0, _dbg_roi_bounce = 0;
 
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
@@ -2172,7 +2185,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         if (_immc_ready) {
             load_immc_cache(GPU_PARAM(gcfg, implicit), &r, immccache,
                             edgeroi, noderoi, faceroi, node, elem, GPU_PARAM(gcfg, elemlen));
-            traceroi_gpu(&r, gcfg, immccache, normal, noderoi, 1);
+            traceroi_gpu(&r, gcfg, immccache, normal, noderoi, 1, node, elem, GPU_PARAM(gcfg, elemlen));
 
             if (GPU_PARAM(gcfg, debuglevel) & dlMove) {
                 printf("{\"id\":%u, \"immc-init\": {\"p\"=[%f, %f, %f], \"inroi\":%d}}\n",
@@ -2218,9 +2231,10 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     while (1) { /*propagate a photon until exit*/
         if (++_dbg_outer_count > 100000) {
-            printf("HANG-DETECT: id=%u OUTER LOOP exceeded 100000 iters, eid=%d p=[%f,%f,%f] v=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d faceid=%d isend=%d w=%e\n",
-                   r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.vec.x, r.vec.y, r.vec.z,
-                   r.slen, r.inroi, r.roitype, r.roiidx, r.faceid, r.isend, r.weight);
+            if (get_local_id(0) == 0) if (get_local_id(0) == 0) printf("HANG-DETECT: id=%u OUTER LOOP exceeded 100000 iters, eid=%d p=[%f,%f,%f] v=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d faceid=%d isend=%d w=%e\n",
+                            r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.vec.x, r.vec.y, r.vec.z,
+                            r.slen, r.inroi, r.roitype, r.roiidx, r.faceid, r.isend, r.weight);
+
             break;
         }
 
@@ -2235,7 +2249,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                                 edgeroi, noderoi, faceroi, node, elem, GPU_PARAM(gcfg, elemlen));
         }
 
-        r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, (_immc_skip_roi ? 0 : _immc_ready));
+        r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, _immc_ready);
         (*raytet)++;
 
         if (r.pout.x == MMC_UNDEFINED) {
@@ -2269,9 +2283,8 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 && r.roitype && r.roiidx >= 0
                 && (gmed[GPU_PARAM(gcfg, prop)].n != gmed[type[r.eid - 1]].n)) {
             reflectrayroi_gpu(gcfg, &r.vec, &r.p0, immccache, normal, gmed,
-                              type, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+                              type, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid, node, elem, GPU_PARAM(gcfg, elemlen));
             r.p0 += r.vec * FL3(10.f * EPS);
-            _immc_skip_roi = 1;
             continue;
         }
 
@@ -2337,7 +2350,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 GPUDEBUG(("P %f %f %f %d %u %e\n", r.pout.x, r.pout.y, r.pout.z, r.eid, id, r.slen));
             }
 
-            r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, (_immc_skip_roi ? 0 : _immc_ready));
+            r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, _immc_ready);
             (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
@@ -2360,7 +2373,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
             while (r.pout.x == MMC_UNDEFINED && fixcount++ < MAX_TRIAL) {
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
-                r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, (_immc_skip_roi ? 0 : _immc_ready));
+                r.slen = branchless_badouel_raytet(&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, replayweight, replaytime, node, edgeroi, noderoi, faceroi, type, immccache, _immc_ready);
                 (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
@@ -2381,9 +2394,10 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
         /* iMMC: inner loop broke due to ROI -> reflect + continue outer (no scatter) */
         if (++_dbg_roi_bounce > 1000) {
-            printf("HANG-DETECT: id=%u ROI BOUNCE exceeded 1000 iters, eid=%d p=[%f,%f,%f] v=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d refeid=%d Lmove=%e\n",
-                   r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.vec.x, r.vec.y, r.vec.z,
-                   r.slen, r.inroi, r.roitype, r.roiidx, r.refeid, r.Lmove);
+            if (get_local_id(0) == 0) if (get_local_id(0) == 0) printf("HANG-DETECT: id=%u ROI BOUNCE exceeded 1000 iters, eid=%d p=[%f,%f,%f] v=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d refeid=%d Lmove=%e\n",
+                            r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.vec.x, r.vec.y, r.vec.z,
+                            r.slen, r.inroi, r.roitype, r.roiidx, r.refeid, r.Lmove);
+
             r.eid = 0;
             break;
         }
@@ -2397,7 +2411,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             if (GPU_PARAM(gcfg, isreflect) && r.roiidx >= 0
                     && (gmed[GPU_PARAM(gcfg, prop)].n != gmed[type[r.eid - 1]].n)) {
                 reflectrayroi_gpu(gcfg, &r.vec, &r.p0, immccache, normal, gmed, type,
-                                  &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+                                  &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid, node, elem, GPU_PARAM(gcfg, elemlen));
                 r.p0 += r.vec * FL3(10.f * EPS);
             }
 
@@ -2463,8 +2477,9 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
         /* iMMC: ROI at end of scattering path */
         if (++_dbg_roi_bounce > 1000) {
-            printf("HANG-DETECT: id=%u ROI_SCATTER_BOUNCE exceeded 1000 iters, eid=%d p=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d\n",
-                   r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.slen, r.inroi, r.roitype, r.roiidx);
+            if (get_local_id(0) == 0) if (get_local_id(0) == 0) printf("HANG-DETECT: id=%u ROI_SCATTER_BOUNCE exceeded 1000 iters, eid=%d p=[%f,%f,%f] slen=%e inroi=%d roitype=%d roiidx=%d\n",
+                            r.photonid, r.eid, r.p0.x, r.p0.y, r.p0.z, r.slen, r.inroi, r.roitype, r.roiidx);
+
             r.eid = 0;
             break;
         }
@@ -2477,9 +2492,8 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             }
 
             reflectrayroi_gpu(gcfg, &r.vec, &r.p0, immccache, normal, gmed, type,
-                              &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
+                              &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid, node, elem, GPU_PARAM(gcfg, elemlen));
             r.p0 += r.vec * FL3(10.f * EPS);
-            _immc_skip_roi = 1;
             continue;
         } else if (GPU_PARAM(gcfg, implicit) && r.roitype) {
             if (GPU_PARAM(gcfg, debuglevel) & dlMove) {

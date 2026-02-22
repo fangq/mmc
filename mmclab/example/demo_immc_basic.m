@@ -50,7 +50,7 @@ cfg0.method = 'grid';
 cfg0.steps = [0.01 0.01 0.01];
 cfg0.isreflect = 1;
 cfg0.gpuid = 1;
-cfg0.compute = 'cuda';
+cfg0.compute = 'opencl';
 
 cfg = cfg0;
 
