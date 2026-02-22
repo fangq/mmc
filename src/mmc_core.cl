@@ -300,6 +300,7 @@ typedef struct MMC_Ray {
     int   roitype;
     int   roiidx;
     int   refeid;
+    int   eps2_bounces;
 } ray __attribute__ ((aligned (4)));
 
 
@@ -525,9 +526,13 @@ __device__ uint finddetector(float3* p0, __constant float4* gmed, __constant MCX
     return 0;
 }
 
-__device__ void savedetphoton(__global float* n_det, __global uint* detectedphoton,
-                              __local float* ppath, ray* r, __constant Medium* gmed,
-                              int extdetid, __constant MCXParam* gcfg, __global RandType* photonseed, RandType* initseed) {
+__device__
+#ifdef __NVCC__
+    __noinline__
+#endif
+void savedetphoton(__global float* n_det, __global uint* detectedphoton,
+                   __local float* ppath, ray* r, __constant Medium* gmed,
+                   int extdetid, __constant MCXParam* gcfg, __global RandType* photonseed, RandType* initseed) {
     uint detid = (extdetid < 0) ? finddetector(&(r->p0), (__constant float4*)gmed, gcfg) : extdetid;
 
     if (detid) {
@@ -584,7 +589,11 @@ __device__ void savedetphoton(__global float* n_det, __global uint* detectedphot
  * @param[in] gdebugdata: pointer to the global-memory buffer to store the trajectory info
  */
 
-__device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, __global float* gdebugdata, __constant MCXParam* gcfg) {
+__device__
+#ifdef __NVCC__
+    __noinline__
+#endif
+void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, __global float* gdebugdata, __constant MCXParam* gcfg) {
     uint pos = atomic_inc(&reporter->jumpdebug);
 
     if (pos < GPU_PARAM(gcfg, maxjumpdebug)) {
@@ -1066,6 +1075,15 @@ __device__ void traceroi_gpu(ray* r, __constant MCXParam* gcfg,
 
         if ((fhit == htInOut || fhit == htOutIn) && r->Lmove < EPS2) {
             r->Lmove = EPS2;
+            r->eps2_bounces++;
+
+            if (r->eps2_bounces > 4) {
+                r->roitype = rtNone;
+                r->inroi = 1;
+                r->eps2_bounces = 0;
+            }
+        } else if (fhit == htInOut || fhit == htOutIn) {
+            r->eps2_bounces = 0;
         }
 
     } else if (imm == 2) {
@@ -1129,17 +1147,30 @@ __device__ void traceroi_gpu(ray* r, __constant MCXParam* gcfg,
 
         if ((fhit == htInOut || fhit == htOutIn) && r->Lmove < EPS2) {
             r->Lmove = EPS2;
+            r->eps2_bounces++;
+
+            if (r->eps2_bounces > 4) {
+                r->roitype = rtNone;
+                r->inroi = 1;
+                r->eps2_bounces = 0;
+            }
+        } else if (fhit == htInOut || fhit == htOutIn) {
+            r->eps2_bounces = 0;
         }
     }
 }
 
 /** @brief Fresnel at ROI boundary. Reads node coords from cache. */
-__device__ float reflectrayroi_gpu(__constant MCXParam* gcfg,
-                                   float3* c0, float3* ph, __local float* cache,
-                                   __global float4* normal, __constant Medium* gmed, __global int* type,
-                                   int* eid, int* inroi, __private RandType* ran,
-                                   int roitype, int roiidx, int refeid,
-                                   __global FLOAT3* node, __global int* elem, int elemlen) {
+__device__
+#ifdef __NVCC__
+    __noinline__
+#endif
+float reflectrayroi_gpu(__constant MCXParam* gcfg,
+                        float3* c0, float3* ph, __local float* cache,
+                        __global float4* normal, __constant Medium* gmed, __global int* type,
+                        int* eid, int* inroi, __private RandType* ran,
+                        int roitype, int roiidx, int refeid,
+                        __global FLOAT3* node, __global int* elem, int elemlen) {
     float3 pn = {0.f, 0.f, 0.f};
     int ei = *eid - 1;
 
@@ -1732,7 +1763,11 @@ __device__ void rotatevector(float3* dir, float stheta, float ctheta, float sphi
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
 
-__device__ float mc_next_scatter(float g, float3* dir, __private RandType* ran, __constant MCXParam* gcfg, float* pmom) {
+__device__
+#ifdef __NVCC__
+    __noinline__
+#endif
+float mc_next_scatter(float g, float3* dir, __private RandType* ran, __constant MCXParam* gcfg, float* pmom) {
 
     float nextslen;
     float sphi, cphi, tmp0, theta, stheta, ctheta;
@@ -1804,7 +1839,11 @@ __device__ void fixphoton(float3* p, __global FLOAT3* node, __global int* ee) {
  * \param[in,out] ran: the random number generator states
  */
 
-__device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOAT3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern) {
+__device__
+#ifdef __NVCC__
+    __noinline__
+#endif
+void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOAT3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern) {
     int canfocus = 1;
     float3 origin = r->p0;
 
@@ -2146,7 +2185,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                           __global float* edgeroi, __global float* noderoi, __global float* faceroi, __local float* immccache) {
 
     int oldeid, fixcount = 0;
-    ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0, 0, 0, 0, rtNone, -1};
+    ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0, 0, 0, 0, rtNone, -1, 0};
     int _immc_ready = 0;  /* 1 when immccache is loaded for current element */
     int _dbg_outer_count = 0, _dbg_inner_count = 0, _dbg_roi_bounce = 0;
 
@@ -2517,7 +2556,8 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         float mom = 0.f;
         r.slen0 = mc_next_scatter(gmed[type[r.eid - 1]].g, &r.vec, ran, gcfg, &mom);
         r.slen = r.slen0;
-        _dbg_roi_bounce = 0; /* reset after successful scatter */
+        _dbg_roi_bounce = 0;
+        r.eps2_bounces = 0; /* reset after successful scatter */
 
         if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
             savedebugdata(&r, id, reporter, gdebugdata, gcfg);
@@ -2551,15 +2591,19 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     }
 }
 
-__kernel void mmc_main_loop(const int nphoton, const int ophoton,
+__kernel void
+#ifdef __NVCC__
+    __launch_bounds__(128, 2)
+#endif
+mmc_main_loop(const int nphoton, const int ophoton,
 #ifndef __NVCC__
     __constant__ MCXParam* gcfg, __local float* sharedmem, __constant__ Medium* gmed,
 #endif
-                            __global FLOAT3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
-                            __global float* n_det, __global uint* detectedphoton,
-                            __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
-                            __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata,
-                            __global float* edgeroi, __global float* noderoi, __global float* faceroi) {
+              __global FLOAT3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
+              __global float* n_det, __global uint* detectedphoton,
+              __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
+              __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata,
+              __global float* edgeroi, __global float* noderoi, __global float* faceroi) {
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
