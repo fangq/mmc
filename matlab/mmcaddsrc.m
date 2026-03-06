@@ -68,4 +68,9 @@ if (isstruct(src))
     src = mmcsrcdomain(src, [min(node); max(node)], opt);
 end
 opt.newnode = src;
+
+if (size(elem, 2) == 4)
+    elem(:, 5) = 1;
+end
+
 [newnode, newelem] = meshrefine(node, elem, opt);
