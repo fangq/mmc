@@ -2426,9 +2426,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
 
         stheta = sinf(ang);
         ctheta = cosf(ang);
-        r->vec.x = stheta * cphi;
-        r->vec.y = stheta * sphi;
-        r->vec.z = ctheta;
+        rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
         canfocus = 0;
 
         if (r->eid > 0) {
@@ -2442,9 +2440,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         ang = sqrtf(-2.f * log(rand_uniform01(ran))) * (1.f - 2.f * rand_uniform01(ran0)) * cfg->srcparam1.x;
         stheta = sinf(ang);
         ctheta = cosf(ang);
-        r->vec.x = stheta * cphi;
-        r->vec.y = stheta * sphi;
-        r->vec.z = ctheta;
+        rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
         canfocus = 0;
     } else if (cfg->srctype == stLine || cfg->srctype == stSlit) {
         float t = rand_uniform01(ran);

@@ -319,4 +319,26 @@ static inline float mmc_rsqrtf(float a) {
 #endif
 }
 
+static inline void rotatevector(float3* dir, float stheta, float ctheta, float sphi, float cphi) {
+    float3 p;
+    float tmp0;
+
+    if (dir->z > -1.f + EPS && dir->z < 1.f - EPS) {
+        tmp0 = 1.f - dir->z * dir->z;
+        float tmp1 = stheta * mmc_rsqrtf(tmp0);
+        p.x = tmp1 * (dir->x * dir->z * cphi - dir->y * sphi) + dir->x * ctheta;
+        p.y = tmp1 * (dir->y * dir->z * cphi + dir->x * sphi) + dir->y * ctheta;
+        p.z = -tmp1 * tmp0 * cphi                              + dir->z * ctheta;
+    } else {
+        p.x = stheta * cphi;
+        p.y = stheta * sphi;
+        p.z = (dir->z > 0.f) ? ctheta : -ctheta;
+    }
+
+    tmp0 = mmc_rsqrtf(p.x * p.x + p.y * p.y + p.z * p.z);
+    dir->x = p.x * tmp0;
+    dir->y = p.y * tmp0;
+    dir->z = p.z * tmp0;
+}
+
 #endif

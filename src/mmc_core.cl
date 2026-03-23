@@ -1283,10 +1283,8 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 
         if (GPU_PARAM(gcfg, srctype) == MCX_SRC_CONE) {
 #endif
-
-            do {
-                ang = (gcfg->srcparam1.y > 0) ? TWO_PI * rand_uniform01(ran) : acos(2.f * rand_uniform01(ran) - 1.f); //sine distribution
-            } while (ang > gcfg->srcparam1.x);
+            ang = MCX_MATHFUN(cos)(gcfg->srcparam1.x);
+            ang = (gcfg->srcparam1.y > 0.f) ? rand_uniform01(ran) * gcfg->srcparam1.x : acos(rand_uniform01(ran) * (1.0f - ang) + ang); //sine distribution
 
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_ISOTROPIC) || defined(MCX_SRC_ARCSINE)
@@ -1307,9 +1305,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 #endif
         stheta = MCX_MATHFUN(sin)(ang);
         ctheta = MCX_MATHFUN(cos)(ang);
-        r->vec.x = stheta * cphi;
-        r->vec.y = stheta * sphi;
-        r->vec.z = ctheta;
+        rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
         canfocus = 0;
 
         if (GPU_PARAM(gcfg, srctype) == stIsotropic)
@@ -1329,9 +1325,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
         ang = MCX_MATHFUN(sqrt)(-2.f * MCX_MATHFUN(log)((rand_uniform01(ran)))) * (1.f - 2.f * rand_uniform01(ran)) * gcfg->srcparam1.x;
         stheta = MCX_MATHFUN(sin)(ang);
         ctheta = MCX_MATHFUN(cos)(ang);
-        r->vec.x = stheta * cphi;
-        r->vec.y = stheta * sphi;
-        r->vec.z = ctheta;
+        rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
         canfocus = 0;
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_LINE) || defined(MCX_SRC_SLIT)
@@ -1489,6 +1483,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     int oldeid, fixcount = 0;
     ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f};
+
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
     RandType initseed[RAND_BUF_LEN] = {NULL};
 #endif
