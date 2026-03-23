@@ -779,7 +779,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         printf("mcx.kernelfile=string of %d;\n", len);
     } else if (strcmp(name, "srctype") == 0) {
         int len = mxGetNumberOfElements(item);
-        const char* srctypeid[] = {"pencil", "isotropic", "cone", "gaussian", "planar", "pattern", "fourier", "arcsine", "disk", "fourierx", "fourierx2d", "zgaussian", "line", "slit", ""};
+        const char* srctypeid[] = {"pencil", "isotropic", "cone", "gaussian", "planar", "pattern", "fourier", "arcsine", "disk", "fourierx", "fourierx2d", "zgaussian", "line", "slit", "pencilarray", "pattern3d", "hyperboloid", "ring", ""};
         char strtypestr[MAX_SESSION_LENGTH] = {'\0'};
 
         if (!mxIsChar(item) || len == 0) {

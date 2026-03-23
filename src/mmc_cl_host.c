@@ -58,7 +58,7 @@ const char* sourceflag[] = {"-DMCX_SRC_PENCIL", "-DMCX_SRC_ISOTROPIC", "-DMCX_SR
                             "-DMCX_SRC_GAUSSIAN", "-DMCX_SRC_PLANAR", "-DMCX_SRC_PATTERN", "-DMCX_SRC_FOURIER",
                             "-DMCX_SRC_ARCSINE", "-DMCX_SRC_DISK", "-DMCX_SRC_FOURIERX", "-DMCX_SRC_FOURIERX2D",
                             "-DMCX_SRC_ZGAUSSIAN", "-DMCX_SRC_LINE", "-DMCX_SRC_SLIT", "-DMCX_SRC_PENCILARRAY",
-                            "-DMCX_SRC_PATTERN3D"
+                            "-DMCX_SRC_PATTERN3D", "-DMCX_SRC_HYPERBOLOID_GAUSSIAN", "-DMCX_SRC_RING"
                            };
 
 extern cl_event kernelevent;

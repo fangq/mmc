@@ -319,6 +319,7 @@ static inline float mmc_rsqrtf(float a) {
 #endif
 }
 
+#ifndef __NVCC__
 static inline void rotatevector(float3* dir, float stheta, float ctheta, float sphi, float cphi) {
     float3 p;
     float tmp0;
@@ -340,5 +341,6 @@ static inline void rotatevector(float3* dir, float stheta, float ctheta, float s
     dir->y = p.y * tmp0;
     dir->z = p.z * tmp0;
 }
+#endif /* __NVCC__ */
 
 #endif

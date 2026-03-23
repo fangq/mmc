@@ -374,7 +374,7 @@ __constant__ int faceorder[] = {1, 3, 2, 0, -1};
 __constant__ int ifaceorder[] = {3, 0, 2, 1};
 //__constant int fc[4][3]={{0,4,2},{3,5,4},{2,5,1},{1,3,0}};
 //__constant int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-#if defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D)
+#if defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D) || defined(MCX_SRC_PENCILARRAY)
 __constant__ int out[4][3] = {{0, 3, 1}, {3, 2, 1}, {0, 2, 3}, {0, 1, 2}};
 __constant__ int facemap[] = {2, 0, 1, 3};
 __constant__ int ifacemap[] = {1, 2, 0, 3};
@@ -391,7 +391,8 @@ enum TMCMethod {mmMCX, mmMCML};
 
 enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX,
-               stFourier2D, stZGaussian, stLine, stSlit
+               stFourier2D, stZGaussian, stLine, stSlit,
+               stPencilArray, stPattern3D, stHyperboloid, stRing
               };
 enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
 enum TOutputFormat {ofASCII, ofBin, ofJSON, ofUBJSON};
@@ -1163,37 +1164,81 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
         }
 
 #endif
-#if defined(__NVCC__) || defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) /*a rectangular grid over a plane*/
+#if defined(__NVCC__) || defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_PENCILARRAY) /*a rectangular grid over a plane*/
 #ifdef __NVCC__
-    } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PLANAR || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN3D || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIER) {
+    } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PLANAR || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN3D || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIER || GPU_PARAM(gcfg, srctype) == MCX_SRC_PENCILARRAY) {
 #endif
         float rx = rand_uniform01(ran);
         float ry = rand_uniform01(ran);
-        r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x + ry * gcfg->srcparam2.x;
-        r->p0.y = gcfg->srcpos.y + rx * gcfg->srcparam1.y + ry * gcfg->srcparam2.y;
-        r->p0.z = gcfg->srcpos.z + rx * gcfg->srcparam1.z + ry * gcfg->srcparam2.z;
-        r->weight = 1.f;
+#if defined(__NVCC__) || defined(MCX_SRC_PATTERN3D)
+#ifdef __NVCC__
+
+        if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN3D) {
+#endif
+            float rz = rand_uniform01(ran);
+            r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x;
+            r->p0.y = gcfg->srcpos.y + ry * gcfg->srcparam1.y;
+            r->p0.z = gcfg->srcpos.z + rz * gcfg->srcparam1.z;
+            r->weight = (GPU_PARAM(gcfg, srcnum) > 1) ? 1.f :
+                        srcpattern[MIN((int)(rz * JUST_BELOW_ONE * (int)gcfg->srcparam1.z), (int)gcfg->srcparam1.z - 1) * (int)gcfg->srcparam1.y * (int)gcfg->srcparam1.x
+                                                + MIN((int)(ry * JUST_BELOW_ONE * (int)gcfg->srcparam1.y), (int)gcfg->srcparam1.y - 1) * (int)gcfg->srcparam1.x
+                                                + MIN((int)(rx * JUST_BELOW_ONE * (int)gcfg->srcparam1.x), (int)gcfg->srcparam1.x - 1)];
+            origin.x += gcfg->srcparam1.x * 0.5f;
+            origin.y += gcfg->srcparam1.y * 0.5f;
+            origin.z += gcfg->srcparam1.z * 0.5f;
+#ifdef __NVCC__
+        } else
+#endif
+#endif
+#if defined(__NVCC__) || defined(MCX_SRC_PENCILARRAY)
+#ifdef __NVCC__
+            if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PENCILARRAY) {
+#endif
+                r->p0.x = gcfg->srcpos.x + MCX_MATHFUN(floor)(rx * gcfg->srcparam1.w) * gcfg->srcparam1.x / (gcfg->srcparam1.w - 1.f)
+                          + MCX_MATHFUN(floor)(ry * gcfg->srcparam2.w) * gcfg->srcparam2.x / (gcfg->srcparam2.w - 1.f);
+                r->p0.y = gcfg->srcpos.y + MCX_MATHFUN(floor)(rx * gcfg->srcparam1.w) * gcfg->srcparam1.y / (gcfg->srcparam1.w - 1.f)
+                          + MCX_MATHFUN(floor)(ry * gcfg->srcparam2.w) * gcfg->srcparam2.y / (gcfg->srcparam2.w - 1.f);
+                r->p0.z = gcfg->srcpos.z + MCX_MATHFUN(floor)(rx * gcfg->srcparam1.w) * gcfg->srcparam1.z / (gcfg->srcparam1.w - 1.f)
+                          + MCX_MATHFUN(floor)(ry * gcfg->srcparam2.w) * gcfg->srcparam2.z / (gcfg->srcparam2.w - 1.f);
+                r->weight = 1.f;
+                origin.x += (gcfg->srcparam1.x + gcfg->srcparam2.x) * 0.5f;
+                origin.y += (gcfg->srcparam1.y + gcfg->srcparam2.y) * 0.5f;
+                origin.z += (gcfg->srcparam1.z + gcfg->srcparam2.z) * 0.5f;
+#ifdef __NVCC__
+            } else {
+#endif
+#endif
+#if defined(__NVCC__) || defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_FOURIER)
+                r->p0.x = gcfg->srcpos.x + rx * gcfg->srcparam1.x + ry * gcfg->srcparam2.x;
+                r->p0.y = gcfg->srcpos.y + rx * gcfg->srcparam1.y + ry * gcfg->srcparam2.y;
+                r->p0.z = gcfg->srcpos.z + rx * gcfg->srcparam1.z + ry * gcfg->srcparam2.z;
+                r->weight = 1.f;
 #if defined(__NVCC__) || defined(MCX_SRC_PATTERN)
 #ifdef __NVCC__
 
-        if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN) {
+                if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN) {
 #endif
-            int xsize = (int)gcfg->srcparam1.w;
-            int ysize = (int)gcfg->srcparam2.w;
-            r->posidx = MIN((int)(ry * JUST_BELOW_ONE * ysize), ysize - 1) * xsize + MIN((int)(rx * JUST_BELOW_ONE * xsize), xsize - 1);
-            r->weight = (GPU_PARAM(gcfg, srcnum) > 1) ? 1.f : srcpattern[r->posidx];
+                    int xsize = (int)gcfg->srcparam1.w;
+                    int ysize = (int)gcfg->srcparam2.w;
+                    r->posidx = MIN((int)(ry * JUST_BELOW_ONE * ysize), ysize - 1) * xsize + MIN((int)(rx * JUST_BELOW_ONE * xsize), xsize - 1);
+                    r->weight = (GPU_PARAM(gcfg, srcnum) > 1) ? 1.f : srcpattern[r->posidx];
 
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_FOURIER)  // need to prevent rx/ry=1 here
 #ifdef __NVCC__
-        } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIER)
+                } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIER)
 #endif
-            r->weight = (MCX_MATHFUN(cos)((floor(gcfg->srcparam1.w) * rx + floor(gcfg->srcparam2.w) * ry + gcfg->srcparam1.w - floor(gcfg->srcparam1.w)) * TWO_PI) * (1.f - gcfg->srcparam2.w + floor(gcfg->srcparam2.w)) + 1.f) * 0.5f;
+                    r->weight = (MCX_MATHFUN(cos)((floor(gcfg->srcparam1.w) * rx + floor(gcfg->srcparam2.w) * ry + gcfg->srcparam1.w - floor(gcfg->srcparam1.w)) * TWO_PI) * (1.f - gcfg->srcparam2.w + floor(gcfg->srcparam2.w)) + 1.f) * 0.5f;
 
 #endif
-        origin.x += (gcfg->srcparam1.x + gcfg->srcparam2.x) * 0.5f;
-        origin.y += (gcfg->srcparam1.y + gcfg->srcparam2.y) * 0.5f;
-        origin.z += (gcfg->srcparam1.z + gcfg->srcparam2.z) * 0.5f;
+                origin.x += (gcfg->srcparam1.x + gcfg->srcparam2.x) * 0.5f;
+                origin.y += (gcfg->srcparam1.y + gcfg->srcparam2.y) * 0.5f;
+                origin.z += (gcfg->srcparam1.z + gcfg->srcparam2.z) * 0.5f;
+#ifdef __NVCC__
+            }
+
+#endif
+#endif
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D) // [v1x][v1y][v1z][|v2|]; [kx][ky][phi0][M], unit(v0) x unit(v1)=unit(v2)
 #ifdef __NVCC__
@@ -1224,21 +1269,29 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
         origin.y += (gcfg->srcparam1.y + tmp * (gcfg->srcdir.z * gcfg->srcparam1.x - gcfg->srcdir.x * gcfg->srcparam1.z)) * 0.5f;
         origin.z += (gcfg->srcparam1.z + tmp * (gcfg->srcdir.x * gcfg->srcparam1.y - gcfg->srcdir.y * gcfg->srcparam1.x)) * 0.5f;
 #endif
-#if defined(__NVCC__) || defined(MCX_SRC_DISK) || defined(MCX_SRC_GAUSSIAN) // uniform disk distribution or Gaussian-beam
+#if defined(__NVCC__) || defined(MCX_SRC_DISK) || defined(MCX_SRC_RING) || defined(MCX_SRC_GAUSSIAN) // uniform disk distribution, ring, or Gaussian-beam
 #ifdef __NVCC__
-    } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_DISK || GPU_PARAM(gcfg, srctype) == MCX_SRC_GAUSSIAN) {
+    } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_DISK || GPU_PARAM(gcfg, srctype) == MCX_SRC_RING || GPU_PARAM(gcfg, srctype) == MCX_SRC_GAUSSIAN) {
 #endif
-        float sphi, cphi;
-        float phi = TWO_PI * rand_uniform01(ran);
-        sphi = MCX_MATHFUN(sin)(phi);
-        cphi = MCX_MATHFUN(cos)(phi);
-        float r0;
-#if defined(__NVCC__) || defined(MCX_SRC_DISK)
+        float sphi, cphi, phi;
+#if defined(__NVCC__) || defined(MCX_SRC_RING)
 #ifdef __NVCC__
 
-        if (GPU_PARAM(gcfg, srctype) == MCX_SRC_DISK) {
+        if (GPU_PARAM(gcfg, srctype) == MCX_SRC_RING && (gcfg->srcparam1.z > 0.f || gcfg->srcparam1.w > 0.f)) {
+            phi = fabs(gcfg->srcparam1.z - gcfg->srcparam1.w) * rand_uniform01(ran) + fmin(gcfg->srcparam1.z, gcfg->srcparam1.w);
+        } else
 #endif
-            r0 = MCX_MATHFUN(sqrt)(rand_uniform01(ran)) * gcfg->srcparam1.x;
+#endif
+            phi = TWO_PI * rand_uniform01(ran);
+
+        MCX_SINCOS(phi, sphi, cphi);
+        float r0;
+#if defined(__NVCC__) || defined(MCX_SRC_DISK) || defined(MCX_SRC_RING)
+#ifdef __NVCC__
+
+        if (GPU_PARAM(gcfg, srctype) == MCX_SRC_DISK || GPU_PARAM(gcfg, srctype) == MCX_SRC_RING) {
+#endif
+            r0 = MCX_MATHFUN(sqrt)(rand_uniform01(ran) * fabs(gcfg->srcparam1.x * gcfg->srcparam1.x - gcfg->srcparam1.y * gcfg->srcparam1.y) + gcfg->srcparam1.y * gcfg->srcparam1.y);
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_GAUSSIAN)
 #ifdef __NVCC__
@@ -1328,6 +1381,60 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
         rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
         canfocus = 0;
 #endif
+#if defined(__NVCC__) || defined(MCX_SRC_HYPERBOLOID_GAUSSIAN) // hyperboloid Gaussian beam
+#ifdef __NVCC__
+    } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_HYPERBOLOID_GAUSSIAN) {
+#endif
+        float sphi, cphi;
+        float r0 = TWO_PI * rand_uniform01(ran); // reuse r0 as phi first
+        MCX_SINCOS(r0, sphi, cphi);
+        r0 = MCX_MATHFUN(sqrt)(0.5f * rand_next_scatlen(ran)) * gcfg->srcparam1.x; // beam waist radius
+
+        /** compute beam direction and transverse displacement relative to beam axis (+z before rotation) */
+        float bdir_x = -r0 * sphi;
+        float bdir_y =  r0 * cphi;
+        float bdir_z =  gcfg->srcparam1.z; // rayleigh range component along beam axis
+
+        /** beam-local position offset: apply beam tilt from focal point (param1.y = focal_dist) */
+        float tilt = (gcfg->srcparam1.z > 0.f) ? (-gcfg->srcparam1.y / gcfg->srcparam1.z) : 0.f;
+        float norm_bdir = MCX_MATHFUN(rsqrt)(bdir_x * bdir_x + bdir_y * bdir_y + bdir_z * bdir_z);
+        bdir_x *= norm_bdir;
+        bdir_y *= norm_bdir;
+        bdir_z *= norm_bdir;
+
+        float dp_x = r0 * (cphi - tilt * sphi);
+        float dp_y = r0 * (sphi + tilt * cphi);
+
+        /** rotate position offset and direction from beam-local frame to srcdir frame */
+        if (gcfg->srcdir.z > -1.f + EPS && gcfg->srcdir.z < 1.f - EPS) {
+            float sin_theta = MCX_MATHFUN(sqrt)(1.f - gcfg->srcdir.z * gcfg->srcdir.z);
+            float inv_sin_theta = MCX_MATHFUN(rsqrt)(1.f - gcfg->srcdir.z * gcfg->srcdir.z);
+            float cphi_beam = gcfg->srcdir.x * inv_sin_theta;
+            float sphi_beam = gcfg->srcdir.y * inv_sin_theta;
+
+            r->p0.x = gcfg->srcpos.x + dp_x * cphi_beam * gcfg->srcdir.z - dp_y * sphi_beam;
+            r->p0.y = gcfg->srcpos.y + dp_x * sphi_beam * gcfg->srcdir.z + dp_y * cphi_beam;
+            r->p0.z = gcfg->srcpos.z - dp_x * sin_theta;
+
+            r->vec.x = bdir_x * cphi_beam * gcfg->srcdir.z - bdir_y * sphi_beam + bdir_z * cphi_beam * sin_theta;
+            r->vec.y = bdir_x * sphi_beam * gcfg->srcdir.z + bdir_y * cphi_beam + bdir_z * sphi_beam * sin_theta;
+            r->vec.z = -bdir_x * sin_theta + bdir_z * gcfg->srcdir.z;
+        } else {
+            r->p0.x = gcfg->srcpos.x + dp_x;
+            r->p0.y = gcfg->srcpos.y + dp_y;
+            r->p0.z = gcfg->srcpos.z;
+
+            r->vec.x = bdir_x;
+            r->vec.y = bdir_y;
+            r->vec.z = (gcfg->srcdir.z > 0.f) ? bdir_z : -bdir_z;
+        }
+
+        float norm_vec = MCX_MATHFUN(rsqrt)(r->vec.x * r->vec.x + r->vec.y * r->vec.y + r->vec.z * r->vec.z);
+        r->vec.x *= norm_vec;
+        r->vec.y *= norm_vec;
+        r->vec.z *= norm_vec;
+        canfocus = 0;
+#endif
 #if defined(__NVCC__) || defined(MCX_SRC_LINE) || defined(MCX_SRC_SLIT)
 #ifdef __NVCC__
     } else if (GPU_PARAM(gcfg, srctype) == MCX_SRC_LINE || GPU_PARAM(gcfg, srctype) == MCX_SRC_SLIT) {
@@ -1405,10 +1512,10 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 
     r->p0 += r->vec * EPS;
 
-#if defined(__NVCC__) || defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D)
+#if defined(__NVCC__) || defined(MCX_SRC_PLANAR) || defined(MCX_SRC_PATTERN) || defined(MCX_SRC_PATTERN3D) || defined(MCX_SRC_FOURIER) || defined(MCX_SRC_FOURIERX) || defined(MCX_SRC_FOURIERX2D) || defined(MCX_SRC_PENCILARRAY)
 #ifdef __NVCC__
 
-    if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PLANAR || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN3D || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIER || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIERX || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIERX2D) {
+    if (GPU_PARAM(gcfg, srctype) == MCX_SRC_PLANAR || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN || GPU_PARAM(gcfg, srctype) == MCX_SRC_PATTERN3D || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIER || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIERX || GPU_PARAM(gcfg, srctype) == MCX_SRC_FOURIERX2D || GPU_PARAM(gcfg, srctype) == MCX_SRC_PENCILARRAY) {
 #endif
         /*Caluclate intial element id and bary-centric coordinates for area sources - position changes everytime*/
         float3 vecS = FL3(0.f), vecAB, vecAC, vecN;

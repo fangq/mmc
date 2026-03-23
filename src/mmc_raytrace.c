@@ -50,6 +50,9 @@
 
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
 #define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
+#ifndef JUST_BELOW_ONE
+    #define JUST_BELOW_ONE  0.9998f          /**<  used to clamp pattern index to avoid overflow */
+#endif
 
 /**
  * \mapping from edge index to node index
@@ -2334,31 +2337,57 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         if (r->eid > 0) {
             return;
         }
-    } else if (cfg->srctype == stPlanar || cfg->srctype == stPattern || cfg->srctype == stFourier) {
+    } else if (cfg->srctype == stPlanar || cfg->srctype == stPattern || cfg->srctype == stPattern3D || cfg->srctype == stFourier || cfg->srctype == stPencilArray) {
         float rx = rand_uniform01(ran);
         float ry = rand_uniform01(ran);
-        r->p0.x = cfg->srcpos.x + rx * cfg->srcparam1.x + ry * cfg->srcparam2.x;
-        r->p0.y = cfg->srcpos.y + rx * cfg->srcparam1.y + ry * cfg->srcparam2.y;
-        r->p0.z = cfg->srcpos.z + rx * cfg->srcparam1.z + ry * cfg->srcparam2.z;
-        r->weight = 1.f;
 
-        if (cfg->srctype == stPattern) {
-            int xsize = (int)cfg->srcparam1.w;
-            int ysize = (int)cfg->srcparam2.w;
-            r->posidx = MIN((int)(ry * ysize), ysize - 1) * xsize + MIN((int)(rx * xsize), xsize - 1);
-            r->weight = (cfg->srcnum == 1) ? cfg->srcpattern[r->posidx] : 1.f;
+        if (cfg->srctype == stPattern3D) {
+            float rz = rand_uniform01(ran);
+            r->p0.x = cfg->srcpos.x + rx * cfg->srcparam1.x;
+            r->p0.y = cfg->srcpos.y + ry * cfg->srcparam1.y;
+            r->p0.z = cfg->srcpos.z + rz * cfg->srcparam1.z;
+            r->weight = (cfg->srcnum > 1) ? 1.f :
+                        cfg->srcpattern[MIN((int)(rz * JUST_BELOW_ONE * (int)cfg->srcparam1.z), (int)cfg->srcparam1.z - 1) * (int)cfg->srcparam1.y * (int)cfg->srcparam1.x
+                                                     + MIN((int)(ry * JUST_BELOW_ONE * (int)cfg->srcparam1.y), (int)cfg->srcparam1.y - 1) * (int)cfg->srcparam1.x
+                                                     + MIN((int)(rx * JUST_BELOW_ONE * (int)cfg->srcparam1.x), (int)cfg->srcparam1.x - 1)];
+            origin.x += cfg->srcparam1.x * 0.5f;
+            origin.y += cfg->srcparam1.y * 0.5f;
+            origin.z += cfg->srcparam1.z * 0.5f;
+        } else if (cfg->srctype == stPencilArray) {
+            r->p0.x = cfg->srcpos.x + floorf(rx * cfg->srcparam1.w) * cfg->srcparam1.x / (cfg->srcparam1.w - 1.f)
+                      + floorf(ry * cfg->srcparam2.w) * cfg->srcparam2.x / (cfg->srcparam2.w - 1.f);
+            r->p0.y = cfg->srcpos.y + floorf(rx * cfg->srcparam1.w) * cfg->srcparam1.y / (cfg->srcparam1.w - 1.f)
+                      + floorf(ry * cfg->srcparam2.w) * cfg->srcparam2.y / (cfg->srcparam2.w - 1.f);
+            r->p0.z = cfg->srcpos.z + floorf(rx * cfg->srcparam1.w) * cfg->srcparam1.z / (cfg->srcparam1.w - 1.f)
+                      + floorf(ry * cfg->srcparam2.w) * cfg->srcparam2.z / (cfg->srcparam2.w - 1.f);
+            r->weight = 1.f;
+            origin.x += (cfg->srcparam1.x + cfg->srcparam2.x) * 0.5f;
+            origin.y += (cfg->srcparam1.y + cfg->srcparam2.y) * 0.5f;
+            origin.z += (cfg->srcparam1.z + cfg->srcparam2.z) * 0.5f;
+        } else {
+            r->p0.x = cfg->srcpos.x + rx * cfg->srcparam1.x + ry * cfg->srcparam2.x;
+            r->p0.y = cfg->srcpos.y + rx * cfg->srcparam1.y + ry * cfg->srcparam2.y;
+            r->p0.z = cfg->srcpos.z + rx * cfg->srcparam1.z + ry * cfg->srcparam2.z;
+            r->weight = 1.f;
 
-            if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) { // replay mode currently doesn't support multiple source patterns
-                r->weight = cfg->srcpattern[MIN( (int)(ry * cfg->srcparam2.w), (int)cfg->srcparam2.w - 1 ) * (int)(cfg->srcparam1.w) + MIN( (int)(rx * cfg->srcparam1.w), (int)cfg->srcparam1.w - 1 )];
-                cfg->replayweight[r->photonid] *= r->weight;
+            if (cfg->srctype == stPattern) {
+                int xsize = (int)cfg->srcparam1.w;
+                int ysize = (int)cfg->srcparam2.w;
+                r->posidx = MIN((int)(ry * ysize), ysize - 1) * xsize + MIN((int)(rx * xsize), xsize - 1);
+                r->weight = (cfg->srcnum == 1) ? cfg->srcpattern[r->posidx] : 1.f;
+
+                if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) { // replay mode currently doesn't support multiple source patterns
+                    r->weight = cfg->srcpattern[MIN( (int)(ry * cfg->srcparam2.w), (int)cfg->srcparam2.w - 1 ) * (int)(cfg->srcparam1.w) + MIN( (int)(rx * cfg->srcparam1.w), (int)cfg->srcparam1.w - 1 )];
+                    cfg->replayweight[r->photonid] *= r->weight;
+                }
+            } else if (cfg->srctype == stFourier) {
+                r->weight = (cosf((floorf(cfg->srcparam1.w) * rx + floorf(cfg->srcparam2.w) * ry + cfg->srcparam1.w - floorf(cfg->srcparam1.w)) * TWO_PI) * (1.f - cfg->srcparam2.w + floorf(cfg->srcparam2.w)) + 1.f) * 0.5f;
             }
-        } else if (cfg->srctype == stFourier) {
-            r->weight = (cosf((floorf(cfg->srcparam1.w) * rx + floorf(cfg->srcparam2.w) * ry + cfg->srcparam1.w - floorf(cfg->srcparam1.w)) * TWO_PI) * (1.f - cfg->srcparam2.w + floorf(cfg->srcparam2.w)) + 1.f) * 0.5f;
-        }
 
-        origin.x += (cfg->srcparam1.x + cfg->srcparam2.x) * 0.5f;
-        origin.y += (cfg->srcparam1.y + cfg->srcparam2.y) * 0.5f;
-        origin.z += (cfg->srcparam1.z + cfg->srcparam2.z) * 0.5f;
+            origin.x += (cfg->srcparam1.x + cfg->srcparam2.x) * 0.5f;
+            origin.y += (cfg->srcparam1.y + cfg->srcparam2.y) * 0.5f;
+            origin.z += (cfg->srcparam1.z + cfg->srcparam2.z) * 0.5f;
+        }
     } else if (cfg->srctype == stFourierX || cfg->srctype == stFourier2D) {
         float rx = rand_uniform01(ran);
         float ry = rand_uniform01(ran);
@@ -2380,15 +2409,21 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         origin.x += (cfg->srcparam1.x + v2.x) * 0.5f;
         origin.y += (cfg->srcparam1.y + v2.y) * 0.5f;
         origin.z += (cfg->srcparam1.z + v2.z) * 0.5f;
-    } else if (cfg->srctype == stDisk || cfg->srctype == stGaussian) { // uniform disk and Gaussian beam
-        float sphi, cphi;
-        float phi = TWO_PI * rand_uniform01(ran);
+    } else if (cfg->srctype == stDisk || cfg->srctype == stRing || cfg->srctype == stGaussian) { // uniform disk, ring, and Gaussian beam
+        float sphi, cphi, phi;
+
+        if (cfg->srctype == stRing && (cfg->srcparam1.z > 0.f || cfg->srcparam1.w > 0.f)) {
+            phi = fabsf(cfg->srcparam1.z - cfg->srcparam1.w) * rand_uniform01(ran) + fminf(cfg->srcparam1.z, cfg->srcparam1.w);
+        } else {
+            phi = TWO_PI * rand_uniform01(ran);
+        }
+
         sphi = sinf(phi);
         cphi = cosf(phi);
         float r0;
 
-        if (cfg->srctype == stDisk) {
-            r0 = sqrtf(rand_uniform01(ran)) * cfg->srcparam1.x;
+        if (cfg->srctype == stDisk || cfg->srctype == stRing) {
+            r0 = sqrtf(rand_uniform01(ran) * fabsf(cfg->srcparam1.x * cfg->srcparam1.x - cfg->srcparam1.y * cfg->srcparam1.y) + cfg->srcparam1.y * cfg->srcparam1.y);
         } else if (fabs(r->focus) < 1e-5f || fabs(cfg->srcparam1.y) < 1e-5f) {
             r0 = sqrtf(-log(rand_uniform01(ran))) * cfg->srcparam1.x;
         } else {
@@ -2441,6 +2476,55 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         stheta = sinf(ang);
         ctheta = cosf(ang);
         rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
+        canfocus = 0;
+    } else if (cfg->srctype == stHyperboloid) { // hyperboloid Gaussian beam
+        float sphi, cphi;
+        float r0 = TWO_PI * rand_uniform01(ran); // phi
+        sphi = sinf(r0);
+        cphi = cosf(r0);
+        r0 = sqrtf(0.5f * rand_next_scatlen(ran)) * cfg->srcparam1.x; // beam waist radius
+
+        /** compute direction in beam-local frame */
+        float tilt = (cfg->srcparam1.z > 0.f) ? (-cfg->srcparam1.y / cfg->srcparam1.z) : 0.f;
+        float bdir_x = -r0 * sphi;
+        float bdir_y =  r0 * cphi;
+        float bdir_z =  cfg->srcparam1.z;
+        float norm_bdir = 1.f / sqrtf(bdir_x * bdir_x + bdir_y * bdir_y + bdir_z * bdir_z);
+        bdir_x *= norm_bdir;
+        bdir_y *= norm_bdir;
+        bdir_z *= norm_bdir;
+
+        float dp_x = r0 * (cphi - tilt * sphi);
+        float dp_y = r0 * (sphi + tilt * cphi);
+
+        /** rotate position offset and direction to srcdir frame */
+        if (cfg->srcdir.z > -1.f + EPS && cfg->srcdir.z < 1.f - EPS) {
+            float sin_theta = sqrtf(1.f - cfg->srcdir.z * cfg->srcdir.z);
+            float inv_sin_theta = 1.f / sin_theta;
+            float cphi_beam = cfg->srcdir.x * inv_sin_theta;
+            float sphi_beam = cfg->srcdir.y * inv_sin_theta;
+
+            r->p0.x = cfg->srcpos.x + dp_x * cphi_beam * cfg->srcdir.z - dp_y * sphi_beam;
+            r->p0.y = cfg->srcpos.y + dp_x * sphi_beam * cfg->srcdir.z + dp_y * cphi_beam;
+            r->p0.z = cfg->srcpos.z - dp_x * sin_theta;
+
+            r->vec.x = bdir_x * cphi_beam * cfg->srcdir.z - bdir_y * sphi_beam + bdir_z * cphi_beam * sin_theta;
+            r->vec.y = bdir_x * sphi_beam * cfg->srcdir.z + bdir_y * cphi_beam + bdir_z * sphi_beam * sin_theta;
+            r->vec.z = -bdir_x * sin_theta + bdir_z * cfg->srcdir.z;
+        } else {
+            r->p0.x = cfg->srcpos.x + dp_x;
+            r->p0.y = cfg->srcpos.y + dp_y;
+            r->p0.z = cfg->srcpos.z;
+
+            r->vec.x = bdir_x;
+            r->vec.y = bdir_y;
+            r->vec.z = (cfg->srcdir.z > 0.f) ? bdir_z : -bdir_z;
+        }
+
+        float norm_vec = 1.f / sqrtf(r->vec.x * r->vec.x + r->vec.y * r->vec.y + r->vec.z * r->vec.z);
+        r->vec.x *= norm_vec;
+        r->vec.y *= norm_vec;
+        r->vec.z *= norm_vec;
         canfocus = 0;
     } else if (cfg->srctype == stLine || cfg->srctype == stSlit) {
         float t = rand_uniform01(ran);
