@@ -415,6 +415,37 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     }
 
 
+
+    if (user_cfg.contains("compileropt")) {
+        std::string compileropt = py::str(user_cfg["compileropt"]);
+
+        if (compileropt.empty()) {
+            throw py::value_error("the 'compileropt' field must be a non-empty string");
+        }
+
+        if (compileropt.size() > MAX_PATH_LENGTH) {
+            throw py::value_error("the 'compileropt' field is too long");
+        }
+
+        strncpy(mcx_config.compileropt, compileropt.c_str(), MAX_PATH_LENGTH);
+    }
+
+
+    if (user_cfg.contains("kernelfile")) {
+        std::string kernelfile = py::str(user_cfg["kernelfile"]);
+
+        if (kernelfile.empty()) {
+            throw py::value_error("the 'kernelfile' field must be a non-empty string");
+        }
+
+        if (kernelfile.size() > MAX_SESSION_LENGTH) {
+            throw py::value_error("the 'kernelfile' field is too long");
+        }
+
+        strncpy(mcx_config.kernelfile, kernelfile.c_str(), MAX_SESSION_LENGTH);
+    }
+
+
     if (user_cfg.contains("session")) {
         std::string session = py::str(user_cfg["session"]);
 
