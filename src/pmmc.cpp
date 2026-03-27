@@ -623,7 +623,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             auto buffer_info = f_style_array.request();
             seed_byte = buffer_info.shape.at(0);
 
-            if (buffer_info.shape.at(0) != sizeof(float) * RAND_BUF_LEN) {
+            if (buffer_info.shape.at(0) != sizeof(RandType) * RAND_BUF_LEN) {
                 throw py::value_error("the row number of cfg.seed does not match RNG seed byte-length");
             }
 
@@ -796,11 +796,11 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 #endif
 
         if (mcx_config.issavedet >= 1) {
-            mcx_config.exportdetected = (float*) malloc(hostdetreclen * mcx_config.maxdetphoton * sizeof(float));
+            mcx_config.exportdetected = NULL;
         }
 
-        if (mcx_config.issaveseed == 1) {
-            mcx_config.photonseed = malloc(mcx_config.maxdetphoton * sizeof(float) * RAND_BUF_LEN);
+        if (mcx_config.issaveseed == 1 && mcx_config.seed != SEED_FROM_FILE) {
+            mcx_config.photonseed = malloc(mcx_config.maxdetphoton * sizeof(RandType) * RAND_BUF_LEN);
         }
 
         if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
@@ -869,14 +869,14 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         }
 
         if (mcx_config.issaveseed == 1) {
-            field_dim[0] = (mcx_config.issaveseed > 0) * RAND_BUF_LEN * sizeof(float);
+            field_dim[0] = (mcx_config.issaveseed > 0) * sizeof(RandType) * RAND_BUF_LEN;
             field_dim[1] = mcx_config.detectedcount; // his.savedphoton is for one repetition, should correct
             field_dim[2] = 0;
             field_dim[3] = 0;
             auto detected_seeds = py::array_t<uint8_t, py::array::f_style>({field_dim[0], field_dim[1]});
-            memcpy(detected_seeds.mutable_data(), mcx_config.photonseed, field_dim[0] * field_dim[1]);
-            free(mcx_config.photonseed);
-            mcx_config.photonseed = nullptr;
+            memcpy(detected_seeds.mutable_data(), mcx_config.exportseed, field_dim[0] * field_dim[1]);
+            free(mcx_config.exportseed);
+            mcx_config.exportseed = nullptr;
             output["seeds"] = detected_seeds;
         }
 
