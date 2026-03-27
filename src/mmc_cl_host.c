@@ -45,8 +45,9 @@
 
 #define MAX_JIT_OPT_LEN  (MAX_PATH_LENGTH << 1)
 
-#define IPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%u ",    #b,(a.b))
-#define FPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%.10ef ",#b,(a.b))
+#define IPARAM_TO_MACRO(macro,a,b)  snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%u ",  #b,(a.b))
+#define SIPARAM_TO_MACRO(macro,a,b) snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%d ",  #b,(a.b))
+#define FPARAM_TO_MACRO(macro,a,b)  snprintf(macro+strlen(macro),MAX_JIT_OPT_LEN-strlen(macro)-1," -Dgcfg%s=%.10ef ",#b,(a.b))
 
 /***************************************************************************//**
 In this unit, we first launch a master thread and initialize the
@@ -473,7 +474,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         IPARAM_TO_MACRO(opt, param, srcelemlen);
         IPARAM_TO_MACRO(opt, param, srctype);
         IPARAM_TO_MACRO(opt, param, voidtime);
-        IPARAM_TO_MACRO(opt, param, seed);
+        SIPARAM_TO_MACRO(opt, param, seed);
         IPARAM_TO_MACRO(opt, param, srcnum);
         IPARAM_TO_MACRO(opt, param, detnum);
         IPARAM_TO_MACRO(opt, param, issaveseed);
