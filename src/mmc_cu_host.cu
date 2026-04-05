@@ -971,12 +971,12 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                 CUDA_ASSERT(cudaFree(gfield_im_cu));
             }
 
-            /* Free and reallocate exportadjoint for the Jacobian output */
-            if (cfg->exportadjoint) {
-                free(cfg->exportadjoint);
+            /* Allocate separate Jacobian buffer; exportadjoint keeps RF imaginary fluence */
+            if (cfg->exportjacob) {
+                free(cfg->exportjacob);
             }
 
-            cfg->exportadjoint = (float*)malloc(sizeof(float) * exportlen_adj);
+            cfg->exportjacob = (float*)malloc(sizeof(float) * exportlen_adj);
 
             /* Photon dilution correction: each slot gets N/(Ns+Nd) photons with srcpos.w = 1/Ns
              * or 1/Nd, so phi_src and phi_det are each reduced vs. a dedicated single-source run.
@@ -998,29 +998,40 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                 }
 
                 if (!isrfforward) {
-                    memcpy(cfg->exportadjoint,              hmua,    adjointlen * sizeof(float));
-                    memcpy(cfg->exportadjoint + adjointlen, hsecond, adjointlen * sizeof(float));
+                    memcpy(cfg->exportjacob,              hmua,    adjointlen * sizeof(float));
+                    memcpy(cfg->exportjacob + adjointlen, hsecond, adjointlen * sizeof(float));
                 } else {
-                    memcpy(cfg->exportadjoint,                   hmua,                 adjointlen * sizeof(float));
-                    memcpy(cfg->exportadjoint + adjointlen,      hsecond,              adjointlen * sizeof(float));
-                    memcpy(cfg->exportadjoint + 2 * adjointlen,  hmua + adjointlen,    adjointlen * sizeof(float));
-                    memcpy(cfg->exportadjoint + 3 * adjointlen,  hsecond + adjointlen, adjointlen * sizeof(float));
+                    memcpy(cfg->exportjacob,                   hmua,                 adjointlen * sizeof(float));
+                    memcpy(cfg->exportjacob + adjointlen,      hsecond,              adjointlen * sizeof(float));
+                    memcpy(cfg->exportjacob + 2 * adjointlen,  hmua + adjointlen,    adjointlen * sizeof(float));
+                    memcpy(cfg->exportjacob + 3 * adjointlen,  hsecond + adjointlen, adjointlen * sizeof(float));
                 }
 
                 free(hmua);
                 free(hsecond);
             } else {
-                CUDA_ASSERT(cudaMemcpy(cfg->exportadjoint, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
+                CUDA_ASSERT(cudaMemcpy(cfg->exportjacob, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
                 CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
 
                 float adj_scale = ((cfg->outputtype == otAdjoint) ? -Vvox : -cfg->unitinmm) * jac_correction;
 
                 for (size_t k = 0; k < single_exportlen; k++) {
-                    cfg->exportadjoint[k] *= adj_scale;
+                    cfg->exportjacob[k] *= adj_scale;
                 }
             }
 
             MMC_FPRINTF(cfg->flog, "adjoint Jacobian computation complete: %d ms\n", GetTimeMillis() - tic);
+
+#ifndef MCX_CONTAINER
+
+            if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
+                MMC_FPRINTF(cfg->flog, "saving adjoint Jacobian to file ...\t");
+                mesh_savejacob(cfg, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
+                MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
+                mcx_fflush(cfg->flog);
+            }
+
+#endif
         }
 
 #ifndef MCX_CONTAINER

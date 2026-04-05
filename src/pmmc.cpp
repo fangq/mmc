@@ -468,7 +468,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     if (user_cfg.contains("outputtype")) {
         std::string output_type_str = py::str(user_cfg["outputtype"]);
         const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "wl", "wp",
-                                    "rf", "rfmus", "adjoint", "dcoeff", "mus", "musp", "muad", "muamusp", ""
+                                    "rf", "rfmus", "adjoint", "adjoint_dcoeff", "adjoint_mus", "adjoint_musp", "adjoint_mua_d", "adjoint_mua_musp", ""
                                    };
 
         if (output_type_str.empty()) {
@@ -937,10 +937,14 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         if (mcx_config.issave2pt) {
             int isrfforward = (mcx_config.omega > 0.f && mcx_config.seed != SEED_FROM_FILE);
             int isadjoint = MCX_IS_ADJOINT_TYPE(mcx_config.outputtype);
-            int nsrcslots = (mcx_config.extrasrclen > 0) ? mcx_config.extrasrclen : 1;
+
+            /* In adjoint mode the weight buffer holds nsrcslots = extrasrclen = Ns+Nd slots;
+             * otherwise it is simply cfg.srcnum. The GPU layout for adjoint is
+             * [dim.x, dim.y, dim.z, maxgate, nsrcslots] (slot index slowest). */
+            int nsrcslots = (isadjoint && mcx_config.extrasrclen > mcx_config.srcnum) ? mcx_config.extrasrclen : mcx_config.srcnum;
 
             size_t datalen = (mcx_config.method == rtBLBadouelGrid) ? mcx_config.crop0.z : ( (mcx_config.basisorder) ? mesh.nn : mesh.ne);
-            field_dim[0] = mcx_config.srcnum;
+            field_dim[0] = nsrcslots;
             field_dim[1] = datalen;
             field_dim[2] = mcx_config.maxgate;
             field_dim[3] = 0;
@@ -948,59 +952,127 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
             std::vector<size_t> array_dims;
 
-            if (isadjoint && mcx_config.exportadjoint) {
-                /* Adjoint Jacobian output: shape [Nx, Ny, Nz, maxgate, extrasrclen] */
-                if (mcx_config.method == rtBLBadouelGrid) {
+            /* Always output forward fluence in output["flux"].
+             * In adjoint mode, flux["flux"] has nsrcslots = srcnum+detnum slices (sources then
+             * detectors-as-sources), and Jacobians go to output["jmua"], output["jd"], etc. */
+            if (mcx_config.method == rtBLBadouelGrid) {
+                /* Adjoint layout: [dim.x, dim.y, dim.z, maxgate, nsrcslots] (nsrcslots last).
+                 * Non-adjoint multi-source layout: [srcnum, dim.x, dim.y, dim.z, maxgate]. */
+                if (isadjoint && nsrcslots > 1) {
                     array_dims = {(size_t)mcx_config.dim.x, (size_t)mcx_config.dim.y,
-                                  (size_t)mcx_config.dim.z, (size_t)mcx_config.maxgate,
-                                  (size_t)nsrcslots
+                                  (size_t)mcx_config.dim.z, (size_t)mcx_config.maxgate, (size_t)nsrcslots
                                  };
-                    auto jac_data = py::array_t<float, py::array::f_style>(array_dims);
-                    memcpy(jac_data.mutable_data(), mcx_config.exportadjoint, jac_data.size() * sizeof(float));
-                    output["flux"] = jac_data;
+                } else if (mcx_config.srcnum > 1) {
+                    array_dims = {(size_t)mcx_config.srcnum, (size_t)mcx_config.dim.x,
+                                  (size_t)mcx_config.dim.y, (size_t)mcx_config.dim.z, (size_t)mcx_config.maxgate
+                                 };
+                } else {
+                    array_dims = {(size_t)mcx_config.dim.x, (size_t)mcx_config.dim.y,
+                                  (size_t)mcx_config.dim.z, (size_t)mcx_config.maxgate
+                                 };
                 }
             } else {
-                if (mcx_config.method == rtBLBadouelGrid) {
-                    field_dim[0] = mcx_config.srcnum;
-                    field_dim[1] = mcx_config.dim.x;
-                    field_dim[2] = mcx_config.dim.y;
-                    field_dim[3] = mcx_config.dim.z;
-                    field_dim[4] = mcx_config.maxgate;
-
-                    if (mcx_config.srcnum > 1) {
-                        array_dims = {field_dim[0], field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
-                    } else {
-                        array_dims = {field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
-                    }
+                if (nsrcslots > 1) {
+                    array_dims = {(size_t)nsrcslots, datalen, (size_t)mcx_config.maxgate};
                 } else {
-                    if (mcx_config.srcnum > 1) {
-                        array_dims = {field_dim[0], field_dim[1], field_dim[2]};
-                    } else {
-                        array_dims = {field_dim[1], field_dim[2]};
+                    array_dims = {datalen, (size_t)mcx_config.maxgate};
+                }
+            }
+
+            auto data = py::array_t<double, py::array::f_style>(array_dims);
+            memcpy(data.mutable_data(), mesh.weight, data.size() * sizeof(double));
+            output["flux"] = data;
+
+            /* RF forward: also return imaginary part in a separate field */
+            if (isrfforward && mcx_config.exportadjoint) {
+                auto im_data = py::array_t<float, py::array::f_style>(array_dims);
+                auto* im_ptr = static_cast<float*>(im_data.mutable_data());
+                memcpy(im_ptr, mcx_config.exportadjoint, data.size() * sizeof(float));
+                output["fluximag"] = im_data;
+            }
+
+            if (mcx_config.issaveref) {
+                field_dim[1] = mesh.nf;
+                field_dim[2] = mcx_config.maxgate;
+                array_dims = {field_dim[1], field_dim[2]};
+                auto dref_array = py::array_t<double, py::array::f_style>(array_dims);
+                auto* dref = static_cast<double*>(dref_array.mutable_data());
+                memcpy(dref, mesh.dref, dref_array.size() * sizeof(double));
+
+                output["dref"] = dref_array;
+            }
+
+            /* Output adjoint Jacobian in separate dict fields (output["jmua"], output["jd"], etc.) */
+            if (isadjoint && mcx_config.exportjacob && mcx_config.method == rtBLBadouelGrid) {
+                int Ns = (mcx_config.extrasrclen > mcx_config.detnum) ? (mcx_config.extrasrclen - mcx_config.detnum) : 1;
+                int Nd = (mcx_config.detnum > 0)                      ?  mcx_config.detnum                          : 1;
+                int nsrcpairs = Ns * Nd;
+                int isdual = MCX_IS_DUAL_ADJOINT_TYPE(mcx_config.outputtype);
+                size_t adjlen = (size_t)mcx_config.dim.x * mcx_config.dim.y * mcx_config.dim.z *
+                                mcx_config.maxgate * nsrcpairs;
+
+                std::vector<size_t> jdims = {(size_t)mcx_config.dim.x, (size_t)mcx_config.dim.y,
+                                             (size_t)mcx_config.dim.z, (size_t)mcx_config.maxgate,
+                                             (size_t)nsrcpairs
+                                            };
+
+                const char* jname1 = "jmua";
+                const char* jname2 = "jd";
+
+                switch (mcx_config.outputtype) {
+                    case otAdjoint:
+                        jname1 = "jmua";
+                        break;
+
+                    case otAdjointDcoeff:
+                        jname1 = "jd";
+                        break;
+
+                    case otAdjointMus:
+                        jname1 = "jmus";
+                        break;
+
+                    case otAdjointMusp:
+                        jname1 = "jmusp";
+                        break;
+
+                    case otAdjointMuaD:
+                        jname1 = "jmua";
+                        jname2 = "jd";
+                        break;
+
+                    case otAdjointMuaMusp:
+                        jname1 = "jmua";
+                        jname2 = "jmusp";
+                        break;
+
+                    default:
+                        break;
+                }
+
+                /* For RF: output real and imaginary parts in separate _re/_im arrays */
+                float* re1 = mcx_config.exportjacob;
+                float* re2 = isdual      ? mcx_config.exportjacob + adjlen                    : nullptr;
+                float* im1 = isrfforward ? mcx_config.exportjacob + (isdual ? 2 : 1) * adjlen : nullptr;
+                float* im2 = (isrfforward && isdual) ? mcx_config.exportjacob + 3 * adjlen    : nullptr;
+
+                auto add_jac = [&](const char* fname, float * re_data, float * im_data) {
+                    auto jre = py::array_t<float, py::array::f_style>(jdims);
+                    memcpy(jre.mutable_data(), re_data, adjlen * sizeof(float));
+                    output[fname] = jre;
+
+                    if (isrfforward && im_data) {
+                        std::string imname = std::string(fname) + "_im";
+                        auto jim = py::array_t<float, py::array::f_style>(jdims);
+                        memcpy(jim.mutable_data(), im_data, adjlen * sizeof(float));
+                        output[imname.c_str()] = jim;
                     }
-                }
+                };
 
-                auto data = py::array_t<double, py::array::f_style>(array_dims);
-                memcpy(data.mutable_data(), mesh.weight, data.size() * sizeof(double));
-                output["flux"] = data;
+                add_jac(jname1, re1, im1);
 
-                /* RF forward: also return imaginary part in a separate field */
-                if (isrfforward && mcx_config.exportadjoint) {
-                    auto im_data = py::array_t<float, py::array::f_style>(array_dims);
-                    auto* im_ptr = static_cast<float*>(im_data.mutable_data());
-                    memcpy(im_ptr, mcx_config.exportadjoint, data.size() * sizeof(float));
-                    output["fluximag"] = im_data;
-                }
-
-                if (mcx_config.issaveref) {
-                    field_dim[1] = mesh.nf;
-                    field_dim[2] = mcx_config.maxgate;
-                    array_dims = {field_dim[1], field_dim[2]};
-                    auto dref_array = py::array_t<double, py::array::f_style>(array_dims);
-                    auto* dref = static_cast<double*>(dref_array.mutable_data());
-                    memcpy(dref, mesh.dref, dref_array.size() * sizeof(double));
-
-                    output["dref"] = dref_array;
+                if (isdual) {
+                    add_jac(jname2, re2, im2);
                 }
             }
         }

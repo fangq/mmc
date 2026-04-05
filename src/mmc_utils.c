@@ -274,6 +274,7 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->srcdata = NULL;
     cfg->detdir = NULL;
     cfg->exportadjoint = NULL;
+    cfg->exportjacob = NULL;
     cfg->ismomentum = 0;
     cfg->issaveseed = 0;
     cfg->issaveexit = 0;
@@ -411,6 +412,11 @@ void mcx_clearcfg(mcconfig* cfg) {
     if (cfg->exportadjoint) {
         free(cfg->exportadjoint);
         cfg->exportadjoint = NULL;
+    }
+
+    if (cfg->exportjacob) {
+        free(cfg->exportjacob);
+        cfg->exportjacob = NULL;
     }
 
     if (cfg->srcdata) {
@@ -599,7 +605,7 @@ void mcx_savenii(OutputType* dat, size_t len, char* name, int type32bit, int out
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg) {
+void mcx_savebnii(void* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, int elemsize, mcconfig* cfg) {
     FILE* fp;
     char fname[MAX_FULL_PATH] = {'\0'};
     int affine[] = {0, 0, 1, 0, 0, 0};
@@ -655,8 +661,8 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     UBJ_WRITE_KEY(root, "Param2", uint8, 0);
     UBJ_WRITE_KEY(root, "Param3", uint8, 0);
     UBJ_WRITE_KEY(root, "Intent", uint8, 0);
-    UBJ_WRITE_KEY(root, "DataType", string, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")));
-    UBJ_WRITE_KEY(root, "BitDepth", uint8, sizeof(OutputType) * 8);
+    UBJ_WRITE_KEY(root, "DataType", string, (elemsize == 8 ? "double" : (isfloat ? "single" : "uint32")));
+    UBJ_WRITE_KEY(root, "BitDepth", uint8, elemsize * 8);
     UBJ_WRITE_KEY(root, "FirstSliceID", uint8, 0);
     ubjw_write_key(root, "VoxelSize");
     UBJ_WRITE_ARRAY(root, single, ndim, voxelsize);
@@ -720,7 +726,7 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     /* the "NIFTIData" section stores volumetric data */
     ubjw_begin_object(root, UBJ_MIXED, 0);
 
-    if (mcx_jdataencode(vol, ndim, dims, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")), sizeof(OutputType), cfg->zipid, root, 1, iscol, cfg)) {
+    if (mcx_jdataencode(vol, ndim, dims, (elemsize == 8 ? "double" : (isfloat ? "single" : "uint32")), elemsize, cfg->zipid, root, 1, iscol, cfg)) {
         MMC_ERROR(-1, "error when converting to JSON");
     }
 
@@ -762,7 +768,7 @@ void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
  * @param[in] cfg: simulation configuration
  */
 
-void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg) {
+void mcx_savejnii(void* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, int elemsize, mcconfig* cfg) {
     FILE* fp;
     char fname[MAX_FULL_PATH] = {'\0'};
     int affine[] = {0, 0, 1, 0, 0, 0};
@@ -796,8 +802,8 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     cJSON_AddNumberToObject(hdr, "Param2", 0);
     cJSON_AddNumberToObject(hdr, "Param3", 0);
     cJSON_AddNumberToObject(hdr, "Intent", 0);
-    cJSON_AddStringToObject(hdr, "DataType", (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")));
-    cJSON_AddNumberToObject(hdr, "BitDepth", sizeof(OutputType) * 8);
+    cJSON_AddStringToObject(hdr, "DataType", (elemsize == 8 ? "double" : (isfloat ? "single" : "uint32")));
+    cJSON_AddNumberToObject(hdr, "BitDepth", elemsize * 8);
     cJSON_AddNumberToObject(hdr, "FirstSliceID", 0);
     cJSON_AddItemToObject(hdr, "VoxelSize", cJSON_CreateFloatArray(voxelsize, ndim));
     cJSON_AddItemToObject(hdr, "Orientation", sub = cJSON_CreateObject());
@@ -847,7 +853,7 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     /* the "NIFTIData" section stores volumetric data */
     cJSON_AddItemToObject(root, "NIFTIData",   dat = cJSON_CreateObject());
 
-    if (mcx_jdataencode(vol, ndim, dims, (sizeof(OutputType) == 8 ? "double" : (isfloat ? "single" : "uint32")), sizeof(OutputType), cfg->zipid, dat, 0, iscol, cfg)) {
+    if (mcx_jdataencode(vol, ndim, dims, (elemsize == 8 ? "double" : (isfloat ? "single" : "uint32")), elemsize, cfg->zipid, dat, 0, iscol, cfg)) {
         MMC_ERROR(-1, "error when converting to JSON");
     }
 
@@ -876,6 +882,14 @@ void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char*
     if (root) {
         cJSON_Delete(root);
     }
+}
+
+void mcx_savefloatjnii(float* vol, int ndim, uint* dims, float* voxelsize, char* name, mcconfig* cfg) {
+    mcx_savejnii(vol, ndim, dims, voxelsize, name, 1, 1, sizeof(float), cfg);
+}
+
+void mcx_savefloatbnii(float* vol, int ndim, uint* dims, float* voxelsize, char* name, mcconfig* cfg) {
+    mcx_savebnii(vol, ndim, dims, voxelsize, name, 1, 1, sizeof(float), cfg);
 }
 
 /**
@@ -928,9 +942,9 @@ void mcx_savedata(OutputType* dat, size_t len, mcconfig* cfg, int isref) {
         }
 
         if (cfg->outputformat == ofJNifti) {
-            mcx_savejnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), cfg);
+            mcx_savejnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), sizeof(OutputType), cfg);
         } else {
-            mcx_savebnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), cfg);
+            mcx_savebnii(dat, lastdim + (dims[lastdim] > 1), dims, voxelsize, name, 1, (cfg->method == rtBLBadouelGrid), sizeof(OutputType), cfg);
         }
 
         return;

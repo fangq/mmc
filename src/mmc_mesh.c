@@ -1648,6 +1648,150 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
 }
 
 /**
+ * @brief Save adjoint Jacobian output to a JNIfTI/BJNIfTI file (standalone mode only)
+ *
+ * Saves one or two Jacobian components (mua/D/mus/musp) as float32 data to files named
+ * "session_jXXX.jnii" or ".bnii".  The first component is written to "session_j<name1>.jnii"
+ * and, for dual output types, the second component to "session_j<name2>.jnii".
+ *
+ * @param[in] cfg: simulation configuration (uses outputtype, outputformat, session, rootpath)
+ * @param[in] jac: float buffer holding the Jacobian (layout: [Re_J1,Re_J2,Im_J1,Im_J2]*adjlen)
+ * @param[in] Ns: number of forward source slots
+ * @param[in] Nd: number of detector slots
+ * @param[in] isrfforward: 1 if RF mode (complex Jacobian), 0 for CW
+ * @param[in] isdual: 1 for dual types (two Jacobians), 0 for single
+ */
+
+void mesh_savejacob(mcconfig* cfg, float* jac, int Ns, int Nd, int isrfforward, int isdual) {
+    char name[MAX_FULL_PATH];
+    size_t adjlen = (size_t)cfg->crop0.z * Ns * Nd;
+
+    /* Jacobian component name suffixes per output type */
+    const char* suffix1 = "jmua";   /* first (or only) Jacobian component */
+    const char* suffix2 = "jd";     /* second Jacobian component (dual types only) */
+
+    switch (cfg->outputtype) {
+        case otAdjoint:
+            suffix1 = "jmua";
+            break;
+
+        case otAdjointDcoeff:
+            suffix1 = "jd";
+            break;
+
+        case otAdjointMus:
+            suffix1 = "jmus";
+            break;
+
+        case otAdjointMusp:
+            suffix1 = "jmusp";
+            break;
+
+        case otAdjointMuaD:
+            suffix1 = "jmua";
+            suffix2 = "jd";
+            break;
+
+        case otAdjointMuaMusp:
+            suffix1 = "jmua";
+            suffix2 = "jmusp";
+            break;
+
+        default:
+            suffix1 = "jacobian";
+            break;
+    }
+
+    /* Dimensions: [Nx, Ny, Nz, maxgate, Ns*Nd] */
+    uint jdims[5] = {(uint)cfg->dim.x, (uint)cfg->dim.y, (uint)cfg->dim.z,
+                     (uint)cfg->maxgate, (uint)(Ns * Nd)
+                    };
+    float jvoxsz[5] = {cfg->steps.x, cfg->steps.y, cfg->steps.z, cfg->tstep, 1.f};
+
+    /* RF: pack real and imaginary parts; for single-component: [Re, Im] */
+    /* Build output format selection for save */
+    int jndim = 5;
+    uint jdims_ri[6];
+    float jvoxsz_ri[6];
+
+    if (isrfforward) {
+        /* For RF: save real+imaginary interleaved as extra dimension [Nx,Ny,Nz,maxgate,Ns*Nd,2] */
+        memcpy(jdims_ri, jdims, sizeof(jdims));
+        memcpy(jvoxsz_ri, jvoxsz, sizeof(jvoxsz));
+        jdims_ri[5] = 2;
+        jvoxsz_ri[5] = 1.f;
+        jndim = 6;
+    }
+
+    /* Save first Jacobian component */
+    if (cfg->rootpath[0]) {
+        snprintf(name, sizeof(name), "%s/%s_%s", cfg->rootpath, cfg->session, suffix1);
+    } else {
+        snprintf(name, sizeof(name), "%s_%s", cfg->session, suffix1);
+    }
+
+    if (!isrfforward) {
+        /* CW: single real array of size adjlen */
+        if (cfg->outputformat == ofJNifti) {
+            mcx_savefloatjnii(jac, jndim, jdims, jvoxsz, name, cfg);
+        } else if (cfg->outputformat == ofBJNifti) {
+            mcx_savefloatbnii(jac, jndim, jdims, jvoxsz, name, cfg);
+        }
+    } else {
+        /* RF: Re(J1) in jac[0..adjlen-1], Im(J1) in jac[(isdual?2:1)*adjlen..] */
+        size_t imoffset = (isdual ? 2 : 1) * adjlen;
+        float* ribuf = (float*)malloc(sizeof(float) * 2 * adjlen);
+
+        if (ribuf) {
+            memcpy(ribuf,          jac,             adjlen * sizeof(float));
+            memcpy(ribuf + adjlen, jac + imoffset,  adjlen * sizeof(float));
+
+            if (cfg->outputformat == ofJNifti) {
+                mcx_savefloatjnii(ribuf, jndim, jdims_ri, jvoxsz_ri, name, cfg);
+            } else if (cfg->outputformat == ofBJNifti) {
+                mcx_savefloatbnii(ribuf, jndim, jdims_ri, jvoxsz_ri, name, cfg);
+            }
+
+            free(ribuf);
+        }
+    }
+
+    /* Save second Jacobian component for dual types */
+    if (isdual) {
+        if (cfg->rootpath[0]) {
+            snprintf(name, sizeof(name), "%s/%s_%s", cfg->rootpath, cfg->session, suffix2);
+        } else {
+            snprintf(name, sizeof(name), "%s_%s", cfg->session, suffix2);
+        }
+
+        if (!isrfforward) {
+            /* CW dual: second component starts at jac + adjlen */
+            if (cfg->outputformat == ofJNifti) {
+                mcx_savefloatjnii(jac + adjlen, jndim, jdims, jvoxsz, name, cfg);
+            } else if (cfg->outputformat == ofBJNifti) {
+                mcx_savefloatbnii(jac + adjlen, jndim, jdims, jvoxsz, name, cfg);
+            }
+        } else {
+            /* RF dual: Re(J2) in jac[adjlen..2*adjlen-1], Im(J2) in jac[3*adjlen..4*adjlen-1] */
+            float* ribuf2 = (float*)malloc(sizeof(float) * 2 * adjlen);
+
+            if (ribuf2) {
+                memcpy(ribuf2,          jac + adjlen,          adjlen * sizeof(float));
+                memcpy(ribuf2 + adjlen, jac + 3 * adjlen,      adjlen * sizeof(float));
+
+                if (cfg->outputformat == ofJNifti) {
+                    mcx_savefloatjnii(ribuf2, jndim, jdims_ri, jvoxsz_ri, name, cfg);
+                } else if (cfg->outputformat == ofBJNifti) {
+                    mcx_savefloatbnii(ribuf2, jndim, jdims_ri, jvoxsz_ri, name, cfg);
+                }
+
+                free(ribuf2);
+            }
+        }
+    }
+}
+
+/**
  * @brief Save detected photon data into an .mch history file
  *
  * @param[in] ppath: buffer points to the detected photon data (partial-path, det id, etc)

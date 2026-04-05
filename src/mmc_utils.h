@@ -297,7 +297,8 @@ typedef struct MMC_config {
     unsigned char* exportseed;     /*memory buffer when returning the RNG seed to matlab*/
     float* exportdetected;         /*memory buffer when returning the partial length info to external programs such as matlab*/
     float* exportdebugdata;        /**<pointer to the buffer where the photon trajectory data are stored*/
-    float* exportadjoint;         /**<float buffer for RF imaginary fluence (RF forward) or adjoint Jacobian output*/
+    float* exportadjoint;         /**<float buffer for RF imaginary fluence (forward mode only; preserved through adjoint post-processing)*/
+    float* exportjacob;           /**<float buffer for adjoint Jacobian output (separate from RF imaginary fluence)*/
     ExtraSrc* srcdata;            /**<multi-source list for adjoint mode; length = extrasrclen*/
     int extrasrclen;              /**<number of entries in srcdata (>0 for adjoint/multi-source mode)*/
     double* energytot;             /**<total energy launched for each source, a buffer of length srcnum */
@@ -360,8 +361,10 @@ void mcx_savejdata(char* filename, mcconfig* cfg);
 int  mcx_jdataencode(void* vol,  int ndim, uint* dims, char* type, int byte, int zipid, void* obj, int isubj, int iscol, mcconfig* cfg);
 int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type, cJSON* obj, mcconfig* cfg);
 void mcx_convertrow2col(float* vol, uint3* dim);
-void mcx_savejnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
-void mcx_savebnii(OutputType* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, mcconfig* cfg);
+void mcx_savejnii(void* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, int elemsize, mcconfig* cfg);
+void mcx_savebnii(void* vol, int ndim, uint* dims, float* voxelsize, char* name, int isfloat, int iscol, int elemsize, mcconfig* cfg);
+void mcx_savefloatjnii(float* vol, int ndim, uint* dims, float* voxelsize, char* name, mcconfig* cfg);
+void mcx_savefloatbnii(float* vol, int ndim, uint* dims, float* voxelsize, char* name, mcconfig* cfg);
 void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);
 void mcx_fflush(FILE* out);
 void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte);
