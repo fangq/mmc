@@ -95,7 +95,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_mem* gweight, *gdref, *gdetphoton, *gseed, *genergy, *greporter, *gdebugdata;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
-    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum;    /**< total output data length in float count per time-frame */
+    int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
+    cl_uint nsrcslots = (cfg->extrasrclen > 0) ? (cl_uint)cfg->extrasrclen : 1u;
+    cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum * nsrcslots;    /**< total output data length */
     cfg->crop0.w = meshlen * cfg->maxgate;    /**< total output data length, before double-buffer expansion */
 
     cl_float*  field, *dref = NULL;
@@ -130,9 +132,15 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         0.f,
 #endif
         mesh->nn, mesh->ne, mesh->nf, cfg->nout, cfg->roulettesize, cfg->srcnum, mesh->srcelemlen,
-        cfg->e0, cfg->isextdet, (meshlen / cfg->srcnum), (mesh->prop + 1 + cfg->isextdet) + cfg->detnum,
+        cfg->e0, cfg->isextdet, (meshlen / cfg->srcnum),
+        (mesh->prop + 1 + cfg->isextdet) + (cfg->extrasrclen * 4) + cfg->detnum,
         (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
-        cfg->issaveseed, cfg->seed, cfg->maxjumpdebug
+        cfg->issaveseed, cfg->seed, cfg->maxjumpdebug,
+        cfg->omega,
+        (float)(3.335640951981520e-12),   /* oneoverc0 */
+        (cfg->extrasrclen > 0) ? -1 : 0,  /* srcid */
+        cfg->extrasrclen,
+        (int)(mesh->prop + 1 + cfg->isextdet)  /* srcpropoffset */
     };
 
     MCXReporter reporter = {0.f, 0};
@@ -256,7 +264,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         fullload = totalcucore;
     }
 
-    field = (cl_float*)calloc(sizeof(cl_float) * meshlen * 2, cfg->maxgate);
+    field = (cl_float*)calloc(sizeof(cl_float) * meshlen * (isrfforward ? 4 : 2), cfg->maxgate);
     dref = (cl_float*)calloc(sizeof(cl_float) * mesh->nf, cfg->maxgate);
     Pdet = (float*)calloc(cfg->maxdetphoton * sizeof(float), hostdetreclen);
 
@@ -292,10 +300,19 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     *progress = 0;
 
     propdet = (float4*)malloc(MAX_PROP * sizeof(float4));
-    memcpy(propdet, mesh->med, (mesh->prop + 1 + cfg->isextdet)*sizeof(medium));
+
+    /* Layout: [media 0..prop] | [extra sources, each 4 float4 slots] | [detector positions] | [normals] */
+    cl_uint srcpropoffset = (cl_uint)(mesh->prop + 1 + cfg->isextdet);
+    cl_uint detpropoffset = srcpropoffset + (cl_uint)(cfg->extrasrclen * 4);
+    memcpy(propdet, mesh->med, srcpropoffset * sizeof(medium));
+
+    /* Pack extra sources into propdet after media; sizeof(ExtraSrc) = 4*sizeof(float4) */
+    if (cfg->extrasrclen > 0 && cfg->srcdata) {
+        memcpy(propdet + srcpropoffset, cfg->srcdata, cfg->extrasrclen * sizeof(ExtraSrc));
+    }
 
     if (cfg->detpos && cfg->detnum) {
-        memcpy(propdet + (mesh->prop + 1 + cfg->isextdet), cfg->detpos, cfg->detnum * sizeof(float4));
+        memcpy(propdet + detpropoffset, cfg->detpos, cfg->detnum * sizeof(float4));
     }
 
     memcpy(propdet + param.maxpropdet, tracer->n, (param.normbuf << 2)*sizeof(float4));
@@ -325,7 +342,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         }
 
         OCL_ASSERT(((gseed[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN, Pseed, &status), status)));
-        OCL_ASSERT(((gweight[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * fieldlen * 2, field, &status), status)));
+        OCL_ASSERT(((gweight[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * fieldlen * (isrfforward ? 4 : 2), field, &status), status)));
         OCL_ASSERT(((gdref[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * nflen, dref, &status), status)));
         OCL_ASSERT(((gdetphoton[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * cfg->maxdetphoton * hostdetreclen, Pdet, &status), status)));
 
@@ -479,6 +496,11 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         IPARAM_TO_MACRO(opt, param, detnum);
         IPARAM_TO_MACRO(opt, param, issaveseed);
         IPARAM_TO_MACRO(opt, param, nf);
+        FPARAM_TO_MACRO(opt, param, omega);
+        FPARAM_TO_MACRO(opt, param, oneoverc0);
+        SIPARAM_TO_MACRO(opt, param, srcid);
+        IPARAM_TO_MACRO(opt, param, extrasrclen);
+        SIPARAM_TO_MACRO(opt, param, srcpropoffset);
 
         if (param.focus != param.focus) {
             snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt) - 1, " -Dgcfgfocus=NAN");
@@ -566,6 +588,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     if (cfg->exportfield == NULL) {
         cfg->exportfield = mesh->weight;
+    }
+
+    if (cfg->exportadjoint == NULL && cfg->method == rtBLBadouelGrid && isrfforward) {
+        cfg->exportadjoint = (float*)calloc(fieldlen, sizeof(float));
     }
 
     if (cfg->exportdetected == NULL) {
@@ -747,15 +773,22 @@ is more than what your have specified (%d), please use the -H option to specify 
 
                 //handling the 2pt distributions
                 if (cfg->issave2pt) {
-                    float* rawfield = (float*)malloc(sizeof(float) * fieldlen * 2);
+                    int rfmul = isrfforward ? 4 : 2;
+                    float* rawfield = (float*)malloc(sizeof(float) * fieldlen * rfmul);
 
-                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gweight[devid], CL_TRUE, 0, sizeof(cl_float)*fieldlen * 2,
+                    OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gweight[devid], CL_TRUE, 0, sizeof(cl_float)*fieldlen * rfmul,
                                                     rawfield, 0, NULL, NULL)));
                     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic);
                     mcx_fflush(cfg->flog);
 
-                    for (i = 0; i < fieldlen; i++) { //accumulate field, can be done in the GPU
+                    for (i = 0; i < fieldlen; i++) { //accumulate real field
                         field[i] += rawfield[i] + rawfield[i + fieldlen];
+                    }
+
+                    if (isrfforward) {
+                        for (i = 0; i < fieldlen; i++) { //accumulate imaginary part
+                            field[i + fieldlen] += rawfield[i + fieldlen * 2] + rawfield[i + fieldlen * 3];
+                        }
                     }
 
                     free(rawfield);
@@ -783,6 +816,13 @@ is more than what your have specified (%d), please use the -H option to specify 
         if (cfg->basisorder == 0 || cfg->method == rtBLBadouelGrid) {
             for (i = 0; i < fieldlen; i++) {
                 cfg->exportfield[i] += field[i];
+            }
+
+            /* RF forward: store imaginary part in exportadjoint */
+            if (isrfforward && cfg->exportadjoint) {
+                for (i = 0; i < fieldlen; i++) {
+                    cfg->exportadjoint[i] += field[i + fieldlen];
+                }
             }
         } else {
             int srcid;
@@ -820,6 +860,176 @@ is more than what your have specified (%d), please use the -H option to specify 
         }
 
         cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
+
+        /* For adjoint Jacobian mode, mesh_normalize only covers slots 0..srcnum-1 in exportfield.
+         * Apply the same average normalizor to the remaining slots srcnum..extrasrclen-1. */
+        if (cfg->extrasrclen > cfg->srcnum && cfg->method == rtBLBadouelGrid && cfg->exportfield) {
+            double avg_normalizor = sum_normalizer / cfg->srcnum;
+            size_t slot_stride   = (size_t)cfg->crop0.z * cfg->maxgate;
+
+            for (int slot = cfg->srcnum; slot < cfg->extrasrclen; slot++) {
+                for (size_t ki = 0; ki < slot_stride; ki++) {
+                    cfg->exportfield[(size_t)slot * slot_stride + ki] *= avg_normalizor;
+                }
+            }
+        }
+
+        /* RF forward: apply the same normalizor to the imaginary part buffer */
+        if (isrfforward && cfg->exportadjoint) {
+            float normalizer = (float)(sum_normalizer / cfg->srcnum);
+
+            for (i = 0; i < (int)fieldlen; i++) {
+                cfg->exportadjoint[i] *= normalizer;
+            }
+        }
+    }
+
+    /* Adjoint Jacobian post-processing: OpenCL equivalent of mmc_cu_host.cu lines 890-1007.
+     * After simulation, exportfield has normalized multi-slot real fluence and exportadjoint
+     * has normalized imaginary fluence (RF only). Launch adjoint/dcoeff kernels on GPU to
+     * compute J_mua = phi_src * phi_det and/or J_D = grad(phi_src) . grad(phi_det). */
+    if (cfg->issave2pt && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method == rtBLBadouelGrid &&
+            cfg->extrasrclen > 0 && cfg->detdir != NULL && cfg->exportfield) {
+        unsigned int Ns         = (unsigned int)(cfg->extrasrclen - cfg->detnum);
+        unsigned int Nd         = (unsigned int)cfg->detnum;
+        unsigned int pure_voxels = (unsigned int)cfg->crop0.z;
+        int isdual              = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
+
+        size_t adjointlen       = (size_t)pure_voxels * Ns * Nd;
+        size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
+        size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
+
+        /* Build float host arrays from exportfield (double) */
+        float* hfield_re = (float*)malloc(sizeof(float) * fieldlen);
+
+        for (size_t k = 0; k < fieldlen; k++) {
+            hfield_re[k] = (float)cfg->exportfield[k];
+        }
+
+        /* Upload real field to GPU */
+        cl_mem gcl_field_re = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * fieldlen, hfield_re, &status);
+        OCL_ASSERT(status);
+        free(hfield_re);
+
+        /* Upload imaginary field to GPU (RF only) */
+        cl_mem gcl_field_im = (cl_mem)0;
+
+        if (isrfforward && cfg->exportadjoint) {
+            gcl_field_im = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * fieldlen, cfg->exportadjoint, &status);
+            OCL_ASSERT(status);
+        }
+
+        /* Allocate zeroed output buffers for Jacobian */
+        float* hzero = (float*)calloc(single_exportlen, sizeof(float));
+
+        cl_mem gcl_adj_mua = (cl_mem)0;
+
+        if (isdual) {
+            gcl_adj_mua = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * single_exportlen, hzero, &status);
+            OCL_ASSERT(status);
+        }
+
+        cl_mem gcl_adj_tmp = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * single_exportlen, hzero, &status);
+        OCL_ASSERT(status);
+        free(hzero);
+
+        size_t adj_local  = 256;
+        size_t adj_global = ((pure_voxels + (unsigned int)adj_local - 1) / (unsigned int)adj_local) * adj_local;
+
+        /* Launch mmc_adjoint_kernel (J_mua = phi_src * phi_det) for otAdjoint or dual modes */
+        if (isdual || cfg->outputtype == otAdjoint) {
+            cl_kernel adj_kern = clCreateKernel(mcxprogram, "mmc_adjoint_kernel", &status);
+            OCL_ASSERT(status);
+            cl_mem dest = isdual ? gcl_adj_mua : gcl_adj_tmp;
+            OCL_ASSERT(clSetKernelArg(adj_kern, 0, sizeof(cl_mem), &gcl_field_re));
+            OCL_ASSERT(clSetKernelArg(adj_kern, 1, sizeof(cl_mem), gcl_field_im ? &gcl_field_im : NULL));
+            OCL_ASSERT(clSetKernelArg(adj_kern, 2, sizeof(cl_mem), &dest));
+            OCL_ASSERT(clSetKernelArg(adj_kern, 3, sizeof(cl_uint), &pure_voxels));
+            OCL_ASSERT(clSetKernelArg(adj_kern, 4, sizeof(cl_uint), (cl_uint*)&cfg->maxgate));
+            OCL_ASSERT(clSetKernelArg(adj_kern, 5, sizeof(cl_uint), &Ns));
+            OCL_ASSERT(clSetKernelArg(adj_kern, 6, sizeof(cl_uint), &Nd));
+            OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], adj_kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
+            OCL_ASSERT(clFinish(mcxqueue[0]));
+            clReleaseKernel(adj_kern);
+        }
+
+        /* Launch mmc_adjoint_dcoeff_kernel (J_D = -grad(phi_src).grad(phi_det)) for dcoeff or dual */
+        if (isdual || cfg->outputtype != otAdjoint) {
+            cl_kernel dcoeff_kern = clCreateKernel(mcxprogram, "mmc_adjoint_dcoeff_kernel", &status);
+            OCL_ASSERT(status);
+            cl_uint Nx = (cl_uint)cfg->dim.x, Ny = (cl_uint)cfg->dim.y;
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 0, sizeof(cl_mem), &gcl_field_re));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 1, sizeof(cl_mem), gcl_field_im ? &gcl_field_im : NULL));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 2, sizeof(cl_mem), &gcl_adj_tmp));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 3, sizeof(cl_uint), &pure_voxels));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 4, sizeof(cl_uint), (cl_uint*)&cfg->maxgate));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 5, sizeof(cl_uint), &Ns));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 6, sizeof(cl_uint), &Nd));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 7, sizeof(cl_uint), &Nx));
+            OCL_ASSERT(clSetKernelArg(dcoeff_kern, 8, sizeof(cl_uint), &Ny));
+            OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], dcoeff_kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
+            OCL_ASSERT(clFinish(mcxqueue[0]));
+            clReleaseKernel(dcoeff_kern);
+        }
+
+        OCL_ASSERT(clReleaseMemObject(gcl_field_re));
+
+        if (gcl_field_im) {
+            OCL_ASSERT(clReleaseMemObject(gcl_field_im));
+        }
+
+        /* Free and reallocate exportadjoint for the Jacobian output */
+        if (cfg->exportadjoint) {
+            free(cfg->exportadjoint);
+        }
+
+        cfg->exportadjoint = (float*)malloc(sizeof(float) * exportlen_adj);
+        float Vvox = cfg->unitinmm * cfg->unitinmm * cfg->unitinmm;
+
+        /* Photon dilution correction: in the combined Ns+Nd source simulation each slot
+         * receives only N/(Ns+Nd) photons, so phi_src and phi_det are each reduced by
+         * a factor that depends on the per-slot importance weights (srcpos.w = 1/Ns and
+         * 1/Nd respectively).  The resulting Jacobian needs to be scaled up by 4*Ns*Nd
+         * to restore unit-energy fluence magnitudes matching a dedicated single-source run. */
+        float jac_correction = 4.f * (float)Ns * (float)Nd;
+
+        if (isdual) {
+            float* hmua    = (float*)malloc(sizeof(float) * single_exportlen);
+            float* hsecond = (float*)malloc(sizeof(float) * single_exportlen);
+            OCL_ASSERT(clEnqueueReadBuffer(mcxqueue[0], gcl_adj_mua, CL_TRUE, 0, sizeof(float) * single_exportlen, hmua,    0, NULL, NULL));
+            OCL_ASSERT(clEnqueueReadBuffer(mcxqueue[0], gcl_adj_tmp, CL_TRUE, 0, sizeof(float) * single_exportlen, hsecond, 0, NULL, NULL));
+            clReleaseMemObject(gcl_adj_mua);
+            clReleaseMemObject(gcl_adj_tmp);
+
+            for (size_t k = 0; k < single_exportlen; k++) {
+                hmua[k]    *= -Vvox              * jac_correction;
+                hsecond[k] *= -(cfg->unitinmm)   * jac_correction;
+            }
+
+            if (!isrfforward) {
+                memcpy(cfg->exportadjoint,              hmua,    adjointlen * sizeof(float));
+                memcpy(cfg->exportadjoint + adjointlen, hsecond, adjointlen * sizeof(float));
+            } else {
+                memcpy(cfg->exportadjoint,                   hmua,                 adjointlen * sizeof(float));
+                memcpy(cfg->exportadjoint + adjointlen,      hsecond,              adjointlen * sizeof(float));
+                memcpy(cfg->exportadjoint + 2 * adjointlen,  hmua    + adjointlen, adjointlen * sizeof(float));
+                memcpy(cfg->exportadjoint + 3 * adjointlen,  hsecond + adjointlen, adjointlen * sizeof(float));
+            }
+
+            free(hmua);
+            free(hsecond);
+        } else {
+            OCL_ASSERT(clEnqueueReadBuffer(mcxqueue[0], gcl_adj_tmp, CL_TRUE, 0, sizeof(float) * single_exportlen, cfg->exportadjoint, 0, NULL, NULL));
+            clReleaseMemObject(gcl_adj_tmp);
+
+            float adj_scale = ((cfg->outputtype == otAdjoint) ? -Vvox : -(cfg->unitinmm)) * jac_correction;
+
+            for (size_t k = 0; k < single_exportlen; k++) {
+                cfg->exportadjoint[k] *= adj_scale;
+            }
+        }
+
+        MMC_FPRINTF(cfg->flog, "adjoint Jacobian computation complete: %d ms\n", GetTimeMillis() - tic);
     }
 
 #ifndef MCX_CONTAINER

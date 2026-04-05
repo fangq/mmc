@@ -75,6 +75,9 @@ struct OptixParams {
     /*! buffer for RNG seed of each thread */
     osc::CUDABuffer seedBuffer;
 
+    /*! buffer for extra source list (adjoint/multi-source mode) */
+    osc::CUDABuffer srcdataBuffer;
+
     /*! buffer for output storage */
     float* outputHostBuffer;
     unsigned int outputBufferSize;

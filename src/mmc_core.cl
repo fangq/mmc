@@ -285,13 +285,15 @@ typedef struct MMC_Ray {
     int eid;                      /**< the index of the enclosing tet (starting from 1) */
     int faceid;                   /**< the index of the face at which ray intersects with tet */
     int isend;                    /**< if 1, the scattering event ends before reaching the intersection */
-    float weight;                 /**< photon current weight */
+    float weight;                 /**< photon current weight (real part; magnitude for roulette) */
+    float weight_im;              /**< imaginary part of photon weight, persists across element crossings for RF */
     float photontimer;            /**< the total time-of-fly of the photon */
     float slen;                   /**< the remaining unitless scattering length = length*mus  */
     float Lmove;                  /**< last photon movement length */
     uint oldidx;
     float oldweight;
-    unsigned int posidx;          /**< launch position index of the photon for pattern source type */
+    float oldweight_im;           /**< accumulated imaginary fluence deposit in current voxel for RF forward mode */
+    unsigned int posidx;          /**< launch position index of the photon for pattern source type; also used as source-slot index in multi-source adjoint mode */
     //int nexteid;                /**< the index to the neighboring tet to be moved into */
     //float4 bary0;               /**< the Barycentric coordinate of the intersection with the tet */
     float slen0;                  /**< initial unitless scattering length = length*mus */
@@ -339,12 +341,28 @@ typedef struct MMC_Parameter {
     int    issaveseed;
     int    seed;
     uint   maxjumpdebug;          /**< max number of positions to be saved to save photon trajectory when -D M is used */
+    float  omega;                  /**< RF modulation angular frequency (rad/s); 0 for CW */
+    float  oneoverc0;              /**< 1/C0 = 3.335640951981520e-12 s/mm */
+    int    srcid;                  /**< < 0 for multi-source mode (adjoint); >= 0 for single source */
+    int    extrasrclen;            /**< number of extra sources packed into gmed[] after media */
+    int    srcpropoffset;          /**< gmed[] index where extra sources start (= prop+1+isextdet) */
 } MCXParam __attribute__ ((aligned (16)));
 
 typedef struct MMC_Reporter {
     float  raytet;
     uint   jumpdebug;
 } MCXReporter  __attribute__ ((aligned (4)));
+
+/** Extra source entry for multi-source / adjoint-mode simulation */
+#ifndef MCX_EXTRASRC_DEFINED
+#define MCX_EXTRASRC_DEFINED
+typedef struct MCX_ExtraSrc {
+    float4 srcpos;      /**< position (x,y,z) and importance weight (w) */
+    float4 srcdir;      /**< direction (x,y,z) and focal length (w) */
+    float4 srcparam1;   /**< source parameters set 1: x=radius for disk source */
+    float4 srcparam2;   /**< source parameters set 2 */
+} ExtraSrc;
+#endif
 
 typedef struct MCX_medium {
     float mua;                    /**<absorption coeff in 1/mm unit*/
@@ -821,7 +839,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                 eid = (int)(r->Lmove * GPU_PARAM(gcfg, dstep)) + 1; // number of segments
                 eid = (eid << 1);
                 S.w = r->Lmove / eid;                 // segment length
-                T.w = MCX_MATHFUN(exp)(-prop.mua * S.w); // segment loss
+                T.w = MCX_MATHFUN(exp)(-prop.mua * S.w); // segment real decay
 #ifndef __NVCC__
                 T.xyz =  r->vec * FL3(S.w);      // delta vector
                 S.xyz =  (r->p0 - gcfg->nmin) + (T.xyz * FL3(0.5f)); /*starting point*/
@@ -832,6 +850,19 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                 totalloss = (totalloss == 0.f) ? 0.f : (1.f - T.w) / totalloss; // fraction of total loss per segment
                 S.w = ww;                             // S.w is now the current weight
 
+                /* multi-source (adjoint) mode: offset newidx by source-slot × field-size-per-source */
+                uint src_slot_offset = (GPU_PARAM(gcfg, srcid) < 0) ?
+                                       (uint)(r->posidx) * gcfg->crop0.z * GPU_PARAM(gcfg, maxgate) : 0u;
+
+                /* RF forward: complex weight per-segment state */
+                float seg_w_re = currweight.f, seg_w_im = r->weight_im;
+                float seg_decay_cos = 1.f, seg_decay_sin = 0.f;
+
+                if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                    float phase = GPU_PARAM(gcfg, omega) * prop.n * GPU_PARAM(gcfg, oneoverc0) * (r->Lmove / (float)eid);
+                    MCX_SINCOS(phase, seg_decay_sin, seg_decay_cos);
+                }
+
                 for (faceidx = 0; faceidx < eid; faceidx++) {
 #ifndef __NVCC__
                     int3 idx = convert_int3_rtn(S.xyz * FL3((float)GPU_PARAM(gcfg, dstep)));
@@ -841,13 +872,34 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                          (S.y > 0.f) ? __float2int_rd(S.y * GPU_PARAM(gcfg, dstep)) : 0,
                                          (S.z > 0.f) ? __float2int_rd(S.z * GPU_PARAM(gcfg, dstep)) : 0);
 #endif
-                    uint newidx = (idx.z * gcfg->crop0.y + idx.y * gcfg->crop0.x + idx.x) + tshift;
+                    uint newidx = (idx.z * gcfg->crop0.y + idx.y * gcfg->crop0.x + idx.x) + tshift + src_slot_offset;
                     r->oldidx = (r->oldidx == ID_UNDEFINED) ? newidx : r->oldidx;
+
+                    /* per-segment RF complex weight deposit: (w0-w)/(mua + i*omega*n/c0) */
+                    float seg_deposit_re = S.w * totalloss;
+                    float seg_deposit_im = 0.f;
+
+                    if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                        float w0_re = seg_w_re, w0_im = seg_w_im;
+                        /* complex Beer-Lambert: w *= exp(-mua*s) * exp(-i*omega*n/c0*s) */
+                        float att = T.w;
+                        float new_re = att * (w0_re * seg_decay_cos + w0_im * seg_decay_sin);
+                        float new_im = att * (-w0_re * seg_decay_sin + w0_im * seg_decay_cos);
+                        seg_w_re = new_re;
+                        seg_w_im = new_im;
+                        /* fluence deposit = (w0 - w) / (mua + i*omega*n/c0) */
+                        float dw_re = w0_re - new_re;
+                        float dw_im = w0_im - new_im;
+                        float a_im = GPU_PARAM(gcfg, omega) * prop.n * GPU_PARAM(gcfg, oneoverc0);
+                        float a_mag2 = prop.mua * prop.mua + a_im * a_im;
+                        seg_deposit_re = (a_mag2 < EPS) ? (w0_re * S.w) : (dw_re * prop.mua + dw_im * a_im) / a_mag2;
+                        seg_deposit_im = (a_mag2 < EPS) ? (w0_im * S.w) : (dw_im * prop.mua - dw_re * a_im) / a_mag2;
+                    }
 
                     if (newidx != r->oldidx) {
 #ifndef DO_NOT_SAVE
 
-                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
+                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1) || GPU_PARAM(gcfg, srcid) < 0) {
 
 #ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + r->oldidx, r->oldweight);
@@ -860,8 +912,18 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 }
                             }
 
+                            /* RF imaginary part into buffer at +2*crop0.w */
+                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                                atomicadd(weight + r->oldidx + gcfg->crop0.w * 2, r->oldweight_im);
+                            }
+
 #else
                             weight[r->oldidx] += r->oldweight;
+
+                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                                weight[r->oldidx + gcfg->crop0.w * 2] += r->oldweight_im;
+                            }
+
 #endif
                         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
 
@@ -886,16 +948,18 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
 #endif // for ifdef DO_NOT_SAVE
                         r->oldidx = newidx;
-                        r->oldweight = S.w * totalloss;
+                        r->oldweight = seg_deposit_re;
+                        r->oldweight_im = seg_deposit_im;
                     } else {
-                        r->oldweight += S.w * totalloss;
+                        r->oldweight += seg_deposit_re;
+                        r->oldweight_im += seg_deposit_im;
                     }
 
 #ifndef DO_NOT_SAVE
 
                     if (r->faceid == -2 || !r->isend) {
 
-                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
+                        if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1) || GPU_PARAM(gcfg, srcid) < 0) {
 
 #ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + newidx, r->oldweight);
@@ -908,8 +972,18 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 }
                             }
 
+                            /* RF imaginary part */
+                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                                atomicadd(weight + newidx + gcfg->crop0.w * 2, r->oldweight_im);
+                            }
+
 #else
                             weight[newidx] += r->oldweight;
+
+                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                                weight[newidx + gcfg->crop0.w * 2] += r->oldweight_im;
+                            }
+
 #endif
                         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
 
@@ -933,6 +1007,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                         }
 
                         r->oldweight = 0.f;
+                        r->oldweight_im = 0.f;
                     }
 
 #endif // for ifdef DO_NOT_SAVE
@@ -943,6 +1018,12 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #else
                     S = make_float4(S.x + T.x, S.y + T.y, S.z + T.z, S.w * T.w);
 #endif
+                }
+
+                /* RF: persist complex photon weight across element crossings */
+                if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                    r->weight_im = seg_w_im;
+                    r->weight    = seg_w_re;  /* real part also phase-mixed; needed as entry for next element */
                 }
 
 #ifdef __NVCC__
@@ -1147,9 +1228,78 @@ __device__ void fixphoton(float3* p, __global FLOAT3* node, __global int* ee) {
  * \param[in,out] ran: the random number generator states
  */
 
-__device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOAT3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern) {
+__device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOAT3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern, __constant Medium* gmed) {
     int canfocus = 1;
     float3 origin = r->p0;
+
+    /* Multi-source / adjoint mode: randomly select a source from gmed[] (packed after media) */
+    if (GPU_PARAM(gcfg, srcid) < 0 && GPU_PARAM(gcfg, extrasrclen) > 0) {
+        /* uniformly select a source slot */
+        unsigned int slot = (unsigned int)(rand_uniform01(ran) * GPU_PARAM(gcfg, extrasrclen));
+
+        if (slot >= (unsigned int)GPU_PARAM(gcfg, extrasrclen)) {
+            slot = (unsigned int)GPU_PARAM(gcfg, extrasrclen) - 1u;
+        }
+
+        /* Extra sources are packed into gmed[] starting at srcpropoffset;
+         * each ExtraSrc occupies 4 Medium slots (both are 16-byte aligned structs of 4 floats) */
+        __constant ExtraSrc* srcs = (__constant ExtraSrc*)(gmed + GPU_PARAM(gcfg, srcpropoffset));
+
+        /* Use scalar field access to remain compatible with both CUDA and OpenCL */
+        float src_pos_x = srcs[slot].srcpos.x;
+        float src_pos_y = srcs[slot].srcpos.y;
+        float src_pos_z = srcs[slot].srcpos.z;
+        float src_dir_x = srcs[slot].srcdir.x;
+        float src_dir_y = srcs[slot].srcdir.y;
+        float src_dir_z = srcs[slot].srcdir.z;
+
+        r->posidx = slot;  /* record source slot for field-buffer indexing */
+        r->p0.x = src_pos_x;
+        r->p0.y = src_pos_y;
+        r->p0.z = src_pos_z;
+        origin   = r->p0;
+
+        /* direction */
+        r->vec.x = src_dir_x;
+        r->vec.y = src_dir_y;
+        r->vec.z = src_dir_z;
+
+        /* disk source: apply uniform disk sampling for adjoint (detector) sources */
+        {
+            float radius = srcs[slot].srcparam1.x;
+
+            if (radius > 0.f) {
+                float phi_d = TWO_PI * rand_uniform01(ran);
+                float r0    = MCX_MATHFUN(sqrt)(rand_uniform01(ran)) * radius;
+                float sphi, cphi;
+                MCX_SINCOS(phi_d, sphi, cphi);
+
+                if (src_dir_z > -1.f + EPS && src_dir_z < 1.f - EPS) {
+                    float tmp0 = 1.f - src_dir_z * src_dir_z;
+                    float tmp1 = r0 * MCX_MATHFUN(rsqrt)(tmp0);
+                    r->p0.x = r->p0.x + tmp1 * (src_dir_x * src_dir_z * cphi - src_dir_y * sphi);
+                    r->p0.y = r->p0.y + tmp1 * (src_dir_y * src_dir_z * cphi + src_dir_x * sphi);
+                    r->p0.z = r->p0.z - tmp1 * tmp0 * cphi;
+                } else {
+                    r->p0.x += r0 * cphi;
+                    r->p0.y += r0 * sphi;
+                }
+            }
+        }
+
+        /* focal-point focusing (srcdir.w = focal length) */
+        float focallen = srcs[slot].srcdir.w;
+
+        if (focallen != 0.f) {
+            canfocus = 0;
+            origin = r->p0 + FL3(focallen) * r->vec;
+        }
+
+        r->weight = srcs[slot].srcpos.w; /* importance weight */
+        r->eid = GPU_PARAM(gcfg, e0);    /* will be corrected after tet-finding */
+        r->slen = rand_next_scatlen(ran);
+        return;
+    }
 
     r->slen = rand_next_scatlen(ran);
 #if defined(__NVCC__) || defined(MCX_SRC_PENCIL)
@@ -1488,7 +1638,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                           __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata) {
 
     int oldeid, fixcount = 0;
-    ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f};
+    ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0.f};
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
     RandType initseed[RAND_BUF_LEN] = {NULL};
 #endif
@@ -1515,7 +1665,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
 
     /*initialize the photon parameters*/
-    launchnewphoton(gcfg, &r, node, elem, srcelem, ran, srcpattern);
+    launchnewphoton(gcfg, &r, node, elem, srcelem, ran, srcpattern, gmed);
 
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 #ifdef __NVCC__
@@ -1719,13 +1869,30 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
         //if(GPU_PARAM(gcfg,debuglevel)&dlMove)
         GPUDEBUG(("M %f %f %f %d %u %e\n", r.p0.x, r.p0.y, r.p0.z, r.eid, id, r.slen));
 
-        if ((GPU_PARAM(gcfg, minenergy) > 0.f) * (r.weight < GPU_PARAM(gcfg, minenergy)) * ((gcfg->tend - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep) <= 1.f)) { /*Russian Roulette*/
-            if (rand_do_roulette(ran)*GPU_PARAM(gcfg, roulettesize) <= 1.f) {
-                r.weight *= GPU_PARAM(gcfg, roulettesize);
-                //if(GPU_PARAM(gcfg,debuglevel)&dlWeight)
-                GPUDEBUG(("Russian Roulette bumps r.weight to %f\n", r.weight));
-            } else {
-                break;
+        {
+            /* For RF forward, use the magnitude of the complex weight for roulette threshold.
+             * The real part can be negative when cos(phi_accumulated)<0, incorrectly triggering
+             * roulette for photons that still carry significant energy.
+             * MCX reference: p.w = sqrt(w_re^2+w_im^2) is always used for the roulette check. */
+            float roulette_w = r.weight;
+
+            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                roulette_w = MCX_MATHFUN(sqrt)(r.weight * r.weight + r.weight_im * r.weight_im);
+            }
+
+            if ((GPU_PARAM(gcfg, minenergy) > 0.f) * (roulette_w < GPU_PARAM(gcfg, minenergy)) * ((gcfg->tend - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep) <= 1.f)) { /*Russian Roulette*/
+                if (rand_do_roulette(ran)*GPU_PARAM(gcfg, roulettesize) <= 1.f) {
+                    r.weight *= GPU_PARAM(gcfg, roulettesize);
+
+                    if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                        r.weight_im *= GPU_PARAM(gcfg, roulettesize);  /* scale imaginary weight too, consistent with MCX */
+                    }
+
+                    //if(GPU_PARAM(gcfg,debuglevel)&dlWeight)
+                    GPUDEBUG(("Russian Roulette bumps r.weight to %f\n", r.weight));
+                } else {
+                    break;
+                }
             }
         }
 
@@ -1813,4 +1980,190 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
     }
 
     atomicadd(&(reporter->raytet), raytet);
+}
+
+/*============================================================================*/
+/* Adjoint Jacobian helper kernels (grid / BLBadouelGrid mode)                */
+/*============================================================================*/
+
+/**
+ * @brief CW time-gate summation for one source/detector slot at a given voxel
+ *
+ * Sums all time gates for a given source-slot index to obtain the CW fluence.
+ * The field layout is: field[vox + (tgate + slot*maxgate)*dimxyz]
+ */
+#ifdef __NVCC__
+__device__ static inline float mmc_cw_sum(const float* field, unsigned int vox, unsigned int slot,
+        unsigned int maxgate, unsigned int dimxyz) {
+#else
+static inline float mmc_cw_sum(__global const float* field, unsigned int vox, unsigned int slot,
+                               unsigned int maxgate, unsigned int dimxyz) {
+#endif
+    float sum = 0.f;
+
+    for (unsigned int t = 0; t < maxgate; t++) {
+        sum += field[vox + (size_t)(t + slot * maxgate) * dimxyz];
+    }
+
+    return sum;
+}
+
+/**
+ * @brief 2nd-order finite-difference spatial gradient along one axis for adjoint Jacobian
+ */
+#ifdef __NVCC__
+__device__ static inline float mmc_fd_grad(const float* field, unsigned int vox, unsigned int slot,
+        unsigned int maxgate, unsigned int dimxyz,
+        unsigned int i, unsigned int N, unsigned int stride) {
+#else
+static inline float mmc_fd_grad(__global const float* field, unsigned int vox, unsigned int slot,
+                                unsigned int maxgate, unsigned int dimxyz,
+                                unsigned int i, unsigned int N, unsigned int stride) {
+#endif
+
+    if (N <= 1) {
+        return 0.f;
+    }
+
+    float f0 = mmc_cw_sum(field, vox, slot, maxgate, dimxyz);
+
+    if (i == 0) {
+        float fp1 = mmc_cw_sum(field, vox + stride, slot, maxgate, dimxyz);
+
+        if (N == 2) {
+            return fp1 - f0;
+        }
+
+        float fp2 = mmc_cw_sum(field, vox + 2 * stride, slot, maxgate, dimxyz);
+        return (-3.f * f0 + 4.f * fp1 - fp2) * 0.5f;
+    } else if (i == N - 1) {
+        float fm1 = mmc_cw_sum(field, vox - stride, slot, maxgate, dimxyz);
+
+        if (N == 2) {
+            return f0 - fm1;
+        }
+
+        float fm2 = mmc_cw_sum(field, vox - 2 * stride, slot, maxgate, dimxyz);
+        return (fm2 - 4.f * fm1 + 3.f * f0) * 0.5f;
+    } else {
+        float fp1 = mmc_cw_sum(field, vox + stride, slot, maxgate, dimxyz);
+        float fm1 = mmc_cw_sum(field, vox - stride, slot, maxgate, dimxyz);
+        return (fp1 - fm1) * 0.5f;
+    }
+}
+
+/**
+ * @brief Adjoint mua Jacobian kernel: J[vox,s,d] = phi_src[vox,s] * phi_det[vox,d]
+ *
+ * For RF mode (gfield_im != NULL):
+ *   Re(J) = Re(phi_src)*Re(phi_det) - Im(phi_src)*Im(phi_det)
+ *   Im(J) = Re(phi_src)*Im(phi_det) + Im(phi_src)*Re(phi_det)
+ *
+ * Output layout: gadjoint[vox + (s*Nd+d)*dimxyz]        (real)
+ *                gadjoint[vox + (s*Nd+d)*dimxyz + Ns*Nd*dimxyz] (imag, RF only)
+ */
+#ifdef __NVCC__
+__global__ void mmc_adjoint_kernel(float* gfield_re, float* gfield_im, float* gadjoint,
+                                   unsigned int dimxyz, unsigned int maxgate,
+                                   unsigned int Ns, unsigned int Nd) {
+    unsigned int vox = blockIdx.x * blockDim.x + threadIdx.x;
+#else
+__kernel void mmc_adjoint_kernel(__global float* gfield_re, __global float* gfield_im,
+                                 __global float* gadjoint,
+                                 unsigned int dimxyz, unsigned int maxgate,
+                                 unsigned int Ns, unsigned int Nd) {
+    unsigned int vox = get_global_id(0);
+#endif
+
+    if (vox >= dimxyz) {
+        return;
+    }
+
+    size_t adjointlen = (size_t)dimxyz * Ns * Nd;
+
+    for (unsigned int s = 0; s < Ns; s++) {
+        float cw_src_re = mmc_cw_sum(gfield_re, vox, s, maxgate, dimxyz);
+        float cw_src_im = (gfield_im != 0) ? mmc_cw_sum(gfield_im, vox, s, maxgate, dimxyz) : 0.f;
+
+        for (unsigned int d = 0; d < Nd; d++) {
+            float cw_det_re = mmc_cw_sum(gfield_re, vox, Ns + d, maxgate, dimxyz);
+
+            unsigned int out_idx = vox + (unsigned int)((size_t)(s * Nd + d) * dimxyz);
+            gadjoint[out_idx] = cw_src_re * cw_det_re;
+
+            if (gfield_im != 0) {
+                float cw_det_im = mmc_cw_sum(gfield_im, vox, Ns + d, maxgate, dimxyz);
+                gadjoint[out_idx] -= cw_src_im * cw_det_im;
+                gadjoint[out_idx + (unsigned int)(adjointlen)] = cw_src_re * cw_det_im + cw_src_im * cw_det_re;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Adjoint D-coefficient Jacobian kernel: J_D[vox,s,d] = nabla(phi_src) . nabla(phi_det)
+ *
+ * For RF mode:
+ *   Re(J_D) = Re(grad_s).Re(grad_d) - Im(grad_s).Im(grad_d)
+ *   Im(J_D) = Re(grad_s).Im(grad_d) + Im(grad_s).Re(grad_d)
+ */
+#ifdef __NVCC__
+__global__ void mmc_adjoint_dcoeff_kernel(float* gfield_re, float* gfield_im, float* gadjoint,
+        unsigned int dimxyz, unsigned int maxgate,
+        unsigned int Ns, unsigned int Nd,
+        unsigned int Nx, unsigned int Ny) {
+    unsigned int vox = blockIdx.x * blockDim.x + threadIdx.x;
+#else
+__kernel void mmc_adjoint_dcoeff_kernel(__global float* gfield_re, __global float* gfield_im,
+                                        __global float* gadjoint,
+                                        unsigned int dimxyz, unsigned int maxgate,
+                                        unsigned int Ns, unsigned int Nd,
+                                        unsigned int Nx, unsigned int Ny) {
+    unsigned int vox = get_global_id(0);
+#endif
+
+    if (vox >= dimxyz) {
+        return;
+    }
+
+    unsigned int Nxy = Nx * Ny;
+    unsigned int Nz  = dimxyz / Nxy;
+    unsigned int ix  = vox % Nx;
+    unsigned int iy  = (vox / Nx) % Ny;
+    unsigned int iz  = vox / Nxy;
+
+    size_t adjointlen = (size_t)dimxyz * Ns * Nd;
+
+    for (unsigned int s = 0; s < Ns; s++) {
+        float gsx_re = mmc_fd_grad(gfield_re, vox, s, maxgate, dimxyz, ix, Nx, 1);
+        float gsy_re = mmc_fd_grad(gfield_re, vox, s, maxgate, dimxyz, iy, Ny, Nx);
+        float gsz_re = mmc_fd_grad(gfield_re, vox, s, maxgate, dimxyz, iz, Nz, Nxy);
+        float gsx_im = 0.f, gsy_im = 0.f, gsz_im = 0.f;
+
+        if (gfield_im != 0) {
+            gsx_im = mmc_fd_grad(gfield_im, vox, s, maxgate, dimxyz, ix, Nx, 1);
+            gsy_im = mmc_fd_grad(gfield_im, vox, s, maxgate, dimxyz, iy, Ny, Nx);
+            gsz_im = mmc_fd_grad(gfield_im, vox, s, maxgate, dimxyz, iz, Nz, Nxy);
+        }
+
+        for (unsigned int d = 0; d < Nd; d++) {
+            float gdx_re = mmc_fd_grad(gfield_re, vox, Ns + d, maxgate, dimxyz, ix, Nx, 1);
+            float gdy_re = mmc_fd_grad(gfield_re, vox, Ns + d, maxgate, dimxyz, iy, Ny, Nx);
+            float gdz_re = mmc_fd_grad(gfield_re, vox, Ns + d, maxgate, dimxyz, iz, Nz, Nxy);
+
+            unsigned int out_idx = vox + (unsigned int)((size_t)(s * Nd + d) * dimxyz);
+            gadjoint[out_idx] = gsx_re * gdx_re + gsy_re * gdy_re + gsz_re * gdz_re;
+
+            if (gfield_im != 0) {
+                float gdx_im = mmc_fd_grad(gfield_im, vox, Ns + d, maxgate, dimxyz, ix, Nx, 1);
+                float gdy_im = mmc_fd_grad(gfield_im, vox, Ns + d, maxgate, dimxyz, iy, Ny, Nx);
+                float gdz_im = mmc_fd_grad(gfield_im, vox, Ns + d, maxgate, dimxyz, iz, Nz, Nxy);
+
+                gadjoint[out_idx] -= gsx_im * gdx_im + gsy_im * gdy_im + gsz_im * gdz_im;
+                gadjoint[out_idx + (unsigned int)(adjointlen)] =
+                    gsx_re * gdx_im + gsy_re * gdy_im + gsz_re * gdz_im
+                    + gsx_im * gdx_re + gsy_im * gdy_re + gsz_im * gdz_re;
+            }
+        }
+    }
 }

@@ -10,8 +10,10 @@
 #include "mmc_optix_ray.h"
 #include "mmc_optix_launchparam.h"
 
-// as of 09/17/2022, only otFlux, otFluence, otEnergy are supported
-enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP,
+                  otRF, otRFmus,
+                  otAdjoint, otAdjointDcoeff, otAdjointMus, otAdjointMusp, otAdjointMuaD, otAdjointMuaMusp
+                 };
 
 constexpr float R_C0 = 3.335640951981520e-12f; // 1/C0 in s/mm
 constexpr float MAX_ACCUM = 1000.0f;
@@ -42,7 +44,8 @@ __device__ __forceinline__ void getInitialMediumId(optixray& r, mcx::Random& rng
                *(uint32_t*) & (r.dir.x), *(uint32_t*) & (r.dir.y), *(uint32_t*) & (r.dir.z),
                *(uint32_t*) & (r.slen), *(uint32_t*) & (r.weight), *(uint32_t*) & (r.photontimer),
                r.mediumid,
-               rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
+               rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w,
+               *(uint32_t*) & (r.weight_im));
 }
 
 /**
@@ -53,6 +56,65 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
     r.p0 = gcfg.srcpos;
     r.dir = gcfg.srcdir;
     r.weight = 1.0f;
+    r.weight_im = 0.0f;  /**< initialize imaginary weight to zero */
+
+    /* multi-source mode: randomly select source from gcfgsrc[] */
+    if (gcfg.srcid < 0 && gcfg.extrasrclen > 0) {
+        int srcslot = (int)(rng.uniform(0.0f, 1.0f) * gcfg.extrasrclen);
+
+        if (srcslot >= gcfg.extrasrclen) {
+            srcslot = gcfg.extrasrclen - 1;
+        }
+
+        ExtraSrc src = ((ExtraSrc*)gcfg.srcdatabuffer)[srcslot];
+        r.p0 = make_float3(src.srcpos.x, src.srcpos.y, src.srcpos.z);
+        r.dir = make_float3(src.srcdir.x, src.srcdir.y, src.srcdir.z);
+        r.weight = src.srcpos.w;  /**< importance weight from srcpos.w */
+
+        /* disk source sampling for adjoint detector-as-source */
+        float radius = src.srcparam1.x;
+
+        if (radius > 0.f) {
+            float sphi, cphi;
+            float phi = TWO_PI * rng.uniform(0.0f, 1.0f);
+            sincosf(phi, &sphi, &cphi);
+            float r0 = sqrtf(rng.uniform(0.0f, 1.0f)) * radius;
+            float3 d = r.dir;
+
+            if (d.z > -1.f + EPS && d.z < 1.f - EPS) {
+                float tmp0 = 1.f - d.z * d.z;
+                float tmp1 = r0 * rsqrt(tmp0);
+                r.p0.x += tmp1 * (d.x * d.z * cphi - d.y * sphi);
+                r.p0.y += tmp1 * (d.y * d.z * cphi + d.x * sphi);
+                r.p0.z -= tmp1 * tmp0 * cphi;
+            } else {
+                r.p0.x += r0 * cphi;
+                r.p0.y += r0 * sphi;
+            }
+        }
+
+        /* focal point focusing: srcdir.w stores focal length */
+        if (src.srcdir.w != 0.f) {
+            float3 focal = make_float3(r.p0.x + src.srcdir.w * r.dir.x,
+                                       r.p0.y + src.srcdir.w * r.dir.y,
+                                       r.p0.z + src.srcdir.w * r.dir.z);
+            float3 newdir = make_float3(focal.x - r.p0.x,
+                                        focal.y - r.p0.y,
+                                        focal.z - r.p0.z);
+            float len = rsqrtf(dot(newdir, newdir));
+            r.dir = newdir * len;
+        }
+
+        r.slen = rng.rand_next_scatlen();
+        r.photontimer = 0.0f;
+        r.mediumid = gcfg.mediumid0;
+
+        if (r.mediumid == INITIAL_MEDIUM_UNKNOWN) {
+            getInitialMediumId(r, rng);
+        }
+
+        return;
+    }
 
     if (gcfg.srctype == MCX_SRC_PLANAR) {
         float rx = rng.uniform(0.0f, 1.0f);
@@ -156,7 +218,8 @@ __device__ __forceinline__ void movePhoton(optixray& r, mcx::Random& rng) {
                *(uint32_t*) & (r.dir.x), *(uint32_t*) & (r.dir.y), *(uint32_t*) & (r.dir.z),
                *(uint32_t*) & (r.slen), *(uint32_t*) & (r.weight), *(uint32_t*) & (r.photontimer),
                r.mediumid,
-               rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w);
+               rng.intSeed.x, rng.intSeed.y, rng.intSeed.z, rng.intSeed.w,
+               *(uint32_t*) & (r.weight_im));
 }
 
 /**
@@ -232,7 +295,7 @@ __device__ __forceinline__ uint getTimeFrame(const float& tof) {
 }
 
 /**
- * @brief Save output to a buffer
+ * @brief Save output to a buffer (real part or CW)
  */
 __device__ __forceinline__ void saveToBuffer(const uint& eid, const float& w) {
     // to minimize numerical error, use the same trick as MCX
@@ -249,16 +312,62 @@ __device__ __forceinline__ void saveToBuffer(const uint& eid, const float& w) {
 }
 
 /**
+ * @brief Save imaginary component to a buffer (RF forward simulation)
+ * Imaginary buffer is located at outputbuffer + 2*crop0.w
+ */
+__device__ __forceinline__ void saveToBufferIm(const uint& eid, const float& w) {
+    uint imeid = eid + 2 * gcfg.crop0.w;
+    float accum = atomicAdd(&((float*)gcfg.outputbuffer)[imeid], w);
+
+    if (accum > MAX_ACCUM) {
+        if (atomicAdd(&((float*)gcfg.outputbuffer)[imeid], -accum) < 0.0f) {
+            atomicAdd(&((float*)gcfg.outputbuffer)[imeid], accum);
+        } else {
+            atomicAdd(&((float*)gcfg.outputbuffer)[imeid + gcfg.crop0.w], accum);
+        }
+    }
+}
+
+/**
  * @brief Accumulate output quantities to a 3D grid
  */
-__device__ __forceinline__ void accumulateOutput(const optixray& r, const Medium& prop,
+__device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop,
         const float& lmove) {
+    bool isrf = (gcfg.omega != 0.f);
+
     // divide path into segments of equal length
     int segcount = ((int)(lmove * gcfg.dstep) + 1) << 1;
     float seglen = lmove / segcount;
     float segdecay = expf(-prop.mua * seglen);
-    float segloss = (gcfg.outputtype == otEnergy) ? r.weight * (1.0f - segdecay) :
-                    (prop.mua ? r.weight * (1.0f - segdecay) / prop.mua : 0.0f);
+
+    // RF: per-segment complex rotation angle = omega * n/c0 * seglen
+    float rfcos = 1.0f, rfsin = 0.0f;
+
+    if (isrf) {
+        float phase = gcfg.omega * prop.n * gcfg.oneoverc0 * seglen;
+        sincosf(phase, &rfsin, &rfcos);
+    }
+
+    float segloss, segloss_im = 0.0f;
+    float w_re = r.weight, w_im = r.weight_im;
+
+    if (isrf) {
+        // complex Beer-Lambert per segment: w_new = w * segdecay * exp(i*phase)
+        float a_im = gcfg.omega * prop.n * gcfg.oneoverc0;
+        float a_mag2 = prop.mua * prop.mua + a_im * a_im;
+        // new weight after one segment
+        float new_re = segdecay * (w_re * rfcos - w_im * rfsin);
+        float new_im = segdecay * (w_re * rfsin + w_im * rfcos);
+        float dw_re = w_re - new_re;
+        float dw_im = w_im - new_im;
+        segloss    = (a_mag2 > 0.f) ? (dw_re * prop.mua + dw_im * a_im) / a_mag2 : 0.f;
+        segloss_im = (a_mag2 > 0.f) ? (dw_im * prop.mua - dw_re * a_im) / a_mag2 : 0.f;
+        w_re = new_re;
+        w_im = new_im;
+    } else {
+        segloss = (gcfg.outputtype == otEnergy) ? r.weight * (1.0f - segdecay) :
+                  (prop.mua ? r.weight * (1.0f - segdecay) / prop.mua : 0.0f);
+    }
 
     // deposit weight loss of each segment to the corresponding grid
     float3 step = seglen * r.dir;
@@ -268,11 +377,25 @@ __device__ __forceinline__ void accumulateOutput(const optixray& r, const Medium
     // find the information of the first segment
     uint oldeid = getTimeFrame(currtof) + getVoxelIdx(segmid);
     float oldweight = segloss;
+    float oldweight_im = segloss_im;
 
-    // iterater over the rest of the segments
+    // iterate over the rest of the segments
     for (int i = 1; i < segcount; ++i) {
-        // update information for the curr segment
-        segloss *= segdecay;
+        if (isrf) {
+            float new_re2 = segdecay * (w_re * rfcos - w_im * rfsin);
+            float new_im2 = segdecay * (w_re * rfsin + w_im * rfcos);
+            float dw_re2 = w_re - new_re2;
+            float dw_im2 = w_im - new_im2;
+            float a_im = gcfg.omega * prop.n * gcfg.oneoverc0;
+            float a_mag2 = prop.mua * prop.mua + a_im * a_im;
+            segloss    = (a_mag2 > 0.f) ? (dw_re2 * prop.mua + dw_im2 * a_im) / a_mag2 : 0.f;
+            segloss_im = (a_mag2 > 0.f) ? (dw_im2 * prop.mua - dw_re2 * a_im) / a_mag2 : 0.f;
+            w_re = new_re2;
+            w_im = new_im2;
+        } else {
+            segloss *= segdecay;
+        }
+
         segmid += step;
         currtof += seglen * R_C0 * prop.n;
         uint neweid = getTimeFrame(currtof) + getVoxelIdx(segmid);
@@ -280,16 +403,33 @@ __device__ __forceinline__ void accumulateOutput(const optixray& r, const Medium
         // save when entering a new element or during the last segment
         if (neweid != oldeid) {
             saveToBuffer(oldeid, oldweight);
+
+            if (isrf) {
+                saveToBufferIm(oldeid, oldweight_im);
+            }
+
             // reset oldeid and weight bucket
             oldeid = neweid;
             oldweight = 0.0f;
+            oldweight_im = 0.0f;
         }
 
         oldweight += segloss;
+        oldweight_im += segloss_im;
     }
 
     // save the weight loss of the last segment
     saveToBuffer(oldeid, oldweight);
+
+    if (isrf) {
+        saveToBufferIm(oldeid, oldweight_im);
+    }
+
+    // update both real and imaginary weight in ray after all segments
+    if (isrf) {
+        r.weight    = w_re;
+        r.weight_im = w_im;
+    }
 }
 
 /**
@@ -405,14 +545,16 @@ extern "C" __global__ void __closesthit__ch() {
     // resolve some edge cases where hitlen is sligthly larger than slen
     const float lmove = min(hitlen, currprop.mus ? r.slen / currprop.mus : std::numeric_limits<float>::max());
 
-    // save output
+    // save output; for RF mode, also updates r.weight and r.weight_im inside
     accumulateOutput(r, currprop, lmove);
 
     // update photon position
     r.p0 += r.dir * (lmove + SAFETY_DISTANCE);
 
-    // update photon weight
-    r.weight *= expf(-currprop.mua * lmove);
+    // for CW mode, update photon weight (RF weights already updated inside accumulateOutput)
+    if (gcfg.omega == 0.f) {
+        r.weight *= expf(-currprop.mua * lmove);
+    }
 
     // update photon timer
     r.photontimer += lmove * R_C0 * currprop.n;
@@ -467,14 +609,16 @@ extern "C" __global__ void __miss__ms() {
     // distance to the scattering event site
     float lmove = r.slen / currprop.mus;
 
-    // save output
+    // save output; for RF mode, also updates r.weight and r.weight_im inside
     accumulateOutput(r, currprop, lmove);
 
     // update photon position
     r.p0 += r.dir * lmove;
 
-    // update photon weight
-    r.weight *= expf(-currprop.mua * lmove);
+    // for CW mode, update photon weight (RF weights already updated inside accumulateOutput)
+    if (gcfg.omega == 0.f) {
+        r.weight *= expf(-currprop.mua * lmove);
+    }
 
     // update photon timer
     r.photontimer += lmove * R_C0 * currprop.n;

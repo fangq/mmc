@@ -3,6 +3,20 @@
 
 #include <limits>
 
+/* ExtraSrc is also defined in mmc_utils.h; define here only for device-only includes */
+#ifndef MCX_EXTRASRC_DEFINED
+#define MCX_EXTRASRC_DEFINED
+/**
+ * @brief struct for extra (adjoint) source parameters
+ */
+typedef struct MCX_ExtraSrc {
+    float4 srcpos;      /**< position (x,y,z) and importance weight (w) */
+    float4 srcdir;      /**< direction (x,y,z) and focal length (w) */
+    float4 srcparam1;   /**< source parameters set 1: x=radius for disk source */
+    float4 srcparam2;   /**< source parameters set 2 */
+} ExtraSrc;
+#endif
+
 #define MAX_PROP           4000              /*maximum property number*/
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */
@@ -65,6 +79,12 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
 
     int threadphoton;
     int oddphoton;
+
+    float omega;                   /**< RF modulation angular frequency (rad/s) */
+    float oneoverc0;               /**< 1/C0 = 3.335640951981520e-12 s/mm */
+    int srcid;                     /**< < 0 for multi-source mode */
+    int extrasrclen;               /**< number of extra sources */
+    CUdeviceptr srcdatabuffer;     /**< device pointer to extra source array (ExtraSrc) */
 
     Medium medium[MAX_PROP];
 } MMCParam;

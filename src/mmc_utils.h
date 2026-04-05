@@ -102,7 +102,12 @@ enum TSrcType {stPencil, stIsotropic, stCone, stGaussian, stPlanar,
                stPattern, stFourier, stArcSin, stDisk, stFourierX,
                stFourier2D, stZGaussian, stLine, stSlit
               };
-enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP};
+enum TOutputType {otFlux, otFluence, otEnergy, otJacobian, otWL, otWP,
+                  otRF, otRFmus,
+                  otAdjoint, otAdjointDcoeff, otAdjointMus, otAdjointMusp, otAdjointMuaD, otAdjointMuaMusp
+                 };
+#define MCX_IS_ADJOINT_TYPE(t)      ((int)(t) >= (int)otAdjoint)
+#define MCX_IS_DUAL_ADJOINT_TYPE(t) ((int)(t) >= (int)otAdjointMuaD)
 enum TOutputFormat {ofASCII, ofBin, ofNifti, ofAnalyze, ofMC2, ofTX3, ofJNifti, ofBJNifti};
 enum TOutputDomain {odMesh, odGrid};
 enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU, dvAppleCPU, dvAppleGPU};
@@ -132,6 +137,17 @@ in 1/mm, the refractive index (n) and anisotropy (g).
  * \brief The structure to store optical properties
  * Four relevant optical properties are needed
  */
+
+/** \brief Extra source entry for multi-source / adjoint-mode simulation */
+#ifndef MCX_EXTRASRC_DEFINED
+#define MCX_EXTRASRC_DEFINED
+typedef struct MCX_ExtraSrc {
+    float4 srcpos;      /**< position and launch-weight (w component = importance) */
+    float4 srcdir;      /**< direction and focal length (w component) */
+    float4 srcparam1;   /**< source parameters set 1: x=radius for disk source */
+    float4 srcparam2;   /**< source parameters set 2 */
+} ExtraSrc;
+#endif
 
 typedef struct MMC_medium {
     float mua;                     /**<absorption coeff in 1/mm unit*/
@@ -218,6 +234,7 @@ typedef struct MMC_config {
                                        normalization error when using non-atomic write*/
     medium* prop;                  /**<optical property mapping table*/
     float4* detpos;                /**<detector positions and radius, overwrite detradius*/
+    float4* detdir;               /**<detector normal directions and focal lengths for adjoint mode (Nd x 4)*/
     float4 detparam1;              /**<parameters set 1 for wide-field detector*/
     float4 detparam2;              /**<parameters set 2 for wide-feild detector*/
     float* detpattern;             /**<detector pattern*/
@@ -252,6 +269,7 @@ typedef struct MMC_config {
     int  mcmethod;                 /**<0 use MCX-styled MC (micro-Beer-Lambert law), 1 use MCML-styled MC (Albedo-Weight)*/
     float roulettesize;            /**<number of roulette for termination*/
     float minenergy;               /**<minimum energy to propagate photon*/
+    float omega;                  /**<modulation angular frequency (rad/s) for RF forward simulation; 0 for CW*/
     float nout;                    /**<refractive index for the domain outside the mesh*/
     int isextdet;                  /**<if 1, there is external wide-field detector (marked by -2 in the mesh)*/
     FILE* flog;                    /**<stream handle to print log information*/
@@ -279,6 +297,9 @@ typedef struct MMC_config {
     unsigned char* exportseed;     /*memory buffer when returning the RNG seed to matlab*/
     float* exportdetected;         /*memory buffer when returning the partial length info to external programs such as matlab*/
     float* exportdebugdata;        /**<pointer to the buffer where the photon trajectory data are stored*/
+    float* exportadjoint;         /**<float buffer for RF imaginary fluence (RF forward) or adjoint Jacobian output*/
+    ExtraSrc* srcdata;            /**<multi-source list for adjoint mode; length = extrasrclen*/
+    int extrasrclen;              /**<number of entries in srcdata (>0 for adjoint/multi-source mode)*/
     double* energytot;             /**<total energy launched for each source, a buffer of length srcnum */
     double* energyesc;             /**<total energy escaped for each source, a buffer of length srcnum */
     unsigned int detectedcount;    /**<total number of detected photons*/

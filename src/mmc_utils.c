@@ -160,7 +160,7 @@ const char raytracing[] = {'p', 'h', 'b', 's', 'g', '\0'};
  * p: scattering counts for computing Jacobians for mus
  */
 
-const char outputtype[] = {'x', 'f', 'e', 'j', 'l', 'p', '\0'};
+const char outputtype[] = {'x', 'f', 'e', 'j', 'l', 'p', 'r', 's', 'a', 'd', 'u', 'v', 'w', 'q', '\0'};
 
 /**
  * Output file format
@@ -269,6 +269,11 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->issaveref = 0;
     cfg->outputtype = otFlux;
     cfg->outputformat = ofASCII;
+    cfg->omega = 0.f;
+    cfg->extrasrclen = 0;
+    cfg->srcdata = NULL;
+    cfg->detdir = NULL;
+    cfg->exportadjoint = NULL;
     cfg->ismomentum = 0;
     cfg->issaveseed = 0;
     cfg->issaveexit = 0;
@@ -401,6 +406,21 @@ void mcx_clearcfg(mcconfig* cfg) {
 
     if (cfg->exportdebugdata) {
         free(cfg->exportdebugdata);
+    }
+
+    if (cfg->exportadjoint) {
+        free(cfg->exportadjoint);
+        cfg->exportadjoint = NULL;
+    }
+
+    if (cfg->srcdata) {
+        free(cfg->srcdata);
+        cfg->srcdata = NULL;
+    }
+
+    if (cfg->detdir) {
+        free(cfg->detdir);
+        cfg->detdir = NULL;
     }
 
     if (cfg->flog && cfg->flog != stdout && cfg->flog != stderr) {
@@ -1821,8 +1841,40 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         cfg->tend  = FIND_JSON_KEY("T1", "Forward.T1", Forward, 0.0, valuedouble);
         cfg->tstep = FIND_JSON_KEY("Dt", "Forward.Dt", Forward, 0.0, valuedouble);
         cfg->nout = FIND_JSON_KEY("N0", "Forward.N0", Forward, cfg->nout, valuedouble);
+        cfg->omega = FIND_JSON_KEY("Omega", "Forward.Omega", Forward, 0.0, valuedouble);
 
         cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
+    }
+
+    /* parse DetDir (detector normal directions for adjoint mode) */
+    {
+        cJSON* dets = FIND_JSON_OBJ("Detector", "Optode.Detector", Optode);
+        cJSON* ddir = dets ? FIND_JSON_OBJ("Dir", "Optode.Detector.Dir", dets) : NULL;
+
+        if (ddir && cfg->detnum > 0) {
+            int di;
+            cfg->detdir = (float4*)calloc(cfg->detnum, sizeof(float4));
+
+            for (di = 0; di < cfg->detnum; di++) {
+                cJSON* d = cJSON_GetArrayItem(ddir, di);
+
+                if (d && d->child) {
+                    cfg->detdir[di].x = d->child->valuedouble;
+
+                    if (d->child->next) {
+                        cfg->detdir[di].y = d->child->next->valuedouble;
+                    }
+
+                    if (d->child->next && d->child->next->next) {
+                        cfg->detdir[di].z = d->child->next->next->valuedouble;
+                    }
+
+                    if (d->child->next && d->child->next->next && d->child->next->next->next) {
+                        cfg->detdir[di].w = d->child->next->next->next->valuedouble;
+                    }
+                }
+            }
+        }
     }
 
     if (cfg->meshtag[0] == '\0' && cfg->nodenum == 0) {
@@ -3600,6 +3652,14 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
         MMC_ERROR(-1, "Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
     }
 
+    if (MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->seed == SEED_FROM_FILE) {
+        MMC_ERROR(-1, "Adjoint Jacobian output is not valid in replay mode.");
+    }
+
+    if (MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method != rtBLBadouelGrid) {
+        MMC_ERROR(-1, "Adjoint Jacobian output currently requires grid output (method G). Please use -M G.");
+    }
+
     if (cfg->isgpuinfo != 2) { /*print gpu info only*/
         if (isinteractive == 2 && jsoninput) {
             mcx_loadfromjson(jsoninput, cfg);
@@ -3757,9 +3817,15 @@ where possible parameters include (the first item in [] is the default value)\n\
 \n"S_BOLD S_CYAN"\
 == Output options ==\n"S_RESET"\
  -s sessionid  (--session)     a string used to tag all output file names\n\
- -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy density\n\
+ -O [X|XFEJLP...] (--outputtype) X - output flux, F - fluence, E - energy density\n\
                                J - Jacobian, L - weighted path length, P -\n\
                                weighted scattering count (J,L,P: replay mode)\n\
+                               R - RF forward (complex fluence, set omega)\n\
+                               A - adjoint mua Jacobian (grid mode, set detdir)\n\
+                               D - adjoint D-coefficient Jacobian\n\
+                               U - adjoint mus Jacobian, V - adjoint musp Jacobian\n\
+                               W - dual adjoint [J_mua, J_D]\n\
+                               Q - dual adjoint [J_mua, J_musp']\n\
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save\n\
  -H [1000000] (--maxdetphoton) max number of detected photons\n\
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save\n\

@@ -109,6 +109,11 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_int    issaveseed;
     cl_uint   seed;
     cl_uint   maxjumpdebug;         /**< max number of positions to be saved to save photon trajectory when -D M is used */
+    cl_float  omega;                /**< RF modulation angular frequency (rad/s); 0 for CW */
+    cl_float  oneoverc0;            /**< 1/C0 = 3.335640951981520e-12 s/mm */
+    cl_int    srcid;                /**< < 0 for multi-source (adjoint) mode; >= 0 for single source */
+    cl_int    extrasrclen;          /**< number of extra sources packed into gproperty after media */
+    cl_int    srcpropoffset;        /**< gproperty index where extra sources start (= prop+1+isextdet) */
 } MCXParam POST_ALIGN(32);
 
 typedef struct POST_ALIGN(32) GPU_reporter {

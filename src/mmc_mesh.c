@@ -2051,7 +2051,11 @@ void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
     }
 
     datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-    mesh->weight = (double*)calloc(sizeof(double) * datalen * cfg->srcnum, cfg->maxgate);
+    {
+        /* For adjoint Jacobian mode, field buffer needs nsrcslots = extrasrclen = srcnum + detnum slots */
+        int nsrcslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
+        mesh->weight = (double*)calloc(sizeof(double) * datalen * nsrcslots, cfg->maxgate);
+    }
 
     if (cfg->method != rtBLBadouelGrid && cfg->unitinmm != 1.f) {
         for (i = 1; i <= mesh->prop; i++) {

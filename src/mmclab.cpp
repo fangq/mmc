@@ -110,7 +110,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
     mxArray*    tmp;
     int        ifield, jstruct;
     int        ncfg, nfields;
-    dimtype     fielddim[5];
+    dimtype     fielddim[6];
     int        errorflag = 0;
     cl_uint    workdev;
 
@@ -260,6 +260,48 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
 #endif
             mesh_srcdetelem(&mesh, &cfg);
 
+            /** Build srcdata from detectors for adjoint mode.
+             *  The field buffer uses nsrcslots = srcnum + detnum slots:
+             *    Slots 0..srcnum-1        : forward source photons (phi_src)
+             *    Slots srcnum..srcnum+detnum-1 : detector-as-source photons (phi_det)
+             *  The adjoint Jacobian kernel then computes J[vox,s,d] = phi_src[s] * phi_det[d].
+             */
+            if (MCX_IS_ADJOINT_TYPE(cfg.outputtype) && cfg.detnum > 0 && cfg.detdir != NULL) {
+                if (cfg.srcdata) {
+                    free(cfg.srcdata);
+                }
+
+                int Ns = cfg.srcnum;   /* number of forward source slots */
+                int Nd = cfg.detnum;   /* number of detector source slots */
+                cfg.extrasrclen = Ns + Nd;
+                cfg.srcdata = (ExtraSrc*)calloc(cfg.extrasrclen, sizeof(ExtraSrc));
+
+                /* Slots 0..Ns-1: forward sources (same position/direction as main source).
+                 * cfg.srcpos/srcdir are float4 (single source); only srcnum=1 is supported. */
+                for (int is = 0; is < Ns; is++) {
+                    cfg.srcdata[is].srcpos    = {cfg.srcpos.x, cfg.srcpos.y,
+                                                 cfg.srcpos.z, 1.f / Ns
+                                                };
+                    cfg.srcdata[is].srcdir    = {cfg.srcdir.x, cfg.srcdir.y,
+                                                 cfg.srcdir.z, 0.f
+                                                };
+                    cfg.srcdata[is].srcparam1 = cfg.srcparam1;
+                    cfg.srcdata[is].srcparam2 = cfg.srcparam2;
+                }
+
+                /* Slots Ns..Ns+Nd-1: detector-as-reversed-source */
+                for (int id = 0; id < Nd; id++) {
+                    cfg.srcdata[Ns + id].srcpos   = {cfg.detpos[id].x, cfg.detpos[id].y,
+                                                     cfg.detpos[id].z, 1.f / Nd
+                                                    };
+                    cfg.srcdata[Ns + id].srcdir   = {cfg.detdir[id].x, cfg.detdir[id].y,
+                                                     cfg.detdir[id].z, cfg.detdir[id].w
+                                                    };
+                    cfg.srcdata[Ns + id].srcparam1 = {cfg.detpos[id].w, 0.f, 0.f, 0.f};
+                    cfg.srcdata[Ns + id].srcparam2 = {0.f, 0.f, 0.f, 0.f};
+                }
+            }
+
             /** Validate all input fields, and warn incompatible inputs */
             mmc_validate_config(&cfg, detps, dimdetps, seedbyte);
             mesh_validate(&mesh, &cfg);
@@ -382,6 +424,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             }
 
             if (nlhs >= 1) {
+                int isrfforward = (cfg.omega > 0.f && cfg.seed != SEED_FROM_FILE);
+                int isadjoint = MCX_IS_ADJOINT_TYPE(cfg.outputtype);
+                (void)((cfg.extrasrclen > 0) ? cfg.extrasrclen : 1); /* nsrcslots unused; see adjoint path below */
+
                 int datalen = (cfg.method == rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
                 fielddim[0] = cfg.srcnum;
                 fielddim[1] = datalen;
@@ -389,39 +435,147 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                 fielddim[3] = 0;
                 fielddim[4] = 0;
 
-                if (cfg.method == rtBLBadouelGrid) {
-                    fielddim[0] = cfg.srcnum;
-                    fielddim[1] = cfg.dim.x;
-                    fielddim[2] = cfg.dim.y;
-                    fielddim[3] = cfg.dim.z;
-                    fielddim[4] = cfg.maxgate;
+                if (isadjoint && cfg.exportadjoint) {
+                    /* Adjoint Jacobian output (grid mode only).
+                     * Ns = forward sources, Nd = detectors, nsrcpairs = Ns*Nd.
+                     * Layout of exportadjoint:
+                     *   CW non-dual:  [Re(J)]               size  vox*nsrcpairs
+                     *   RF non-dual:  [Re(J), Im(J)]        size 2*vox*nsrcpairs
+                     *   CW dual:      [J_mua, J_D]          size 2*vox*nsrcpairs
+                     *   RF dual:      [Re_mua,Re_D,Im_mua,Im_D] size 4*vox*nsrcpairs
+                     * Output shape (non-dual): [Nx,Ny,Nz,maxgate,nsrcpairs]  complex if RF
+                     * Output shape (dual):     [Nx,Ny,Nz,maxgate,nsrcpairs,2] complex if RF */
+                    if (cfg.method == rtBLBadouelGrid) {
+                        int Ns = (cfg.extrasrclen > cfg.detnum) ? (cfg.extrasrclen - cfg.detnum) : 1;
+                        int Nd = (cfg.detnum > 0)              ?  cfg.detnum                    : 1;
+                        int nsrcpairs = Ns * Nd;
+                        int isdual = MCX_IS_DUAL_ADJOINT_TYPE(cfg.outputtype);
+                        mxComplexity cplx = isrfforward ? mxCOMPLEX : mxREAL;
+                        size_t vox = (size_t)cfg.dim.x * cfg.dim.y * cfg.dim.z * cfg.maxgate;
+                        size_t adjlen = vox * nsrcpairs;   /* elements per Jacobian component */
 
-                    if (cfg.srcnum > 1) {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(5, fielddim, mxDOUBLE_CLASS, mxREAL)));
-                    } else {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(4, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
+                        fielddim[0] = cfg.dim.x;
+                        fielddim[1] = cfg.dim.y;
+                        fielddim[2] = cfg.dim.z;
+                        fielddim[3] = cfg.maxgate;
+                        fielddim[4] = nsrcpairs;
+
+                        if (isdual) {
+                            fielddim[5] = 2;  /* J_mua and J_D (or J_mus) */
+                            mxSetFieldByNumber(plhs[0], jstruct, 0,
+                                               mmclab_assert(mxCreateNumericArray(6, fielddim, mxSINGLE_CLASS, cplx)));
+                        } else {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0,
+                                               mmclab_assert(mxCreateNumericArray(5, fielddim, mxSINGLE_CLASS, cplx)));
+                        }
+
+                        mxArray* outfield = mxGetFieldByNumber(plhs[0], jstruct, 0);
+
+                        if (!isrfforward) {
+                            /* CW: copy real Jacobian(s) directly */
+                            memcpy((float*)mxGetData(outfield), cfg.exportadjoint,
+                                   (isdual ? 2 : 1) * adjlen * sizeof(float));
+                        } else {
+                            /* RF: interleave real/imaginary parts */
+                            /* exportadjoint layout: [Re_J1, (Re_J2), Im_J1, (Im_J2)]
+                             * where J1=J_mua (or J for non-dual), J2=J_D for dual */
+                            int ncomp = isdual ? 2 : 1;
+                            float* re_src = cfg.exportadjoint;               /* Re parts */
+                            float* im_src = cfg.exportadjoint + ncomp * adjlen; /* Im parts */
+#if MX_HAS_INTERLEAVED_COMPLEX
+                            mxComplexSingle* cptr = mxGetComplexSingles(outfield);
+
+                            if (cptr) {
+                                for (int c = 0; c < ncomp; c++) {
+                                    for (size_t ii = 0; ii < adjlen; ii++) {
+                                        cptr[c * adjlen + ii].real = re_src[c * adjlen + ii];
+                                        cptr[c * adjlen + ii].imag = im_src[c * adjlen + ii];
+                                    }
+                                }
+                            }
+
+#else
+                            float* pr = (float*)mxGetData(outfield);
+                            float* pi = (float*)mxGetImagData(outfield);
+
+                            if (pr && pi) {
+                                memcpy(pr, re_src, ncomp * adjlen * sizeof(float));
+                                memcpy(pi, im_src, ncomp * adjlen * sizeof(float));
+                            }
+
+#endif
+                        }
                     }
                 } else {
-                    if (cfg.srcnum > 1) {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(3, fielddim, mxDOUBLE_CLASS, mxREAL)));
+                    if (cfg.method == rtBLBadouelGrid) {
+                        fielddim[0] = cfg.srcnum;
+                        fielddim[1] = cfg.dim.x;
+                        fielddim[2] = cfg.dim.y;
+                        fielddim[3] = cfg.dim.z;
+                        fielddim[4] = cfg.maxgate;
+
+                        mxComplexity cplx = (isrfforward && cfg.exportadjoint) ? mxCOMPLEX : mxREAL;
+
+                        if (cfg.srcnum > 1) {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(5, fielddim, mxDOUBLE_CLASS, cplx)));
+                        } else {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(4, &fielddim[1], mxDOUBLE_CLASS, cplx)));
+                        }
                     } else {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
+                        if (cfg.srcnum > 1) {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(3, fielddim, mxDOUBLE_CLASS, mxREAL)));
+                        } else {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
+                        }
                     }
-                }
 
-                double* output = (double*)mxGetPr(mxGetFieldByNumber(plhs[0], jstruct, 0));
+                    mxArray* outfield = mxGetFieldByNumber(plhs[0], jstruct, 0);
+                    size_t nelem = (size_t)cfg.srcnum * datalen * cfg.maxgate;
 
-                if (output == NULL) {
-                    mexErrMsgTxt("MMCLAB failed to allocate memory!");
-                }
+                    if (isrfforward && cfg.exportadjoint) {
+#if MX_HAS_INTERLEAVED_COMPLEX
+                        mxComplexDouble* cptr = mxGetComplexDoubles(outfield);
 
-                memcpy(output, mesh.weight, cfg.srcnum * datalen * cfg.maxgate * sizeof(double));
+                        if (cptr) {
+                            for (size_t ii = 0; ii < nelem; ii++) {
+                                cptr[ii].real = mesh.weight[ii];
+                                cptr[ii].imag = (double)cfg.exportadjoint[ii];
+                            }
+                        }
 
-                if (cfg.issaveref) {      /** save diffuse reflectance */
-                    fielddim[1] = mesh.nf;
-                    fielddim[2] = cfg.maxgate;
-                    mxSetFieldByNumber(plhs[0], jstruct, 1, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
-                    memcpy((double*)mxGetPr(mxGetFieldByNumber(plhs[0], jstruct, 1)), mesh.dref, fielddim[1]*fielddim[2]*sizeof(double));
+#else
+                        double* output = (double*)mxGetPr(outfield);
+                        double* imoutput = (double*)mxGetPi(outfield);
+
+                        if (output == NULL) {
+                            mexErrMsgTxt("MMCLAB failed to allocate memory!");
+                        }
+
+                        memcpy(output, mesh.weight, nelem * sizeof(double));
+
+                        if (imoutput) {
+                            for (size_t ii = 0; ii < nelem; ii++) {
+                                imoutput[ii] = (double)cfg.exportadjoint[ii];
+                            }
+                        }
+
+#endif
+                    } else {
+                        double* output = (double*)mxGetPr(outfield);
+
+                        if (output == NULL) {
+                            mexErrMsgTxt("MMCLAB failed to allocate memory!");
+                        }
+
+                        memcpy(output, mesh.weight, nelem * sizeof(double));
+                    }
+
+                    if (cfg.issaveref) {      /** save diffuse reflectance */
+                        fielddim[1] = mesh.nf;
+                        fielddim[2] = cfg.maxgate;
+                        mxSetFieldByNumber(plhs[0], jstruct, 1, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mxREAL)));
+                        memcpy((double*)mxGetPr(mxGetFieldByNumber(plhs[0], jstruct, 1)), mesh.dref, fielddim[1]*fielddim[2]*sizeof(double));
+                    }
                 }
             }
 
@@ -846,7 +1000,9 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         printf("mmc.method='%s';\n", methodstr);
     } else if (strcmp(name, "outputtype") == 0) {
         int len = mxGetNumberOfElements(item);
-        const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "wl", "wp", ""};
+        const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "wl", "wp",
+                                    "rf", "rfmus", "adjoint", "dcoeff", "mus", "musp", "muad", "muamusp", ""
+                                   };
         char outputstr[MAX_SESSION_LENGTH] = {'\0'};
 
         if (!mxIsChar(item) || len == 0) {
@@ -870,6 +1026,32 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
         }
 
         printf("mmc.outputtype='%s';\n", outputstr);
+    } else if (strcmp(name, "omega") == 0) {
+        double* val = mxGetPr(item);
+        cfg->omega = (float)val[0];
+        printf("mmc.omega=%g;\n", cfg->omega);
+    } else if (strcmp(name, "detdir") == 0) {
+        arraydim = mxGetDimensions(item);
+
+        if (arraydim[0] > 0 && arraydim[1] != 4) {
+            MEXERROR("the 'detdir' field must have 4 columns (dx,dy,dz,focal)");
+        }
+
+        double* val = mxGetPr(item);
+        int nd = arraydim[0];
+
+        if (cfg->detdir) {
+            free(cfg->detdir);
+        }
+
+        cfg->detdir = (float4*)malloc(nd * sizeof(float4));
+
+        for (j = 0; j < 4; j++)
+            for (i = 0; i < nd; i++) {
+                ((float*)(&cfg->detdir[i]))[j] = val[j * nd + i];
+            }
+
+        printf("mmc.detdir=[%d,4];\n", nd);
     } else if (strcmp(name, "compute") == 0) {
         int len = mxGetNumberOfElements(item);
         const char* computebackend[] = {"sse", "opencl", "cuda", "optix", ""};

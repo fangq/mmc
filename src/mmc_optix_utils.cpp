@@ -95,11 +95,27 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
-    for (size_t i = 0; i < optixcfg.launchParams.crop0.w; i++) {
-        // combine two outputs into one
+    int isrfforward_o = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
+    size_t fieldlen_o = optixcfg.launchParams.crop0.w;
+
+    for (size_t i = 0; i < fieldlen_o; i++) {
+        // combine real double-buffer outputs
         #pragma omp atomic
         mesh->weight[i] += optixcfg.outputHostBuffer[i] +
-                           optixcfg.outputHostBuffer[i + optixcfg.launchParams.crop0.w];
+                           optixcfg.outputHostBuffer[i + fieldlen_o];
+    }
+
+    /* RF forward: store imaginary part in exportadjoint */
+    if (isrfforward_o) {
+        if (cfg->exportadjoint == NULL) {
+            cfg->exportadjoint = (float*)calloc(fieldlen_o, sizeof(float));
+        }
+
+        for (size_t i = 0; i < fieldlen_o; i++) {
+            #pragma omp atomic
+            cfg->exportadjoint[i] += optixcfg.outputHostBuffer[i + fieldlen_o * 2] +
+                                     optixcfg.outputHostBuffer[i + fieldlen_o * 3];
+        }
     }
 
     // ==================================================================
@@ -221,6 +237,12 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     // output type
     optixcfg->launchParams.outputtype = static_cast<int>(cfg->outputtype);
 
+    // RF / adjoint settings
+    optixcfg->launchParams.omega = cfg->omega;
+    optixcfg->launchParams.oneoverc0 = (float)(3.335640951981520e-12);
+    optixcfg->launchParams.srcid = (cfg->extrasrclen > 0) ? -1 : 0;
+    optixcfg->launchParams.extrasrclen = cfg->extrasrclen;
+
     // number of photons for each thread
     int totalthread = cfg->nthread;
 
@@ -239,8 +261,9 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.oddphoton =
         cfg->nphoton - optixcfg->launchParams.threadphoton * totalthread;
 
-    // output buffer (single precision)
-    optixcfg->outputBufferSize = (optixcfg->launchParams.crop0.w << 1);
+    // output buffer (single precision); 4x for RF (re1, re2, im1, im2)
+    int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
+    optixcfg->outputBufferSize = optixcfg->launchParams.crop0.w * (isrfforward ? 4 : 2);
     optixcfg->outputHostBuffer = (float*)calloc(optixcfg->outputBufferSize, sizeof(float));
     optixcfg->outputBuffer.alloc_and_upload(optixcfg->outputHostBuffer,
                                             optixcfg->outputBufferSize);
@@ -264,6 +287,14 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 
     if (hseed) {
         free(hseed);
+    }
+
+    // upload extra source list if in multi-source mode
+    if (cfg->extrasrclen > 0 && cfg->srcdata != NULL) {
+        optixcfg->srcdataBuffer.alloc_and_upload(cfg->srcdata, cfg->extrasrclen);
+        optixcfg->launchParams.srcdatabuffer = optixcfg->srcdataBuffer.d_pointer();
+    } else {
+        optixcfg->launchParams.srcdatabuffer = 0;
     }
 
     // upload launch parameters to device
@@ -348,7 +379,7 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
     optixcfg->pipelineCompileOptions.traversableGraphFlags =
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
     optixcfg->pipelineCompileOptions.usesMotionBlur     = false;
-    optixcfg->pipelineCompileOptions.numPayloadValues   = 14;
+    optixcfg->pipelineCompileOptions.numPayloadValues   = 15; /* +1 for RF imaginary weight */
     optixcfg->pipelineCompileOptions.numAttributeValues = 2;  // for triangle
 #ifndef NDEBUG
     optixcfg->pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG |

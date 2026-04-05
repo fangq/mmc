@@ -10,9 +10,10 @@ typedef struct __attribute__((aligned(16))) MMC_OptiX_Ray {
     float3 p0;                    /**< current photon position */
     float3 dir;                   /**< current photon direction vector */
     float slen;                   /**< the remaining unitless scattering length = length*mus */
-    float weight;                 /**< photon current weight */
+    float weight;                 /**< photon current weight (real part for RF) */
     float photontimer;            /**< the total time-of-fly of the photon */
     unsigned int mediumid;        /**< ID of current medium type */
+    float weight_im;              /**< imaginary part of photon weight for RF forward simulation */
 } optixray;
 
 /**
@@ -132,6 +133,20 @@ __device__ __forceinline__ void setRNGSeed(const uint4& seed) {
 }
 
 /**
+ * @brief Get imaginary photon weight (RF forward simulation)
+ */
+__device__ __forceinline__ float getWeightIm() {
+    return __uint_as_float(optixGetPayload_14());
+}
+
+/**
+ * @brief Set imaginary photon weight (RF forward simulation)
+ */
+__device__ __forceinline__ void setWeightIm(const float& w) {
+    optixSetPayload_14(__float_as_uint(w));
+}
+
+/**
  * @brief Get ray info
  */
 __device__ __forceinline__ optixray getRay() {
@@ -142,6 +157,7 @@ __device__ __forceinline__ optixray getRay() {
     r.weight = getWeight();
     r.photontimer = getPhotonTimer();
     r.mediumid = getMediumID();
+    r.weight_im = getWeightIm();
     return r;
 }
 
@@ -155,6 +171,7 @@ __device__ __forceinline__ void setRay(const optixray& r) {
     setWeight(r.weight);
     setPhotonTimer(r.photontimer);
     setMediumID(r.mediumid);
+    setWeightIm(r.weight_im);
 }
 
 /**

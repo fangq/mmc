@@ -467,7 +467,9 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
     if (user_cfg.contains("outputtype")) {
         std::string output_type_str = py::str(user_cfg["outputtype"]);
-        const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "nscat", "wl", "wp", ""};
+        const char* outputtype[] = {"flux", "fluence", "energy", "jacobian", "wl", "wp",
+                                    "rf", "rfmus", "adjoint", "dcoeff", "mus", "musp", "muad", "muamusp", ""
+                                   };
 
         if (output_type_str.empty()) {
             throw py::value_error("the 'outputtype' field must be a non-empty string");
@@ -475,13 +477,44 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         mcx_config.outputtype = mcx_keylookup((char*)(output_type_str.c_str()), outputtype);
 
-        if (mcx_config.outputtype >= 5) { // map wl to jacobian, wp to nscat
-            mcx_config.outputtype -= 2;
-        }
-
         if (mcx_config.outputtype == -1) {
             throw py::value_error("the specified output type is not supported");
         }
+    }
+
+    if (user_cfg.contains("omega")) {
+        mcx_config.omega = py::float_(user_cfg["omega"]);
+        std::cout << "omega: " << mcx_config.omega << std::endl;
+    }
+
+    if (user_cfg.contains("detdir")) {
+        auto f_style_volume = py::array_t < float, py::array::f_style | py::array::forcecast >::ensure(user_cfg["detdir"]);
+
+        if (!f_style_volume) {
+            throw py::value_error("Invalid detdir field value");
+        }
+
+        auto buffer_info = f_style_volume.request();
+
+        if ((buffer_info.shape.size() > 1 && buffer_info.shape.at(0) > 0 && buffer_info.shape.at(1) != 4) || (buffer_info.shape.size() == 1 && buffer_info.shape.at(0) != 4)) {
+            throw py::value_error("the 'detdir' field must have 4 columns (dx,dy,dz,focal)");
+        }
+
+        int nd = (buffer_info.shape.size() == 1) ? 1 : buffer_info.shape.at(0);
+
+        if (mcx_config.detdir) {
+            free(mcx_config.detdir);
+        }
+
+        mcx_config.detdir = (float4*) malloc(nd * sizeof(float4));
+        auto val = static_cast<float*>(buffer_info.ptr);
+
+        for (int j = 0; j < 4; j++)
+            for (int i = 0; i < nd; i++) {
+                ((float*) (&mcx_config.detdir[i]))[j] = val[j * nd + i];
+            }
+
+        std::cout << "detdir: [" << nd << ",4]" << std::endl;
     }
 
 
@@ -779,6 +812,27 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
         mesh_srcdetelem(&mesh, &mcx_config);
 
+        /** Build srcdata from detectors for adjoint mode */
+        if (MCX_IS_ADJOINT_TYPE(mcx_config.outputtype) && mcx_config.detnum > 0 && mcx_config.detdir != nullptr) {
+            if (mcx_config.srcdata) {
+                free(mcx_config.srcdata);
+            }
+
+            mcx_config.extrasrclen = mcx_config.detnum;
+            mcx_config.srcdata = (ExtraSrc*)calloc(mcx_config.detnum, sizeof(ExtraSrc));
+
+            for (int id = 0; id < mcx_config.detnum; id++) {
+                mcx_config.srcdata[id].srcpos  = {mcx_config.detpos[id].x, mcx_config.detpos[id].y,
+                                                  mcx_config.detpos[id].z, 1.f / mcx_config.detnum
+                                                 };
+                mcx_config.srcdata[id].srcdir  = {mcx_config.detdir[id].x, mcx_config.detdir[id].y,
+                                                  mcx_config.detdir[id].z, mcx_config.detdir[id].w
+                                                 };
+                mcx_config.srcdata[id].srcparam1 = {mcx_config.detpos[id].w, 0.f, 0.f, 0.f};
+                mcx_config.srcdata[id].srcparam2 = {0.f, 0.f, 0.f, 0.f};
+            }
+        }
+
         if (mcx_config.isgpuinfo == 0) {
             mmc_prep(&mcx_config, &mesh, &tracer);
         }
@@ -881,6 +935,10 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         }
 
         if (mcx_config.issave2pt) {
+            int isrfforward = (mcx_config.omega > 0.f && mcx_config.seed != SEED_FROM_FILE);
+            int isadjoint = MCX_IS_ADJOINT_TYPE(mcx_config.outputtype);
+            int nsrcslots = (mcx_config.extrasrclen > 0) ? mcx_config.extrasrclen : 1;
+
             size_t datalen = (mcx_config.method == rtBLBadouelGrid) ? mcx_config.crop0.z : ( (mcx_config.basisorder) ? mesh.nn : mesh.ne);
             field_dim[0] = mcx_config.srcnum;
             field_dim[1] = datalen;
@@ -890,39 +948,60 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
             std::vector<size_t> array_dims;
 
-            if (mcx_config.method == rtBLBadouelGrid) {
-                field_dim[0] = mcx_config.srcnum;
-                field_dim[1] = mcx_config.dim.x;
-                field_dim[2] = mcx_config.dim.y;
-                field_dim[3] = mcx_config.dim.z;
-                field_dim[4] = mcx_config.maxgate;
-
-                if (mcx_config.srcnum > 1) {
-                    array_dims = {field_dim[0], field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
-                } else {
-                    array_dims = {field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
+            if (isadjoint && mcx_config.exportadjoint) {
+                /* Adjoint Jacobian output: shape [Nx, Ny, Nz, maxgate, extrasrclen] */
+                if (mcx_config.method == rtBLBadouelGrid) {
+                    array_dims = {(size_t)mcx_config.dim.x, (size_t)mcx_config.dim.y,
+                                  (size_t)mcx_config.dim.z, (size_t)mcx_config.maxgate,
+                                  (size_t)nsrcslots
+                                 };
+                    auto jac_data = py::array_t<float, py::array::f_style>(array_dims);
+                    memcpy(jac_data.mutable_data(), mcx_config.exportadjoint, jac_data.size() * sizeof(float));
+                    output["flux"] = jac_data;
                 }
             } else {
-                if (mcx_config.srcnum > 1) {
-                    array_dims = {field_dim[0], field_dim[1], field_dim[2]};
+                if (mcx_config.method == rtBLBadouelGrid) {
+                    field_dim[0] = mcx_config.srcnum;
+                    field_dim[1] = mcx_config.dim.x;
+                    field_dim[2] = mcx_config.dim.y;
+                    field_dim[3] = mcx_config.dim.z;
+                    field_dim[4] = mcx_config.maxgate;
+
+                    if (mcx_config.srcnum > 1) {
+                        array_dims = {field_dim[0], field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
+                    } else {
+                        array_dims = {field_dim[1], field_dim[2], field_dim[3], field_dim[4]};
+                    }
                 } else {
-                    array_dims = {field_dim[1], field_dim[2]};
+                    if (mcx_config.srcnum > 1) {
+                        array_dims = {field_dim[0], field_dim[1], field_dim[2]};
+                    } else {
+                        array_dims = {field_dim[1], field_dim[2]};
+                    }
                 }
-            }
 
-            auto data = py::array_t<double, py::array::f_style>(array_dims);
-            memcpy(data.mutable_data(), mesh.weight, data.size() * sizeof(double));
-            output["flux"] = data;
+                auto data = py::array_t<double, py::array::f_style>(array_dims);
+                memcpy(data.mutable_data(), mesh.weight, data.size() * sizeof(double));
+                output["flux"] = data;
 
-            if (mcx_config.issaveref) {
-                field_dim[1] = mesh.nf;
-                field_dim[2] = mcx_config.maxgate;
-                array_dims = {field_dim[1], field_dim[2]};
-                auto dref_array = py::array_t<double, py::array::f_style>(array_dims);
-                auto* dref = static_cast<double*>(dref_array.mutable_data());
-                memcpy(dref, mesh.dref, dref_array.size() * sizeof(double));
+                /* RF forward: also return imaginary part in a separate field */
+                if (isrfforward && mcx_config.exportadjoint) {
+                    auto im_data = py::array_t<float, py::array::f_style>(array_dims);
+                    auto* im_ptr = static_cast<float*>(im_data.mutable_data());
+                    memcpy(im_ptr, mcx_config.exportadjoint, data.size() * sizeof(float));
+                    output["fluximag"] = im_data;
+                }
 
-                output["dref"] = dref_array;
+                if (mcx_config.issaveref) {
+                    field_dim[1] = mesh.nf;
+                    field_dim[2] = mcx_config.maxgate;
+                    array_dims = {field_dim[1], field_dim[2]};
+                    auto dref_array = py::array_t<double, py::array::f_style>(array_dims);
+                    auto* dref = static_cast<double*>(dref_array.mutable_data());
+                    memcpy(dref, mesh.dref, dref_array.size() * sizeof(double));
+
+                    output["dref"] = dref_array;
+                }
             }
         }
     } catch (const char* err) {
