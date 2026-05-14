@@ -94,9 +94,13 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
     pos = 0;
 
     mesh->nn += edgelist.size();
-    mesh->node = (FLOAT3*)realloc((void*)mesh->node, sizeof(FLOAT3) * (mesh->nn));
-    mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * mesh->nn * cfg->maxgate);
-    memset(mesh->weight, 0, sizeof(double)*mesh->nn * cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
+    if (mesh->nn <= 0 || cfg->maxgate <= 0) {
+        MESH_ERROR("invalid mesh nn or maxgate value");
+    }
+
+    mesh->node = (FLOAT3*)realloc((void*)mesh->node, sizeof(FLOAT3) * (size_t)mesh->nn);
+    mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * (size_t)mesh->nn * (size_t)cfg->maxgate);
+    memset(mesh->weight, 0, sizeof(double) * (size_t)mesh->nn * (size_t)cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
 
     for (it = edgelist.begin(); it != edgelist.end(); it++) {
         for (int i = 0; i < 3; i++) {
