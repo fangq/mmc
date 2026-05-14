@@ -154,13 +154,89 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     GET_SCALAR_FIELD(user_cfg, mcx_config, adjointmode, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, isnodalmua, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, isnodalmusp, py::int_);
-    GET_VEC3_FIELD(user_cfg, mcx_config, srcpos, float);
-    GET_VEC34_FIELD(user_cfg, mcx_config, srcdir, float);
     GET_VEC3_FIELD(user_cfg, mcx_config, steps, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, srcparam1, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, srcparam2, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, detparam1, float);
     GET_VEC4_FIELD(user_cfg, mcx_config, detparam2, float);
+
+    /* srcpos / srcdir can be either a single 3- or 4-vector (single source)
+     * or an (Nsrc, 3) / (Nsrc, 4) matrix (multi-source). The matrix form
+     * mirrors mmclab.cpp:783-821: row 0 fills cfg.srcpos/srcdir (the
+     * "main" slot the kernel falls back to in single-source mode); all
+     * rows are then copied into cfg.srcdata[0..Nsrc-1] and cfg.extrasrclen
+     * is set to Nsrc, so the multi-source kernel dispatch picks them up.
+     *
+     * srcdir's optional 4th column (focal length / RF NaN/Inf markers) is
+     * read whenever the row has 4 entries; the floats parse cleanly even
+     * for NaN/Inf if the caller passes math.nan / math.inf in the numpy
+     * array (no string-literal handling like mmclab.cpp because pybind11
+     * arrays are typed). */
+    {
+        auto parse_multisrc_matrix = [&](const char* name, float4& dst_single,
+                                         float4 ExtraSrc::* dst_field, bool is_srcdir) {
+            if (!user_cfg.contains(name)) {
+                return;
+            }
+
+            auto arr = py::array_t < float, py::array::f_style | py::array::forcecast >::ensure(user_cfg[name]);
+
+            if (!arr) {
+                throw py::value_error(std::string("Invalid ") + name + " field value");
+            }
+
+            auto info = arr.request();
+
+            int nrows = 1, ncols = 0;
+
+            if (info.ndim == 1) {
+                ncols = (int)info.shape[0];
+            } else if (info.ndim == 2) {
+                nrows = (int)info.shape[0];
+                ncols = (int)info.shape[1];
+            } else {
+                throw py::value_error(std::string(name) + " must be a 1D or 2D array");
+            }
+
+            if (ncols < 3 || ncols > 4) {
+                throw py::value_error(std::string(name) + " must have 3 or 4 columns");
+            }
+
+            float* val = (float*)info.ptr;
+            /* numpy passes f_style: linear index = col * nrows + row */
+            for (int c = 0; c < ncols; c++) {
+                ((float*)(&dst_single))[c] = val[c * nrows + 0];
+            }
+
+            std::cout << name << ": [" << dst_single.x << ", " << dst_single.y << ", "
+                      << dst_single.z << ", " << dst_single.w << "]" << std::endl;
+
+            if (nrows == 1 && mcx_config.extrasrclen == 0) {
+                return;
+            }
+
+            /* multi-source: populate srcdata[].srcpos or srcdata[].srcdir */
+            if (mcx_config.extrasrclen != 0 && mcx_config.extrasrclen != nrows) {
+                throw py::value_error("Length of sub-elements of srcpos/srcdir/srcparam1/srcparam2 must match");
+            }
+
+            mcx_config.extrasrclen = nrows;
+
+            if (mcx_config.srcdata == NULL) {
+                mcx_config.srcdata = (ExtraSrc*)calloc(sizeof(ExtraSrc), mcx_config.extrasrclen);
+            }
+
+            for (int c = 0; c < ncols; c++)
+                for (int r = 0; r < nrows; r++) {
+                    ((float*)(&(mcx_config.srcdata[r].*dst_field)))[c] = val[c * nrows + r];
+                }
+
+            std::cout << name << " multi-source rows=" << nrows << std::endl;
+        };
+
+        parse_multisrc_matrix("srcpos", mcx_config.srcpos, &ExtraSrc::srcpos, false);
+        parse_multisrc_matrix("srcdir", mcx_config.srcdir, &ExtraSrc::srcdir, true);
+    }
 
     if (user_cfg.contains("node")) {
         auto f_style_volume = py::array_t < float, py::array::f_style | py::array::forcecast >::ensure(user_cfg["node"]);
