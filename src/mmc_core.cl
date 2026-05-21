@@ -45,6 +45,31 @@
 #define MMC_TEMPLATE template <const int NODAL_USE_MUA, const int NODAL_USE_MUSP>
 #define MMC_TARGS    <NODAL_USE_MUA, NODAL_USE_MUSP>
 
+/* Cap mmc_main_loop's per-thread register footprint via launch bounds so the
+ * kernel can fit MIN_BLOCKS resident blocks per SM at the default block size.
+ * 64 threads/block x 16 blocks/SM = 1024 threads/SM, requiring <=64 regs/thread
+ * on archs with 64K regs/SM (sm_52+). Benchmarked on TITAN V (Volta sm_70) with
+ * dmmc-cube60: 122 regs (no annotation) -> 64 regs (lb=16) gives +45% throughput
+ * in DMMC-grid mode and +15% in pure mesh ray-tracing mode despite ~460 B of
+ * spills. Going to lb=20 (48 regs) collapses to 0.34x baseline.
+ *
+ * Build-time overrides:
+ *   -DMMC_NO_LAUNCH_BOUNDS    fully disable the annotation (let ptxas pick regs)
+ *   -DMMC_BLOCKSIZE=<N>       override the threads-per-block target (default 64)
+ *   -DMMC_MIN_BLOCKS=<N>      override the min-blocks-per-SM target (default 16)
+ */
+#ifndef MMC_BLOCKSIZE
+    #define MMC_BLOCKSIZE 64
+#endif
+#ifndef MMC_MIN_BLOCKS
+    #define MMC_MIN_BLOCKS 16
+#endif
+#ifdef MMC_NO_LAUNCH_BOUNDS
+    #define MMC_LAUNCH_BOUNDS
+#else
+    #define MMC_LAUNCH_BOUNDS __launch_bounds__(MMC_BLOCKSIZE, MMC_MIN_BLOCKS)
+#endif
+
 inline __device__ float3 cross(float3 a, float3 b) {
     return make_float3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
 }
@@ -240,6 +265,7 @@ typedef struct MMC_FLOAT3 {
  * #defines above, so the template prefix and call-site arglist are empty. */
 #define MMC_TEMPLATE
 #define MMC_TARGS
+#define MMC_LAUNCH_BOUNDS
 
 
 #ifdef MCX_USE_NATIVE
@@ -2095,15 +2121,15 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 }
 
 MMC_TEMPLATE
-__kernel void mmc_main_loop(const int nphoton, const int ophoton,
+__kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophoton,
 #ifndef __NVCC__
     __constant__ MCXParam* gcfg, __local float* sharedmem, __constant__ Medium* gmed,
 #endif
-                            __global FLOAT3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
-                            __global float* gnodemua, __global float* gnodemusp,
-                            __global float* n_det, __global uint* detectedphoton,
-                            __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
-                            __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata) {
+        __global FLOAT3* node, __global int* elem,  __global float* weight, __global float* dref, __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal,
+        __global float* gnodemua, __global float* gnodemusp,
+        __global float* n_det, __global uint* detectedphoton,
+        __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
+        __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata) {
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
