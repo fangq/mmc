@@ -2156,14 +2156,6 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
     double energydeposit = 0.f, energyelem, normalizor;
     int* ee;
     int datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-    /* Field-buffer layout: pattern source uses (gate*datalen + node) interleaved
-     * by srcnum; adjoint multi-slot mode (srcnum==1, extrasrclen>0) uses a
-     * slot-major stride of datalen*maxgate per slot. The srcnum==1 single-source
-     * case is layout-equivalent to slot-major with slot=0. */
-#define MESH_WIDX(gate, node, slot) \
-    (((size_t)cfg->srcnum == 1) \
-     ? ((size_t)(slot) * (size_t)datalen * (size_t)cfg->maxgate + (size_t)(gate) * (size_t)datalen + (size_t)(node)) \
-     : (((size_t)(gate) * (size_t)datalen + (size_t)(node)) * (size_t)cfg->srcnum + (size_t)(slot)))
 
     if (cfg->issaveref && mesh->dref) {
         float normalizor = 1.f / Etotal;
@@ -2183,7 +2175,7 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
         for (i = 0; i < cfg->maxgate; i++)
             for (j = 0; j < datalen; j++) {
-                mesh->weight[MESH_WIDX(i, j, pair)] *= normalizor;
+                mesh->weight[(i * datalen + j)*cfg->srcnum + pair] *= normalizor;
             }
 
         return normalizor;
@@ -2194,7 +2186,7 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
         for (i = 0; i < cfg->maxgate; i++)
             for (j = 0; j < datalen; j++) {
-                mesh->weight[MESH_WIDX(i, j, pair)] *= normalizor;
+                mesh->weight[(i * datalen + j)*cfg->srcnum + pair] *= normalizor;
             }
 
         return normalizor;
@@ -2214,11 +2206,10 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
         normalizor = 1.0 / (Etotal * cfg->unitinmm * cfg->unitinmm * cfg->unitinmm); /*scaling factor*/
     } else {
         if (cfg->basisorder) {
-
             for (i = 0; i < cfg->maxgate; i++)
                 for (j = 0; j < datalen; j++)
                     if (mesh->nvol[j] > 0.f) {
-                        mesh->weight[MESH_WIDX(i, j, pair)] /= mesh->nvol[j];
+                        mesh->weight[(i * datalen + j)*cfg->srcnum + pair] /= mesh->nvol[j];
 
                         if (imag_slot) {
                             imag_slot[i * datalen + j] /= mesh->nvol[j];
@@ -2232,7 +2223,7 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
                 for (j = 0; j < cfg->maxgate; j++)
                     for (k = 0; k < 4; k++) {
                         int node_idx = ee[k] - 1;
-                        float re_val = mesh->weight[MESH_WIDX(j, node_idx, pair)];
+                        float re_val = mesh->weight[(j * mesh->nn + node_idx) * cfg->srcnum + pair];
 
                         /* RF: deposit is mu_a * |phi| so numerator (Eabsorb from |w|)
                          * and denominator (energydeposit) share the magnitude convention.
@@ -2252,14 +2243,14 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
         } else {
             for (i = 0; i < datalen; i++)
                 for (j = 0; j < cfg->maxgate; j++) {
-                    energydeposit += mesh->weight[MESH_WIDX(j, i, pair)];
+                    energydeposit += mesh->weight[(j * datalen + i) * cfg->srcnum + pair];
                 }
 
             for (i = 0; i < datalen; i++) {
                 energyelem = mesh->evol[i] * mesh->med[mesh->type[i]].mua;
 
                 for (j = 0; j < cfg->maxgate; j++) {
-                    mesh->weight[MESH_WIDX(j, i, pair)] /= energyelem;
+                    mesh->weight[(j * datalen + i) * cfg->srcnum + pair] /= energyelem;
                 }
             }
 
@@ -2273,7 +2264,7 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
     for (i = 0; i < cfg->maxgate; i++)
         for (j = 0; j < datalen; j++) {
-            mesh->weight[MESH_WIDX(i, j, pair)] *= normalizor;
+            mesh->weight[(i * datalen + j)*cfg->srcnum + pair] *= normalizor;
 
             /* RF imag fluence: apply the same scalar normalizor so phi_im stays
              * paired with the real fluence in fluence-per-unit-source-energy
@@ -2286,7 +2277,6 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
     return normalizor;
 }
-#undef MESH_WIDX
 
 
 /**

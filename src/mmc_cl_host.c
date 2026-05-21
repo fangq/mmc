@@ -100,11 +100,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     /* cfg->srcid > 0 selects a single slot from srcdata, collapsing the field buffer to one slot. */
     cl_uint nsrcslots = (cfg->extrasrclen > 0 && cfg->srcid <= 0) ? (cl_uint)cfg->extrasrclen : 1u;
     cl_uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum * nsrcslots;    /**< total output data length */
-    /* Per-slot energy accounting (Eabsorb/Etotal) needs one bin per launch slot when
-     * the kernel dispatches photons across multiple slots (adjoint mode). Otherwise
-     * the kernel writes to srcnum bins (pattern source) or to bin 0 (single source). */
-    cl_uint nenergybins = ((cfg->srcnum == 1) && (cfg->extrasrclen > 0) && (cfg->srcid <= 0))
-                          ? (cl_uint)cfg->extrasrclen : (cl_uint)cfg->srcnum;
     cfg->crop0.w = meshlen * cfg->maxgate;    /**< total output data length, before double-buffer expansion */
 
     cl_float*  field, *dref = NULL;
@@ -167,7 +162,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     param.reclen = sharedmemsize / sizeof(float);
 
-    sharedmemsize += sizeof(cl_float) * (nenergybins << 1);   /**< store energyesc/energytot */
+    sharedmemsize += sizeof(cl_float) * (cfg->srcnum << 1);   /**< store energyesc/energytot */
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
         sharedmemsize += sizeof(cl_float) * cfg->srcnum;
@@ -356,7 +351,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         OCL_ASSERT(((gparam[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(MCXParam), &param, &status), status)));
 
         Pseed = (cl_uint*)malloc(sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN);
-        energy = (cl_float*)calloc(sizeof(cl_float) * nenergybins, gpu[i].autothread << 1);
+        energy = (cl_float*)calloc(sizeof(cl_float) * cfg->srcnum, gpu[i].autothread << 1);
 
         for (j = 0; j < gpu[i].autothread * RAND_SEED_WORD_LEN; j++) {
             Pseed[j] = rand();
@@ -377,7 +372,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             OCL_ASSERT(((gdebugdata[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (debuglen * cfg->maxjumpdebug), cfg->exportdebugdata, &status), status)));
         }
 
-        OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1) * nenergybins, energy, &status), status)));
+        OCL_ASSERT(((genergy[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(float) * (gpu[i].autothread << 1) * cfg->srcnum, energy, &status), status)));
         OCL_ASSERT(((gdetected[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint), &detected, &status), status)));
         OCL_ASSERT(((greporter[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(MCXReporter), &reporter, &status), status)));
 
@@ -647,8 +642,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
     }
 
-    cfg->energytot = (double*)calloc(nenergybins, sizeof(double));
-    cfg->energyesc = (double*)calloc(nenergybins, sizeof(double));
+    cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
+    cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
     energytot = 0.0;
     energyesc = 0.0;
     cfg->runtime = 0;
@@ -729,16 +724,16 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 reporter.raytet += rep.raytet;
                 reporter.jumpdebug += rep.jumpdebug;
 
-                energy = (cl_float*)calloc(sizeof(cl_float) * nenergybins, gpu[devid].autothread << 1);
-                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1) * nenergybins,
+                energy = (cl_float*)calloc(sizeof(cl_float) * cfg->srcnum, gpu[devid].autothread << 1);
+                OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], genergy[devid], CL_TRUE, 0, sizeof(cl_float) * (gpu[devid].autothread << 1) * cfg->srcnum,
                                                 energy, 0, NULL, NULL)));
 
                 for (i = 0; i < gpu[devid].autothread; i++) {
-                    for (j = 0; j < (int)nenergybins; j++) {
-                        cfg->energyesc[j] += energy[(i << 1) * nenergybins + j];
-                        cfg->energytot[j] += energy[((i << 1) + 1) * nenergybins + j];
-                        energyesc += energy[(i << 1) * nenergybins + j];
-                        energytot += energy[((i << 1) + 1) * nenergybins + j];
+                    for (j = 0; j < (int)cfg->srcnum; j++) {
+                        cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
+                        cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
+                        energyesc += energy[(i << 1) * cfg->srcnum + j];
+                        energytot += energy[((i << 1) + 1) * cfg->srcnum + j];
                     }
                 }
 
@@ -929,13 +924,7 @@ is more than what your have specified (%d), please use the -H option to specify 
     if (cfg->isnormalized) {
         double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
-        /* Per-slot mesh_normalize: in adjoint mode (srcnum==1, extrasrclen>0)
-         * the kernel maintained extrasrclen energy bins (one per launch slot).
-         * mesh_normalize now handles both layouts (slot-major when srcnum==1,
-         * interleaved for pattern source) and applies the scalar normalizor to
-         * both the real (mesh->weight) and imag (cfg->exportadjoint) fluence in
-         * one pass, so the previous broadcast/avg fallback is no longer needed. */
-        for (j = 0; j < (int)nenergybins; j++) {
+        for (j = 0; j < cfg->srcnum; j++) {
             energyabs =  cfg->energytot[j] - cfg->energyesc[j];
             cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
             sum_normalizer += cur_normalizer;
@@ -943,7 +932,76 @@ is more than what your have specified (%d), please use the -H option to specify 
                                    j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
         }
 
-        cfg->his.normalizer = sum_normalizer / nenergybins;
+        cfg->his.normalizer = sum_normalizer / cfg->srcnum;
+
+        /* Broadcast normalizor from slot 0 to the remaining adjoint slots
+         * (srcnum..extrasrclen-1). mesh_normalize only processes pair=0..srcnum-1;
+         * the multi-source/adjoint slots get scale = avg_normalizor (uniform launch
+         * weight means w0/wk = 1, so no per-slot weight ratio). Includes the per-node
+         * nvol division for basisorder=1 mesh mode that mesh_normalize would have
+         * applied to slot 0. */
+        if (cfg->extrasrclen > cfg->srcnum && cfg->exportfield) {
+            double avg_normalizor = sum_normalizer / cfg->srcnum;
+            int mesh_basis1 = (cfg->method != rtBLBadouelGrid) && (cfg->basisorder != 0);
+            size_t datalen = (cfg->method == rtBLBadouelGrid)
+                             ? (size_t)cfg->crop0.z
+                             : (size_t)((cfg->basisorder) ? mesh->nn : mesh->ne);
+            size_t slot_stride = datalen * (size_t)cfg->maxgate;
+
+            for (int slot = cfg->srcnum; slot < cfg->extrasrclen; slot++) {
+                if (mesh_basis1) {
+                    for (int t = 0; t < cfg->maxgate; t++) {
+                        for (int jj = 0; jj < (int)datalen; jj++) {
+                            size_t idx = (size_t)slot * slot_stride + (size_t)t * datalen + jj;
+
+                            if (mesh->nvol[jj] > 0.f) {
+                                cfg->exportfield[idx] /= mesh->nvol[jj];
+                            }
+
+                            cfg->exportfield[idx] *= avg_normalizor;
+                        }
+                    }
+                } else {
+                    for (size_t ki = 0; ki < slot_stride; ki++) {
+                        cfg->exportfield[(size_t)slot * slot_stride + ki] *= avg_normalizor;
+                    }
+                }
+            }
+        }
+
+        /* RF imag fluence: mesh_normalize applies the per-node nvol division +
+         * scalar normalizor to slot 0 of cfg->exportadjoint. Mirror that for the
+         * adjoint detector slots here (srcnum..extrasrclen-1). For mesh basis1
+         * mode the imag fluence layout matches the real (slot-major), so we use
+         * the same per-slot stride. */
+        if (isrfforward && cfg->exportadjoint && cfg->extrasrclen > cfg->srcnum) {
+            float normalizer = (float)(sum_normalizer / cfg->srcnum);
+            int mesh_basis1 = (cfg->method != rtBLBadouelGrid) && (cfg->basisorder != 0);
+            size_t datalen = (cfg->method == rtBLBadouelGrid)
+                             ? (size_t)cfg->crop0.z
+                             : (size_t)((cfg->basisorder) ? mesh->nn : mesh->ne);
+            size_t slot_stride = datalen * (size_t)cfg->maxgate;
+
+            for (int slot = cfg->srcnum; slot < cfg->extrasrclen; slot++) {
+                if (mesh_basis1) {
+                    for (int t = 0; t < cfg->maxgate; t++) {
+                        for (int jj = 0; jj < (int)datalen; jj++) {
+                            size_t idx = (size_t)slot * slot_stride + (size_t)t * datalen + jj;
+
+                            if (mesh->nvol[jj] > 0.f) {
+                                cfg->exportadjoint[idx] /= mesh->nvol[jj];
+                            }
+
+                            cfg->exportadjoint[idx] *= normalizer;
+                        }
+                    }
+                } else {
+                    for (size_t ki = 0; ki < slot_stride; ki++) {
+                        cfg->exportadjoint[(size_t)slot * slot_stride + ki] *= normalizer;
+                    }
+                }
+            }
+        }
     }
 
     /* Mesh-mode adjoint Jacobian post-processing (OpenCL): FEM/nodal formulas on a tet mesh. */

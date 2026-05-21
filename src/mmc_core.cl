@@ -1839,16 +1839,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
 
     if (GPU_PARAM(gcfg, srcnum) == 1) {
-        /* Adjoint multi-source mode (extrasrclen > 0, srcid <= 0): each photon
-         * belongs to exactly one launch slot (r.posidx). Per-slot energy
-         * accounting lets mesh_normalize compute a self-consistent normalizor
-         * for each detector-as-adjoint slot instead of broadcasting the source
-         * slot's value. */
-        if ((GPU_PARAM(gcfg, extrasrclen) > 0) && (GPU_PARAM(gcfg, srcid) <= 0)) {
-            energytot[r.posidx] += r.weight;
-        } else {
-            *energytot += r.weight;
-        }
+        *energytot += r.weight;
     } else {
         for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
             ppath[GPU_PARAM(gcfg, reclen) + oldeid] = srcpattern[r.posidx * GPU_PARAM(gcfg, srcnum) + oldeid];
@@ -2095,11 +2086,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                     : r.weight;
 
     if (GPU_PARAM(gcfg, srcnum) == 1) {
-        if ((GPU_PARAM(gcfg, extrasrclen) > 0) && (GPU_PARAM(gcfg, srcid) <= 0)) {
-            energyesc[r.posidx] += esc_mag;
-        } else {
-            *energyesc += esc_mag;
-        }
+        *energyesc += esc_mag;
     } else {
         for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
             energyesc[oldeid] += esc_mag * ppath[GPU_PARAM(gcfg, reclen) + oldeid];
@@ -2130,17 +2117,8 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
         gpu_rng_init(t, n_seed, idx);
     }
 
-    /* Effective per-thread energy bin count. In adjoint multi-source mode
-     * (srcnum==1 && extrasrclen>0 && srcid<=0) the kernel dispatches each
-     * photon's energy into its launch slot, requiring extrasrclen bins per
-     * thread; otherwise srcnum bins (1 for single source, srcnum for pattern). */
-    int nbins = ((GPU_PARAM(gcfg, srcnum) == 1)
-                 && (GPU_PARAM(gcfg, extrasrclen) > 0)
-                 && (GPU_PARAM(gcfg, srcid) <= 0))
-                ? GPU_PARAM(gcfg, extrasrclen) : GPU_PARAM(gcfg, srcnum);
-
-    clearpath(sharedmem + get_local_id(0) * nbins, nbins);
-    clearpath(sharedmem + (get_local_size(0) + get_local_id(0)) * nbins, nbins);
+    clearpath(sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
+    clearpath(sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
 
     /*launch photons*/
     for (int i = 0; i < nphoton + (idx < ophoton); i++) {
@@ -2149,18 +2127,18 @@ __kernel void mmc_main_loop(const int nphoton, const int ophoton,
                 t[j] = replayseed[(idx * nphoton + MIN(idx, ophoton) + i) * RAND_BUF_LEN + j];
             }
 
-        onephoton MMC_TARGS (idx * nphoton + MIN(idx, ophoton) + i, sharedmem + get_local_size(0) * (nbins << 1) +
+        onephoton MMC_TARGS (idx * nphoton + MIN(idx, ophoton) + i, sharedmem + get_local_size(0) * (GPU_PARAM(gcfg, srcnum) << 1) +
                              get_local_id(0) * (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)), gcfg, node, elem,
                              weight, dref, type, facenb, srcelem, normal, gmed,
                              gnodemua, gnodemusp,
-                             n_det, detectedphoton, sharedmem + get_local_id(0) * nbins,
-                             sharedmem + (get_local_size(0) + get_local_id(0)) * nbins, t, &raytet,
+                             n_det, detectedphoton, sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum),
+                             sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), t, &raytet,
                              srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata);
     }
 
-    for (int i = 0; i < nbins; i++) {
-        energy[(idx << 1) * nbins + i] += sharedmem[(get_local_size(0) + get_local_id(0)) * nbins + i];
-        energy[((idx << 1) + 1) * nbins + i] += sharedmem[get_local_id(0) * nbins + i];
+    for (int i = 0; i < GPU_PARAM(gcfg, srcnum); i++) {
+        energy[(idx << 1) * GPU_PARAM(gcfg, srcnum) + i] += sharedmem[(get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum) + i];
+        energy[((idx << 1) + 1) * GPU_PARAM(gcfg, srcnum) + i] += sharedmem[get_local_id(0) * GPU_PARAM(gcfg, srcnum) + i];
     }
 
     if (GPU_PARAM(gcfg, debuglevel) & MCX_DEBUG_PROGRESS && progress) {
