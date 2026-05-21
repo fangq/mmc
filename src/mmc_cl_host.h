@@ -114,6 +114,8 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_int    srcid;                /**< < 0 for multi-source (adjoint) mode; >= 0 for single source */
     cl_int    extrasrclen;          /**< number of extra sources packed into gproperty after media */
     cl_int    srcpropoffset;        /**< gproperty index where extra sources start (= prop+1+isextdet) */
+    cl_uint   isnodalmua;           /**< 1: read mua per-element from gnodemua centroid (DOT recon); CUDA only */
+    cl_uint   isnodalmusp;          /**< 1: read musp per-element from gnodemusp centroid (RF DOT recon); CUDA only */
 } MCXParam POST_ALIGN(32);
 
 typedef struct POST_ALIGN(32) GPU_reporter {

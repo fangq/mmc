@@ -142,7 +142,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         (float)(3.335640951981520e-12),   /* oneoverc0 */
         (cfg->extrasrclen > 0 && cfg->srcid == 0) ? -1 : cfg->srcid,  /* srcid<0 multi-slot, srcid>0 single slot, srcid==0 with srcdata: auto-promote to -1 */
         cfg->extrasrclen,
-        (int)(mesh->prop + 1 + cfg->isextdet)  /* srcpropoffset */
+        (int)(mesh->prop + 1 + cfg->isextdet),  /* srcpropoffset */
+        (uint)cfg->isnodalmua,
+        (uint)cfg->isnodalmusp
     };
 
     MCXReporter reporter = {0.f, 0};
@@ -485,6 +487,23 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     if (cfg->isnodalmusp) {
         snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_NODAL_MUSP");
+    }
+
+    /* IS_RF / IS_MULTISRC / SAVE_DETPHOTON: persistent per-photon state gates.
+     * Setting these as JIT defines lets the OpenCL compiler dead-code-eliminate
+     * the unused branches, matching the CUDA template-param register savings. */
+    if (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DIS_RF=1");
+    }
+
+    if (cfg->srctype == stPattern || cfg->srctype == stPattern3D
+            || cfg->srcnum > 1
+            || (cfg->extrasrclen > 0 && cfg->srcid <= 0)) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DIS_MULTISRC=1");
+    }
+
+    if (cfg->issavedet) {
+        snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DSAVE_DETPHOTON=1");
     }
 
     if (strstr(opt, "USE_MACRO_CONST")) {

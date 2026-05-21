@@ -299,7 +299,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         (float)(3.335640951981520e-12),   /* oneoverc0 = 1/C0 in s/mm */
         (cfg->extrasrclen > 0 && cfg->srcid == 0) ? -1 : cfg->srcid,  /* srcid<0 multi-slot, srcid>0 single slot, srcid==0 with srcdata: auto-promote to -1 */
         cfg->extrasrclen,
-        (int)(mesh->prop + 1 + cfg->isextdet)  /* srcpropoffset: gmed index where extra sources start */
+        (int)(mesh->prop + 1 + cfg->isextdet),  /* srcpropoffset: gmed index where extra sources start */
+        (uint)cfg->isnodalmua,
+        (uint)cfg->isnodalmusp
     };
 
     MCXReporter reporter = {0.f, 0};
@@ -659,35 +661,67 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             param.tend = twindow1;
 
 
-            /* Three valid template variants for cfg.isnodalmua/isnodalmusp:
-             *   (0,0): default, all properties from gmed[type] (constant mem)
-             *   (1,0): per-node mua via gnodemua_cu (CW DOT recon)
-             *   (1,1): per-node mua + musp via gnodemua_cu + gnodemusp_cu (RF DOT recon)
-             * isnodalmusp=1 without isnodalmua=1 is rejected during prep. */
-            int nodevariant = (cfg->isnodalmua ? 1 : 0) | (cfg->isnodalmusp ? 2 : 0);
+            /* Template-dispatch on persistent per-photon state: each flag gates
+             * register-resident state across the photon lifetime, letting ptxas
+             * dead-code-eliminate unused features. NODAL_USE_MUA/MUSP are now
+             * runtime reads from gcfg (their lifetime is too short to affect
+             * peak register pressure). 8 instantiations enumerated below.
+             *
+             *   IS_RF          - cfg.omega>0 and not replay
+             *   IS_MULTISRC    - cfg.srcnum>1 or (extrasrclen>0 && srcid<=0)
+             *   SAVE_DETPHOTON - cfg.issavedet */
+            const int is_rf = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE) ? 1 : 0;
+            /* IS_MULTISRC includes pattern source (uses r->posidx for srcpattern[] lookup)
+             * alongside pattern-multi-source (srcnum>1) and adjoint multi-source. */
+            const int is_ms = (cfg->srctype == stPattern || cfg->srctype == stPattern3D
+                               || cfg->srcnum > 1
+                               || (cfg->extrasrclen > 0 && cfg->srcid <= 0)) ? 1 : 0;
+            const int save_dp = cfg->issavedet ? 1 : 0;
+            const int variant = (is_rf << 2) | (is_ms << 1) | save_dp;
 
-            if (nodevariant == 3) {
-                mmc_main_loop<1, 1> <<< mcgrid, mcblock, sharedmemsize>>>(
-                    threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
-                    gtype, (int*)gfacenb, gsrcelem, gnormal,
-                    gnodemua_cu, gnodemusp_cu,
-                    gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
-                    gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata);
-            } else if (nodevariant == 1) {
-                mmc_main_loop<1, 0> <<< mcgrid, mcblock, sharedmemsize>>>(
-                    threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
-                    gtype, (int*)gfacenb, gsrcelem, gnormal,
-                    gnodemua_cu, NULL,
-                    gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
-                    gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata);
-            } else {
-                mmc_main_loop<0, 0> <<< mcgrid, mcblock, sharedmemsize>>>(
-                    threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref,
-                    gtype, (int*)gfacenb, gsrcelem, gnormal,
-                    NULL, NULL,
-                    gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter,
-                    gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata);
+#define MMC_DISPATCH(RF, MS, SD) \
+    mmc_main_loop<RF, MS, SD> <<< mcgrid, mcblock, sharedmemsize>>>( \
+            threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref, \
+            gtype, (int*)gfacenb, gsrcelem, gnormal, \
+            gnodemua_cu, gnodemusp_cu, \
+            gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter, \
+            gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata)
+
+            switch (variant) {
+                case 0:
+                    MMC_DISPATCH(0, 0, 0);
+                    break;
+
+                case 1:
+                    MMC_DISPATCH(0, 0, 1);
+                    break;
+
+                case 2:
+                    MMC_DISPATCH(0, 1, 0);
+                    break;
+
+                case 3:
+                    MMC_DISPATCH(0, 1, 1);
+                    break;
+
+                case 4:
+                    MMC_DISPATCH(1, 0, 0);
+                    break;
+
+                case 5:
+                    MMC_DISPATCH(1, 0, 1);
+                    break;
+
+                case 6:
+                    MMC_DISPATCH(1, 1, 0);
+                    break;
+
+                case 7:
+                    MMC_DISPATCH(1, 1, 1);
+                    break;
             }
+
+#undef MMC_DISPATCH
 
             #pragma omp master
             {

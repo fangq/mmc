@@ -36,14 +36,30 @@
 #define __global
 #define __kernel __global__
 
-/* CUDA: per-node mua/musp dispatch via template parameters so the host can
- * select between gmed[] (constant memory) and the per-node global-memory
- * arrays at runtime without rebuilding the kernel. The template-param names
- * NODAL_USE_MUA / NODAL_USE_MUSP match the OpenCL #defines (set in the #else
- * branch from MCX_NODAL_MUA / MCX_NODAL_MUSP) so the kernel body can be
- * written once. */
-#define MMC_TEMPLATE template <const int NODAL_USE_MUA, const int NODAL_USE_MUSP>
-#define MMC_TARGS    <NODAL_USE_MUA, NODAL_USE_MUSP>
+/* CUDA: dispatch persistent per-photon state (RF complex weight, multi-source
+ * launch-slot index, detphoton/partial-path bookkeeping) via template params
+ * so ptxas can dead-code-eliminate the unused features. Each flag gates state
+ * that lives in registers across the photon lifetime, so unlike the previous
+ * NODAL_USE_MUA/MUSP templating (which only gated leaf-of-dataflow values)
+ * these actually reduce peak register pressure.
+ *
+ *   IS_RF          - cfg.omega > 0 and not replay: track r.weight_im /
+ *                    oldweight_im / complex deposit (saves ~8 regs when off).
+ *   IS_MULTISRC    - cfg.srcnum > 1 (pattern source) or extrasrclen>0/srcid<=0
+ *                    (adjoint multi-source): track r.posidx / per-slot ppath
+ *                    (saves ~12 regs when off).
+ *   SAVE_DETPHOTON - cfg.issavedet: maintain ppath partial-path-length array,
+ *                    save exit position/dir for detected photons (saves ~6
+ *                    regs when off).
+ *
+ * NODAL_USE_MUA/MUSP moved out of templates: on CUDA they're now runtime reads
+ * from gcfg (their lifetime is too short to affect peak register pressure, so
+ * templating gave no benefit); on OpenCL they remain build-time #defines
+ * since the kernel is JIT-built per simulation anyway. */
+#define MMC_TEMPLATE template <const int IS_RF, const int IS_MULTISRC, const int SAVE_DETPHOTON>
+#define MMC_TARGS    <IS_RF, IS_MULTISRC, SAVE_DETPHOTON>
+#define NODAL_USE_MUA   (GPU_PARAM(gcfg, isnodalmua))
+#define NODAL_USE_MUSP  (GPU_PARAM(gcfg, isnodalmusp))
 
 /* Cap mmc_main_loop's per-thread register footprint via launch bounds so the
  * kernel can fit MIN_BLOCKS resident blocks per SM at the default block size.
@@ -246,10 +262,9 @@ typedef struct MMC_FLOAT3 {
  * gnodemua/gnodemusp args but only dereferences them when the macro is set,
  * so non-recon callers can bind NULL.
  *
- * CUDA: dispatch lives in template parameters (see the #ifdef __NVCC__
- * block at the head of this file); the names NODAL_USE_MUA / NODAL_USE_MUSP
- * are reused inside templated functions so the same body compiles for both
- * backends. */
+ * CUDA: NODAL_USE_MUA / NODAL_USE_MUSP read from gcfg at runtime (see the
+ * #ifdef __NVCC__ block at the head of this file). Templating gave no
+ * register benefit since the mua/musp lookup is a leaf in the dataflow. */
 #ifdef MCX_NODAL_MUA
     #define NODAL_USE_MUA   1
 #else
@@ -259,6 +274,19 @@ typedef struct MMC_FLOAT3 {
     #define NODAL_USE_MUSP  1
 #else
     #define NODAL_USE_MUSP  0
+#endif
+
+/* OpenCL: persistent per-photon state dispatch via build-time JIT flags
+ * appended by mmc_cl_host.c. IS_RF / IS_MULTISRC / SAVE_DETPHOTON are 0 or 1
+ * compile-time constants here, identical in effect to CUDA template params. */
+#ifndef IS_RF
+    #define IS_RF           0
+#endif
+#ifndef IS_MULTISRC
+    #define IS_MULTISRC     0
+#endif
+#ifndef SAVE_DETPHOTON
+    #define SAVE_DETPHOTON  0
 #endif
 
 /* OpenCL has no function templates; the dispatch lives entirely in the
@@ -406,6 +434,8 @@ typedef struct MMC_Parameter {
     int    srcid;                  /**< < 0 for multi-source mode (adjoint); >= 0 for single source */
     int    extrasrclen;            /**< number of extra sources packed into gmed[] after media */
     int    srcpropoffset;          /**< gmed[] index where extra sources start (= prop+1+isextdet) */
+    uint   isnodalmua;             /**< 1: read mua per-element from gnodemua centroid (DOT recon); CUDA only */
+    uint   isnodalmusp;            /**< 1: read musp per-element from gnodemusp centroid (RF DOT recon); CUDA only */
 } MCXParam __attribute__ ((aligned (16)));
 
 typedef struct MMC_Reporter {
@@ -589,6 +619,7 @@ __device__ uint finddetector(float3* p0, __constant float4* gmed, __constant MCX
     return 0;
 }
 
+MMC_TEMPLATE
 __device__ void savedetphoton(__global float* n_det, __global uint* detectedphoton,
                               __local float* ppath, ray* r, __constant Medium* gmed,
                               int extdetid, __constant MCXParam* gcfg, __global RandType* photonseed, RandType* initseed) {
@@ -621,7 +652,7 @@ __device__ void savedetphoton(__global float* n_det, __global uint* detectedphot
              * upper 16 bits of the detid column when running in multi-source mode.
              * Lower 16 bits keep the detector id; the upper bits stay zero for
              * single-source runs (extrasrclen==0) so existing readers are unaffected. */
-            if (GPU_PARAM(gcfg, extrasrclen) > 0 && GPU_PARAM(gcfg, srcid) <= 0) {
+            if (IS_MULTISRC && GPU_PARAM(gcfg, extrasrclen) > 0 && GPU_PARAM(gcfg, srcid) <= 0) {
                 detid |= ((unsigned int)(r->posidx + 1u) << 16);
             }
 
@@ -746,9 +777,10 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         /* Per-node mua/musp override (set by redbird-style DOT reconstruction).
          * Uses the element-centroid average of the four nodal values, which is
          * what the linear-FEM mass-matrix integration of a per-node-linear
-         * property reduces to. NODAL_USE_MUA/NODAL_USE_MUSP are compile-time
-         * constants (template params in CUDA, #define from MCX_NODAL_MUA/MUSP
-         * in OpenCL) so the unused branch is dead-code-eliminated. */
+         * property reduces to. NODAL_USE_MUA/MUSP are gcfg runtime reads on
+         * CUDA, build-time #defines on OpenCL (kernel JIT-rebuilds per
+         * simulation), so the unused branch is dead-code-eliminated on OpenCL
+         * and a uniform-divergence branch on CUDA. */
         if (NODAL_USE_MUA) {
             __global int* eelocal = elem + (r->eid - 1) * GPU_PARAM(gcfg, elemlen);
             prop.mua = 0.25f * (gnodemua[eelocal[0] - 1] + gnodemua[eelocal[1] - 1]
@@ -820,7 +852,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
             if (GPU_PARAM(gcfg, method) == rtBLBadouel) {
 #endif
                 /* multi-source (adjoint) mode: offset newidx by source-slot × ne × maxgate */
-                uint src_slot_offset = (GPU_PARAM(gcfg, srcid) < 0) ?
+                uint src_slot_offset = (IS_MULTISRC && GPU_PARAM(gcfg, srcid) < 0) ?
                                        (uint)(r->posidx) * GPU_PARAM(gcfg, ne) * GPU_PARAM(gcfg, maxgate) : 0u;
                 uint newidx = eid + tshift + src_slot_offset;
                 r->oldidx = (r->oldidx == ID_UNDEFINED) ? newidx : r->oldidx;
@@ -833,7 +865,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                 float bl_dep_im = 0.f;
                 float bl_dep_re_rf = 0.f;
 
-                if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                if (IS_RF) {
                     float w0_re = currweight.f, w0_im = r->weight_im;
                     float att_re = totalloss < 1.f ? (1.f - totalloss) : 1.f; /* exp(-mua*Lmove) */
                     float phase  = GPU_PARAM(gcfg, omega) * prop.n * GPU_PARAM(gcfg, oneoverc0) * r->Lmove;
@@ -876,14 +908,14 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                             }
 
                             /* RF imag part lives at +2*crop0.w (matches rtBLBadouelGrid). */
-                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                            if (IS_RF) {
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w * 2, r->oldweight_im);
                             }
 
 #else
                             weight[r->oldidx] += r->oldweight;
 
-                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                            if (IS_RF) {
                                 weight[r->oldidx + gcfg->crop0.w * 2] += r->oldweight_im;
                             }
 
@@ -936,14 +968,14 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                             }
                         }
 
-                        if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                        if (IS_RF) {
                             atomicadd(weight + newidx + gcfg->crop0.w * 2, r->oldweight_im);
                         }
 
 #else
                         weight[newidx] += r->oldweight;
 
-                        if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                        if (IS_RF) {
                             weight[newidx + gcfg->crop0.w * 2] += r->oldweight_im;
                         }
 
@@ -1000,14 +1032,14 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                 S.w = ww;                             // S.w is now the current weight
 
                 /* multi-source (adjoint) mode: offset newidx by source-slot × field-size-per-source */
-                uint src_slot_offset = (GPU_PARAM(gcfg, srcid) < 0) ?
+                uint src_slot_offset = (IS_MULTISRC && GPU_PARAM(gcfg, srcid) < 0) ?
                                        (uint)(r->posidx) * gcfg->crop0.z * GPU_PARAM(gcfg, maxgate) : 0u;
 
                 /* RF forward: complex weight per-segment state */
                 float seg_w_re = currweight.f, seg_w_im = r->weight_im;
                 float seg_decay_cos = 1.f, seg_decay_sin = 0.f;
 
-                if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                if (IS_RF) {
                     float phase = GPU_PARAM(gcfg, omega) * prop.n * GPU_PARAM(gcfg, oneoverc0) * (r->Lmove / (float)eid);
                     MCX_SINCOS(phase, seg_decay_sin, seg_decay_cos);
                 }
@@ -1028,7 +1060,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                     float seg_deposit_re = S.w * totalloss;
                     float seg_deposit_im = 0.f;
 
-                    if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                    if (IS_RF) {
                         float w0_re = seg_w_re, w0_im = seg_w_im;
                         /* complex Beer-Lambert: w *= exp(-mua*s) * exp(-i*omega*n/c0*s) */
                         float att = T.w;
@@ -1062,14 +1094,14 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                             }
 
                             /* RF imaginary part into buffer at +2*crop0.w */
-                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                            if (IS_RF) {
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w * 2, r->oldweight_im);
                             }
 
 #else
                             weight[r->oldidx] += r->oldweight;
 
-                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                            if (IS_RF) {
                                 weight[r->oldidx + gcfg->crop0.w * 2] += r->oldweight_im;
                             }
 
@@ -1122,14 +1154,14 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                             }
 
                             /* RF imaginary part */
-                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                            if (IS_RF) {
                                 atomicadd(weight + newidx + gcfg->crop0.w * 2, r->oldweight_im);
                             }
 
 #else
                             weight[newidx] += r->oldweight;
 
-                            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                            if (IS_RF) {
                                 weight[newidx + gcfg->crop0.w * 2] += r->oldweight_im;
                             }
 
@@ -1170,7 +1202,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                 }
 
                 /* RF: persist complex photon weight across element crossings */
-                if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                if (IS_RF) {
                     r->weight_im = seg_w_im;
                     r->weight    = seg_w_re;  /* real part also phase-mixed; needed as entry for next element */
                 }
@@ -1377,6 +1409,7 @@ __device__ void fixphoton(float3* p, __global FLOAT3* node, __global int* ee) {
  * \param[in,out] ran: the random number generator states
  */
 
+MMC_TEMPLATE
 __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOAT3* node, __global int* elem, __global int* srcelem, __private RandType* ran, __global float* srcpattern, __constant Medium* gmed) {
     int canfocus = 1;
     float3 origin = r->p0;
@@ -1391,7 +1424,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
      * doesn't warn when GPU_PARAM(gcfg, srcid) and ...extrasrclen are
      * constant-folded macros - same convention as the omega/seed/srctype
      * guards elsewhere in this file. */
-    if ((GPU_PARAM(gcfg, extrasrclen) > 0)
+    if (IS_MULTISRC && (GPU_PARAM(gcfg, extrasrclen) > 0)
             & (((GPU_PARAM(gcfg, srcid) < 0))
                | ((GPU_PARAM(gcfg, srcid) > 0) & (GPU_PARAM(gcfg, srcid) <= GPU_PARAM(gcfg, extrasrclen))))) {
         unsigned int slot;            /* slot index into srcdata[] (source geometry) */
@@ -1506,8 +1539,11 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 #endif
             int xsize = (int)gcfg->srcparam1.w;
             int ysize = (int)gcfg->srcparam2.w;
-            r->posidx = MIN((int)(ry * JUST_BELOW_ONE * ysize), ysize - 1) * xsize + MIN((int)(rx * JUST_BELOW_ONE * xsize), xsize - 1);
-            r->weight = (GPU_PARAM(gcfg, srcnum) > 1) ? 1.f : srcpattern[r->posidx];
+
+            if (IS_MULTISRC) {
+                r->posidx = MIN((int)(ry * JUST_BELOW_ONE * ysize), ysize - 1) * xsize + MIN((int)(rx * JUST_BELOW_ONE * xsize), xsize - 1);
+                r->weight = (GPU_PARAM(gcfg, srcnum) > 1) ? 1.f : srcpattern[r->posidx];
+            }
 
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_FOURIER)  // need to prevent rx/ry=1 here
@@ -1843,12 +1879,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
 
     /*initialize the photon parameters*/
-    launchnewphoton(gcfg, &r, node, elem, srcelem, ran, srcpattern, gmed);
+    launchnewphoton MMC_TARGS (gcfg, &r, node, elem, srcelem, ran, srcpattern, gmed);
 
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 #ifdef __NVCC__
 
-    if (GPU_PARAM(gcfg, issavedet)) {
+    if (SAVE_DETPHOTON) {
 #endif
 
         if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
@@ -1864,7 +1900,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
 #endif
 
-    if (GPU_PARAM(gcfg, srcnum) == 1) {
+    if (!IS_MULTISRC || GPU_PARAM(gcfg, srcnum) == 1) {
         *energytot += r.weight;
     } else {
         for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
@@ -1900,7 +1936,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
-        if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
+        if (SAVE_DETPHOTON && r.Lmove > 0.f && type[r.eid - 1] > 0) {
             ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;    /*second medianum block is the partial path*/
         }
 
@@ -1958,7 +1994,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
-            if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
+            if (SAVE_DETPHOTON && r.Lmove > 0.f && type[r.eid - 1] > 0) {
                 ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
             }
 
@@ -1976,7 +2012,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
-                if (GPU_PARAM(gcfg, issavedet) && r.Lmove > 0.f && type[r.eid - 1] > 0) {
+                if (SAVE_DETPHOTON && r.Lmove > 0.f && type[r.eid - 1] > 0) {
                     ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
                 }
 
@@ -2000,7 +2036,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                           r.vec.x, r.vec.y, r.vec.z, r.weight, r.eid));
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
-                if (GPU_PARAM(gcfg, issavedet) * GPU_PARAM(gcfg, issaveexit)) {                                 /*when issaveexit is set to 1*/
+                if (SAVE_DETPHOTON * GPU_PARAM(gcfg, issaveexit)) {                                 /*when issaveexit is set to 1*/
                     copystate(ppath + (GPU_PARAM(gcfg, reclen) - 7), (__private float*) & (r.p0), 3); /*columns 7-5 from the right store the exit positions*/
                     copystate(ppath + (GPU_PARAM(gcfg, reclen) - 4), (__private float*) & (r.vec), 3); /*columns 4-2 from the right store the exit dirs*/
                 }
@@ -2023,15 +2059,15 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 #ifdef __NVCC__
 
-            if (GPU_PARAM(gcfg, issavedet)) {
+            if (SAVE_DETPHOTON) {
 #endif
 
                 if (r.eid <= 0) {
 
 #if defined(MCX_SAVE_SEED) || defined(__NVCC__)
-                    savedetphoton(n_det, detectedphoton, ppath, &r, gmed, ((GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) ? oldeid : -1), gcfg, photonseed, initseed);
+                    savedetphoton MMC_TARGS (n_det, detectedphoton, ppath, &r, gmed, ((GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) ? oldeid : -1), gcfg, photonseed, initseed);
 #else
-                    savedetphoton(n_det, detectedphoton, ppath, &r, gmed, ((GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) ? oldeid : -1), gcfg, photonseed, NULL);
+                    savedetphoton MMC_TARGS (n_det, detectedphoton, ppath, &r, gmed, ((GPU_PARAM(gcfg, isextdet) && type[oldeid - 1] == GPU_PARAM(gcfg, maxmedia) + 1) ? oldeid : -1), gcfg, photonseed, NULL);
 #endif
                 }
 
@@ -2054,7 +2090,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
              * MCX reference: p.w = sqrt(w_re^2+w_im^2) is always used for the roulette check. */
             float roulette_w = r.weight;
 
-            if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+            if (IS_RF) {
                 roulette_w = MCX_MATHFUN(sqrt)(r.weight * r.weight + r.weight_im * r.weight_im);
             }
 
@@ -2062,7 +2098,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 if (rand_do_roulette(ran)*GPU_PARAM(gcfg, roulettesize) <= 1.f) {
                     r.weight *= GPU_PARAM(gcfg, roulettesize);
 
-                    if ((GPU_PARAM(gcfg, omega) > 0.f) & (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE)) {
+                    if (IS_RF) {
                         r.weight_im *= GPU_PARAM(gcfg, roulettesize);  /* scale imaginary weight too, consistent with MCX */
                     }
 
@@ -2084,12 +2120,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
-        if (GPU_PARAM(gcfg, issavedet)) {
+        if (SAVE_DETPHOTON) {
             if (GPU_PARAM(gcfg, ismomentum) && type[r.eid - 1] > 0) {             /*when ismomentum is set to 1*/
                 ppath[(GPU_PARAM(gcfg, maxmedia) << 1) + type[r.eid - 1] - 1] += mom;    /*the third medianum block stores the momentum transfer*/
             }
 
-            if (GPU_PARAM(gcfg, issavedet)) {
+            if (SAVE_DETPHOTON) {
                 ppath[type[r.eid - 1] - 1] += 1.f;    /*the first medianum block stores the scattering event counts*/
             }
         }
@@ -2107,11 +2143,11 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
      * sqrt(w_re^2 + w_im^2) in its kernel), so MMC mirrors that here for omega>0.
      * Replay (SEED_FROM_FILE) is excluded because the imaginary track is not
      * driven in that path. */
-    float esc_mag = ((GPU_PARAM(gcfg, omega) > 0.f) && (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE))
+    float esc_mag = IS_RF
                     ? sqrt(r.weight * r.weight + r.weight_im * r.weight_im)
                     : r.weight;
 
-    if (GPU_PARAM(gcfg, srcnum) == 1) {
+    if (!IS_MULTISRC || GPU_PARAM(gcfg, srcnum) == 1) {
         *energyesc += esc_mag;
     } else {
         for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
