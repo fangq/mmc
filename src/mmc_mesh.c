@@ -1089,6 +1089,72 @@ int mesh_initelem(tetmesh* mesh, mcconfig* cfg) {
     return 1;
 }
 
+/**
+ * @brief Find the enclosing tetrahedron for each launch slot in cfg->srcdata
+ *
+ * In multi-source / adjoint mode (cfg->srcid <= 0 && cfg->extrasrclen > 0)
+ * the kernel's launchnewphoton sets r->eid = gcfg->e0 for every photon, but
+ * gcfg->e0 is computed only from cfg->srcpos[0] (the main source's tet). For
+ * every other slot (sources 2..Ns, detector-as-adjoint slots 1..Nd) the
+ * initial element is wrong and photons start with a tet that doesn't contain
+ * their actual launch position, corrupting the ray-tet walking and the
+ * per-element deposits.
+ *
+ * This helper iterates over cfg->srcdata, computes the containing element for
+ * each slot's srcpos via bbox-prefilter + barycentric check, and stashes the
+ * resulting 1-based element ID into srcparam2.w (an otherwise-unused float
+ * slot for pencil and detector-disk source types). The kernel reads it back
+ * as (int) and uses it as the per-slot r->eid. Float-exact storage works
+ * because ne is well within the 24-bit integer range of a single-precision
+ * float.
+ *
+ * Call this once after the host has populated cfg->srcdata, before the kernel
+ * is launched. It is a no-op when extrasrclen == 0 or srcid > 0.
+ */
+void mesh_init_srcdata_eid(tetmesh* mesh, mcconfig* cfg) {
+    if (cfg->extrasrclen <= 0 || cfg->srcdata == NULL || cfg->srcid > 0) {
+        return;
+    }
+
+    FLOAT3* nodes = mesh->node;
+
+    for (int slot = 0; slot < cfg->extrasrclen; slot++) {
+        FLOAT3 pos = {cfg->srcdata[slot].srcpos.x,
+                      cfg->srcdata[slot].srcpos.y,
+                      cfg->srcdata[slot].srcpos.z
+                     };
+        float bary[4];
+        int eid = 0;
+
+        /* bbox-prefilter + barycentric check, same logic as mesh_initelem */
+        for (int i = 0; i < mesh->ne; i++) {
+            double pmin[3] = {VERY_BIG, VERY_BIG, VERY_BIG};
+            double pmax[3] = { -VERY_BIG, -VERY_BIG, -VERY_BIG};
+            int* elems = (int*)(mesh->elem + i * mesh->elemlen);
+
+            for (int j = 0; j < mesh->elemlen; j++) {
+                pmin[0] = MIN(nodes[elems[j] - 1].x, pmin[0]);
+                pmin[1] = MIN(nodes[elems[j] - 1].y, pmin[1]);
+                pmin[2] = MIN(nodes[elems[j] - 1].z, pmin[2]);
+                pmax[0] = MAX(nodes[elems[j] - 1].x, pmax[0]);
+                pmax[1] = MAX(nodes[elems[j] - 1].y, pmax[1]);
+                pmax[2] = MAX(nodes[elems[j] - 1].z, pmax[2]);
+            }
+
+            if (pos.x <= pmax[0] && pos.x >= pmin[0] &&
+                    pos.y <= pmax[1] && pos.y >= pmin[1] &&
+                    pos.z <= pmax[2] && pos.z >= pmin[2]) {
+                if (mesh_barycentric(i + 1, bary, &pos, mesh) == 0) {
+                    eid = i + 1;
+                    break;
+                }
+            }
+        }
+
+        cfg->srcdata[slot].srcparam2.w = (float)eid;
+    }
+}
+
 
 /**
  * @brief Compute the barycentric coordinate of the source in the initial element
@@ -2090,6 +2156,14 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
     double energydeposit = 0.f, energyelem, normalizor;
     int* ee;
     int datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+    /* Field-buffer layout: pattern source uses (gate*datalen + node) interleaved
+     * by srcnum; adjoint multi-slot mode (srcnum==1, extrasrclen>0) uses a
+     * slot-major stride of datalen*maxgate per slot. The srcnum==1 single-source
+     * case is layout-equivalent to slot-major with slot=0. */
+#define MESH_WIDX(gate, node, slot) \
+    (((size_t)cfg->srcnum == 1) \
+     ? ((size_t)(slot) * (size_t)datalen * (size_t)cfg->maxgate + (size_t)(gate) * (size_t)datalen + (size_t)(node)) \
+     : (((size_t)(gate) * (size_t)datalen + (size_t)(node)) * (size_t)cfg->srcnum + (size_t)(slot)))
 
     if (cfg->issaveref && mesh->dref) {
         float normalizor = 1.f / Etotal;
@@ -2109,7 +2183,7 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
         for (i = 0; i < cfg->maxgate; i++)
             for (j = 0; j < datalen; j++) {
-                mesh->weight[(i * datalen + j)*cfg->srcnum + pair] *= normalizor;
+                mesh->weight[MESH_WIDX(i, j, pair)] *= normalizor;
             }
 
         return normalizor;
@@ -2120,20 +2194,35 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
         for (i = 0; i < cfg->maxgate; i++)
             for (j = 0; j < datalen; j++) {
-                mesh->weight[(i * datalen + j)*cfg->srcnum + pair] *= normalizor;
+                mesh->weight[MESH_WIDX(i, j, pair)] *= normalizor;
             }
 
         return normalizor;
     }
 
+    /* RF mode: locate the imag-fluence buffer for this source slot. The
+     * exportadjoint layout for srcnum==1 (single or adjoint) is slot-major
+     * (slot * datalen * maxgate + gate * datalen + node); for srcnum>1 the
+     * imag path isn't currently populated (pattern source RF isn't supported
+     * through this normalization route), so we only resolve imag_slot when
+     * srcnum==1 to stay safe. */
+    int is_rf = (cfg->omega > 0.f) && (cfg->seed != SEED_FROM_FILE)
+                && (cfg->exportadjoint != NULL) && (cfg->srcnum == 1);
+    float* imag_slot = is_rf ? (cfg->exportadjoint + (size_t)pair * (size_t)datalen * (size_t)cfg->maxgate) : NULL;
+
     if (cfg->method == rtBLBadouelGrid) {
         normalizor = 1.0 / (Etotal * cfg->unitinmm * cfg->unitinmm * cfg->unitinmm); /*scaling factor*/
     } else {
         if (cfg->basisorder) {
+
             for (i = 0; i < cfg->maxgate; i++)
                 for (j = 0; j < datalen; j++)
                     if (mesh->nvol[j] > 0.f) {
-                        mesh->weight[(i * datalen + j)*cfg->srcnum + pair] /= mesh->nvol[j];
+                        mesh->weight[MESH_WIDX(i, j, pair)] /= mesh->nvol[j];
+
+                        if (imag_slot) {
+                            imag_slot[i * datalen + j] /= mesh->nvol[j];
+                        }
                     }
 
             for (i = 0; i < mesh->ne; i++) {
@@ -2142,7 +2231,18 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
                 for (j = 0; j < cfg->maxgate; j++)
                     for (k = 0; k < 4; k++) {
-                        energyelem += mesh->weight[(j * mesh->nn + ee[k] - 1) * cfg->srcnum + pair];    /*1/4 factor is absorbed two lines below*/
+                        int node_idx = ee[k] - 1;
+                        float re_val = mesh->weight[MESH_WIDX(j, node_idx, pair)];
+
+                        /* RF: deposit is mu_a * |phi| so numerator (Eabsorb from |w|)
+                         * and denominator (energydeposit) share the magnitude convention.
+                         * CW: |phi| = |Re(phi)| reduces to Re(phi) since phi is non-negative. */
+                        if (imag_slot) {
+                            float im_val = imag_slot[j * mesh->nn + node_idx];
+                            energyelem += sqrtf(re_val * re_val + im_val * im_val);
+                        } else {
+                            energyelem += re_val;    /*1/4 factor is absorbed two lines below*/
+                        }
                     }
 
                 energydeposit += energyelem * mesh->evol[i] * mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
@@ -2152,14 +2252,14 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
         } else {
             for (i = 0; i < datalen; i++)
                 for (j = 0; j < cfg->maxgate; j++) {
-                    energydeposit += mesh->weight[(j * datalen + i) * cfg->srcnum + pair];
+                    energydeposit += mesh->weight[MESH_WIDX(j, i, pair)];
                 }
 
             for (i = 0; i < datalen; i++) {
                 energyelem = mesh->evol[i] * mesh->med[mesh->type[i]].mua;
 
                 for (j = 0; j < cfg->maxgate; j++) {
-                    mesh->weight[(j * datalen + i)*cfg->srcnum + pair] /= energyelem;
+                    mesh->weight[MESH_WIDX(j, i, pair)] /= energyelem;
                 }
             }
 
@@ -2173,11 +2273,20 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
     for (i = 0; i < cfg->maxgate; i++)
         for (j = 0; j < datalen; j++) {
-            mesh->weight[(i * datalen + j)*cfg->srcnum + pair] *= normalizor;
+            mesh->weight[MESH_WIDX(i, j, pair)] *= normalizor;
+
+            /* RF imag fluence: apply the same scalar normalizor so phi_im stays
+             * paired with the real fluence in fluence-per-unit-source-energy
+             * units. The per-node nvol division (basisorder=1) was already
+             * applied to imag_slot in lockstep with mesh->weight above. */
+            if (imag_slot) {
+                imag_slot[(size_t)i * (size_t)datalen + (size_t)j] *= (float)normalizor;
+            }
         }
 
     return normalizor;
 }
+#undef MESH_WIDX
 
 
 /**

@@ -233,6 +233,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     uint nsrcslots = (cfg->extrasrclen > 0 && cfg->srcid <= 0) ? (uint)cfg->extrasrclen : 1u;
     uint meshlen = ((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * cfg->srcnum * nsrcslots;
     cfg->crop0.w = meshlen * cfg->maxgate; // offset for the second (double) buffer
+    /* Per-slot energy accounting (Eabsorb/Etotal): match the OpenCL host so
+     * adjoint mode (srcnum==1, extrasrclen>0) gets one bin per launch slot. */
+    uint nenergybins = ((cfg->srcnum == 1) && (cfg->extrasrclen > 0) && (cfg->srcid <= 0))
+                       ? (uint)cfg->extrasrclen : (uint)cfg->srcnum;
 
     float* field, *dref = NULL;
 
@@ -310,7 +314,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     param.reclen = sharedmemsize / sizeof(float);  //< the shared memory buffer length associated with detected photon
 
-    sharedmemsize += sizeof(float) * (cfg->srcnum << 1);   /**< store energyesc/energytot */
+    sharedmemsize += sizeof(float) * (nenergybins << 1);   /**< store energyesc/energytot */
 
     if (cfg->srctype == stPattern && cfg->srcnum > 1) {
         sharedmemsize += sizeof(float) * cfg->srcnum;
@@ -358,8 +362,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             cfg->exportseed = (unsigned char*)malloc(cfg->maxdetphoton * (sizeof(RandType) * RAND_BUF_LEN));
         }
 
-        cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
-        cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
+        cfg->energytot = (double*)calloc(nenergybins, sizeof(double));
+        cfg->energyesc = (double*)calloc(nenergybins, sizeof(double));
         cfg->runtime = 0;
     }
     #pragma omp barrier
@@ -525,7 +529,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     *progress = 0;
 
     Pseed = (uint*)malloc(sizeof(uint) * gpu[gpuid].autothread * RAND_SEED_WORD_LEN);
-    energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
+    energy = (float*)calloc(sizeof(float) * nenergybins, gpu[gpuid].autothread << 1);
 
     for (j = 0; j < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; j++) {
         Pseed[j] = rand();
@@ -552,9 +556,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&genergy,
-                           sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum));
+                           sizeof(float) * (gpu[gpuid].autothread << 1) * nenergybins));
     CUDA_ASSERT(cudaMemcpy(genergy, energy,
-                           sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
+                           sizeof(float) * (gpu[gpuid].autothread << 1) * nenergybins,
                            cudaMemcpyHostToDevice));
 
     CUDA_ASSERT(cudaMalloc((void**)&gdetected, sizeof(uint)));
@@ -730,20 +734,20 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             reporter.raytet += rep.raytet;
             reporter.jumpdebug += rep.jumpdebug;
 
-            energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
+            energy = (float*)calloc(sizeof(float) * nenergybins, gpu[gpuid].autothread << 1);
 
             CUDA_ASSERT(cudaMemcpy(energy, genergy,
-                                   sizeof(float) * (gpu[gpuid].autothread << 1) * cfg->srcnum,
+                                   sizeof(float) * (gpu[gpuid].autothread << 1) * nenergybins,
                                    cudaMemcpyDeviceToHost));
             #pragma omp critical
             {
 
                 for (i = 0; i < gpu[gpuid].autothread; i++) {
-                    for (j = 0; j < (uint) cfg->srcnum; j++) {
-                        cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
-                        cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
-                        energyesc += energy[(i << 1) * cfg->srcnum + j];
-                        energytot += energy[((i << 1) + 1) * cfg->srcnum + j];
+                    for (j = 0; j < nenergybins; j++) {
+                        cfg->energyesc[j] += energy[(i << 1) * nenergybins + j];
+                        cfg->energytot[j] += energy[((i << 1) + 1) * nenergybins + j];
+                        energyesc += energy[(i << 1) * nenergybins + j];
+                        energytot += energy[((i << 1) + 1) * nenergybins + j];
                     }
                 }
             }
@@ -950,7 +954,13 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
         if (cfg->isnormalized) {
             double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
-            for (j = 0; j < cfg->srcnum; j++) {
+            /* Per-slot mesh_normalize matches the OpenCL host: in adjoint mode
+             * each launch slot has its own energy bin and gets self-consistent
+             * Eabsorb/Etotal accounting. mesh_normalize handles both layouts
+             * (slot-major when srcnum==1, interleaved for pattern source) and
+             * applies the scalar normalizor to mesh->weight + exportadjoint in
+             * one pass; no broadcast fallback is needed. */
+            for (j = 0; j < (int)nenergybins; j++) {
                 energyabs =  cfg->energytot[j] - cfg->energyesc[j];
                 cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
                 sum_normalizer += cur_normalizer;
@@ -958,53 +968,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                                        j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
             }
 
-            cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
-
-            /* For adjoint / multi-source mode, mesh_normalize only writes to slots
-             * 0..srcnum-1 in exportfield (its indexing isn't slot-aware). For the
-             * remaining slots srcnum..extrasrclen-1, apply a per-slot normalizer that
-             * scales the slot-0 normalizer by w_0/w_k (the ratio of source weights),
-             * so slot k ends up expressed in fluence-per-unit-source-energy units
-             * regardless of whether srcdata[k].srcpos.w was 1/Ns, 1/Nd, or arbitrary.
-             * Falls back to the old avg_normalizor broadcast when srcdata isn't
-             * populated. */
-            if (cfg->extrasrclen > cfg->srcnum && cfg->exportfield) {
-                double avg_normalizor = sum_normalizer / cfg->srcnum;
-                int mesh_basis1 = (cfg->method != rtBLBadouelGrid) && (cfg->basisorder != 0);
-                size_t datalen = (cfg->method == rtBLBadouelGrid)
-                                 ? (size_t)cfg->crop0.z
-                                 : (size_t)((cfg->basisorder) ? mesh->nn : mesh->ne);
-                size_t slot_stride = datalen * (size_t)cfg->maxgate;
-                double w0 = (cfg->srcdata) ? cfg->srcdata[0].srcpos.w : 0.0;
-
-                for (int slot = cfg->srcnum; slot < cfg->extrasrclen; slot++) {
-                    double slot_normalizor = avg_normalizor;
-
-                    if (cfg->srcdata && w0 > 0.0 && cfg->srcdata[slot].srcpos.w > 0.0) {
-                        slot_normalizor = avg_normalizor * (w0 / cfg->srcdata[slot].srcpos.w);
-                    }
-
-                    /* mesh + basisorder=1: mesh_normalize divides slot 0 by nvol[j] per
-                     * node before applying its scalar normalizer; replicate that here. */
-                    if (mesh_basis1) {
-                        for (int t = 0; t < cfg->maxgate; t++) {
-                            for (int j = 0; j < (int)datalen; j++) {
-                                size_t idx = (size_t)slot * slot_stride + (size_t)t * datalen + j;
-
-                                if (mesh->nvol[j] > 0.f) {
-                                    cfg->exportfield[idx] /= mesh->nvol[j];
-                                }
-
-                                cfg->exportfield[idx] *= slot_normalizor;
-                            }
-                        }
-                    } else {
-                        for (size_t ki = 0; ki < slot_stride; ki++) {
-                            cfg->exportfield[(size_t)slot * slot_stride + ki] *= slot_normalizor;
-                        }
-                    }
-                }
-            }
+            cfg->his.normalizer = sum_normalizer / nenergybins;
         }
 
         /* Mesh-mode adjoint Jacobian post-processing: FEM/nodal formulas on tet mesh.
@@ -1024,29 +988,35 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
             size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
             size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
 
-            /* Convert double exportfield to float for GPU processing */
-            float* hfield_re = (float*)malloc(sizeof(float) * fieldlen);
-            float* hfield_im = isrfforward ? (float*)malloc(sizeof(float) * fieldlen) : NULL;
+            /* Convert double exportfield to float for GPU processing.
+             * exportfield (= mesh->weight) is node-major for basisorder=1, sized
+             * nn * extrasrclen * maxgate -- NOT fieldlen, which is sized on
+             * mesh->ne (the kernel field buffer stride). Reading fieldlen
+             * doubles walks past the allocation. */
+            size_t nodefield_len = (size_t)datalen * (size_t)cfg->extrasrclen * (size_t)cfg->maxgate;
 
-            for (size_t k = 0; k < fieldlen; k++) {
+            float* hfield_re = (float*)malloc(sizeof(float) * nodefield_len);
+            float* hfield_im = isrfforward ? (float*)malloc(sizeof(float) * nodefield_len) : NULL;
+
+            for (size_t k = 0; k < nodefield_len; k++) {
                 hfield_re[k] = (float)cfg->exportfield[k];
             }
 
             if (isrfforward && cfg->exportadjoint) {
-                for (size_t k = 0; k < fieldlen; k++) {
+                for (size_t k = 0; k < nodefield_len; k++) {
                     hfield_im[k] = cfg->exportadjoint[k];
                 }
             }
 
             float* gfield_re_cu = NULL, *gfield_im_cu = NULL;
             float* gjmua_cu = NULL, *gjd_cu = NULL;
-            CUDA_ASSERT(cudaMalloc((void**)&gfield_re_cu, sizeof(float) * fieldlen));
-            CUDA_ASSERT(cudaMemcpy(gfield_re_cu, hfield_re, sizeof(float) * fieldlen, cudaMemcpyHostToDevice));
+            CUDA_ASSERT(cudaMalloc((void**)&gfield_re_cu, sizeof(float) * nodefield_len));
+            CUDA_ASSERT(cudaMemcpy(gfield_re_cu, hfield_re, sizeof(float) * nodefield_len, cudaMemcpyHostToDevice));
             free(hfield_re);
 
             if (hfield_im) {
-                CUDA_ASSERT(cudaMalloc((void**)&gfield_im_cu, sizeof(float) * fieldlen));
-                CUDA_ASSERT(cudaMemcpy(gfield_im_cu, hfield_im, sizeof(float) * fieldlen, cudaMemcpyHostToDevice));
+                CUDA_ASSERT(cudaMalloc((void**)&gfield_im_cu, sizeof(float) * nodefield_len));
+                CUDA_ASSERT(cudaMemcpy(gfield_im_cu, hfield_im, sizeof(float) * nodefield_len, cudaMemcpyHostToDevice));
                 free(hfield_im);
             }
 
@@ -1148,30 +1118,18 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
             cfg->exportjacob = (float*)malloc(sizeof(float) * exportlen_adj);
             memset(cfg->exportjacob, 0, sizeof(float) * exportlen_adj);
 
-            /* Photon dilution correction: each slot got nphoton/(Ns+Nd) photons with
-             * srcpos.w = 1/Ns or 1/Nd; restore unit-energy magnitudes. */
-            float jac_correction = 4.f * (float)Ns * (float)Nd;
-
             float* hmua = NULL, *hjd = NULL;
 
             if (compute_jmua) {
                 hmua = (float*)malloc(sizeof(float) * single_exportlen);
                 CUDA_ASSERT(cudaMemcpy(hmua, gjmua_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
                 CUDA_ASSERT(cudaFree(gjmua_cu));
-
-                for (size_t k = 0; k < single_exportlen; k++) {
-                    hmua[k] *= jac_correction;    /* sign + Ve / nvol already in kernel */
-                }
             }
 
             if (compute_jd) {
                 hjd = (float*)malloc(sizeof(float) * single_exportlen);
                 CUDA_ASSERT(cudaMemcpy(hjd, gjd_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
                 CUDA_ASSERT(cudaFree(gjd_cu));
-
-                for (size_t k = 0; k < single_exportlen; k++) {
-                    hjd[k] *= jac_correction;
-                }
             }
 
             /* Pack into cfg->exportjacob using same layout as grid path:
@@ -1295,11 +1253,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
             cfg->exportjacob = (float*)malloc(sizeof(float) * exportlen_adj);
 
-            /* Photon dilution correction: each slot gets N/(Ns+Nd) photons with srcpos.w = 1/Ns
-             * or 1/Nd, so phi_src and phi_det are each reduced vs. a dedicated single-source run.
-             * Scale by 4*Ns*Nd to restore unit-energy fluence magnitudes. */
             float Vvox = cfg->unitinmm * cfg->unitinmm * cfg->unitinmm;
-            float jac_correction = 4.f * (float)Ns * (float)Nd;
 
             if (isdual) {
                 float* hmua    = (float*)malloc(sizeof(float) * single_exportlen);
@@ -1310,8 +1264,8 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                 CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
 
                 for (size_t k = 0; k < single_exportlen; k++) {
-                    hmua[k]    *= -Vvox            * jac_correction;
-                    hsecond[k] *= -cfg->unitinmm   * jac_correction;
+                    hmua[k]    *= -Vvox;
+                    hsecond[k] *= -cfg->unitinmm;
                 }
 
                 if (!isrfforward) {
@@ -1330,7 +1284,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                 CUDA_ASSERT(cudaMemcpy(cfg->exportjacob, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
                 CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
 
-                float adj_scale = ((cfg->outputtype == otAdjoint) ? -Vvox : -cfg->unitinmm) * jac_correction;
+                float adj_scale = (cfg->outputtype == otAdjoint) ? -Vvox : -cfg->unitinmm;
 
                 for (size_t k = 0; k < single_exportlen; k++) {
                     cfg->exportjacob[k] *= adj_scale;

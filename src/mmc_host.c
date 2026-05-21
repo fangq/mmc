@@ -145,6 +145,14 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     tracer_init(tracer, mesh, cfg->method);
     tracer_prep(tracer, cfg);
 
+    /* Multi-source / adjoint mode: pre-compute per-slot initial element index.
+     * Otherwise launchnewphoton would use gcfg->e0 (= source-1's tet) for every
+     * slot, corrupting deposits for slots whose launch position isn't inside
+     * that single tet. Stashed into srcdata[slot].srcparam2.w and read back by
+     * the kernel. Shared across mmclab / pmmc / mmc-binary because all entry
+     * points reach this function. */
+    mesh_init_srcdata_eid(mesh, cfg);
+
     /* Precompute <grad(phi_i).grad(phi_j)>*Ve for mesh-mode adjoint Jacobian.
      * Required for J_D in elem/node-based mesh adjoint outputs (mcx-style
      * grid adjoint uses finite differences instead and does not need this). */

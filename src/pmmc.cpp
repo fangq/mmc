@@ -173,8 +173,8 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
      * array (no string-literal handling like mmclab.cpp because pybind11
      * arrays are typed). */
     {
-        auto parse_multisrc_matrix = [&](const char* name, float4& dst_single,
-                                         float4 ExtraSrc::* dst_field, bool is_srcdir) {
+        auto parse_multisrc_matrix = [&](const char* name, float4 & dst_single,
+        float4 ExtraSrc::* dst_field, bool is_srcdir) {
             if (!user_cfg.contains(name)) {
                 return;
             }
@@ -203,6 +203,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             }
 
             float* val = (float*)info.ptr;
+
             /* numpy passes f_style: linear index = col * nrows + row */
             for (int c = 0; c < ncols; c++) {
                 ((float*)(&dst_single))[c] = val[c * nrows + 0];
@@ -966,9 +967,12 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 mcx_config.srcdata = (ExtraSrc*)realloc(mcx_config.srcdata, (Ns_pre + Nd_pre) * sizeof(ExtraSrc));
                 memset(mcx_config.srcdata + Ns_pre, 0, Nd_pre * sizeof(ExtraSrc));
 
+                /* Uniform per-slot launch weight (MCX parity, mcx_utils.c:1822, :1985-1986):
+                 * every slot launches with srcpos.w = 1 so the total simulated energy
+                 * equals N_photon. Matches mmclab.cpp adjoint setup. */
                 for (int is = 0; is < Ns_pre; is++) {
                     if (mcx_config.srcdata[is].srcpos.w == 0.f) {
-                        mcx_config.srcdata[is].srcpos.w = 1.f / Ns_pre;
+                        mcx_config.srcdata[is].srcpos.w = 1.f;
                     }
                 }
             } else {
@@ -979,12 +983,16 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 Ns_pre = (mcx_config.srcnum > 0) ? mcx_config.srcnum : 1;
                 mcx_config.srcdata = (ExtraSrc*)calloc(Ns_pre + Nd_pre, sizeof(ExtraSrc));
 
+                /* Slots 0..Ns-1: forward sources (replicate the single main source).
+                 * Uniform unit weight per slot (MCX parity); preserve cfg.srcdir.w
+                 * (focal length / lens parameter). Detector slots below honor
+                 * cfg.detdir.w. */
                 for (int is = 0; is < Ns_pre; is++) {
                     mcx_config.srcdata[is].srcpos    = {mcx_config.srcpos.x, mcx_config.srcpos.y,
-                                                        mcx_config.srcpos.z, 1.f / Ns_pre
+                                                        mcx_config.srcpos.z, 1.f
                                                        };
                     mcx_config.srcdata[is].srcdir    = {mcx_config.srcdir.x, mcx_config.srcdir.y,
-                                                        mcx_config.srcdir.z, 0.f
+                                                        mcx_config.srcdir.z, mcx_config.srcdir.w
                                                        };
                     mcx_config.srcdata[is].srcparam1 = mcx_config.srcparam1;
                     mcx_config.srcdata[is].srcparam2 = mcx_config.srcparam2;
@@ -993,9 +1001,10 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
             mcx_config.extrasrclen = Ns_pre + Nd_pre;
 
+            /* Slots Ns..Ns+Nd-1: detector-as-reversed-source, unit weight per slot. */
             for (int id = 0; id < Nd_pre; id++) {
                 mcx_config.srcdata[Ns_pre + id].srcpos  = {mcx_config.detpos[id].x, mcx_config.detpos[id].y,
-                                                           mcx_config.detpos[id].z, 1.f / Nd_pre
+                                                           mcx_config.detpos[id].z, 1.f
                                                           };
                 mcx_config.srcdata[Ns_pre + id].srcdir  = {mcx_config.detdir[id].x, mcx_config.detdir[id].y,
                                                            mcx_config.detdir[id].z, mcx_config.detdir[id].w

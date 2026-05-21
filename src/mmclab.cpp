@@ -286,12 +286,15 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     cfg.srcdata = (ExtraSrc*)realloc(cfg.srcdata, (Ns + Nd) * sizeof(ExtraSrc));
                     memset(cfg.srcdata + Ns, 0, Nd * sizeof(ExtraSrc));
 
-                    /* Fill in missing per-slot weights so each forward source gets
-                     * 1/Ns of the photon budget (the multi-source srcpos parser leaves
-                     * .w = 0 when user only passes a 3-column position). */
+                    /* Uniform per-slot launch weight: every slot (forward source and
+                     * detector-as-adjoint source) launches photons with srcpos.w = 1,
+                     * matching MCX's convention (mcx_utils.c:1822, :1985-1986). With
+                     * uniform random slot picking, each slot receives N_photon/(Ns+Nd)
+                     * photons of unit weight, so the total simulated energy equals
+                     * N_photon and per-slot Eabsorb/Etotal ratios are comparable. */
                     for (int is = 0; is < Ns; is++) {
                         if (cfg.srcdata[is].srcpos.w == 0.f) {
-                            cfg.srcdata[is].srcpos.w = 1.f / Ns;
+                            cfg.srcdata[is].srcpos.w = 1.f;
                         }
                     }
                 } else {
@@ -302,13 +305,17 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     Ns = cfg.srcnum;   /* photon-sharing replication count */
                     cfg.srcdata = (ExtraSrc*)calloc(Ns + Nd, sizeof(ExtraSrc));
 
-                    /* Slots 0..Ns-1: forward sources (replicate the single main source). */
+                    /* Slots 0..Ns-1: forward sources (replicate the single main source).
+                     * Uniform unit weight per slot (MCX parity); preserve cfg.srcdir.w
+                     * (focal length / lens parameter) so users can control beam profiles
+                     * (e.g., planar wavefront via srcdir(4)=-inf) for the source slots;
+                     * the detector slots below honor cfg.detdir.w. */
                     for (int is = 0; is < Ns; is++) {
                         cfg.srcdata[is].srcpos    = {cfg.srcpos.x, cfg.srcpos.y,
-                                                     cfg.srcpos.z, 1.f / Ns
+                                                     cfg.srcpos.z, 1.f
                                                     };
                         cfg.srcdata[is].srcdir    = {cfg.srcdir.x, cfg.srcdir.y,
-                                                     cfg.srcdir.z, 0.f
+                                                     cfg.srcdir.z, cfg.srcdir.w
                                                     };
                         cfg.srcdata[is].srcparam1 = cfg.srcparam1;
                         cfg.srcdata[is].srcparam2 = cfg.srcparam2;
@@ -317,10 +324,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
 
                 cfg.extrasrclen = Ns + Nd;
 
-                /* Slots Ns..Ns+Nd-1: detector-as-reversed-source */
+                /* Slots Ns..Ns+Nd-1: detector-as-reversed-source, unit weight per slot. */
                 for (int id = 0; id < Nd; id++) {
                     cfg.srcdata[Ns + id].srcpos   = {cfg.detpos[id].x, cfg.detpos[id].y,
-                                                     cfg.detpos[id].z, 1.f / Nd
+                                                     cfg.detpos[id].z, 1.f
                                                     };
                     cfg.srcdata[Ns + id].srcdir   = {cfg.detdir[id].x, cfg.detdir[id].y,
                                                      cfg.detdir[id].z, cfg.detdir[id].w
@@ -337,6 +344,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             /** Validate all input fields, and warn incompatible inputs */
             mmc_validate_config(&cfg, detps, dimdetps, seedbyte);
             mesh_validate(&mesh, &cfg);
+            /* mmc_prep -> mesh_init_srcdata_eid fills per-slot e0 into
+             * cfg.srcdata[].srcparam2.w so the kernel's launchnewphoton can
+             * use the correct initial tet for each slot in multi-source mode. */
 
             if (cfg.isgpuinfo == 0) {
                 mmc_prep(&cfg, &mesh, &tracer);
