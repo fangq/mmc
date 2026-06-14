@@ -85,7 +85,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_kernel* mcxkernel;                   // compute mcxkernel
     cl_int status = 0;
     cl_device_id devices[MAX_DEVICE];
-    cl_event* waittoread;
     cl_platform_id platform = NULL;
 
     cl_uint  totalcucore;
@@ -177,7 +176,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     OCL_ASSERT(((mcxcontext = clCreateContext(cprops, workdev, devices, NULL, NULL, &status), status)));
 
     mcxqueue = (cl_command_queue*)malloc(workdev * sizeof(cl_command_queue));
-    waittoread = (cl_event*)malloc(workdev * sizeof(cl_event));
 
     gseed = (cl_mem*)malloc(workdev * sizeof(cl_mem));
     gweight = (cl_mem*)malloc(workdev * sizeof(cl_mem));
@@ -695,7 +693,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 #ifndef USE_OS_TIMER
                 OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid], mcxkernel[devid], 1, NULL, &gpu[devid].autothread, &gpu[devid].autoblock, 0, NULL, &kernelevent)));
 #else
-                OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid], mcxkernel[devid], 1, NULL, &gpu[devid].autothread, &gpu[devid].autoblock, 0, NULL, &waittoread[devid])));
+                /* pass NULL for the event: the launch is synchronized below via
+                 * clFinish (clWaitForEvents is disabled), so a returned cl_event
+                 * would never be consumed nor released. On NVIDIA's OpenCL runtime
+                 * a live event keeps an implicit reference to the queue/context,
+                 * so leaking it here prevents clReleaseContext from ever freeing
+                 * the GPU allocations -> per-run device-memory leak. */
+                OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid], mcxkernel[devid], 1, NULL, &gpu[devid].autothread, &gpu[devid].autoblock, 0, NULL, NULL)));
 #endif
                 OCL_ASSERT((clFlush(mcxqueue[devid])));
             }
@@ -722,7 +726,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
             clEnqueueUnmapMemObject(mcxqueue[0], gprogress[0], progress, 0, NULL, NULL);
 
-            //clWaitForEvents(workdev,waittoread);
             for (devid = 0; devid < workdev; devid++) {
                 OCL_ASSERT((clFinish(mcxqueue[devid])));
             }
@@ -739,7 +742,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             for (devid = 0; devid < workdev; devid++) {
                 MCXReporter rep;
                 OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], greporter[devid], CL_TRUE, 0, sizeof(MCXReporter),
-                                                &rep, 0, NULL, waittoread + devid)));
+                                                &rep, 0, NULL, NULL)));
                 reporter.raytet += rep.raytet;
                 reporter.jumpdebug += rep.jumpdebug;
 
@@ -773,7 +776,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                         debugrec = MIN(debugrec, cfg->maxjumpdebug);
                         cfg->exportdebugdata = (float*)realloc(cfg->exportdebugdata, (cfg->debugdatalen + debugrec) * debuglen * sizeof(float));
                         OCL_ASSERT((clEnqueueReadBuffer(mcxqueue[devid], gdebugdata[devid], CL_FALSE, 0, sizeof(float)*debuglen * debugrec,
-                                                        cfg->exportdebugdata + cfg->debugdatalen, 0, NULL, waittoread + devid)));
+                                                        cfg->exportdebugdata + cfg->debugdatalen, 0, NULL, NULL)));
                         cfg->debugdatalen += debugrec;
                     }
                 }
@@ -1520,7 +1523,6 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(greplaytime);
     free(mcxkernel);
 
-    free(waittoread);
     free(cfg->energytot);
     free(cfg->energyesc);
     cfg->energytot = NULL;
