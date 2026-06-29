@@ -54,6 +54,14 @@
     #define JUST_BELOW_ONE  0.9998f          /**<  used to clamp pattern index to avoid overflow */
 #endif
 
+static inline int mmc_is_fluence_like(char outputtype) {
+    return outputtype != otEnergy && outputtype != otWP && outputtype != otWL;
+}
+
+static inline float mmc_fluence_deposit(float w0, float w1, float mua, float len) {
+    return (mua < EPS) ? (w0 * len) : ((w0 - w1) / mua);
+}
+
 /**
  * \mapping from edge index to node index
  */
@@ -387,6 +395,11 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
         if (!cfg->basisorder) {
             ww = currweight - r->weight;
             r->Eabsorb += ww;
+
+            if (mmc_is_fluence_like(cfg->outputtype)) {
+                ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
+            }
+
             r->photontimer += r->Lmove * rc;
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
@@ -418,12 +431,15 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                 r->photontimer += r->Lmove * rc;
                 ww = currweight - r->weight;
 
-                if (prop->mua > 0.f) {
+                if (prop->mua > 0.f || mmc_is_fluence_like(cfg->outputtype)) {
                     ratio = r->Lmove / Lp0;
-                    r->Eabsorb += ww;
 
-                    if (cfg->outputtype != otEnergy && cfg->outputtype != otWP) {
-                        ww /= prop->mua;
+                    if (prop->mua > 0.f) {
+                        r->Eabsorb += ww;
+                    }
+
+                    if (mmc_is_fluence_like(cfg->outputtype)) {
+                        ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
                     }
 
                     if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
@@ -656,10 +672,10 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             if (prop->mua > 0.f) {
                 r->Eabsorb += ww;
+            }
 
-                if (cfg->outputtype != otEnergy && cfg->outputtype != otWP) {
-                    ww /= prop->mua;
-                }
+            if (mmc_is_fluence_like(cfg->outputtype)) {
+                ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
             }
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
@@ -894,6 +910,11 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
         if (bary.x >= 0.f) {
             ww = currweight - r->weight;
             r->Eabsorb += ww;
+
+            if (mmc_is_fluence_like(cfg->outputtype)) {
+                ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
+            }
+
             r->photontimer += r->Lmove * rc;
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
@@ -920,10 +941,6 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                         tracer->mesh->weight[eid + tshift] += ww;
                     }
                 } else {
-                    if (cfg->outputtype != otEnergy && cfg->outputtype != otWP) {
-                        ww /= prop->mua;
-                    }
-
                     ww *= 1.f / 3.f;
 
                     if (cfg->isatomic)
@@ -1549,10 +1566,10 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
 
             if (prop->mua > 0.f) {
                 r->Eabsorb += ww;
+            }
 
-                if (cfg->outputtype != otEnergy && cfg->outputtype != otWP) {
-                    ww /= prop->mua;
-                }
+            if (mmc_is_fluence_like(cfg->outputtype)) {
+                ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
             }
 
             T = _mm_set1_ps(r->Lmove);
