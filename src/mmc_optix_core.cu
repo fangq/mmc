@@ -366,7 +366,8 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
         w_im = new_im;
     } else {
         segloss = (gcfg.outputtype == otEnergy) ? r.weight * (1.0f - segdecay) :
-                  (prop.mua ? r.weight * (1.0f - segdecay) / prop.mua : 0.0f);
+                  (prop.mua < EPS ? r.weight * seglen :
+                   __fdividef(r.weight * (1.0f - segdecay), prop.mua));
     }
 
     // deposit weight loss of each segment to the corresponding grid
