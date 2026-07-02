@@ -127,9 +127,10 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     GET_SCALAR_FIELD(user_cfg, mcx_config, tstep, py::float_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, tend, py::float_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, isreflect, py::int_);
-    GET_SCALAR_FIELD(user_cfg, mcx_config, isspecular, py::bool_);
+    GET_SCALAR_FIELD(user_cfg, mcx_config, isspecular, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, ismomentum, py::bool_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issaveexit, py::bool_);
+    GET_SCALAR_FIELD(user_cfg, mcx_config, isextdet, py::bool_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issave2pt, py::bool_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issavedet, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issaveseed, py::bool_);
