@@ -607,12 +607,13 @@ __device__ void clearpath(__local float* p, int len) {
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 __device__ uint finddetector(float3* p0, __constant float4* gmed, __constant MCXParam* gcfg) {
     uint i;
+    uint detstart = GPU_PARAM(gcfg, srcpropoffset) + ((uint)GPU_PARAM(gcfg, extrasrclen) << 2);
 
-    for (i = GPU_PARAM(gcfg, maxmedia) + 1 + GPU_PARAM(gcfg, isextdet); i < GPU_PARAM(gcfg, maxmedia) + 1 + GPU_PARAM(gcfg, isextdet) + GPU_PARAM(gcfg, detnum); i++) {
+    for (i = detstart; i < detstart + GPU_PARAM(gcfg, detnum); i++) {
         if ((gmed[i].x - p0[0].x) * (gmed[i].x - p0[0].x) +
                 (gmed[i].y - p0[0].y) * (gmed[i].y - p0[0].y) +
                 (gmed[i].z - p0[0].z) * (gmed[i].z - p0[0].z) < gmed[i].w * gmed[i].w) {
-            return i - GPU_PARAM(gcfg, maxmedia) - GPU_PARAM(gcfg, isextdet);
+            return i - detstart + 1u;
         }
     }
 
