@@ -113,6 +113,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
 
     int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
+    int savevolume = (cfg->issave2pt != 0);
     /* cfg->srcid > 0 selects a single slot from srcdata, collapsing the field buffer to one slot. */
     cl_uint nsrcslots = (cfg->extrasrclen > 0 && cfg->srcid <= 0) ? (cl_uint)cfg->extrasrclen : 1u;
     /* Compute the output length in 64-bit first and bail out cleanly if it cannot
@@ -120,12 +121,15 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
      * meshlen/crop0.w and under-allocating the field buffer. */
     size_t meshlen64 = (size_t)((cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : mesh->ne) * (size_t)cfg->srcnum * (size_t)nsrcslots;
 
-    if (meshlen64 * (size_t)((cfg->maxgate > 0) ? cfg->maxgate : 1) > 0xFFFFFFFFULL) {
+    if (savevolume && meshlen64 * (size_t)((cfg->maxgate > 0) ? cfg->maxgate : 1) > 0xFFFFFFFFULL) {
         mcx_error(-6, (char*)("output buffer length exceeds 32-bit addressing; reduce grid size, time gates, or source count"), __FILE__, __LINE__);
     }
 
-    cl_uint meshlen = (cl_uint)meshlen64;    /**< total output data length (per gate) */
-    cfg->crop0.w = meshlen * cfg->maxgate;    /**< total output data length, before double-buffer expansion */
+    /* MCX_SKIP_VOLUME keeps the kernel from touching gweight, but the kernel
+     * signature still needs a valid buffer argument. Use one dummy slot when
+     * volume output is disabled. */
+    cl_uint meshlen = savevolume ? (cl_uint)meshlen64 : 1u;    /**< total output data length (per gate), or a dummy slot when volume saving is off */
+    cfg->crop0.w = savevolume ? meshlen * cfg->maxgate : 1u;    /**< total output data length, before double-buffer expansion */
 
     cl_float*  field = NULL, *dref = NULL;
 
@@ -314,7 +318,8 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             fullload = totalcucore;
         }
 
-        field = (cl_float*)calloc(sizeof(cl_float) * (size_t)meshlen * (isrfforward ? 4 : 2), cfg->maxgate);
+        field = savevolume ? (cl_float*)calloc(sizeof(cl_float) * (size_t)meshlen * (isrfforward ? 4 : 2), cfg->maxgate)
+                : (cl_float*)calloc((size_t)(isrfforward ? 4 : 2), sizeof(cl_float));
         dref = (cl_float*)calloc(sizeof(cl_float) * mesh->nf, cfg->maxgate);
         Pdet = (float*)calloc(cfg->maxdetphoton * sizeof(float), hostdetreclen);
         MMC_ASSERT_ALLOC(field);
@@ -705,11 +710,11 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         MMC_FPRINTF(cfg->flog, "set kernel arguments complete : %d ms %d\n", GetTimeMillis() - tic, param.method);
         mcx_fflush(cfg->flog);
 
-        if (cfg->exportfield == NULL) {
+        if (savevolume && cfg->exportfield == NULL) {
             cfg->exportfield = mesh->weight;
         }
 
-        if (cfg->exportadjoint == NULL && isrfforward) {
+        if (savevolume && cfg->exportadjoint == NULL && isrfforward) {
             /* Grid and mesh paths both need an imag fluence buffer when RF is on so
              * the adjoint Jacobian post-processing can read phi_im(node). */
             cfg->exportadjoint = (float*)calloc(fieldlen, sizeof(float));
@@ -1026,7 +1031,7 @@ is more than what your have specified (%d), please use the -H option to specify 
             }
         }
 
-        if (cfg->isnormalized) {
+        if (cfg->isnormalized && savevolume) {
             double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
             for (j = 0; j < cfg->srcnum; j++) {
