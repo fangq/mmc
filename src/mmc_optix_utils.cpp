@@ -348,7 +348,7 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
                   << "][" << std::setw( 12 ) << tag << "]: "
                   << message << "\n";
     };
-#ifndef NDEBUG
+#ifdef MMC_OPTIX_DEBUG  /* full OptiX debug pipeline, opt-in: also fails on some driver/SDK combinations */
     options.logCallbackLevel = 4;
     options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
 #else
@@ -366,7 +366,7 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
 void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
     // moduleCompileOptions
     optixcfg->moduleCompileOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
-#ifndef NDEBUG
+#ifdef MMC_OPTIX_DEBUG
     optixcfg->moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     optixcfg->moduleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
 #else
@@ -381,7 +381,7 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
     optixcfg->pipelineCompileOptions.usesMotionBlur     = false;
     optixcfg->pipelineCompileOptions.numPayloadValues   = 15; /* +1 for RF imaginary weight */
     optixcfg->pipelineCompileOptions.numAttributeValues = 2;  // for triangle
-#ifndef NDEBUG
+#ifdef MMC_OPTIX_DEBUG
     optixcfg->pipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG |
             OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
 #else
