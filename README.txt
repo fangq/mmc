@@ -58,6 +58,10 @@ this release also fixed a list of bugs, including
 
 The full changelog is listed below
 
+* 2026-10-21 [7a3b3f3] [optix] terminate rays that miss all triangles in a non-scattering medium, fix NaN grid corners
+* 2026-10-21 [db4d829] [perf] build the OpenCL kernel with -cl-unsafe-math-optimizations, 1.14-1.16x
+* 2026-10-21 [e803195] [perf] dynamic photon dispatch in the OpenCL/CUDA kernel, 1.02-1.06x
+* 2026-10-21 [3dca2b6] [doc] refresh the v2026 ChangeLog and README change lists
 * 2026-10-21 [ddb5953] [perf] schedule the SSE/OpenMP photon loop dynamically, 1.1-1.3x on 16 threads
 * 2026-10-21 [fa723e2] [doc] refresh the v2026 ChangeLog, NEWS and README change lists
 * 2026-10-21 [3329d2c] [pmmc] opt-in CUDA backend (-DBUILD_CUDA=ON), fix its device query, test opencl/cuda
