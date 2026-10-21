@@ -423,7 +423,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             }
         } else {
             if (cfg->debuglevel & dlBary) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"barycentric\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"bary\"=[%f, %f, %f, %f]}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"barycentric\": {\"p\":[%f, %f, %f], \"eid\":%d, \"bary\":[%f, %f, %f, %f]}}\n",
                             r->photonid, r->p0.x, r->p0.y, r->p0.z, r->eid, baryout[0], baryout[1], baryout[2], baryout[3]);
             }
 
@@ -449,7 +449,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                     }
 
                     if (cfg->debuglevel & dlAccum) {
-                        MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"add\": {\"loc\"=[%f, %f, %f], \"w\":%e, \"eid\":%d, \"l\":%e}}\n",
+                        MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"add\": {\"loc\":[%f, %f, %f], \"w\":%e, \"eid\":%d, \"l\":%e}}\n",
                                     r->photonid, r->p0.x - (r->Lmove * 0.5f)*r->vec.x, r->p0.y - (r->Lmove * 0.5f)*r->vec.y, r->p0.z - (r->Lmove * 0.5f)*r->vec.z, ww, eid + 1, dlen);
                     }
 
@@ -685,7 +685,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             }
 
             if (cfg->debuglevel & dlAccum) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"pre-add\": {\"p\"=[%f, %f, %f], \"lmin\":%e, \"eid\":%d, \"l\":%e}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"pre-add\": {\"p\":[%f, %f, %f], \"lmin\":%e, \"eid\":%d, \"l\":%e}}\n",
                             r->photonid, r->p0.x, r->p0.y, r->p0.z, bary.x, eid + 1, r->Lmove);
             }
 
@@ -699,7 +699,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             barypout[facemap[i]] = 0.f;
 
             if (cfg->debuglevel & dlBary) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"barycentric\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"bary\"=[%f, %f, %f, %f]}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"barycentric\": {\"p\":[%f, %f, %f], \"eid\":%d, \"bary\":[%f, %f, %f, %f]}}\n",
                             r->photonid, r->p0.x, r->p0.y, r->p0.z, r->eid, barypout[0], barypout[1], barypout[2], barypout[3]);
             }
 
@@ -709,7 +709,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             dlen = r->Lmove / bary.x;       /* normalized moving length */
 
             if (cfg->debuglevel & dlAccum) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"add\": {\"loc\"=[%f, %f, %f], \"w\":%e, \"eid\":%d, \"l\":%e}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"add\": {\"loc\":[%f, %f, %f], \"w\":%e, \"eid\":%d, \"l\":%e}}\n",
                             r->photonid, r->p0.x - (r->Lmove * 0.5f)*r->vec.x, r->p0.y - (r->Lmove * 0.5f)*r->vec.y, r->p0.z - (r->Lmove * 0.5f)*r->vec.z, ww, eid + 1, dlen);
             }
 
@@ -924,7 +924,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             }
 
             if (cfg->debuglevel & dlAccum) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"pre-add\": {\"loc\"=[%f, %f, %f], \"lmin\":%e, \"eid\":%d, \"l\":%e}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"pre-add\": {\"loc\":[%f, %f, %f], \"lmin\":%e, \"eid\":%d, \"l\":%e}}\n",
                             r->photonid, r->p0.x, r->p0.y, r->p0.z, bary.x, eid + 1, r->Lmove);
             }
 
@@ -1270,7 +1270,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg)
                 r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
 
                 if (cfg->debuglevel & dlMove) {
-                    MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-edge\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
+                    MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-edge\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
                                 r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, firsthit);
                 }
             }
@@ -1322,7 +1322,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg)
             r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtNode : rtNone;
 
             if (cfg->debuglevel & dlMove) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-node\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-node\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
                             r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, firsthit);
             }
         }
@@ -1383,7 +1383,7 @@ void traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg)
         r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtFace : rtNone;
 
         if (cfg->debuglevel & dlMove) {
-            MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-face\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
+            MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-face\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
                         r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, firsthit);
         }
 
@@ -1560,7 +1560,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
             }
 
             if (cfg->debuglevel & dlAccum) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"pre-add\": {\"p\"=[%f, %f, %f], \"lmin\":%e, \"eid\":%d, \"l\":%e}}\n",
+                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"pre-add\": {\"p\":[%f, %f, %f], \"lmin\":%e, \"eid\":%d, \"l\":%e}}\n",
                             r->photonid, r->p0.x, r->p0.y, r->p0.z, bary.x, eid + 1, r->Lmove);
             }
 
@@ -1919,7 +1919,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             /*when a photon enters the domain from the background*/
             if (mesh->type[oldeid - 1] == 0 && mesh->type[r.eid - 1]) {
                 if (cfg->debuglevel & dlExit)
-                    MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"enter\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"w\":%f, \"eid=\"%d}}\n", id, r.p0.x, r.p0.y, r.p0.z,
+                    MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"enter\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"w\":%f, \"eid\":%d}}\n", id, r.p0.x, r.p0.y, r.p0.z,
                                 r.vec.x, r.vec.y, r.vec.z, r.weight, r.eid);
 
                 if (!cfg->voidtime) {
@@ -1930,7 +1930,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             /*when a photon exits the domain into the background*/
             if (mesh->type[oldeid - 1] && mesh->type[r.eid - 1] == 0) {
                 if (cfg->debuglevel & dlExit)
-                    MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"leave\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"w\":%f, \"eid=\"%d}}\n", id, r.p0.x, r.p0.y, r.p0.z,
+                    MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"leave\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"w\":%f, \"eid\":%d}}\n", id, r.p0.x, r.p0.y, r.p0.z,
                                 r.vec.x, r.vec.y, r.vec.z, r.weight, r.eid);
 
                 if (!cfg->isextdet) {
@@ -1941,7 +1941,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 
             /*print intersection position*/
             if (r.pout.x != MMC_UNDEFINED && (cfg->debuglevel & dlMove)) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"hit\": {\"pout\"=[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.pout.x, r.pout.y, r.pout.z, r.eid, r.slen);
+                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"hit\": {\"pout\":[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.pout.x, r.pout.y, r.pout.z, r.eid, r.slen);
             }
 
             if (cfg->implicit) {
@@ -1984,12 +1984,12 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 
         if (r.eid <= 0 || r.pout.x == MMC_UNDEFINED) {
             if (r.eid != ID_UNDEFINED && (cfg->debuglevel & dlMove)) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"exit-boundary\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen);
+                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"exit-boundary\": {\"p\":[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen);
             }
 
             if (r.eid != ID_UNDEFINED) {
                 if (cfg->debuglevel & dlExit)
-                    MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"terminate\": {\"p\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"w\":%f, \"eid=\"%d}}\n", id, r.p0.x, r.p0.y, r.p0.z,
+                    MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"terminate\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"w\":%f, \"eid\":%d}}\n", id, r.p0.x, r.p0.y, r.p0.z,
                                 r.vec.x, r.vec.y, r.vec.z, r.weight, r.eid);
 
                 if (cfg->issavedet && cfg->issaveexit) {                                   /*when issaveexit is set to 1*/
@@ -2002,9 +2002,9 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
                     mesh->dref[((-r.eid) - 1) + tshift] += r.weight;
                 }
             } else if (r.faceid == -2 && (cfg->debuglevel & dlMove)) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"terminate-by-time\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen);
+                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"terminate-by-time\": {\"p\":[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen);
             } else if (r.eid && r.faceid != -2  && cfg->debuglevel & dlEdge) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"terminate-by-exit\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen);
+                MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"terminate-by-exit\": {\"p\":[%f, %f, %f], \"eid\":%d, \"slen\":%e}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen);
             }
 
             if (cfg->issavedet && r.eid <= 0) {
@@ -2027,7 +2027,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->debuglevel & dlMove) {
-            MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"move\": {\"p\"=[%f, %f, %f], \"eid\":%d, \"slen\":%e, \"l\":%f}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen, r.Lmove);
+            MMC_FPRINTF(cfg->flog, "{\"id\":%zu, \"move\": {\"p\":[%f, %f, %f], \"eid\":%d, \"slen\":%e, \"l\":%f}}\n", id, r.p0.x, r.p0.y, r.p0.z, r.eid, r.slen, r.Lmove);
         }
 
         if (cfg->minenergy > 0.f && r.weight < cfg->minenergy && (cfg->tend - cfg->tstart)*visit->rtstep <= 1.f) { /*Russian Roulette*/
@@ -2213,7 +2213,7 @@ float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, in
             *inroi = !(*inroi);
 
             if (cfg->debuglevel & dlReflect) {
-                MMC_FPRINTF(cfg->flog, "{\"implicit-reflect\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
+                MMC_FPRINTF(cfg->flog, "{\"implicit-reflect\": {\"norm\":[%f, %f, %f], \"v\":[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
             }
         } else if (cfg->isspecular == 2 && *eid == 0) {
             // if do transmission, but next neighbor is 0, terminate
@@ -2222,7 +2222,7 @@ float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, in
             vec_mult_add3(pn, c0, tmp2, n1 / n2, c0);
 
             if (cfg->debuglevel & dlReflect) {
-                MMC_FPRINTF(cfg->flog, "{\"implicit-transmit\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
+                MMC_FPRINTF(cfg->flog, "{\"implicit-transmit\": {\"norm\":[%f, %f, %f], \"v\":[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
             }
         }
     } else { /*total internal reflection*/
@@ -2230,7 +2230,7 @@ float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, in
         *inroi = !(*inroi);
 
         if (cfg->debuglevel & dlReflect) {
-            MMC_FPRINTF(cfg->flog, "{\"implicit-totalreflect\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
+            MMC_FPRINTF(cfg->flog, "{\"implicit-totalreflect\": {\"norm\":[%f, %f, %f], \"v\":[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, *inroi, roitype, roiidx);
         }
     }
 
@@ -2305,7 +2305,7 @@ float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int*
             *eid = *oldeid; /*stay with the current element*/
 
             if (cfg->debuglevel & dlReflect) {
-                MMC_FPRINTF(cfg->flog, "{\"implicit-reflect\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"faceid\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, inroi, faceid);
+                MMC_FPRINTF(cfg->flog, "{\"implicit-reflect\": {\"norm\":[%f, %f, %f], \"v\":[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"faceid\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, inroi, faceid);
             }
         } else if (cfg->isspecular == 2 && *eid == 0) {
             // if do transmission, but next neighbor is 0, terminate
@@ -2314,7 +2314,7 @@ float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int*
             vec_mult_add(pn, c0, tmp2, n1 / n2, c0);
 
             if (cfg->debuglevel & dlReflect) {
-                MMC_FPRINTF(cfg->flog, "{\"implicit-transmit\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"faceid\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, inroi, faceid);
+                MMC_FPRINTF(cfg->flog, "{\"implicit-transmit\": {\"norm\":[%f, %f, %f], \"v\":[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"faceid\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, inroi, faceid);
             }
         }
     } else { /*total internal reflection*/
@@ -2322,7 +2322,7 @@ float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int*
         *eid = *oldeid;
 
         if (cfg->debuglevel & dlReflect) {
-            MMC_FPRINTF(cfg->flog, "{\"implicit-totalreflect\": {\"norm\"=[%f, %f, %f], \"v\"=[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"faceid\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, inroi, faceid);
+            MMC_FPRINTF(cfg->flog, "{\"implicit-totalreflect\": {\"norm\":[%f, %f, %f], \"v\":[%f, %f, %f], \"eid\":%d, \"inroi\":%d, \"faceid\":%d}}\n", pn->x, pn->y, pn->z, c0->x, c0->y, c0->z, *eid, inroi, faceid);
         }
     }
 
