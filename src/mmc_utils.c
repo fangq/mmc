@@ -1044,7 +1044,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
 
             cJSON_AddItemToObject(dat, dname[id], sub = cJSON_CreateObject());
 
-            if (mcx_jdataencode(buf, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 1, cfg)) {
+            if (mcx_jdataencode(buf, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 0, cfg)) {
                 MMC_ERROR(-1, "error when converting to JSON");
             }
 
@@ -1099,7 +1099,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
 
                     cJSON_AddItemToObject(dat, "srcid", sub = cJSON_CreateObject());
 
-                    if (mcx_jdataencode((void*)srcid, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 1, cfg)) {
+                    if (mcx_jdataencode((void*)srcid, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 0, cfg)) {
                         MMC_ERROR(-1, "error when converting to JSON");
                     }
 
@@ -1108,7 +1108,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
 
                 cJSON_AddItemToObject(dat, dname[id], sub = cJSON_CreateObject());
 
-                if (mcx_jdataencode(val, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 1, cfg)) {
+                if (mcx_jdataencode(val, 2, dims, dtype[id], 4, cfg->zipid, sub, 0, 0, cfg)) {
                     MMC_ERROR(-1, "error when converting to JSON");
                 }
 
@@ -1122,7 +1122,7 @@ void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig*
         uint dims[2] = {count, cfg->his.seedbyte};
         cJSON_AddItemToObject(dat, "seed", sub = cJSON_CreateObject());
 
-        if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, sub, 0, 1, cfg)) {
+        if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, sub, 0, 0, cfg)) {
             MMC_ERROR(-1, "error when converting to JSON");
         }
     }
@@ -1243,7 +1243,7 @@ void mcx_savejdb(float* ppath, void* seeds, uint count, int doappend, mcconfig* 
             ubjw_write_key(root, dname[id]);
             ubjw_begin_object(root, UBJ_MIXED, 0);
 
-            if (mcx_jdataencode(buf, 2, dims, dtype[id], 4, cfg->zipid, root, 1, 1, cfg)) {
+            if (mcx_jdataencode(buf, 2, dims, dtype[id], 4, cfg->zipid, root, 1, 0, cfg)) {
                 MMC_ERROR(-1, "error when converting to JSON");
             }
 
@@ -1257,7 +1257,7 @@ void mcx_savejdb(float* ppath, void* seeds, uint count, int doappend, mcconfig* 
             ubjw_write_key(root, "seed");
             ubjw_begin_object(root, UBJ_MIXED, 0);
 
-            if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, root, 1, 1, cfg)) {
+            if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, root, 1, 0, cfg)) {
                 MMC_ERROR(-1, "error when converting to JSON");
             }
 
@@ -1312,7 +1312,7 @@ void mcx_savejdb(float* ppath, void* seeds, uint count, int doappend, mcconfig* 
                     ubjw_write_key(root, "srcid");
                     ubjw_begin_object(root, UBJ_MIXED, 0);
 
-                    if (mcx_jdataencode((void*)srcid, 2, dims, dtype[id], 4, cfg->zipid, root, 1, 1, cfg)) {
+                    if (mcx_jdataencode((void*)srcid, 2, dims, dtype[id], 4, cfg->zipid, root, 1, 0, cfg)) {
                         MMC_ERROR(-1, "error when converting to JSON");
                     }
 
@@ -1323,7 +1323,7 @@ void mcx_savejdb(float* ppath, void* seeds, uint count, int doappend, mcconfig* 
                 ubjw_write_key(root, dname[id]);
                 ubjw_begin_object(root, UBJ_MIXED, 0);
 
-                if (mcx_jdataencode(val, 2, dims, dtype[id], 4, cfg->zipid, root, 1, 1, cfg)) {
+                if (mcx_jdataencode(val, 2, dims, dtype[id], 4, cfg->zipid, root, 1, 0, cfg)) {
                     MMC_ERROR(-1, "error when converting to JSON");
                 }
 
@@ -1338,7 +1338,7 @@ void mcx_savejdb(float* ppath, void* seeds, uint count, int doappend, mcconfig* 
             ubjw_write_key(root, "seed");
             ubjw_begin_object(root, UBJ_MIXED, 0);
 
-            if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, root, 1, 1, cfg)) {
+            if (mcx_jdataencode(seeds, 2, dims, "uint8", 1, cfg->zipid, root, 1, 0, cfg)) {
                 MMC_ERROR(-1, "error when converting to JSON");
             }
 
