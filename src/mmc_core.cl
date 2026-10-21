@@ -301,7 +301,7 @@ typedef struct MMC_FLOAT3 {
     #define MCX_SINCOS(theta,osin,ocos)   {(osin)=native_sin(theta);(ocos)=native_cos(theta);}
 #else
     #define MCX_MATHFUN(fun)              fun
-    #define MCX_SINCOS(theta,osin,ocos)   (ocos)=sincos((theta),&(osin))
+    #define MCX_SINCOS(theta,osin,ocos)   (osin)=sincos((theta),&(ocos))  /* OpenCL sincos returns sin, stores cos */
 #endif
 
 #ifdef MCX_SAVE_DETECTORS

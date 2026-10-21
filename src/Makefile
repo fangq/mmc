@@ -28,3 +28,6 @@ ifneq (,$(filter $(MAKECMDGOALS),optix optixmex optixoct))
 endif
 
 include $(ROOTDIR)/commons/Makefile_common.mk
+
+## mmc_utils.c embeds the OpenCL kernel; recompile whenever mmc_core.cl changes ##
+$(OBJDIR)/mmc_utils$(OBJSUFFIX): $(CLSOURCE)
