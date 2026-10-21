@@ -266,8 +266,9 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             mcx_progressbar(-0.f);
         }
 
-        /*launch photons*/
-        #pragma omp for reduction(+:raytri,raytri0)
+        /*launch photons; photon lifetimes vary widely, so hand out small chunks dynamically instead of
+          splitting the photons evenly over the threads up front - with one thread the order is unchanged*/
+        #pragma omp for reduction(+:raytri,raytri0) schedule(dynamic, 64)
 
         for (id = 0; id < cfg->nphoton; id++) {
             visit.raytet = 0.f;
