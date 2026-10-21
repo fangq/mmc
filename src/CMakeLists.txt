@@ -223,6 +223,18 @@ if(BUILD_PYTHON)
     add_dependencies(_pmmc clheader)
     set_target_properties(_pmmc PROPERTIES CXX_VISIBILITY_PRESET "hidden")
 
+    # opt-in CUDA backend (compute='cuda'), e.g. CMAKE_ARGS="-DBUILD_CUDA=ON" pip install .
+    if(BUILD_CUDA)
+        cuda_add_library(pmmc-cudahost STATIC
+            mmc_cu_host.cu
+            mmc_cu_host.h
+            )
+        target_compile_definitions(pmmc-cudahost PUBLIC MCX_CONTAINER PYBIND11_VERSION_MAJOR)
+        target_compile_definitions(_pmmc PUBLIC USE_CUDA)
+        target_link_libraries(_pmmc pmmc-cudahost ${CUDA_LIBRARIES})
+        add_dependencies(pmmc-cudahost clheader)
+    endif()
+
 endif()
 
 

@@ -51,6 +51,7 @@
 #endif
 #ifdef USE_CUDA
     #include "mmc_cu_host.h"
+    int mcx_list_cu_gpu(mcconfig* cfg, GPUInfo** info); /* defined in mmc_cu_host.cu; mmc_cuda_query_gpu.h clashes with the vector types */
 #endif
 #include "mmc_tictoc.h"
 #include "mmc_raytrace.h"
@@ -922,7 +923,10 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
         if (mcx_config.compute == cbCUDA) {
 #ifdef USE_CUDA
-            mcx_list_cu_gpu(&mcx_config, &active_dev, NULL, &gpu_info);
+            char deviceid0[MAX_DEVICE];  /* mmc_run_cu lists the devices again, keep the unconverted mask */
+            memcpy(deviceid0, mcx_config.deviceid, MAX_DEVICE);
+            active_dev = mcx_list_cu_gpu(&mcx_config, &gpu_info);
+            memcpy(mcx_config.deviceid, deviceid0, MAX_DEVICE);
 #endif
         } else {
 #ifdef USE_OPENCL
@@ -1399,7 +1403,7 @@ py::list get_GPU_info() {
 
         if (mcx_config.compute == cbCUDA) {
 #ifdef USE_CUDA
-            mcx_list_cu_gpu(&mcx_config, &workdev, NULL, &gpu_info);
+            workdev = mcx_list_cu_gpu(&mcx_config, &gpu_info);
 #endif
         } else {
 #ifdef USE_OPENCL

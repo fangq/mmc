@@ -99,6 +99,9 @@ cd mmc/pmmc
 stored inside the `mmc/pmmc` folder. You can install this wheel package using `python3 -m pip install --force-reinstall pmmc-*.whl`
 to force installing this locally compiled `pmmc` module and overwrite any previously installed versions.
 
+6. (optional) To also build the CUDA backend (`cfg["compute"] = "cuda"`, NVIDIA GPUs only), install the CUDA
+toolkit and pass `-DBUILD_CUDA=ON` to CMake, for example `CMAKE_ARGS="-DBUILD_CUDA=ON" python3 -m pip install .`
+
 
 ## How to use
 

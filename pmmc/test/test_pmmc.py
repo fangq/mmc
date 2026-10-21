@@ -1,4 +1,6 @@
-"""Minimal pmmc tests on the CPU (SSE/OpenMP) path, no GPU needed
+"""Minimal pmmc tests on the CPU (SSE/OpenMP) path, no GPU needed; the GPU
+backends (opencl, and cuda when built with CMAKE_ARGS="-DBUILD_CUDA=ON") are
+tested on device 1 when usable, and skipped otherwise
 
 Run with: python3 -m unittest discover -s pmmc/test
 """
@@ -72,6 +74,38 @@ class TestPMMC(unittest.TestCase):
         absorbed = pmmc.run(cfg)["flux"].sum()
         self.assertGreater(absorbed, 0.54)
         self.assertLess(absorbed, 0.60)
+
+
+def has_backend(name):
+    """True if pmmc can run on the given GPU backend on device 1"""
+    if pmmc is None:
+        return False
+
+    cfg = base_cfg()
+    cfg.update({"nphoton": 100, "compute": name, "gpuid": 1})
+
+    try:
+        return "flux" in pmmc.run(cfg)
+    except Exception:
+        return False
+
+
+class TestPMMCGPU(unittest.TestCase):
+    def check_absorbed(self, backend):
+        if not has_backend(backend):
+            self.skipTest("pmmc %s backend is not available" % backend)
+
+        cfg = base_cfg()
+        cfg.update({"outputtype": "energy", "compute": backend, "gpuid": 1, "nphoton": 100000})
+        absorbed = pmmc.run(cfg)["flux"].sum()
+        self.assertGreater(absorbed, 0.56)
+        self.assertLess(absorbed, 0.59)
+
+    def test_absorbed_fraction_opencl(self):
+        self.check_absorbed("opencl")
+
+    def test_absorbed_fraction_cuda(self):
+        self.check_absorbed("cuda")
 
 
 if __name__ == "__main__":
