@@ -607,6 +607,15 @@ extern "C" __global__ void __miss__ms() {
     // get medium properties
     const Medium currprop = gcfg.medium[r.mediumid];
 
+    // a ray that hits no triangle in a non-scattering medium (the void outside the
+    // mesh, mus=0) has left the domain for good: slen/mus is inf, and depositing
+    // that segment wrote NaN into the 8 corners of the output grid
+    if (currprop.mus == 0.f) {
+        r.mediumid = DEAD_MEDIUM_ID;
+        setRay(r);
+        return;
+    }
+
     // distance to the scattering event site
     float lmove = r.slen / currprop.mus;
 
