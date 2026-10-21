@@ -486,8 +486,11 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         OCL_ASSERT(((mcxprogram = clCreateProgramWithSource(mcxcontext, 1, (const char**) & (cfg->clsource), NULL, &status), status)));
 
+        /* -cl-unsafe-math-optimizations, but not -cl-fast-relaxed-math: the latter implies
+         * -cl-finite-math-only, and the ray-tetrahedron test relies on inf; autopilot off
+         * (-A 0) keeps strict math for reproducible runs */
         if (cfg->optlevel >= 1) {
-            snprintf(opt, MAX_JIT_OPT_LEN - strlen(opt), "%s ", "-cl-mad-enable -DMCX_USE_NATIVE");
+            snprintf(opt, MAX_JIT_OPT_LEN - strlen(opt), "%s ", cfg->autopilot ? "-cl-mad-enable -cl-unsafe-math-optimizations -DMCX_USE_NATIVE" : "-cl-mad-enable -DMCX_USE_NATIVE");
         }
 
         if (cfg->optlevel >= 2) {
