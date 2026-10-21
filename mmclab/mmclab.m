@@ -394,7 +394,38 @@ for i = 1:len
         cfg(i).srcpattern = reshape(cfg(i).srcpattern, ...
                                     size(cfg(i).srcpattern, 1), size(cfg(i).srcpattern, 2), 1);
     end
-    if (isnan(cfg(i).e0))  % widefield source
+    % Wide-field sources pick a new launch position on the source plane for
+    % every photon, so the launch element must be looked up per-photon. The GPU
+    % kernels (mmc_core.cl/mmc_core.cu, "for(is=0;is<srcelemlen;is++)") scan
+    % only the srcelem[] list that mesh_srcdetelem() builds from elements
+    % labeled elemprop<0, and they have no fallback: when srcelemlen==0 the
+    % loop body never runs and every photon silently keeps r->eid=cfg.e0,
+    % depositing the whole beam into that one tetrahedron instead of the
+    % requested pattern. (The CPU tracer starts the same loop at is=-1 and at
+    % least raises "initial element does not enclose the source!".)
+    %
+    % Keying the retessellation below off isnan(cfg.e0) alone is not enough: a
+    % cfg.srcpos placed exactly on (or inside) the mesh surface makes tsearchn
+    % succeed, so the whole mmcsrcdomain/mmcaddsrc block used to be skipped and
+    % the simulation ran on with srcelemlen==0. Trigger it off the source type
+    % instead.
+    %
+    % The kernel also gates fourierx/fourierx2d as wide-field, but they are
+    % left out here on purpose: mmcsrcdomain overrides v2 with cross(srcpos,v1)
+    % for those (a position crossed with a direction, so the domain is not
+    % guaranteed to enclose the source), and it spells the second one
+    % 'fourier2d' while srctypeid[] in mmc_utils.c calls it 'fourierx2d', so
+    % 'fourierx2d' falls through to its "source type not supported" error. Add
+    % them here once mmcsrcdomain is fixed.
+    %
+    % optix is excluded because it does its own source handling, never gets the
+    % added source domain (see the mmcaddsrc guard below), and reads cfg.e0 to
+    % pick launchParams.mediumid0 in mmc_optix_utils.cpp -- entering this block
+    % would reset a perfectly good e0 to -1 for it.
+    iswidesrc = isfield(cfg(i), 'srctype') && ...
+        any(strcmp(cfg(i).srctype, {'planar', 'pattern', 'fourier'})) && ...
+        ~(isfield(cfg(i), 'compute') && strcmp(cfg(i).compute, 'optix'));
+    if (isnan(cfg(i).e0) || iswidesrc)  % widefield source
         if (~isfield(cfg(i), 'srcparam1') || ~isfield(cfg(i), 'srcparam2'))
             error('for wide-field sources, you must provide srcparam1 and srcparam2');
         end
@@ -432,6 +463,18 @@ for i = 1:len
             cfg(i).e0 = find(cfg(i).elemprop < 0);
         else
             cfg(i).e0 = -1;
+        end
+        % refuse to hand the GPU a wide-field source with an empty srcelem[]
+        % list -- see the comment above (iswidesrc is already false for optix)
+        if (iswidesrc && ~any(cfg(i).elemprop < 0))
+            error(['no source-domain element was tessellated into the mesh for ' ...
+                   'the ''' cfg(i).srctype ''' wide-field source, so the ' ...
+                   'per-photon launch-element search has nothing to search and ' ...
+                   'the simulation would deposit the entire beam into element ' ...
+                   'cfg.e0. this normally means cfg.srcpos sits on or inside ' ...
+                   'the mesh surface: move the source outside the mesh, ' ...
+                   'against cfg.srcdir, so that mmcaddsrc can attach the ' ...
+                   'source domain (see mmclab/example/demo_compare_mmc_mcx.m)']);
         end
     end
     if (~isfield(cfg(i), 'elemprop'))
