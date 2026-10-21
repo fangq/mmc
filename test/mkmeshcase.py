@@ -7,8 +7,14 @@ Usage:
 
 MCXCASE uses a Grid shape covering Domain.Dim, optionally split along z by
 ZLayers. The same box is tessellated into tetrahedra (6 Kuhn tetrahedra per
-z-slab, conforming across slabs) and written inline as Mesh.MeshNode/MeshElem,
-so that MMC traces photons in exactly the same domain and media as MCX.
+box of a rectilinear grid, conforming across boxes) and written inline as
+Mesh.MeshNode/MeshElem, so that MMC traces photons in exactly the same domain
+and media as MCX.
+
+The box is also split along x and y at unequal fractions (XYSPLIT): with a
+single box, the symmetric pencil beam at the domain center would travel inside
+the internal x=y face shared by the Kuhn tetrahedra, a degenerate ray that
+the tracer handles by nudging the photon (fixphoton), differently per backend.
 """
 
 import json
@@ -16,8 +22,11 @@ import sys
 from itertools import permutations
 
 
-def kuhn_tets(x, y, z0, z1):
-    """6 tetrahedra filling [0,x]x[0,y]x[z0,z1], all sharing the main diagonal"""
+XYSPLIT = (0.37, 0.61)  # x and y split fractions, unequal to avoid diagonal faces through the center
+
+
+def kuhn_tets(x0, x1, y0, y1, z0, z1):
+    """6 tetrahedra filling [x0,x1]x[y0,y1]x[z0,z1], all sharing the main diagonal"""
     nodes, tets = [], []
     corner = {}
 
@@ -25,7 +34,7 @@ def kuhn_tets(x, y, z0, z1):
         for j in (0, 1):
             for k in (0, 1):
                 corner[(i, j, k)] = len(nodes)
-                nodes.append([i * x, j * y, z0 + k * (z1 - z0)])
+                nodes.append([x0 + i * (x1 - x0), y0 + j * (y1 - y0), z0 + k * (z1 - z0)])
 
     for perm in permutations(range(3)):
         v = [0, 0, 0]
@@ -89,8 +98,13 @@ def main():
 
     nodemap, nodes, elems = {}, [], []
 
-    for z0, z1, t in layers:
-        n, tets = kuhn_tets(dim[0], dim[1], z0, z1)
+    xs = [0, dim[0] * XYSPLIT[0], dim[0]]
+    ys = [0, dim[1] * XYSPLIT[1], dim[1]]
+    boxes = [(xs[i], xs[i + 1], ys[j], ys[j + 1], z0, z1, t)
+             for z0, z1, t in layers for i in range(2) for j in range(2)]
+
+    for x0, x1, y0, y1, z0, z1, t in boxes:
+        n, tets = kuhn_tets(x0, x1, y0, y1, z0, z1)
         local = []
 
         for p in n:
