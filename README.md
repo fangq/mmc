@@ -74,6 +74,8 @@ this release also fixed a list of bugs, including
 
 The full changelog is listed below
 
+* 2026-10-21 [ddb5953] [perf] schedule the SSE/OpenMP photon loop dynamically, 1.1-1.3x on 16 threads
+* 2026-10-21 [fa723e2] [doc] refresh the v2026 ChangeLog, NEWS and README change lists
 * 2026-10-21 [3329d2c] [pmmc] opt-in CUDA backend (-DBUILD_CUDA=ON), fix its device query, test opencl/cuda
 * 2026-10-21 [5e5b797] [build] link cudart into the Octave mex built by 'make cudaoct'
 * 2026-10-21 [9b7c135] [test] test the opencl, cuda and optix backends compiled into mmc in testmmc.sh
