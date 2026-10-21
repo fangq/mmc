@@ -494,7 +494,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     uint srcpropoffset = (uint)(mesh->prop + 1 + cfg->isextdet);
     uint detpropoffset = srcpropoffset + (uint)(cfg->extrasrclen * 4);
 
-    if (detpropoffset + cfg->detnum + (param.normbuf << 2) >= MAX_PROP) {
+    if (detpropoffset + cfg->detnum + (param.normbuf << 2) > MAX_PROP) {
         mcx_error(-5, "Total tissue types, extra sources, detectors and normals must fit in MAX_PROP slots", __FILE__, __LINE__);
     }
 

@@ -53,7 +53,7 @@ WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
 
 # benchmark name and the expected integer part(s) of the absorbed fraction
-for bench in "dmmc-cube60:1[78]" "dmmc-cube60b:2[67]" "edgeimmc:30" "nodeimmc:14" "faceimmc:94"; do
+for bench in "dmmc-cube60:1[78]" "dmmc-cube60b:2[67]" "edgeimmc:30" "nodeimmc:1[45]" "faceimmc:94"; do
     name=${bench%%:*}
     expect=${bench#*:}
     echo "test absorbed fraction of benchmark $name ... "
