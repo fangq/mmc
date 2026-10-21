@@ -19,92 +19,145 @@ Table of Content:
 
 == # What's New ==
 
-MMC v2025.10 (2.8.0) is a maintenance release with multiple bug fixes and new features. It is highly
-recommended to upgrade for all users.
+MMC v2026 (3.0.0) is a milestone release that brings mesh-based MC to feature parity
+with MCX for inverse problems, and makes its ray-tracing verifiable step-by-step.
+It is highly recommended to upgrade for all users.
 
-MMC v2025.10 adds the below key features
+MMC v2026 adds the below key features
 
-* new Python module - pmmc (`pip install pmmc`)
-* pmmc supports Apple silicon
-* pmmc integrates with pyiso2mesh (`pip install iso2mesh`)
-* support focal length via `cfg.srcdir(4)`, fix #108
-* support isotropic (`cfg.srcdir(4)=nan`) and Lambertian launch (`cfg.srcdir(4)=-inf`)
-* make implicit MMC (immc) available on OpenMP-only builds, such as Apple silicon (where SSE is not supported)
-* enable level-3 optimization (`--optlevel 3`) by default, accelerating simulations by 30%-100%
+* mesh-space adjoint Jacobians (full FEM and nodal approximation) computed on the GPU,
+  per-node mua/musp for diffuse optical tomography, and saving both the forward
+  solution and the Jacobian in one run
+* RF forward and RF/CW adjoint Jacobians ported from MCX, with complex photon weights
+  in the mesh-based (BLBadouel) kernel
+* MCX-compatible multi-source simulations (`cfg.srcid`, JSON array `Pos`/`Dir`,
+  per-slot normalization, `srcid` column in detected photon data)
+* new source types: pencilarray, pattern3d, hyperboloid and ring; new OptiX source
+  types (disk/gaussian/zgaussian/isotropic/cone/arcsine/line/slit) and a single
+  acceleration structure for arbitrary sources in the OptiX-based RT-MMC
+  (contributed by Shijie Yan)
+* `-F bnii` binary JSON output, `cfg.compileropt`/`cfg.kernelfile` in mmclab/pmmc
+* faster CUDA kernel (64 registers, templated RF/multi-source/detphoton paths)
+* new functional and step-by-step trajectory tests (`test/testmmc.sh`,
+  `test/testtraj.sh`) that run on the CPU, compare MMC with MMC golden data and
+  statistically with MCX on matching voxel/mesh domains, and run in the CI
+* pmmc is bumped to 0.4.0
 
 this release also fixed a list of bugs, including
 
-* fix a critical-level bug related to fluence normalization - affect all simulations starting v2025
-* fix a "photon-leakage" bug in implicit MMC (immc) #76
-* fix the 2nd-neighboring element search in implicit MMC (immc)
-* fix incorrect node passing to OpenCL kernel, fix #109
-* fix roulettesize type in OpenCL bug, fixed by Aiden Lewis
-* remove outdated replay preprocessing, use mcx workflow, fix #110
-* allow widefield source to search cfg->e0 first before searching srcelem
+* detected photon, trajectory and seed records in `.jdt`/`.jdb` files were tagged
+  column-major and were scrambled when loaded by JData readers
+* wide-field sources placed on the mesh surface silently deposited the whole beam
+  into one element on the GPU; fourierx/fourierx2d source domains were incorrect
+* low-mua fluence deposition, detector lookup with extra sources, and OpenCL volume
+  buffer allocation (contributed by Lorenzo Pattelli, #129-#132)
+* long-standing OpenCL memory leaks (#127), replay with `--optlevel 3` (#122),
+  cone/zgaussian launch direction (#121), immc trajectories and partial paths (#116),
+  `-F jnii` for detected photons/trajectories (#124), `--maxjumpdebug` (#123),
+  unitinmm with `cfg.method='grid'` (#117), faceroi search (#119, #120)
 
 The full changelog is listed below
 
-* 2025-10-20 [ae42a8c] [pmmc] bump version to 0.3.6 to include fix to #113
-* 2025-10-20 [4be1227] [bug] add missing macros after enabling optlevel 3, fix #113
-* 2025-10-12 [c113625] [deploy] fix octave 5.2 opencl not linked bug, fix command
-* 2025-10-12 [6acfb54] [deploy] fix octave 5.2 opencl not linked bug, need to set LFLAGS instead of LDFLAGS
-* 2025-10-11 [36c381d] [deploy] use LIBOPENCL for opencl library
-* 2025-10-09 [904fd93] [deploy] fix octave mex file missing libOpenCL on older Linux
-* 2025-10-06 [8d170a6] [release] prepare release for v2025.10
-* 2025-10-02 [cc5179c] [doc] update doc for v2025.10, bump pmmc to 0.3.5
-* 2025-10-02 [7dd25d9] [bug] enable immc in omp only mode on Apple silicon, fix memory error when r->nexteid
-* 2025-10-02 [d21587a] [bug] build immc in omp mode without sse, such as on Apple silicon, result incorrect
-* 2025-10-02 [c2cbc3b] [amd] fix one more warning
-* 2025-10-02 [7f1b47e] [amd] remove jit warnings
-* 2025-10-02 [8d0c19d] [bug] critical bug fix - incorrect energytot and energyesc introduced in commit 072fafe4305cd3c2da78094b0622dc4c67267983 Oct 14 2024
-* 2025-10-01 [2f81f87] [clang] silence clang warnings, make optlevel 3 default with macros
-* 2025-09-29 [63b48a6] [bug] add the missing gcfg constants when using -o 4 optimization
-* 2025-09-27 [2649e36] [doc] update documentation for v2025.10
-* 2025-09-19 [74191ba] [ci] avoid using slow choco octave installation
-* 2025-09-15 [688c1ba] [feat] support focal length via cfg.srcdir(4), fix #108
-* 2025-08-25 [38f8e8a] [pmmc] bump version to 0.3.0 to include expanded mcx utils functions
-* 2025-08-21 [c085223] [pmmc] bump pmmc to v0.2.6 to include the bug fixes for immc
-* 2025-08-21 [3ab80db] [ci] adjust pybind11 version for various python
-* 2025-08-21 [aaf588c] [ci] avoid pybind11 upgrade for python 3.6
-* 2025-08-21 [6d93cd6] [ci] fetch tags before checking out specific version
-* 2025-08-21 [1d9b118] [ci] downgrade pybind11 to v2 to avoid ci errors
-* 2025-08-20 [0c43144] [bug] fix immc photon leakage from edge cases in tracer #76
-* 2025-08-18 [0d3cf79] [bug] fix 2nd neighbor element ID referencing, fixing notch artifact thanks to the debugging info provided by Aiden Lewis
-* 2025-07-30 [0798ba2] [format] reformat c and matlab with formatters
-* 2025-07-30 [f80d541] [bug] remove outdated replay preprocessing, use mcx workflow, fix #110
-* 2025-07-19 [f86c824] [ci] upload updated pmmc for apple silicon, bump 0.2.5
-* 2025-07-19 [3d6803a] [ci] build pmmc on apple silicon
-* 2025-07-19 [97543d3] [pmmc] statically link with libomp, build on apple silicon
-* 2025-07-19 [7328d46] [pmmc] use libgomp-1.dll from sparse_numba, bump to 0.2.4
-* 2025-07-18 [a808bd1] [ci] update pmmc version to use statically linked _pmmc module
-* 2025-07-18 [7c97cf0] [ci] install intel opencl runtime on windows 2022
-* 2025-07-18 [8923673] [ci] print verbose info to debug windows pmmc wheel build
-* 2025-07-18 [e68a427] [bug] allow widefield source to search cfg->e0 first before searching srcelem
-* 2025-07-17 [16031dd] [ci] build windows wheels for python 3.13, bump version 0.2.2
-* 2025-07-17 [504730f] [ci] only update pybind11 for 3.13
-* 2025-07-17 [542ae94] [ci] check out submodule
-* 2025-07-16 [792f809] [ci] use git version of pybind11 for windows pmmc build
-* 2025-06-25 [24dab0b] [ci] remove windows python 3.13 build due to errors
-* 2025-06-25 [7607095] [pmmc] bump to 0.2.1, add iso2mesh example, add 3.13 on win
-* 2025-06-25 [65642f1] [bug] fix roulettesize type in OpenCL bug, fixed by Aiden Lewis
-* 2025-06-07 [a69ed21] [pmmc] first fully working version, bump to v0.2.0
-* 2025-06-07 [e6b6540] [pmmc] fix pyvista tetgen mesh bug, need to flip element
-* 2025-06-07 [40ab888] [pmmc] bump version to 0.1.0
-* 2025-06-07 [b104d02] [ci] fix macos pmmc
-* 2025-06-07 [031cc06] [ci] macos pmmc build missing omp.h
-* 2025-06-07 [8e06991] [ci] fix windows pmmc build
-* 2025-06-07 [d747603] [ci] macos pmmc build error
-* 2025-06-07 [a3342d8] [ci] remove ubuntu-20.04 from linux, debug macos pmmc build
-* 2025-06-07 [98a11dc] [ci] debug windows and macos pmmc build
-* 2025-06-07 [f910e0a] [ci] try fixing macos build
-* 2025-06-07 [12346b7] [ci] build pmmc
-* 2025-06-07 [5ef7a78] [pmmc] version 0.0.1
-* 2025-06-06 [edacffb] [pmmc] fix memory error, runs locally
-* 2025-06-06 [a537219] [bug] fix some run time bugs, still crashes
-* 2025-06-05 [ef159b8] [pmmc] make pmmc module loadable in python3
-* 2025-06-05 [09d2499] [pmmc] fix all compilation errors
-* 2025-06-05 [eb0a506] [feat] initial units for pmmc
-* 2025-05-20 [b85e750] [bug] fix incorrect node passing to OpenCL kernel, fix #109
+* 2026-10-21 [e3d94f0] [release] bump version to v2026 (3.0.0), pmmc to 0.4.0, update copyright years
+* 2026-10-21 [178598c] [ci] run testmmc.sh, and the trajectory tests on the POCL CPU OpenCL device
+* 2026-10-21 [5498290]*[test] add functional, step-by-step trajectory and pmmc tests runnable on the CPU
+* 2026-10-21 [2c47938]*[bug] label detected photon, trajectory and seed records in .jdt/.jdb as row-major
+* 2026-10-21 [a8f0af4] [bug] mmcsrcdomain: fix fourierx/fourierx2d source domain, treat them as wide-field in mmclab
+* 2026-10-21 [757de21]*[bug] mmclab: retessellate wide-field sources by srctype, refuse empty srcelem
+* 2026-07-07 [f0b8d82] Avoid volume buffer allocation when OpenCL volume output is disabled
+* 2026-07-02 [9f9f1ae] Fix detector lookup offset with extra source records
+* 2026-06-29 [d9bc2fe]*Fix low-mua fluence deposition in MMC raytracers
+* 2026-06-29 [fc34792] Expose integer isspecular and isextdet in pMMC
+* 2026-06-13 [8312b5b] [bug] opencl: harden host buffer handling and fix error-path GPU memory leaks
+* 2026-06-13 [ef5bb39]*[bug] fix long-standing memory leakage, due to unused event, fix #127
+* 2026-05-21 [5442e3e] [perf] replace NODAL_USE_MUA/MUSP templates with IS_RF/IS_MULTISRC/SAVE_DETPHOTON
+* 2026-05-21 [f8c8cb7] [perf] cuda: __launch_bounds__(64,16) on mmc_main_loop drops 122->64 regs
+* 2026-05-20 [9dc5ec0] [clean] mmc: revert per-slot energy accumulator to single-bin + broadcast
+* 2026-05-20 [12652da] [bug] mesh adjoint multi-source: per-slot initial tet + per-slot energy accounting, w/ Claude code
+* 2026-05-14 [35cfefe] [bug] pmmc: build detector-as-adjoint srcdata BEFORE mesh_validate, w/ Claude code
+* 2026-05-14 [47e5406] [feat] pmmc: accept Nsrc-row srcpos / srcdir for multi-source forward, w/ Claude code
+* 2026-05-13 [6a90384] [clean] suppress OpenCL build log on successful kernel build, w/ Claude code
+* 2026-05-13 [f769204] [fix] silence OpenCL JIT warnings on srcid multi-source guard, w/ Claude code
+* 2026-05-13 [30498af] [feat] mmclab honors USE_MCXCL=N device override, ported from mcxlabcl, w/ Claude code
+* 2026-05-13 [23cde0a] [feat] mmclab/pmmc adjoint detector append preserves multi-source srcdata, w/ Claude code
+* 2026-05-13 [4b26968] [format] apply astyle + mh_style fixes from make pretty / mh_style --fix .
+* 2026-05-13 [4e6550e] [fix] guard sgtitle() in mmclab demos for Octave < 8.0 compat, w/ Claude code
+* 2026-05-13 [8868080]*[feat] RF complex weight tracking in BLBadouel mesh kernel + complex flux.data in mmclab mesh mode, w/ Claude code
+* 2026-05-13 [461b1ed] [feat] mmclab: multi-source / mesh adjoint demos + 2D srcpos parser + RF imag for mesh basisorder=1, w/ Claude code
+* 2026-05-13 [abeb635] [feat] per-slot normalizer for extra-source slots scales by srcdata weight ratio, w/ Claude code
+* 2026-05-13 [a90ef05]*[feat] mcx-parity multi-source: JSON array Pos/Dir, srcid>0 single-slot, detphoton srcid column, w/ Claude code
+* 2026-05-13 [c39d979] [bug] fix per-node mua/musp parsers + missing OpenCL JIT macros, w/ Claude code
+* 2026-05-12 [5433129]*[feat] per-node mua/musp via CUDA templates + OpenCL macros for DOT recon, w/ Claude code
+* 2026-05-12 [0d8fb36] [bug] fix mesh-adjoint flux.data layout + nsrcslots gate, w/ Claude code
+* 2026-05-12 [ed4733e]*[feat] mesh-space adjoint Jacobian (full FEM + nodal approx) via GPU kernels, w/ Claude code
+* 2026-05-12 [959562b] [bug] fix maxgate>1 adjoint buffer collision: framelen should be datalen, w/ Claude code
+* 2026-05-12 [25b5982]*[feat] add cfg.srcid and mesh-mode multi-source slot infrastructure, w/ Claude code
+* 2026-05-10 [76f945d]*[feat] support -F bnii to save binary json files, use -Z base64 for raw, faster IO
+* 2026-05-10 [2a7c1f8] [bug] enable -F jnii flag for saving detphoton and traj data, fix #124
+* 2026-05-10 [31d6a06] [bug] add the missing --maxjumpdebug flag to cli, fix #123
+* 2026-05-08 [82994b1] [ci] add the missing detparam1/detparam2 input interface in JSON
+* 2026-04-04 [47b8472]*[feat] save and export both forward model and the Jacobian outputs
+* 2026-04-04 [2434e3a]*[feat] port RF forward and adjoint Jacobian from mcx to mmc
+* 2026-03-27 [a1465d4] [bug] fix additional seed buffer bugs to enable replay, fix #122, w/ Claude code
+* 2026-03-27 [90081a3] [bug] fix replay failure when setting optlevel>=3, fix #122, bump pmmc 0.3.9
+* 2026-03-27 [c2ea9e1] [bug] fix replay failure when setting optlevel>=3, fix #122, bump pmmc 0.3.9
+* 2026-03-22 [db6a0ed]*[feat] support pencilarray, pattern3d, hyperboloid and ring src, must retesselate
+* 2026-03-22 [fd74cbc] [feat] support cfg.compileropt and cfg.kernelfile in mmclab and pmmc
+* 2026-03-22 [f4052eb] [bug] fix mmc cone beam and zgaussian launch dir rotation, fix #121
+* 2026-03-06 [4cbf7b1] [bug] force input elem to mmcaddsrc and mmcadddet to have label
+* 2026-01-11 [1799480] [bug] stop testing faceroi in the 1st neighbor, close #119, close #120
+* 2025-12-31 [47617fd] [ci] remove octave image from mcxcl package
+* 2025-12-14 [85a7bfa] [bug] debug immc ray-tracing, fix incorrect partial path output, #116
+* 2025-12-14 [f03d523] [debug] change debug ouput to json, fix cfg.debugphoton bug
+* 2025-12-10 [95dc994] [ci] remove retired macos-13 runner, use macos-15-intel
+* 2025-12-10 [85613f9] [bug] fix missing trajectories in the immc mode, #116
+* 2025-12-10 [2a58c43] [bug] fix disabled unitinmm setting when cfg.method='grid', fix #117
+* 2025-12-01 [0eedf2b]*[optix] add source types: disk/gaussian/zgaussian/isotropic/cone/arcsine/line/slot
+* 2025-12-01 [3fe4024] [optix] fix some memory leakage
+* 2025-11-30 [639e810] [optix] add back normalization, at the moment, energytot is set to nphoton
+* 2025-11-30 [f048bd9] [optix] fix regression due to float3/FLOAT3 transition, patched by Shijie
+* 2025-11-30 [263d23f] [optix] fix example script path
+* 2025-11-30 [5b639c6] [format] automatically reformat all new matlab .m scripts
+* 2025-11-30 [72015ad] [optix] fix ifdef in mmclab
+* 2025-11-29 [3dd250a] [optix] reformat all optix units, rename all units start with mmc_
+* 2025-11-28 [5402644] [ci] fix g++-12 missing on macos-14
+* 2025-11-28 [deb927f] [ci] fix g++-9 missing on ubuntu 22.04
+* 2025-11-28 [7be94c0] [bug] fix immc unable to save ROI partial-path, fix #116, pmmc 0.3.8
+* 2025-11-17 [ad54567] remove redundant debugging code
+* 2025-11-17 [9ff1501] fix tissue labels for wide-field simulations
+* 2025-11-17 [5e52cb2] add planar source in RT-DMMCLAB
+* 2025-11-16 [fada4bc] search init. medium ID at runtime, add medium ID for terminating photons
+* 2025-11-13 [5e5cb81] [pmmc] bump pmmc version to 0.3.7 after fix #108
+* 2025-11-13 [e55aa08] [bug] allow passing srcdir(4) as NaN and -Inf, accept --json, fix #108
+* 2025-11-10 [f65b5a7] [doc] explain widefield detector settings in mmclab help info
+* 2025-10-25 [4ebbcbb] [mem] optimize struct align param to minimize padding
+* 2025-10-25 [563aaeb] [std] make unit compatible with some compilers
+* 2023-10-27 [d47862c] print kernel speed
+* 2023-10-27 [4cd86ca] improve variable definition
+* 2023-06-09 [acefed0] add slen to optix trace call
+* 2022-09-28 [2571307] disable anyhit program to improve speed
+* 2022-09-22 [1f4608f] free the host seed buffer after use
+* 2022-09-22 [47126c4] update example to output normalized fluence
+* 2022-09-21 [c998f72] add double buffer for OpenCL and CUDA MMC to reduce numerical loss
+* 2022-09-17 [9891182] add output normalization for OptiX
+* 2022-09-17 [6a40a5b] add fluence output in OptiX
+* 2022-09-15 [fc45dd9] add reflection/refraction for mismatched boundaries
+* 2022-09-14 [fb50bf6] add face normal vector to SBT
+* 2022-09-14 [1dd44e3] reduce miss cases by setting tmin to 0.0f
+* 2022-09-10 [5ba4606] add debug messages for context creation
+* 2022-09-08 [14fa090] no need to check volume mesh for triangle-based MC
+* 2022-09-07 [10dc9ed] fix lower 16-bit mask, thanks to Douglas!
+* 2022-09-07 [5c1ee41] fix an edge case for matched media bounaries
+* 2022-09-07 [834669b] remove redundant compilation files
+* 2022-09-07 [ec74b75] automate compilation for optix dependencies
+* 2022-09-07 [9f48be7] allow GNU make to track changes in header files
+* 2022-09-06 [2a6bfa8] resolve the mex compiler complaint
+* 2022-09-06 [b6717c6] save output only when moving to a new element
+* 2022-09-06 [6168b64] Reorganize code for better readability
+* 2022-09-06 [208027a] tweak tmin threshold to work with colin27 example
+* 2022-09-06 [4eb13c6] add function to get surface mesh from volume mesh, thanks to Qianqian!
+* 2022-09-05 [d477bc5] add command line options and fix bugs
+* 2022-09-05 [86d1686] add triangular surface-based MC
 
 
 
