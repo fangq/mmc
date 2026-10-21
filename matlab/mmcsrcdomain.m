@@ -76,12 +76,14 @@ elseif (strcmp(cfg.srctype, 'line') || strcmp(cfg.srctype, 'slit'))
     srcnode = orthdisk(v0, v0 + cfg.srcdir(1:3), norm(cfg.srcparam1(1:3)) * expansion, 3, cfg.srcparam1(1:3));
     srcface = [1 2 3];
 elseif (strcmp(cfg.srctype, 'planar') || strcmp(cfg.srctype, 'pattern') || ...
-        strcmp(cfg.srctype, 'fourier') || strcmp(cfg.srctype, 'fourierx') || strcmp(cfg.srctype, 'fourier2d'))
+        strcmp(cfg.srctype, 'fourier') || strcmp(cfg.srctype, 'fourierx') || strcmp(cfg.srctype, 'fourierx2d'))
     v0 = cfg.srcpos(1:3);
     v1 = cfg.srcparam1(1:3);
     v2 = cfg.srcparam2(1:3);
-    if (strcmp(cfg.srctype, 'fourierx') || strcmp(cfg.srctype, 'fourier2d'))
-        v2 = cross(v0, v1);
+    if (strcmp(cfg.srctype, 'fourierx') || strcmp(cfg.srctype, 'fourierx2d'))
+        % match the launch code in mmc_raytrace.c/mmc_core.cl: srcparam1 is
+        % [v1x,v1y,v1z,|v2|] and v2 is |v2|*(srcdir x v1)/|v1|
+        v2 = cross(cfg.srcdir(1:3), v1) * (cfg.srcparam1(4) / norm(v1));
     end
     voff1 = (v1 + v2) * 0.5;
     voff2 = (v1 - v2) * 0.5;

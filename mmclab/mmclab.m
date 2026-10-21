@@ -410,20 +410,16 @@ for i = 1:len
     % the simulation ran on with srcelemlen==0. Trigger it off the source type
     % instead.
     %
-    % The kernel also gates fourierx/fourierx2d as wide-field, but they are
-    % left out here on purpose: mmcsrcdomain overrides v2 with cross(srcpos,v1)
-    % for those (a position crossed with a direction, so the domain is not
-    % guaranteed to enclose the source), and it spells the second one
-    % 'fourier2d' while srctypeid[] in mmc_utils.c calls it 'fourierx2d', so
-    % 'fourierx2d' falls through to its "source type not supported" error. Add
-    % them here once mmcsrcdomain is fixed.
+    % fourierx/fourierx2d are wide-field too: mmcsrcdomain builds their v2 as
+    % srcparam1(4)*(srcdir x v1)/|v1|, matching the launch code in
+    % mmc_raytrace.c and mmc_core.cl.
     %
     % optix is excluded because it does its own source handling, never gets the
     % added source domain (see the mmcaddsrc guard below), and reads cfg.e0 to
     % pick launchParams.mediumid0 in mmc_optix_utils.cpp -- entering this block
     % would reset a perfectly good e0 to -1 for it.
     iswidesrc = isfield(cfg(i), 'srctype') && ...
-        any(strcmp(cfg(i).srctype, {'planar', 'pattern', 'fourier'})) && ...
+        any(strcmp(cfg(i).srctype, {'planar', 'pattern', 'fourier', 'fourierx', 'fourierx2d'})) && ...
         ~(isfield(cfg(i), 'compute') && strcmp(cfg(i).compute, 'optix'));
     if (isnan(cfg(i).e0) || iswidesrc)  % widefield source
         if (~isfield(cfg(i), 'srcparam1') || ~isfield(cfg(i), 'srcparam2'))
