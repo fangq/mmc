@@ -76,6 +76,10 @@ for casefile in "$TESTDIR"/traj_cases/*.json; do
 
     if [ "$UPDATE" = "1" ] || [ ! -f "$golden" ]; then
         "$PYTHON" "$TESTDIR/trajtest.py" "$WORKDIR/${case}_traj.jdt" --case "$casefile" --wtol "$REFTOL" --save "$golden" --solver mmc || fail=$((fail + 1))
+    elif [ "$(uname -s)" != "Linux" ]; then
+        # the per-thread RNG seeds come from the C library's srand()/rand(), whose sequence differs
+        # between platforms, so the Linux golden paths only apply on Linux; check the invariants here
+        "$PYTHON" "$TESTDIR/trajtest.py" "$WORKDIR/${case}_traj.jdt" --case "$casefile" --wtol "$REFTOL" || fail=$((fail + 1))
     else
         "$PYTHON" "$TESTDIR/trajtest.py" "$WORKDIR/${case}_traj.jdt" --case "$casefile" --ref "$golden" --tol "$REFTOL" --wtol "$REFTOL" --max-fork "$MAXFORK" || fail=$((fail + 1))
     fi

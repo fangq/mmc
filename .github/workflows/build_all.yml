@@ -250,7 +250,7 @@ jobs:
         run: |
           cd src
           LIBRARY_PATH=$CUDA_PATH/lib64/stubs make optix CUDAHOME=$CUDA_PATH OPTIXHOME=/tmp/optix
-          ../bin/mmc --version
+          ls -l ../bin/mmc   # not run: the OptiX build links libcuda.so.1 from the GPU driver
 
   upload_package:
     name: Upload Packages
