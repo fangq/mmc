@@ -4,7 +4,7 @@ Mesh-based Monte Carlo (MMC) Trinity - SSE4, OpenCL and CUDA
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
 -   License: GNU General Public License version 3 (GPL v3), see License.txt
--   Version: 3.0.0 (v2026, CODENAME_TBD)
+-   Version: 3.0.0 (v2026, Egg Tart)
 -   URL: <https://mcx.space/mmc>
 
 ![Mex and Binaries](https://github.com/fangq/mcxcl/actions/workflows/build_all.yml/badge.svg)

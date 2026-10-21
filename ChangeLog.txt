@@ -1,6 +1,6 @@
 Change Log
 
-== MMC 3.0.0 (v2026, CODENAME_TBD), Qianqian Fang <q.fang at neu.edu> ==
+== MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
  2026-10-21 [de3d1cf] [bug] read a JSON detector object by key regardless of its field count
  2026-10-21 [eba3e97] [bug] emit valid JSON in the -D S/X/R debug log ("key":[..] instead of "key"=[..])
  2026-10-21 [91bc95b] [release] bump the remaining v2025.10 keyword strings to v2026
