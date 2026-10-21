@@ -5,7 +5,6 @@
 #include <optix.h>
 #include <optix_device.h>
 #include <optix_types.h>
-#include <sutil/vec_math.h>
 #include <limits>
 
 namespace mcx {

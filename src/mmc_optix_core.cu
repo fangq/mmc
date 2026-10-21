@@ -5,7 +5,7 @@
 #include <optix.h>
 #include <optix_device.h>
 #include <optix_types.h>
-#include <sutil/vec_math.h>
+#include "mmc_vector_ops.h"
 
 #include "mmc_optix_ray.h"
 #include "mmc_optix_launchparam.h"
