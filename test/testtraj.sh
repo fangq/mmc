@@ -22,7 +22,10 @@
 #    MMC:     path to the mmc binary (default ../bin/mmc)
 #    MMCOPT:  device options (default "-G -1", the SSE/OpenMP CPU path)
 #    PYTHON:  python interpreter with numpy (default python3)
-#    REFTOL:  position/relative weight tolerance against the golden data (default 1e-3)
+#    REFTOL:  position (mm)/relative weight tolerance against the golden data (default 1e-3)
+#    MAXFORK: maximum fraction of photons allowed to fork from the golden data
+#             (default 0, i.e. the same backend must reproduce every step; use
+#             e.g. REFTOL=5e-2 MAXFORK=0.1 to compare another backend, see trajtest.py)
 #    GOLDENTAG: suffix of the MMC golden files, e.g. "_opencl" for the OpenCL
 #             path, which seeds its threads differently from the CPU path
 #    NSTAT:   photon number of the statistical comparison (default 4000)
@@ -32,6 +35,7 @@ MMC=${MMC:-$(dirname "$0")/../bin/mmc}
 MMCOPT=${MMCOPT:-"-G -1"}
 PYTHON=${PYTHON:-python3}
 REFTOL=${REFTOL:-1e-3}
+MAXFORK=${MAXFORK:-0}
 NSTAT=${NSTAT:-4000}
 SIGMA=${SIGMA:-4}
 GOLDENTAG=${GOLDENTAG:-}
@@ -73,7 +77,7 @@ for casefile in "$TESTDIR"/traj_cases/*.json; do
     if [ "$UPDATE" = "1" ] || [ ! -f "$golden" ]; then
         "$PYTHON" "$TESTDIR/trajtest.py" "$WORKDIR/${case}_traj.jdt" --case "$casefile" --wtol "$REFTOL" --save "$golden" --solver mmc || fail=$((fail + 1))
     else
-        "$PYTHON" "$TESTDIR/trajtest.py" "$WORKDIR/${case}_traj.jdt" --case "$casefile" --ref "$golden" --tol "$REFTOL" --wtol "$REFTOL" || fail=$((fail + 1))
+        "$PYTHON" "$TESTDIR/trajtest.py" "$WORKDIR/${case}_traj.jdt" --case "$casefile" --ref "$golden" --tol "$REFTOL" --wtol "$REFTOL" --max-fork "$MAXFORK" || fail=$((fail + 1))
     fi
 
     stats="$TESTDIR/golden/${case}_mcxstats.json"
