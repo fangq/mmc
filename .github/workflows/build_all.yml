@@ -218,6 +218,38 @@ jobs:
           name: all-mmc-packages-${{ env.RELEASE_TAG }}
           path: packages/mmc-${{ env.RELEASE_TAG }}.zip
 
+  build_cuda_optix:
+    name: Build-only check of the CUDA and OptiX backends
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev
+      - name: Install CUDA
+        uses: Jimver/cuda-toolkit@v0.2.10
+        with:
+          cuda: '11.7.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart"]'
+      - name: Fetch the OptiX headers
+        run: |
+          git clone --depth 1 --branch v7.5.0 https://github.com/NVIDIA/optix-dev.git /tmp/optix
+      - name: Build mmc with the CUDA backend
+        run: |
+          cp -a src commons /tmp/ && mkdir -p /tmp/cudabuild && mv /tmp/src /tmp/commons /tmp/cudabuild/
+          cd /tmp/cudabuild/src
+          LIBRARY_PATH=$CUDA_PATH/lib64/stubs make cuda CUDAHOME=$CUDA_PATH
+          ../bin/mmc --version
+      - name: Build mmc with the OptiX backend
+        run: |
+          cd src
+          LIBRARY_PATH=$CUDA_PATH/lib64/stubs make optix CUDAHOME=$CUDA_PATH OPTIXHOME=/tmp/optix
+          ../bin/mmc --version
+
   upload_package:
     name: Upload Packages
     needs: build_all

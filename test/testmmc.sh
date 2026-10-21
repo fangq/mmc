@@ -6,10 +6,16 @@
 #
 # runs the built-in benchmarks on the SSE/OpenMP CPU path (-G -1) and checks
 # the absorbed fraction against the expected values, then runs the
-# step-by-step trajectory tests in testtraj.sh
+# step-by-step trajectory tests in testtraj.sh. The GPU backends compiled
+# into the binary (opencl; cuda with "make cuda"; optix with "make optix")
+# and usable on device -G 1 are then tested as well: absorbed fraction of the
+# dual-grid benchmarks for opencl/cuda, step-by-step trajectories of cuda
+# against the opencl golden data, and a smoke run for optix, which does not
+# report the absorbed fraction or save trajectories.
 #
 # environment variables:
 #    MMC:  path to the mmc binary (default ../bin/mmc)
+#    BACKENDS: GPU backends to test (default: probe opencl, cuda and optix)
 
 MMC=${MMC:-$(dirname "$0")/../bin/mmc}
 PARAM=$@
@@ -58,12 +64,48 @@ temp=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60b -G -1 -n 1e5 -S 0 -q 1 -s re
 if [ -z "$temp" ]; then echo "fail to replay detected photons"; fail=$((fail + 1)); else echo "ok"; fi
 
 echo "test step-by-step photon trajectories ... "
-if ! sh "$TESTDIR/testtraj.sh" > "$WORKDIR/traj.log" 2>&1; then
+if ! MMC="$MMC" sh "$TESTDIR/testtraj.sh" > "$WORKDIR/traj.log" 2>&1; then
     cat "$WORKDIR/traj.log"
     fail=$((fail + 1))
 else
     echo "ok"
 fi
+
+if [ -z "${BACKENDS+x}" ]; then
+    BACKENDS=""
+    for b in opencl cuda optix; do
+        if (cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -c $b -G 1 -n 1000 -S 0 -D T 2>&1 | grep -q 'simulated 1000 photons'); then
+            BACKENDS="$BACKENDS $b"
+        fi
+    done
+fi
+
+for b in $BACKENDS; do
+    if [ "$b" = "optix" ]; then
+        echo "test running benchmark dmmc-cube60 with optix ... "
+        temp=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -c optix -G 1 -n 1e5 -S 0 -D T $PARAM 2>&1 | grep -o -E 'simulated 100000 photons')
+        if [ -z "$temp" ]; then echo "fail to run optix"; fail=$((fail + 1)); else echo "ok"; fi
+        continue
+    fi
+
+    for bench in "dmmc-cube60:1[78]" "dmmc-cube60b:2[67]"; do
+        name=${bench%%:*}
+        expect=${bench#*:}
+        echo "test absorbed fraction of benchmark $name with $b ... "
+        temp=$(cd "$WORKDIR" && "$MMC" --bench "$name" -c $b -G 1 -n 1e5 -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E "absorbed: *$expect\.[0-9]+%")
+        if [ -z "$temp" ]; then echo "fail to match the absorbed fraction of $name with $b"; fail=$((fail + 1)); else echo "ok"; fi
+    done
+
+    if [ "$b" = "cuda" ]; then
+        echo "test step-by-step photon trajectories with cuda against the opencl golden data ... "
+        if ! MMC="$MMC" MMCOPT="-G 1 -c cuda" GOLDENTAG=_opencl REFTOL=5e-2 MAXFORK=0.1 sh "$TESTDIR/testtraj.sh" -t 4000 -T 1 > "$WORKDIR/trajcuda.log" 2>&1; then
+            cat "$WORKDIR/trajcuda.log"
+            fail=$((fail + 1))
+        else
+            echo "ok"
+        fi
+    fi
+done
 
 if [ "$fail" -gt 0 ]; then
     echo "failed $fail tests"
