@@ -74,6 +74,10 @@ this release also fixed a list of bugs, including
 
 The full changelog is listed below
 
+* 2026-10-21 [99e7eec] [bug] fix -F jnii/bnii output of mesh-based (non-dual-grid) simulations
+* 2026-10-21 [2ad91b2] [bug] fix off-by-one MAX_PROP check that rejected large meshes on cuda
+* 2026-10-21 [71eb4f1] [optix] no fluence in the ambient medium, terminate rays that exit the mesh
+* 2026-10-21 [654d6fe] [doc] refresh the v2026 ChangeLog, NEWS and README change lists
 * 2026-10-21 [7a3b3f3] [optix] terminate rays that miss all triangles in a non-scattering medium, fix NaN grid corners
 * 2026-10-21 [db4d829] [perf] build the OpenCL kernel with -cl-unsafe-math-optimizations, 1.14-1.16x
 * 2026-10-21 [e803195] [perf] dynamic photon dispatch in the OpenCL/CUDA kernel, 1.02-1.06x
