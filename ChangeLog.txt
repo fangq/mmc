@@ -1,7 +1,10 @@
 Change Log
 
 == MMC 3.0.0 (v2026, CODENAME_TBD), Qianqian Fang <q.fang at neu.edu> ==
-
+ 2026-10-21 [de3d1cf] [bug] read a JSON detector object by key regardless of its field count
+ 2026-10-21 [eba3e97] [bug] emit valid JSON in the -D S/X/R debug log ("key":[..] instead of "key"=[..])
+ 2026-10-21 [91bc95b] [release] bump the remaining v2025.10 keyword strings to v2026
+ 2026-10-21 [c1ef008] [doc] v2026 What's New and ChangeLog entry
  2026-10-21 [e3d94f0] [release] bump version to v2026 (3.0.0), pmmc to 0.4.0, update copyright years
  2026-10-21 [178598c] [ci] run testmmc.sh, and the trajectory tests on the POCL CPU OpenCL device
  2026-10-21 [5498290]*[test] add functional, step-by-step trajectory and pmmc tests runnable on the CPU
