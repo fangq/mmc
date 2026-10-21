@@ -76,8 +76,15 @@ fi
 
 if [ -z "${BACKENDS+x}" ]; then
     BACKENDS=""
+    # a backend missing from the binary falls back to another one, so look for its own log line
     for b in opencl cuda optix; do
-        if (cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -c $b -G 1 -n 1000 -S 0 -D T 2>&1 | grep -q 'simulated 1000 photons'); then
+        case $b in
+            opencl) mark='OpenCL' ;;
+            cuda)   mark='compiled by nvcc' ;;
+            optix)  mark='optix init complete' ;;
+        esac
+        log=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -c $b -G 1 -n 1000 -S 0 -D T 2>&1)
+        if echo "$log" | grep -q 'simulated 1000 photons' && echo "$log" | grep -q "$mark"; then
             BACKENDS="$BACKENDS $b"
         fi
     done

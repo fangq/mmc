@@ -4350,7 +4350,8 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig* cfg) {
-    MMC_ERROR(MMC_INFO, "MMC $Rev::      $" MMC_VERSION);
+    MMC_FPRINTF(stdout, "MMC $Rev::      $" MMC_VERSION "\n");
+    exit(0);
 }
 
 /**
