@@ -447,7 +447,7 @@ The full command line options of MMC include the following:
 #Please visit our free scientific data sharing portal at https://neurojson.io/#
 # and consider sharing your public datasets in standardized JSON/JData format #
 ###############################################################################
-$Rev::      $v2025.10$Date::                       $ by $Author::             $
+$Rev::      $v2026$Date::                       $ by $Author::             $
 ###############################################################################
 
 usage: mmc <param1> <param2> ...
