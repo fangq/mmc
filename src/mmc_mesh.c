@@ -746,7 +746,7 @@ void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg) {
             MESH_ERROR("mesh file has wrong format");
         }
 
-        if (mesh->type[i] == 0) {
+        if (mesh->type[i] <= 0) { /* nodal volume of tissue elements only, the only ones receiving fluence */
             continue;
         }
 
@@ -938,7 +938,7 @@ void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
 
         mesh->evol[i] *= (1.f / 6.f);
 
-        if (mesh->type[i] == 0) {
+        if (mesh->type[i] <= 0) { /* nodal volume of tissue elements only, the only ones receiving fluence */
             continue;
         }
 
@@ -1363,12 +1363,17 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
             int* elems = tracer->mesh->elem + i * tracer->mesh->elemlen;   // element node indices
             int* enb = tracer->mesh->facenb + i * tracer->mesh->elemlen;   // check facenb, find surface faces
 
+            if (tracer->mesh->type[i] <= 0) { // only the surface of the tissue matters, see mesh_validate
+                continue;
+            }
+
             for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
-                if (enb[j] == 0) {                        // 0-valued face neighbor indicates an exterior triangle
+                // an exterior triangle (0-valued face neighbor), or one facing a non-tissue element where photons are terminated
+                if (enb[j] == 0 || tracer->mesh->type[enb[j] - 1] <= 0) {
                     for (k = 0; k < 3; k++) {
                         int nid = elems[out[ifaceorder[j]][k]] - 1;
 
-                        if (tracer->mesh->nvol[nid] > 0.f && tracer->mesh->type[i] >= 0) {  // change sign to prevent it from changing again
+                        if (tracer->mesh->nvol[nid] > 0.f) {  // change sign to prevent it from changing again
                             tracer->mesh->nvol[nid] *= -(2.f / (1.0 + Reff[tracer->mesh->type[i]])); // 2 accounts for the missing half of the solid angle, Reff is the effective reflection coeff
                         }
                     }

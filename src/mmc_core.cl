@@ -897,6 +897,11 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                     r->weight_im = new_im;
                 }
 
+                if (type <= 0) { /* no fluence in non-tissue (label<=0) elements, as mcx never deposits in label-0 voxels; weights above are still updated */
+                    ww = 0.f;
+                    bl_dep_im = 0.f;
+                }
+
                 if (newidx != r->oldidx) {
 #ifndef DO_NOT_SAVE
 
@@ -1081,6 +1086,11 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                         float a_mag2 = prop.mua * prop.mua + a_im * a_im;
                         seg_deposit_re = (a_mag2 < EPS) ? (w0_re * S.w) : (dw_re * prop.mua + dw_im * a_im) / a_mag2;
                         seg_deposit_im = (a_mag2 < EPS) ? (w0_im * S.w) : (dw_im * prop.mua - dw_re * a_im) / a_mag2;
+                    }
+
+                    if (type <= 0) { /* no fluence in non-tissue (label<=0) elements */
+                        seg_deposit_re = 0.f;
+                        seg_deposit_im = 0.f;
                     }
 
                     if (newidx != r->oldidx) {
