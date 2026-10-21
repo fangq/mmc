@@ -10,14 +10,17 @@
 # into the binary (opencl; cuda with "make cuda"; optix with "make optix")
 # and usable on device -G 1 are then tested as well: absorbed fraction of the
 # dual-grid benchmarks for opencl/cuda, step-by-step trajectories of cuda
-# against the opencl golden data, and a smoke run for optix, which does not
-# report the absorbed fraction or save trajectories.
+# against the opencl golden data, and for optix (which does not report the
+# absorbed fraction or save trajectories) a smoke run plus a comparison of the
+# planar-source fluence with opencl.
 #
 # environment variables:
 #    MMC:  path to the mmc binary (default ../bin/mmc)
 #    BACKENDS: GPU backends to test (default: probe opencl, cuda and optix)
+#    PYTHON: python with numpy, used by the optix planar test (default python3)
 
 MMC=${MMC:-$(dirname "$0")/../bin/mmc}
+PYTHON=${PYTHON:-python3}
 PARAM=$@
 TESTDIR=$(cd "$(dirname "$0")" && pwd)
 
@@ -85,6 +88,23 @@ for b in $BACKENDS; do
         echo "test running benchmark dmmc-cube60 with optix ... "
         temp=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -c optix -G 1 -n 1e5 -S 0 -D T $PARAM 2>&1 | grep -o -E 'simulated 100000 photons')
         if [ -z "$temp" ]; then echo "fail to run optix"; fail=$((fail + 1)); else echo "ok"; fi
+
+        # a planar source launched in the air above the mesh must not deposit
+        # fluence in the gap before it enters the tissue
+        case " $BACKENDS " in
+            *" opencl "*)
+                echo "test planar source fluence of optix against opencl ... "
+                cp "$TESTDIR"/../examples/planar/planar.inp "$TESTDIR"/../examples/planar/*_digimouse.dat "$WORKDIR"/
+                for c in optix opencl; do
+                    (cd "$WORKDIR" && "$MMC" -f planar.inp -b 1 -n 1e5 -c $c -G 1 -s planar_$c -F bin $PARAM > planar_$c.log 2>&1)
+                done
+                if ! (cd "$WORKDIR" && "$PYTHON" -c "import numpy as np; a=np.fromfile('planar_optix.bin').sum(); b=np.fromfile('planar_opencl.bin').sum(); print('optix/opencl total fluence ratio %.4f' % (a/b)); raise SystemExit(int(not abs(a/b-1)<0.05))"); then
+                    fail=$((fail + 1))
+                else
+                    echo "ok"
+                fi
+                ;;
+        esac
         continue
     fi
 
