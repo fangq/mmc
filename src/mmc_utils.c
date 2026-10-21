@@ -2168,7 +2168,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                     cJSON* pos = dets, *rad = NULL;
                     rad = FIND_JSON_OBJ("R", "Optode.Detector.R", det);
 
-                    if (cJSON_GetArraySize(det) == 2) {
+                    if (cJSON_IsObject(det)) { /* {"Pos":[..],"R":r,"Dir":[..]}; may carry more than 2 fields */
                         pos = FIND_JSON_OBJ("Pos", "Optode.Detector.Pos", det);
                     }
 
