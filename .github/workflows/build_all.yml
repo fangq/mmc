@@ -158,6 +158,18 @@ jobs:
           ./mmc --bench edgeimmc -S 0 -D T -G -1
           ./mmc --bench nodeimmc -S 0 -D T -G -1
           ./mmc --bench faceimmc -S 0 -D T -G -1
+      - name: Run functional and trajectory tests (Linux and MacOS)
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          python3 -m pip install numpy || python3 -m pip install --break-system-packages numpy
+          cd test
+          ./testmmc.sh
+      - name: Run trajectory tests on the POCL CPU OpenCL device (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get install -y pocl-opencl-icd
+          cd test
+          MMCOPT="-G 1 -c opencl" GOLDENTAG=_opencl ./testtraj.sh -t 4000 -T 1
       - name: Create package folder
         run: |
           mkdir packages
