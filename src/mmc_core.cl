@@ -100,6 +100,8 @@ inline __device__ __host__ int get_local_id(int idx) {
 inline __device__ __host__ int get_local_size(int idx) {
     return (idx == 0) ? blockDim.x : ( (idx == 1) ? blockDim.y : blockDim.z );
 }
+#define barrier(flags)          __syncthreads()
+#define CLK_LOCAL_MEM_FENCE     0
 inline __device__ __host__ float3 operator *(float3 a, float3 b) {
     return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
@@ -2177,7 +2179,30 @@ __kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophot
 
 #ifdef __NVCC__
     extern __shared__ float sharedmem[];
+    __shared__ int blockphoton[1];
+#else
+    __local int blockphoton[1];
 #endif
+
+    /* dynamic photon dispatch: photon lifetimes span orders of magnitude, so with a
+     * static photons-per-thread split every warp waits for its unluckiest lane. The
+     * threads of a block instead draw the next photon of the block's (unchanged) id
+     * range from a shared counter. Replay keeps the static split, which pairs each
+     * thread with the photons whose seeds it reads. With at most one photon per thread
+     * (nphoton == 0, as in the step-by-step tests) or one thread per block (-A 0 -T 1)
+     * there is nothing to balance, and the static split keeps runs deterministic. */
+    const int isdynamic = (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE && get_local_size(0) > 1 && nphoton > 0);
+    const int gstart = idx - get_local_id(0);
+    const int blockstart = gstart * nphoton + MIN(gstart, ophoton);
+    const int blocktotal = get_local_size(0) * nphoton + MIN((ophoton > gstart ? ophoton - gstart : 0), (int)get_local_size(0));
+
+    if (isdynamic) {
+        if (get_local_id(0) == 0) {
+            blockphoton[0] = 0;
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
 
     if (GPU_PARAM(gcfg, seed) != SEED_FROM_FILE) {
         gpu_rng_init(t, n_seed, idx);
@@ -2187,13 +2212,31 @@ __kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophot
     clearpath(sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), GPU_PARAM(gcfg, srcnum));
 
     /*launch photons*/
-    for (int i = 0; i < nphoton + (idx < ophoton); i++) {
-        if (GPU_PARAM(gcfg, seed) == SEED_FROM_FILE)
-            for (int j = 0; j < RAND_BUF_LEN; j++) {
-                t[j] = replayseed[(idx * nphoton + MIN(idx, ophoton) + i) * RAND_BUF_LEN + j];
+    for (int i = 0; ; i++) {
+        int photonid;
+
+        if (isdynamic) {
+            int k = atomic_inc(blockphoton);
+
+            if (k >= blocktotal) {
+                break;
             }
 
-        onephoton MMC_TARGS (idx * nphoton + MIN(idx, ophoton) + i, sharedmem + get_local_size(0) * (GPU_PARAM(gcfg, srcnum) << 1) +
+            photonid = blockstart + k;
+        } else {
+            if (i >= nphoton + (idx < ophoton)) {
+                break;
+            }
+
+            photonid = idx * nphoton + MIN(idx, ophoton) + i;
+        }
+
+        if (GPU_PARAM(gcfg, seed) == SEED_FROM_FILE)
+            for (int j = 0; j < RAND_BUF_LEN; j++) {
+                t[j] = replayseed[photonid * RAND_BUF_LEN + j];
+            }
+
+        onephoton MMC_TARGS (photonid, sharedmem + get_local_size(0) * (GPU_PARAM(gcfg, srcnum) << 1) +
                              get_local_id(0) * (GPU_PARAM(gcfg, reclen) + (GPU_PARAM(gcfg, srcnum) > 1) * GPU_PARAM(gcfg, srcnum)), gcfg, node, elem,
                              weight, dref, type, facenb, srcelem, normal, gmed,
                              gnodemua, gnodemusp,
