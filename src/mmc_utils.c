@@ -941,10 +941,10 @@ void mcx_savedata(OutputType* dat, size_t len, mcconfig* cfg, int isref) {
         uint dims[6] = {cfg->dim.x, cfg->dim.y, cfg->dim.z, cfg->maxgate, cfg->srcnum, 1}, lastdim = 5;
         float voxelsize[6] = {cfg->steps.x, cfg->steps.y, cfg->steps.z, cfg->tstep, 1, 1};
 
-        if (cfg->method != rtBLBadouelGrid) {
-            dims[0] = cfg->nodenum;
-            dims[1] = cfg->maxgate;
-            dims[2] = cfg->srcnum;
+        if (cfg->method != rtBLBadouelGrid) { /* mesh_saveweight() passes {slots, gates, nodes/elements/faces} in cfg->dim */
+            dims[0] = cfg->dim.z;
+            dims[1] = cfg->dim.y;
+            dims[2] = cfg->dim.x;
             dims[3] = 1;
             lastdim = 3;
             voxelsize[0] = 1.f;
