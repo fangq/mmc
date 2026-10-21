@@ -6,7 +6,7 @@
 
 *Author:  Qianqian Fang <q.fang at neu.edu>
 *License: GNU General Public License version 3 (GPL v3), see License.txt
-*Version: 2.8.0 (v2025.10, Bubble Tea)
+*Version: 3.0.0 (v2026, CODENAME_TBD)
 *URL:     https://mcx.space/mmc
 
 ---------------------------------------------------------------------
