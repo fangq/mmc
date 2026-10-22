@@ -2059,7 +2059,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         mom = 0.f;
-        r.slen0 = mc_next_scatter(mesh->med[mesh->type[r.eid - 1]].g, &r.vec, ran, ran0, cfg, &mom);
+        r.slen0 = mc_next_scatter(mesh->med[(cfg->implicit && r.inroi) ? mesh->prop : mesh->type[r.eid - 1]].g, &r.vec, ran, ran0, cfg, &mom);
         r.slen = r.slen0;
 
         if (cfg->debuglevel & dlTraj) {
@@ -2688,7 +2688,7 @@ void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit) {
     int* ee = (int*)(mesh->elem + eid * mesh->elemlen);
     int i, tshift, datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);;
 
-    medium* prop = mesh->med + (mesh->type[eid]);
+    medium* prop = mesh->med + ((cfg->implicit && r->inroi) ? mesh->prop : mesh->type[eid]);
     float ww = r->weight;
 
     r->weight *= prop->mus / (prop->mua + prop->mus);

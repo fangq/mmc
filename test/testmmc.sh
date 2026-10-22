@@ -61,6 +61,18 @@ for bench in "dmmc-cube60:1[78]" "dmmc-cube60b:2[67]" "edgeimmc:30" "nodeimmc:1[
     if [ -z "$temp" ]; then echo "fail to match the absorbed fraction of $name"; fail=$((fail + 1)); else echo "ok"; fi
 done
 
+# the ROI medium (mua=23.05) of edgeimmc shares g=0.9 with the background;
+# setting only its g to 0 must change the result of a fixed-seed run
+echo "test implicit ROI scattering uses the anisotropy of the ROI medium ... "
+a=""
+for roig in keep 0; do
+    if [ "$roig" = keep ]; then filter=cat; else filter='sed -E /"mua":[[:space:]]*23\.05/{n;n;s/"g":[[:space:]]*[0-9.]+/"g":0/;}'; fi
+    a="$a $(cd "$WORKDIR" && "$MMC" --bench edgeimmc -G -1 --dumpjson - 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | $filter |
+            OMP_NUM_THREADS=1 "$MMC" -f - -G -1 -n 1e4 -E 12345 -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'absorbed: *[0-9.]+%' | tr -d ' ')"
+done
+set -- $a
+if [ $# -ne 2 ] || [ "$1" = "$2" ]; then echo "fail: ROI g has no effect ($a)"; fail=$((fail + 1)); else echo "ok"; fi
+
 echo "test photon replay ... "
 temp=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60b -G -1 -n 1e5 -S 0 -q 1 -s replaytest -D T $PARAM > /dev/null 2>&1 &&
        "$MMC" --bench dmmc-cube60b -G -1 -E replaytest_detp.jdt -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'simulated.*photons|absorbed: *[0-9.]+%')
