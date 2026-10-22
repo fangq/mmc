@@ -413,7 +413,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             MMC_ASSERT_ALLOC(energy);
 
             for (j = 0; j < gpu[i].autothread * RAND_SEED_WORD_LEN; j++) {
-                Pseed[j] = rand();
+                Pseed[j] = mmc_rand_uint32();
             }
 
             OCL_TRY(((gseed[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN, Pseed, &status), status)));
@@ -946,7 +946,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                         Pseed = (cl_uint*)malloc(sizeof(cl_uint) * gpu[devid].autothread * RAND_SEED_WORD_LEN);
 
                         for (i = 0; i < gpu[devid].autothread * RAND_SEED_WORD_LEN; i++) {
-                            Pseed[i] = rand();
+                            Pseed[i] = mmc_rand_uint32();
                         }
 
                         OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid], gseed[devid], CL_TRUE, 0, sizeof(cl_uint)*gpu[devid].autothread * RAND_SEED_WORD_LEN,

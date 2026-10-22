@@ -279,7 +279,11 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     uint4* hseed = (uint4*)malloc(sizeof(uint4) * totalthread);
 
     for (int i = 0; i < totalthread; ++i) {
-        hseed[i] = make_uint4(rand(), rand(), rand(), rand());
+        // separate statements: the evaluation order of function arguments is unspecified
+        hseed[i].x = mmc_rand_uint32();
+        hseed[i].y = mmc_rand_uint32();
+        hseed[i].z = mmc_rand_uint32();
+        hseed[i].w = mmc_rand_uint32();
     }
 
     optixcfg->seedBuffer.alloc_and_upload(hseed, totalthread);

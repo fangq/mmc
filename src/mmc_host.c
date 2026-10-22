@@ -241,7 +241,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             srand(cfg->seed);
 
             for (i = 0; i < threadnum * RAND_SEED_WORD_LEN; i++) {
-                seeds[i] = rand();
+                seeds[i] = mmc_rand_uint32();
             }
         }
         #pragma omp barrier

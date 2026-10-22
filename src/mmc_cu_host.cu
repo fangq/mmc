@@ -530,7 +530,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
 
     for (j = 0; j < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; j++) {
-        Pseed[j] = rand();
+        Pseed[j] = mmc_rand_uint32();
     }
 
     CUDA_ASSERT(cudaMalloc((void**)&gseed, sizeof(uint) * gpu[gpuid].autothread*
@@ -895,7 +895,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                                       RAND_SEED_WORD_LEN);
 
                 for (i = 0; i < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; i++) {
-                    Pseed[i] = rand();
+                    Pseed[i] = mmc_rand_uint32();
                 }
 
                 CUDA_ASSERT(cudaMemcpy(gseed, Pseed,
