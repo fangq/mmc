@@ -171,7 +171,9 @@ jobs:
         run: |
           sudo apt-get install -y pocl-opencl-icd
           cd test
-          MMCOPT="-G 1 -c opencl" GOLDENTAG=_opencl ./testtraj.sh -t 4000 -T 1
+          # POCL versions round single-precision math differently, so allow a few photons to fork
+          # at a reflect/escape decision; every step before the fork must still match
+          MMCOPT="-G 1 -c opencl" GOLDENTAG=_opencl MAXFORK=0.1 ./testtraj.sh -t 4000 -T 1
       - name: Create package folder
         run: |
           mkdir packages
