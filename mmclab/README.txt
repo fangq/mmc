@@ -52,24 +52,24 @@ formats and examples. The input cfg structure has very similar field names as
 the verbose command line options in MMC.
 
 <pre>
- #############################################################################%
+  #############################################################################%
                       Mesh-based Monte Carlo (MMC) - OpenCL                   %
-           Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          %
-               https://mcx.space/#mmc  &  https://neurojson.io/               %
+           Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          %
+               https://mcx.space/#mmc  &  https://neurojson.io                %
                                                                               %
- Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
+  Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
     Department of Bioengineering, Northeastern University, Boston, MA, USA    %
- #############################################################################%
+  #############################################################################%
      The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      %
- #############################################################################%
+  #############################################################################%
    Open-source codes and reusable scientific data are essential for research, %
   MCX proudly developed human-readable JSON-based data formats for easy reuse.%
                                                                               %
- Please visit our free scientific data sharing portal at https://neurojson.io/%
+  Please visit our free scientific data sharing portal at https://neurojson.io%
   and consider sharing your public datasets in standardized JSON/JData format %
- #############################################################################%
- $Rev::4ca899$v2026$Date::2023-09-11 17:37:07 -04$by $Author::Qianqian Fang%
- #############################################################################%
+  #############################################################################%
+  $Rev::10da53$v2026$Date::2024-03-14 16:10:25 -04$by $Author::Qianqian Fang%
+  #############################################################################%
  
   Format:
      [fluence,detphoton,ncfg,seeds,traj]=mmclab(cfg);
@@ -86,6 +86,19 @@ the verbose command line options in MMC.
           option='preview': this plots the domain configuration using mcxpreview(cfg)
           option='opencl':  force using OpenCL (set cfg.gpuid=1 if not set)
                             instead of SSE on CPUs/GPUs that support OpenCL
+ 
+     if one defines USE_MCXCL in the MATLAB/Octave base workspace, mmclab
+     inspects it before every call:
+         USE_MCXCL = 1   (or unset)   default: run on the first GPU/device
+         USE_MCXCL = 0                identical to the default for mmclab
+                                       (mmc.mex is unified - no CUDA/OpenCL
+                                       switch). Provided for mcxlabcl parity.
+         USE_MCXCL = N  with |N| > 1  override cfg.gpuid with abs(N) so that
+                                       every cfg in the input runs on device
+                                       N (1-based, matches gpuinfo numbering).
+                                       Useful for selecting one specific GPU
+                                       on multi-GPU systems without editing
+                                       every script's cfg.gpuid.
  
  
      cfg may contain the following fields:
@@ -130,7 +143,7 @@ the verbose command line options in MMC.
        cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
        cfg.roulettesize:[10] size of Russian roulette
        cfg.steps:       [dx, dy, dz], defines the DMMC grid voxel size,
-                        must be isostropic, i.e. dx=dy=dz, only used when
+                        must be isotropic, i.e. dx=dy=dz, only used when
                         cfg.method = 'grid', by default dx=dy=dz=1
        cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions
                         the default value is 1.0 (mm). For example, if the mesh node length unit is
@@ -139,6 +152,10 @@ the verbose command line options in MMC.
  
   == Source-detector parameters ==
        cfg.detpos:      an N by 4 array, each row specifying a detector: [x,y,z,radius]
+       cfg.detparam1:   a 4-element vector: [u1, u2, u3, Nx], define the x-axis of a widefield
+                        detector, [u1,u2,u3] is the x-axis vector; Nx is the pixel count in the x-axis
+       cfg.detparam2:   a 4-element vector: [v1, v2, v3, Ny], define the y-axis of a widefield
+                        detector, [v1,v2,v3] is the y-axis vector; Ny is the pixel count in the y-axis
        cfg.maxdetphoton:   maximum number of photons saved by the detectors [1000000]
        cfg.srctype:     source type, the parameters of the src are specified by cfg.srcparam{1,2}
                        'pencil' - default, pencil beam, no param needed
@@ -157,8 +174,8 @@ the verbose command line options in MMC.
                                  by srcpos, srcpos+srcparam1(1:3) and srcpos+srcparam2(1:3)
                        'pattern' - a 3D quadrilateral pattern illumination, same as above, except
                                  srcparam1(4) and srcparam2(4) specify the pattern array x/y dimensions,
-                                 and srcpattern is a floating-point pattern array, with values between [0-1].
-                                 if cfg.srcnum>1, srcpattern must be a floating-point array with
+                                 and srcpattern is a double-precision pattern array, with values between [0-1].
+                                 if cfg.srcnum>1, srcpattern must be a 3-D double-precision array with
                                  a dimension of [srcnum srcparam1(4) srcparam2(4)]
                                  Example: <demo_photon_sharing.m>
                        'fourier' - spatial frequency domain source, similar to 'planar', except
@@ -197,7 +214,7 @@ the verbose command line options in MMC.
        cfg.unitinmm  (in mm) to specify the actual length unit.
  
   == Optional mesh data ==
-      -cfg.facenb:      element face neighbohood list (calculated by faceneighbors())
+      -cfg.facenb:      element face neighborhood list (calculated by faceneighbors())
       -cfg.evol:        element volume (calculated by elemvolume() with iso2mesh)
       -cfg.e0:          the element ID enclosing the source, if not defined,
                         it will be calculated by tsearchn(node,elem,srcpos);
@@ -209,7 +226,15 @@ the verbose command line options in MMC.
                         '-': search both directions
  
   == Output control ==
-       cfg.issaveexit: [0]-save the position (x,y,z) and (vx,vy,vz) for a detected photon
+       cfg.issaveexit: [0]-whether to save the position (x,y,z) and (vx,vy,vz) for a detected photon
+                       When issaveexit is set to 2, this signals mmclab to output a 2D array
+                       a widefield detector defined by cfg.detparam1 and cfg.detparam2.
+                       Specifically, instead of output individual detected photon data,
+                       the exiting weight of all detected photons are binned and summed
+                       into a detparam1(4)-by-detparam2(4) pixelated output, covering
+                       the quadrilateral area with 4 corners defined by (only 1:3 elem are used)
+                       [detpos, detpos+detparam1, detpos+detparam1+detparam2, detpos+detparam2].
+                       When a widefield detector is used, detector radii are ignored.
        cfg.issaveref:  [0]-save diffuse reflectance/transmittance on the exterior surfaces.
                        The output is stored as flux.dref in a 2D array of size [#Nf,  #time_gate]
                        where #Nf is the number of triangles on the surface; #time_gate is the
@@ -225,7 +250,7 @@ the verbose command line options in MMC.
                         'jacobian' - mua Jacobian (replay mode)
                         'wl'- weighted path lengths to build mua Jacobian (replay mode)
                         'wp'- weighted scattering counts to build mus Jacobian (replay mode)
-       cfg.debuglevel:  debug flag string, a subset of [MCBWDIOXATRPE], no space
+       cfg.debuglevel:  debug flag string, a subset of [SCBWDIOXATRPEM], no space
        cfg.debugphoton: print the photon movement debug info only for a specified photon ID
        cfg.maxjumpdebug: [10000000|int] when trajectory is requested in the output,
                       use this parameter to set the maximum position stored. By default,
@@ -253,16 +278,16 @@ the verbose command line options in MMC.
        detphoton: (optional) a struct array, with a length equals to that of cfg.
              Starting from v2016.5, the detphoton contains the below subfields:
                detphoton.detid: the ID(>0) of the detector that captures the photon
-               detphoton.nscat: cummulative scattering event counts in each medium
-               detphoton.ppath: cummulative path lengths in each medium (partial pathlength)
+               detphoton.nscat: cumulative scattering event counts in each medium
+               detphoton.ppath: cumulative path lengths in each medium (partial pathlength)
                     one need to multiply cfg.unitinmm with ppath to convert it to mm.
-               detphoton.mom: cummulative cos_theta for momentum transfer in each medium
+               detphoton.mom: cumulative cos_theta for momentum transfer in each medium
                detphoton.p or .v: exit position and direction, when cfg.issaveexit=1
                detphoton.w0: photon initial weight at launch time
                detphoton.prop: optical properties, a copy of cfg.prop
                detphoton.data: a concatenated and transposed array in the order of
                      [detid nscat ppath mom p v w0]'
-               "data" is the is the only subfield in all mmclab before 2016.5
+               "data" is the is the only subfield in all MMCLAB before 2016.5
        ncfg: (optional), if given, mmclab returns the preprocessed cfg structure,
              including the calculated subfields (marked by "-"). This can be
              used in the subsequent simulations to avoid repetitive preprocessing.
@@ -371,7 +396,7 @@ an MMC simulation.
 To compile MMCLAB from source code, you need to make sure your 
 computer have the following requirements:
 
-* your computer should have MATLAB C compiler (mex) and/or octave3.x-headers installed
+* your computer should have the MATLAB C compiler (mex) and/or the Octave development package (liboctave-dev on Ubuntu) installed
 * to compile the SSE versions, your computer should support SSE4 instructions
 * the commands "mex" and "mkoctfile" should be in the search path ($PATH)
 * you should have both gcc and g++ with version 4.4 or newer
@@ -394,9 +419,8 @@ to compile MMCLAB for Octave, you type
 or
  make octsse
 
-The command <tt>mkoctfile</tt> must be accessible from your command line
-and it is provided in a package named "octave3.x-headers" in Ubuntu (3.x
-can be 3.2 or 3.4 etc).
+The command <tt>mkoctfile</tt> must be accessible from your command line;
+on Ubuntu/Debian, it is provided by the package <tt>liboctave-dev</tt>.
 
 Compiling MMCLAB on Windows and Mac OS, you should use the following
 command:

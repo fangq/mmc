@@ -2,7 +2,7 @@
 
 # PMMC - Python bindings for Mesh-based Monte Carlo (MMC) photon transport simulator
 
-- Copyright: (C) Qianqian Fang (2025) <q.fang at neu.edu>
+- Copyright: (C) Qianqian Fang (2025-2026) <q.fang at neu.edu>
 - License: GNU Public License V3 or later
 - Version: 0.3.12
 - URL: https://pypi.org/project/pmmc/
@@ -31,6 +31,9 @@ optimized for excellent computational efficiency and portability.
 
 * PIP: ```pip install pmmc```, see https://pypi.org/project/pmmc/
 
+Binary wheels are available for Linux (x86_64), macOS (Apple silicon and Intel) and
+Windows. They include the multi-threaded SSE (CPU) and the OpenCL (CPU/GPU) backends.
+
 
 ## Runtime Dependencies
 * **CPU or GPU**: An OpenCL-capable CPU or GPU; most modern CPUs or GPUs support OpenCL -
@@ -44,7 +47,7 @@ POCL's support is largely limited to CPUs. You **do not need** to install CUDA S
 * **Python**: Python 3.6 and newer is required. **Python 2 is not supported**.
 * **numpy**: Used to pass/receive volumetric information to/from pmmc. To install, use either conda or pip 
 package managers: `pip install numpy` or `conda install numpy`
-* **iso2mesh** is a easy-to-use mesh generator for creating the tetrahedral meshed domain
+* **iso2mesh** is an easy-to-use mesh generator for creating the tetrahedral meshed domain
 for pmmc, install it with `pip install iso2mesh`
 * (optional) **jdata**: Only needed to read/write JNIfTI output files. To install, use pip: `pip install jdata` 
 on all operating systems; For Debian-based Linux distributions, you can also install to the system interpreter 
@@ -65,7 +68,7 @@ OpenCL runtimes.
 * **Python Interpreter**: Python 3.6 or above. The ```pip``` Python package manager and the ```wheel``` package (available
   via ```pip```) are not required but recommended.
 * **C/C++ Compiler**: pmmc can be compiled using a wide variety of C compilers, including
-  * GNU GCC for Linux, MacOS (intalled via MacPorts or brew), and Windows (installed via msys2, mingw64 or cygwin64)
+  * GNU GCC for Linux, MacOS (installed via MacPorts or brew), and Windows (installed via msys2, mingw64 or cygwin64)
   * Microsoft Visual Studio C/C++ Compiler for Windows.
   * Apple Clang for macOS, available via Xcode.
 
@@ -105,15 +108,16 @@ toolkit and pass `-DBUILD_CUDA=ON` to CMake, for example `CMAKE_ARGS="-DBUILD_CU
 
 ## How to use
 
-The PMMC module is easy to use. You can use the `pmmc.gpuinfo()` function to first verify
-if you have NVIDIA/CUDA compatible GPUs installed; if there are NVIDIA GPUs detected,
-you can then call the `run()` function to launch a photon simulation.
+The PMMC module is easy to use. You can use the `pmmc.gpuinfo()` function to first list
+the OpenCL CPUs and GPUs available on your computer, then call the `run()` function to launch
+a photon simulation. The compute backend is selected by `cfg['compute']`: `'opencl'` (default),
+`'sse'` (multi-threaded CPU, `cfg['gpuid']=-1`), or `'cuda'` if pmmc was built with CUDA.
 
 A simulation can be defined conveniently in two approaches - a one-liner and a two-liner:
 
-* For the one-liner, one simply pass on each MMC simulation setting as positional
-argument. The supported setting names are compatible to nearly all the input fields
-for the MATLAB version of MMC - [MMCLAB](https://github.com/fangq/mmc/blob/master/mmclab/mmclab.m))
+* For the one-liner, one simply passes each MMC simulation setting as a keyword
+argument. The supported setting names are compatible with nearly all the input fields
+of the MATLAB version of MMC - [MMCLAB](https://github.com/fangq/mmc/blob/master/mmclab/mmclab.m)
 
 ```python3
 import pmmc
@@ -143,3 +147,10 @@ cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.
        'srcpos': [30,30,0], 'srcdir':[0,0,1], 'prop':[[0,0,1,1],[0.005,1,0.01,1.37]]}
 res = pmmc.run(cfg)
 ```
+
+### Reproducible simulations
+
+Photons are scheduled to the CPU threads and GPU threads dynamically for speed, so two runs
+with the same `cfg['seed']` agree statistically but do not simulate the identical set of
+photons. To reproduce a simulation exactly on the CPU, use the SSE backend with a single
+OpenMP thread (set the environment variable `OMP_NUM_THREADS=1` before starting Python).

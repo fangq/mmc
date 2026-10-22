@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------
 =                  Mesh-based Monte Carlo (MMC)                     =
-        Supporting both OpenCL and Multi-threading with SSE4
+          Multi-threaded SSE4, OpenCL, CUDA and OptiX
 ---------------------------------------------------------------------
 
 
@@ -41,6 +41,12 @@ MMC v2026 adds the below key features
 * new functional and step-by-step trajectory tests (`test/testmmc.sh`,
   `test/testtraj.sh`) that run on the CPU, compare MMC with MMC golden data and
   statistically with MCX on matching voxel/mesh domains, and run in the CI
+* faster simulations: the SSE/OpenMP photon loop is scheduled dynamically (1.1-1.3x
+  on 16 threads), the OpenCL kernel is built with `-cl-unsafe-math-optimizations`
+  (1.14-1.16x) and photons are dispatched dynamically in the OpenCL/CUDA kernels
+  (1.02-1.06x); because of the dynamic scheduling, multi-threaded runs with the same
+  seed agree statistically but are not bit-reproducible, use a single thread
+  (`OMP_NUM_THREADS=1`) on the CPU to reproduce a run exactly
 * pmmc is bumped to 0.4.0
 
 this release also fixed a list of bugs, including
@@ -55,6 +61,18 @@ this release also fixed a list of bugs, including
   cone/zgaussian launch direction (#121), immc trajectories and partial paths (#116),
   `-F jnii` for detected photons/trajectories (#124), `--maxjumpdebug` (#123),
   unitinmm with `cfg.method='grid'` (#117), faceroi search (#119, #120)
+* no fluence is deposited in non-tissue (label<=0) elements, and the nodal output
+  uses the tissue-only nodal volume consistently on all backends
+* the scattering angle and the albedo weight in implicit MMC (edge/node/face ROIs)
+  now use the optical properties of the ROI instead of the host element
+* the host-generated RNG seeds were not uniformly random (bit 31 was always 0 with
+  the 31-bit rand() of Linux/macOS, only 15 bits per word with MSVC); seeds are now
+  uniform on all backends, which changes the random streams for a given seed
+* OptiX: no fluence in the ambient medium, rays that exit the mesh or miss all
+  triangles are terminated, and OptiX builds without the SDK's `sutil` headers
+* large meshes are no longer rejected by the CUDA backend (off-by-one MAX_PROP check)
+* pmmc macOS wheels are tagged with their actual architecture instead of
+  `universal2`, and the Intel macOS module links the OpenMP runtime
 
 The full changelog is listed below
 
@@ -207,20 +225,22 @@ discretize the problem domain. Image-based 3D mesh generation has been
 a very challenging task only until recently. One can now use a powerful 
 yet easy-to-use mesh generator, iso2mesh [1], to make tetrahedral meshes
 directly from volumetric medical images. You should download and install 
-the latest iso2mesh toolbox in order to run the build-in examples in MMC.
+the latest iso2mesh toolbox in order to run the built-in examples in MMC.
 
-We are working on a massively-parallel version of MMC by porting
-this code to CUDA and OpenCL. This is expected to produce a hundred-
-or even thousand-fold acceleration in speed similar to what we 
-have observed in our GPU-accelerated Monte Carlo software (Monte Carlo 
-eXtreme, or MCX [2]).
+MMC is also accelerated on GPUs: an OpenCL version (since v2019.10) runs on
+CPUs/GPUs from nearly all vendors, a CUDA version on NVIDIA GPUs, and an OptiX-based
+version (RT-MMC) uses the hardware ray-tracing cores of NVIDIA RTX GPUs. The GPU
+versions are typically a hundred to a thousand times faster than a single CPU
+thread, similar to what we have observed in our GPU-accelerated Monte Carlo
+software (Monte Carlo eXtreme, or MCX [2]). The backend is selected by "-c"
+("sse", "opencl", "cuda" or "optix") or "cfg.compute" in mmclab/pmmc.
 
 The most relevant publication describing this work is the GPU-accelerated
 MMC paper:
 
 Qianqian Fang and Shijie Yan, "GPU-accelerated mesh-based Monte Carlo 
-photon transport simulations," J. of Biomedical Optics, in press, 2019.
-Preprint URL: https://www.biorxiv.org/content/10.1101/815977v1
+photon transport simulations," J. of Biomedical Optics, 24(11), 115002 (2019)
+URL: http://dx.doi.org/10.1117/1.JBO.24.11.115002
 
 Please keep in mind that MMC is only a partial implementation of the 
 general Mesh-based Monte Carlo Method (MMCM). The limitations and issues
@@ -233,7 +253,7 @@ The details of MMCM can be found in the following paper:
 
 Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing 
 in Plücker coordinates," Biomed. Opt. Express 1, 165-175 (2010)
-URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-1-1-165
+URL: https://opg.optica.org/boe/abstract.cfm?uri=boe-1-1-165
 
 While the original MMC paper was based on the Plücker coordinates, a number
 of more efficient SIMD-based ray-tracers, namely, Havel SSE4 ray-tracer, 
@@ -244,23 +264,23 @@ details of these methods can be found in the below paper
 Qianqian Fang and David R. Kaeli, 
 "Accelerating mesh-based Monte Carlo method on modern CPU architectures,"
 Biomed. Opt. Express 3(12), 3223-3230 (2012)
-URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-3-12-3223
+URL: https://opg.optica.org/boe/abstract.cfm?uri=boe-3-12-3223
   
 and their key differences compared to another mesh-based MC simulator, 
 TIM-OS, are discussed in 
 
 Qianqian Fang, "Comment on 'A study on tetrahedron-based inhomogeneous 
 Monte-Carlo optical simulation'," Biomed. Opt. Express, vol. 2(5) 1258-1264, 2011.
-URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-2-5-1258
+URL: https://opg.optica.org/boe/abstract.cfm?uri=boe-2-5-1258
 
-In addition, the generalized MMC algorithm for wide-field sources and detectors are
+In addition, the generalized MMC algorithm for wide-field sources and detectors  is
 described in the following paper, and was made possible with the collaboration
 with Ruoyang Yao and Prof. Xavier Intes from RPI
 
 Yao R, Intes X, Fang Q, "Generalized mesh-based Monte Carlo for
 wide-field illumination and detection via mesh retessellation,"
 Biomed. Optics Express, 7(1), 171-184 (2016)
-URL: https://www.osapublishing.org/boe/abstract.cfm?uri=boe-7-1-171
+URL: https://opg.optica.org/boe/abstract.cfm?uri=boe-7-1-171
 
 In addition, we have been developing a fast approach to build the
 Jacobian matrix for solving inverse problems. The technique is called
@@ -268,15 +288,15 @@ Jacobian matrix for solving inverse problems. The technique is called
 
 Yao R, Intes X, Fang Q, "A direct approach to compute Jacobians for 
 diffuse optical tomography using perturbation Monte Carlo-based 
-photon 'replay'," Biomed. Optics Express, in press, (2018)
+photon 'replay'," Biomed. Opt. Express 9(10), 4588-4603 (2018)
 
 In 2019, we published an improved MMC algorithm, named "dual-grid MMC", 
-or DMMC, in the below JBO Letter. This method allows to use separate mesh
+or DMMC, in the below JBO Letter. This method uses separate meshes
 for ray-tracing and fluence storage, and can be 2 to 3 fold faster
 than the original MMC without loss of accuracy. 
 
 Shijie Yan, Anh Phong Tran, Qianqian Fang*, "A dual-grid mesh-based 
-Monte Carlo algorithm for efficient photon1transport simulations in 
+Monte Carlo algorithm for efficient photon transport simulations in  
 complex 3-D media," J. of Biomedical Optics, 24(2), 020503 (2019).
 
 The authors of the papers are greatly appreciated if you can cite 
@@ -450,7 +470,7 @@ The full command line options of MMC include the following:
 <pre>
 ###############################################################################
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
-#          Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          #
+#          Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          #
 #              https://mcx.space/#mmc  &  https://neurojson.io/               #
 #                                                                             #
 #Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
@@ -471,7 +491,14 @@ usage: mmc <param1> <param2> ...
 where possible parameters include (the first item in [] is the default value)
 
 == Required option ==
- -f config     (--input)       read an input file in .json or inp format
+ -f config     (--input)       read an input file in the .json format,if config
+                               string starts with '{',it is parsed as an inline
+                               JSON input file; if -f is followed by nothing or
+                               a single '-', it reads input from stdin via pipe
+ -Q benchmark  (--bench)       run a built-in benchmark, -Q only to list
+ -N benchmark  (--net)         get benchmark from NeuroJSON.io, -N only to list
+                               benchmark can be dataset URL,or dbname/benchname
+                               requires 'curl', install from https://curl.se/
 
 == MC options ==
  -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1
@@ -481,11 +508,11 @@ where possible parameters include (the first item in [] is the default value)
  -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
  -u [1.|float] (--unitinmm)    define the mesh data length unit in mm
  -E [1648335518|int|mch](--seed) set random-number-generator seed;
-                               if an mch file is followed, MMC "replays" 
+                               if an mch file is followed, MMC "replays"
                                the detected photons; the replay mode can be used
                                to calculate the mua/mus Jacobian matrices
- -P [0|int]    (--replaydet)   replay only the detected photons from a given 
-                               detector (det ID starts from 1), use with -E 
+ -P [0|int]    (--replaydet)   replay only the detected photons from a given
+                               detector (det ID starts from 1), use with -E
  -M [G|SG]    (--method)      choose ray-tracing algorithm (only use 1 letter)
                                P - Plucker-coordinate ray-tracing algorithm
                                H - Havel's SSE4 ray-tracing algorithm
@@ -508,26 +535,32 @@ where possible parameters include (the first item in [] is the default value)
 
 == Output options ==
  -s sessionid  (--session)     a string used to tag all output file names
- -O [X|XFEJLP] (--outputtype)  X - output flux, F - fluence, E - energy density
+ -O [X|XFEJLP...] (--outputtype) X - output flux, F - fluence, E - energy density
                                J - Jacobian, L - weighted path length, P -
                                weighted scattering count (J,L,P: replay mode)
+                               R - RF forward (complex fluence, set omega)
+                               A - adjoint mua Jacobian (grid mode, set detdir)
+                               D - adjoint D-coefficient Jacobian
+                               U - adjoint mus Jacobian, V - adjoint musp Jacobian
+                               W - dual adjoint [J_mua, J_D]
+                               Q - dual adjoint [J_mua, J_musp']
  -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
  -H [1000000] (--maxdetphoton) max number of detected photons
  -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
  -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
                                setting -x to 1 also implies setting '-d' to 1
- -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the 
-                               exterior surface. The output is stored in a 
-                               file named *_dref.dat, and the 2nd column of 
+ -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the
+                               exterior surface. The output is stored in a
+                               file named *_dref.dat, and the 2nd column of
                                the data is resized to [#Nf, #time_gate] where
-                               #Nf is the number of triangles on the surface; 
-                               #time_gate is the number of total time gates. 
-                               To plot the surface diffuse reflectance, the 
+                               #Nf is the number of triangles on the surface;
+                               #time_gate is the number of total time gates.
+                               To plot the surface diffuse reflectance, the
                                output triangle surface mesh can be extracted
                                by faces=faceneighbors(cfg.elem,'rowmajor');
                                where 'faceneighbors' is part of Iso2Mesh.
  -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
- -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double) 
+ -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double)
                                'hdr' (Analyze) or 'nii' (nifti, double)
                                mc2 - MCX mc2 format (binary 64bit float)
                                jnii - JNIfTI format (https://neurojson.org)
@@ -536,26 +569,27 @@ where possible parameters include (the first item in [] is the default value)
                                hdr - Analyze 7.5 hdr/img format
     the bnii/jnii formats support compression (-Z) and generate small files
     load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:
-      MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti, 
-      MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab, 
+      MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti,
+      MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab,
       Python:        PyJData:         https://pypi.org/project/jdata
       JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata
  -Z [zlib|...] (--zip)      set compression method if -F jnii or --dumpjson
                             is used (when saving data to JSON/JNIfTI format)
-                            0 zlib: zip format (moderate compression,fast) 
+                            0 zlib: zip format (moderate compression,fast)
                             1 gzip: gzip format (compatible with *.gz)
-                            2 base64: base64 encoding with no compression
+                            2 base64: no compression; raw _ArrayData_ (base64 in
+                              text JSON, raw binary in BJData)
                             3 lzip: lzip format (high compression,very slow)
                             4 lzma: lzma format (high compression,very slow)
                             5 lz4: LZ4 format (low compression,extrem. fast)
                             6 lz4hc: LZ4HC format (moderate compression,fast)
  --dumpjson [-,2,'file.json'] export all settings, including volume data using
-                          JSON/JData (https://neurojson.org) format for 
+                          JSON/JData (https://neurojson.org) format for
                           easy sharing; can be reused using -f
                           if followed by nothing or '-', mmc will print
                           the JSON to the console; write to a file if file
                           name is specified; by default, prints settings
-                          after pre-processing; '--dumpjson 2' prints 
+                          after pre-processing; '--dumpjson 2' prints
                           raw inputs before pre-processing
 
 == User IO options ==
@@ -583,17 +617,37 @@ where possible parameters include (the first item in [] is the default value)
                             8192 M  return photon trajectories
       combine multiple items by using a string, or add selected numbers together
  --debugphoton [-1|int]        to print the debug info specified by -D only for
-                               a single photon, followed by its index (start 0)
+                               a single photon, followed by its index (1-based)
 
 == Additional options ==
  --momentum     [0|1]          1 to save photon momentum transfer,0 not to save
  --gridsize     [1|float]      if -M G is used, this sets the grid size in mm
+ --srcid  [0|-1,0,1,2,..]      -1 simulate each source/detector slot separately
+                               0 all sources together (default)
+                               -2 append detectors as adjoint sources (forward
+                               fluence in all Ns+Nd slots, no Jacobian)
+                               N>0 run only the N-th source
  --maxjumpdebug [10000000|int] when trajectory is requested (i.e. -D S),
                                use this parameter to set the maximum positions
                                stored (default: 1e7)
 
 == Example ==
-       mmc -n 1000000 -f input.json -s test -b 0 -D TP -G -1
+example: (list built-in benchmarks: -Q/--bench)
+       mmc -Q
+or (use multiple devices - 1st,2nd and 4th GPUs - together with equal load)
+       mmc -Q dmmc-cube60 -n 1e7 -G 1101 -W 10,10,10
+or (use inline json setting modifier)
+       mmc -f input.json -j '{"Optode":{"Source":{"Type":"isotropic"}}}'
+or (dump simulation in a single json file)
+       mmc -Q dmmc-cube60 --dumpjson
+or (use -N/--net to browse community-contributed mmc simulations at https://neurojson.io)
+       mmc -N
+or (run user-shared mmc simulations, see full list at https://neurojson.org/db/mmc)
+       mmc -N dmmc-cube60
+or (use -f - to read piped input file modified by shell text processing utilities)
+       mmc -Q dmmc-cube60 --dumpjson | sed -e 's/pencil/isotropic/g' | mmc -f -
+or (download/modify simulations from NeuroJSON.io and run with mmc -f)
+       curl -s -X GET https://neurojson.io:7777/mmc/dmmc-cube60 | jq '.Forward.Dt = 1e-9' | mmc -f
 </pre>
 
 
@@ -619,7 +673,7 @@ specify most of the simulation parameters. The input file follows
 a similar format as in MCX, which looks like the following
 
 <pre>
-100                  # total photon number (can be overwriten by -n)
+100                  # total photon number (can be overwritten by -n)
 17182818             # RNG seed, negative to regenerate
 2. 8. 0.             # source position (mm)
 0. 0. 1.             # initial incident vector
@@ -862,9 +916,10 @@ readings without rerunning the simulation (for absorption changes only).
 
 * MMC only supports linear tetrahedral elements at this point. Quadratic \
  elements will be added later
-* Currently, this code only supports element-based optical properties; \
- nodal-based optical properties (for continuously varying media) will be \
- added in a future release
+* Optical properties are defined per element, except for the per-node mua/musp \
+ used to compute adjoint Jacobians for image reconstruction
+* Implicit MMC (edge/node/face regions of interest defined in the mesh input) \
+ is only supported by the SSE/OpenMP CPU backend (-G -1)
 
 -------------------------------------------------------------------------------
 

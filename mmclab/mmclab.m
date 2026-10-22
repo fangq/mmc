@@ -2,7 +2,7 @@ function varargout = mmclab(varargin)
 %
 % #############################################################################%
 %                     Mesh-based Monte Carlo (MMC) - OpenCL                   %
-%          Copyright (c) 2010-2025 Qianqian Fang <q.fang at neu.edu>          %
+%          Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          %
 %              https://mcx.space/#mmc  &  https://neurojson.io                %
 %                                                                             %
 % Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
@@ -91,7 +91,7 @@ function varargout = mmclab(varargin)
 %      cfg.minenergy:   terminate photon when weight less than this level (float) [0.0]
 %      cfg.roulettesize:[10] size of Russian roulette
 %      cfg.steps:       [dx, dy, dz], defines the DMMC grid voxel size,
-%                       must be isostropic, i.e. dx=dy=dz, only used when
+%                       must be isotropic, i.e. dx=dy=dz, only used when
 %                       cfg.method = 'grid', by default dx=dy=dz=1
 %      cfg.unitinmm:    defines the default length unit (to interpret mesh nodes, src/det positions
 %                       the default value is 1.0 (mm). For example, if the mesh node length unit is
@@ -162,7 +162,7 @@ function varargout = mmclab(varargin)
 %      cfg.unitinmm  (in mm) to specify the actual length unit.
 %
 % == Optional mesh data ==
-%     -cfg.facenb:      element face neighbohood list (calculated by faceneighbors())
+%     -cfg.facenb:      element face neighborhood list (calculated by faceneighbors())
 %     -cfg.evol:        element volume (calculated by elemvolume() with iso2mesh)
 %     -cfg.e0:          the element ID enclosing the source, if not defined,
 %                       it will be calculated by tsearchn(node,elem,srcpos);
@@ -181,7 +181,7 @@ function varargout = mmclab(varargin)
 %                      the exiting weight of all detected photons are binned and summed
 %                      into a detparam1(4)-by-detparam2(4) pixelated output, covering
 %                      the quadrilateral area with 4 corners defined by (only 1:3 elem are used)
-%                      [detpos, detpos+detparam1, detpos+detparam1+detaram2, detpos+detparam2].
+%                      [detpos, detpos+detparam1, detpos+detparam1+detparam2, detpos+detparam2].
 %                      When a widefield detector is used, detector radii are ignored.
 %      cfg.issaveref:  [0]-save diffuse reflectance/transmittance on the exterior surfaces.
 %                      The output is stored as flux.dref in a 2D array of size [#Nf,  #time_gate]
@@ -226,10 +226,10 @@ function varargout = mmclab(varargin)
 %      detphoton: (optional) a struct array, with a length equals to that of cfg.
 %            Starting from v2016.5, the detphoton contains the below subfields:
 %              detphoton.detid: the ID(>0) of the detector that captures the photon
-%              detphoton.nscat: cummulative scattering event counts in each medium
-%              detphoton.ppath: cummulative path lengths in each medium (partial pathlength)
+%              detphoton.nscat: cumulative scattering event counts in each medium
+%              detphoton.ppath: cumulative path lengths in each medium (partial pathlength)
 %                   one need to multiply cfg.unitinmm with ppath to convert it to mm.
-%              detphoton.mom: cummulative cos_theta for momentum transfer in each medium
+%              detphoton.mom: cumulative cos_theta for momentum transfer in each medium
 %              detphoton.p or .v: exit position and direction, when cfg.issaveexit=1
 %              detphoton.w0: photon initial weight at launch time
 %              detphoton.prop: optical properties, a copy of cfg.prop
