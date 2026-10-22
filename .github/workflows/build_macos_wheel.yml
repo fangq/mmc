@@ -63,6 +63,16 @@ jobs:
         if: ${{ runner.os == 'macOS' && matrix.os == 'macos-14' }}
         run: |
           ln -sf /opt/homebrew/opt/libomp/include/*.h src/pybind11/include
+      - name: Tag wheels with the runner architecture
+        run: |
+          # setup-python's CPython 3.11+ is a universal2 build, so without this every wheel was
+          # tagged universal2 while holding only the runner's own arch, and pip on Apple Silicon
+          # with macOS 15 picked the x86_64-only one
+          ARCH=$(uname -m)
+          OSVER=$(sw_vers -productVersion | cut -d. -f1).0
+          echo "ARCHFLAGS=-arch $ARCH" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$OSVER" >> $GITHUB_ENV
+          echo "_PYTHON_HOST_PLATFORM=macosx-$OSVER-$ARCH" >> $GITHUB_ENV
       - name: Build Wheels
         run: |
           cd pmmc/
@@ -70,6 +80,20 @@ jobs:
           VERBOSE=1 pip wheel . -w ../dist/
           ls ../dist/
           cd ../
+      - name: Check wheel architecture and import
+        run: |
+          ARCH=$(uname -m)
+          for whl in dist/pmmc-*.whl; do
+            case "$whl" in *_$ARCH.whl) ;; *) echo "wheel $whl is not tagged $ARCH"; exit 1 ;; esac
+            rm -rf whlcheck && mkdir whlcheck && (cd whlcheck && unzip -q "../$whl")
+            for so in whlcheck/_pmmc*.so; do
+              archs=$(lipo -archs "$so")
+              echo "$so: $archs"
+              [ "$archs" = "$ARCH" ] || { echo "binary arch $archs does not match $ARCH"; exit 1; }
+            done
+          done
+          pip install --no-deps --force-reinstall dist/pmmc-*.whl
+          (cd /tmp && python -c "import _pmmc; print('imported _pmmc', _pmmc.__file__)")
       - name: Check If the Build Version Exists on PyPI
         id: perform_pypi_upload_check
         run: |
