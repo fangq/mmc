@@ -44,9 +44,18 @@ endif()
 # C Options
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
     set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -D_hypot=hypot -fPIC ${OpenMP_CXX_FLAGS}")
-    set(CMAKE_MODULE_LINKER_FLAGS "/opt/homebrew/lib/libomp.a")
 else()
     set(CMAKE_CXX_FLAGS "-Wall -g -DMCX_EMBED_CL -fno-strict-aliasing -m64 -DMMC_USE_SSE -DHAVE_SSE2 -msse -msse2 -msse3 -mssse3 -msse4.1 -O3 -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -D_hypot=hypot -fPIC ${OpenMP_CXX_FLAGS}")
+endif()
+
+# Apple clang's OpenMP flags do not link a runtime: link Homebrew's static libomp into modules
+# (_pmmc) on both arm64 and x86_64, so the wheels need no libomp.dylib; without it the x86_64
+# _pmmc failed to import with "symbol not found: ___kmpc_barrier"
+if(APPLE)
+    find_library(LIBOMP_STATIC NAMES libomp.a HINTS /opt/homebrew/opt/libomp/lib /usr/local/opt/libomp/lib /opt/homebrew/lib /usr/local/lib)
+    if(LIBOMP_STATIC)
+        set(CMAKE_MODULE_LINKER_FLAGS "${LIBOMP_STATIC}")
+    endif()
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}")
 
