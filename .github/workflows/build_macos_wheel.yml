@@ -15,6 +15,7 @@ jobs:
     name: Build macOS wheels
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-15-intel, macos-14]
         python_version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', 'pypy3.7', 'pypy3.8', 'pypy3.9', 'pypy3.10' ]
@@ -68,8 +69,11 @@ jobs:
           # setup-python's CPython 3.11+ is a universal2 build, so without this every wheel was
           # tagged universal2 while holding only the runner's own arch, and pip on Apple Silicon
           # with macOS 15 picked the x86_64-only one
+          # deployment target: the oldest macOS for each arch (11.0 introduced arm64), not the
+          # runner's; Python <= 3.7 on macOS 11+ reports the OS as 10.16, so its pip rejects
+          # wheels tagged macosx_11_0 or newer for x86_64
           ARCH=$(uname -m)
-          OSVER=$(sw_vers -productVersion | cut -d. -f1).0
+          if [ "$ARCH" = "arm64" ]; then OSVER=11.0; else OSVER=10.15; fi
           echo "ARCHFLAGS=-arch $ARCH" >> $GITHUB_ENV
           echo "MACOSX_DEPLOYMENT_TARGET=$OSVER" >> $GITHUB_ENV
           echo "_PYTHON_HOST_PLATFORM=macosx-$OSVER-$ARCH" >> $GITHUB_ENV
@@ -90,6 +94,9 @@ jobs:
               archs=$(lipo -archs "$so")
               echo "$so: $archs"
               [ "$archs" = "$ARCH" ] || { echo "binary arch $archs does not match $ARCH"; exit 1; }
+              minos=$(otool -l "$so" | awk '/minos|version [0-9]/{print $2; exit}')
+              echo "$so: minimum macOS $minos"
+              [ "$minos" = "$MACOSX_DEPLOYMENT_TARGET" ] || { echo "binary needs macOS $minos, not $MACOSX_DEPLOYMENT_TARGET"; exit 1; }
             done
           done
           pip install --no-deps --force-reinstall dist/pmmc-*.whl
