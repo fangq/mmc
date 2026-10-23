@@ -322,6 +322,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         mesh.noderoi = (float*) malloc(mesh.nn * sizeof(float));
         auto val = static_cast<float*>(buffer_info.ptr);
         memcpy(mesh.noderoi, val, mesh.nn * sizeof(float));
+        mcx_config.implicit = 1; /* enable implicit MMC (iMMC), as mmclab */
     }
 
 
@@ -351,6 +352,8 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             for (int i = 0; i < mesh.ne; i++) {
                 mesh.edgeroi[i * 6 + j] = val[j * mesh.ne + i];
             }
+
+        mcx_config.implicit = 1; /* edge-based iMMC */
     }
 
 
@@ -380,6 +383,8 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             for (int i = 0; i < mesh.ne; i++) {
                 mesh.faceroi[i * 4 + j] = val[j * mesh.ne + i];
             }
+
+        mcx_config.implicit = 2; /* face-based iMMC */
     }
 
 
