@@ -148,6 +148,14 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
     set(CMAKE_SHARED_LINKER_FLAGS "-static-libgcc -static-libstdc++")
     set(CMAKE_MODULE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+
+    if (UNIX AND NOT APPLE)
+        # do not export the symbols of the static libstdc++/libgcc: _pmmc exported their GNU_UNIQUE
+        # symbols (std::locale facet ids), which the dynamic linker merges process-wide, so a module
+        # using the system libstdc++ (such as _pmcx) crashed in std::cout after _pmmc was loaded
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs,ALL")
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,--exclude-libs,ALL")
+    endif()
 endif()
 
 if(BUILD_CUDA)
