@@ -797,15 +797,16 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         auto gpu_id_value = user_cfg["gpuid"];
 
         if (py::int_::check_(gpu_id_value)) {
-            mcx_config.gpuid = py::int_(gpu_id_value);
+            int gpuid = py::int_(gpu_id_value);
+            mcx_config.gpuid = gpuid;
             memset(mcx_config.deviceid, 0, MAX_DEVICE);
 
-            if (mcx_config.gpuid > 0 && mcx_config.gpuid < MAX_DEVICE) {
+            if (gpuid >= MAX_DEVICE) {
+                throw py::value_error("GPU id can not be more than 256");
+            } else if (gpuid > 0) {
                 memset(mcx_config.deviceid, '0', mcx_config.gpuid - 1);
                 mcx_config.deviceid[mcx_config.gpuid - 1] = '1';
-            } else {
-                throw py::value_error("GPU id must be positive and can not be more than 256");
-            }
+            } /* gpuid<=0, e.g. -1 to run on the CPU, is passed on as in mmclab */
         } else if (py::str::check_(gpu_id_value)) {
             std::string gpu_id_string_value = py::str(gpu_id_value);
 
