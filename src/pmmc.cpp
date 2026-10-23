@@ -681,7 +681,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
     if (user_cfg.contains("compute")) {
         std::string compute_str = py::str(user_cfg["compute"]);
-        const char* computebackend[] = {"sse", "opencl", "cuda", ""};
+        const char* computebackend[] = {"sse", "opencl", "cuda", "optix", ""};  /* as mmclab; without OptiX, "optix" runs OpenCL */
 
         if (compute_str.empty()) {
             throw py::value_error("the 'compute' field must be a non-empty string");
