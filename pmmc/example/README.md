@@ -37,7 +37,9 @@ them from this folder of an mmc source tree:
 
 ## Dependencies
 
-- all demos: `pmmc`, `numpy`, `matplotlib`, `iso2mesh` (pip install iso2mesh)
+- all demos: `pmmc`, `numpy`, `matplotlib`, `iso2mesh` 0.6.7 or newer (pip install iso2mesh);
+  older versions build meshes that differ from MATLAB's or fail in tetgen, and lack the
+  `dovol` option of `meshasphere`
 - `scipy`: `.mat` loading and interpolation
 - `pmcx`: `demo_compare_mmc_mcx`, `demo_dmmc_sphshells`, `demo_dualmesh_output`
 - `pmcxcl`: `demo_mmcl_b2_b2d`
