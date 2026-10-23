@@ -946,6 +946,11 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
         mcx_python_flush();
 
+        /** Find the source (-1) and wide-field detector (-2) elements first, as mmclab does: it sets
+         *  cfg.isextdet, which mmc_validate_config (keeping issavedet) and mesh_validate (the medium
+         *  of the detector elements) need */
+        mesh_srcdetelem(&mesh, &mcx_config);
+
         /** Validate all input fields, and warn incompatible inputs */
         mmc_validate_config(&mcx_config, det_ps, dim_det_ps, seed_byte);
 
@@ -1054,9 +1059,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             mcx_config.debuglevel |= dlTraj;
         }
 
-        mesh_srcdetelem(&mesh, &mcx_config);
-
-        /* (detector-as-adjoint-source append now runs above, before
+        /* (mesh_srcdetelem and the detector-as-adjoint-source append run above, before
          * mesh_validate, so mesh.weight is sized for the correct nsrcslots.) */
 
         if (mcx_config.isgpuinfo == 0) {
