@@ -1999,6 +1999,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 
                 if (cfg->issaveref && r.eid < 0 && mesh->dref) {
                     int tshift = MIN( ((int)((r.photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * mesh->nf;
+                    #pragma omp atomic
                     mesh->dref[((-r.eid) - 1) + tshift] += r.weight;
                 }
             } else if (r.faceid == -2 && (cfg->debuglevel & dlMove)) {

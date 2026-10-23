@@ -1952,7 +1952,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
                 if (GPU_PARAM(gcfg, issaveref) && r.eid < 0 && dref) {
                     int tshift = MIN( ((int)((r.photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, nf);
+                    /* many threads exit through the same faces near the source; a plain += loses updates */
+#ifdef USE_ATOMIC
+                    atomicadd(dref + ((-r.eid) - 1) + tshift, r.weight);
+#else
                     dref[((-r.eid) - 1) + tshift] += r.weight;
+#endif
                 }
 
 #endif
