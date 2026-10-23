@@ -692,7 +692,6 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
     if (user_cfg.contains("debuglevel")) {
         std::string debug_level = py::str(user_cfg["debuglevel"]);
-        const char debugflag[] = {'R', 'M', 'P', '\0'};
         char debuglevel[MAX_SESSION_LENGTH] = {'\0'};
 
         if (debug_level.empty()) {
@@ -704,6 +703,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         }
 
         strncpy(debuglevel, debug_level.c_str(), MAX_SESSION_LENGTH);
+        /* the same flags as mmc -D and mmclab, e.g. 'T' timing, 'P' progress, 'M' trajectories (dlTraj) */
         mcx_config.debuglevel = mcx_parsedebugopt(debuglevel, debugflag);
 
         if (mcx_config.debuglevel == 0) {
@@ -1044,7 +1044,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             mcx_config.photonseed = malloc(mcx_config.maxdetphoton * sizeof(RandType) * RAND_BUF_LEN);
         }
 
-        if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
+        if (mcx_config.debuglevel & dlTraj) {
             mcx_config.exportdebugdata = (float*)malloc(mcx_config.maxjumpdebug * sizeof(float) * MCX_DEBUG_REC_LEN);
             mcx_config.debuglevel |= dlTraj;
         }
@@ -1093,14 +1093,14 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             throw py::runtime_error("PMMC terminated due to an exception!");
         }
 
-        if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
+        if (mcx_config.debuglevel & dlTraj) {
             field_dim[0] = MCX_DEBUG_REC_LEN;
             field_dim[1] = mcx_config.debugdatalen; // his.savedphoton is for one repetition, should correct
             field_dim[2] = 0;
             field_dim[3] = 0;
             auto photon_traj_data = py::array_t<float, py::array::f_style>({field_dim[0], field_dim[1]});
 
-            if (mcx_config.debuglevel & MCX_DEBUG_MOVE) {
+            if (mcx_config.debuglevel & dlTraj) {
                 memcpy(photon_traj_data.mutable_data(), mcx_config.exportdebugdata, field_dim[0] * field_dim[1] * sizeof(float));
             }
 
