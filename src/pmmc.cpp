@@ -725,6 +725,10 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             free(mcx_config.srcpattern);
         }
 
+        if (buffer_info.ndim == 3) { /* a stack of patterns for photon sharing, [srcnum, Nx, Ny], as in mmclab */
+            mcx_config.srcnum = buffer_info.shape[0];
+        }
+
         mcx_config.srcpattern = (float*) malloc(buffer_info.size * sizeof(float));
         auto val = static_cast<float*>(buffer_info.ptr);
 
