@@ -651,7 +651,8 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
         mesh->type = (int*)malloc(sizeof(int ) * mesh->ne);
 
         datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-        mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * cfg->srcnum);
+        /* one slot per source for multi-source (srcid<=0) and adjoint runs, as in mesh_validate */
+        mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * ((cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum));
 
         for (i = 0; i < mesh->ne; i++) {
             for (j = 0; j < mesh->elemlen; j++) {
@@ -685,7 +686,8 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
     mesh->type = (int*)malloc(sizeof(int ) * mesh->ne);
 
     datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-    mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * cfg->srcnum);
+    /* one slot per source for multi-source (srcid<=0) and adjoint runs, as in mesh_validate */
+    mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * ((cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum));
 
     for (i = 0; i < mesh->ne; i++) {
         pe = mesh->elem + i * mesh->elemlen;
