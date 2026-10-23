@@ -1715,11 +1715,12 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 } else {
                     mcx_jdatadecode((void**)&cfg->roidata, &ndim, dims, 2, &type, subitem, cfg);
 
-                    if (strcmp(type, "single") || ndim > 2 || (ndim >= 2 && dims[1] != 6 && dims[1] != 4)) {
+                    if (strcmp(type, "single") || ndim > 2 || (ndim >= 2 && dims[1] != 6 && dims[1] != 4 && dims[1] != 1)) {
                         free(cfg->roidata);
                         MMC_ERROR(-1, "Mesh.MeshROI JData-annotated array must be in the 'single' format");
                     } else {
                         cfg->roitype = (dims[1] == 6) ? rtEdge : ((ndim == 1 || dims[0] == 1 || dims[1] == 1) ? rtNode : (dims[1] == 4 ? rtFace : rtNone));
+                        cfg->implicit = (cfg->roitype != rtNone) + (cfg->roitype == rtFace);
                     }
                 }
             }
@@ -3556,7 +3557,11 @@ void mcx_validatecfg(mcconfig* cfg) {
     }
 
     if (cfg->implicit && (int)(cfg->gpuid) >= 0) {
-        MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
+        if (!flagset['G']) { /* no device was requested, run implicit MMC on the CPU */
+            cfg->gpuid = -1;
+        } else {
+            MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
+        }
     }
 
     for (i = 0; i < MAX_DEVICE; i++)
