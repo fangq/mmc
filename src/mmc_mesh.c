@@ -283,6 +283,16 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
                 elem[i * (mesh->elemlen + 1) + mesh->elemlen] = mesh->type[i];
             }
 
+            /* mesh_srcdetelem relabeled the wide-field source (-1) and detector (-2) elements;
+               restore their labels so that the saved mesh keeps the source/detector domains */
+            for (i = 0; i < mesh->srcelemlen; i++) {
+                elem[(mesh->srcelem[i] - 1) * (mesh->elemlen + 1) + mesh->elemlen] = -1;
+            }
+
+            for (i = 0; i < mesh->detelemlen; i++) {
+                elem[(mesh->detelem[i] - 1) * (mesh->elemlen + 1) + mesh->elemlen] = -2;
+            }
+
             cfg->elem = elem;
         }
 

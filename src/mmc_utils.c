@@ -2090,7 +2090,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                     mcx_jdatadecode((void**)&cfg->srcpattern, &ndim, dims, 3, &type, subitem, cfg);
 
-                    if (strcmp(type, "single")) {
+                    if (type == NULL || strcmp(type, "single")) {
                         if (cfg->srcpattern) {
                             free(cfg->srcpattern);
                         }
@@ -2804,11 +2804,64 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
         cJSON_AddStringToObject(sub, "Type", srctypeid[(int)cfg->srctype]);
     }
 
-    cJSON_AddItemToObject(sub, "Pos", cJSON_CreateFloatArray(&(cfg->srcpos.x), 3));
-    cJSON_AddItemToObject(sub, "Dir", cJSON_CreateFloatArray(&(cfg->srcdir.x), 4));
-    cJSON_AddItemToObject(sub, "Param1", cJSON_CreateFloatArray(&(cfg->srcparam1.x), 4));
-    cJSON_AddItemToObject(sub, "Param2", cJSON_CreateFloatArray(&(cfg->srcparam2.x), 4));
+    if (cfg->extrasrclen > 1 && cfg->srcdata) {
+        /* multiple sources are written as Nsrc x 4 Pos/Dir/Param1/Param2 arrays, with the source
+           weight in Pos(:,4); srcdata[0] mirrors the main source (extrasrclen counts all sources).
+           The detectors appended as adjoint sources are added later by mmc_prep, not saved here */
+        cJSON* srcfield[4];
+        const char* fieldname[4] = {"Pos", "Dir", "Param1", "Param2"};
+        const float* first[4] = {&(cfg->srcpos.x), &(cfg->srcdir.x), &(cfg->srcparam1.x), &(cfg->srcparam2.x)};
+
+        for (i = 0; i < 4; i++) {
+            srcfield[i] = cJSON_CreateArray();
+            cJSON_AddItemToArray(srcfield[i], cJSON_CreateFloatArray(first[i], 4));
+        }
+
+        for (i = 1; i < cfg->extrasrclen; i++) {
+            cJSON_AddItemToArray(srcfield[0], cJSON_CreateFloatArray(&(cfg->srcdata[i].srcpos.x), 4));
+            cJSON_AddItemToArray(srcfield[1], cJSON_CreateFloatArray(&(cfg->srcdata[i].srcdir.x), 4));
+            cJSON_AddItemToArray(srcfield[2], cJSON_CreateFloatArray(&(cfg->srcdata[i].srcparam1.x), 4));
+            cJSON_AddItemToArray(srcfield[3], cJSON_CreateFloatArray(&(cfg->srcdata[i].srcparam2.x), 4));
+        }
+
+        for (i = 0; i < 4; i++) {
+            cJSON_AddItemToObject(sub, fieldname[i], srcfield[i]);
+        }
+    } else {
+        cJSON_AddItemToObject(sub, "Pos", cJSON_CreateFloatArray(&(cfg->srcpos.x), 3));
+        cJSON_AddItemToObject(sub, "Dir", cJSON_CreateFloatArray(&(cfg->srcdir.x), 4));
+        cJSON_AddItemToObject(sub, "Param1", cJSON_CreateFloatArray(&(cfg->srcparam1.x), 4));
+        cJSON_AddItemToObject(sub, "Param2", cJSON_CreateFloatArray(&(cfg->srcparam2.x), 4));
+    }
+
     cJSON_AddNumberToObject(sub, "SrcNum", cfg->srcnum);
+
+    if (cfg->srcpattern) {
+        /* the pattern of pattern sources, Nsrc x Nx x Ny (Nx, Ny in srcparam1.w, srcparam2.w) */
+        uint dims[4] = {cfg->srcnum, (uint)cfg->srcparam1.w, (uint)cfg->srcparam2.w, 1}, x, y, z;
+        uint* pdims = dims + (cfg->srcnum == 1);
+        float* rowpat = (float*)malloc(sizeof(float) * pdims[0] * pdims[1] * pdims[2]);
+        int ret;
+
+        /* the JData array is row-major, the reader converts it back with mcx_convertrow2col */
+        for (x = 0; x < pdims[0]; x++)
+            for (y = 0; y < pdims[1]; y++)
+                for (z = 0; z < pdims[2]; z++) {
+                    rowpat[(x * pdims[1] + y) * pdims[2] + z] = cfg->srcpattern[(z * pdims[1] + y) * pdims[0] + x];
+                }
+
+        cJSON_AddItemToObject(sub, "Pattern", tmp = cJSON_CreateObject());
+        ret = mcx_jdataencode(rowpat, 2 + (cfg->srcnum > 1), pdims, "single", sizeof(float), cfg->zipid, tmp, 0, 0, cfg);
+        free(rowpat);
+
+        if (ret) {
+            MMC_ERROR(-10, "saving the source pattern to JSON failed");
+        }
+    }
+
+    if (cfg->srcid) {
+        cJSON_AddNumberToObject(sub, "ID", cfg->srcid);
+    }
 
     cJSON_AddItemToObject(obj, "Detector", sub = cJSON_CreateArray());
 
@@ -2985,9 +3038,13 @@ int  mcx_jdatadecode(void** vol, int* ndim, uint* dims, int maxdim, char** type,
         vdata = cJSON_GetObjectItem(obj, "_ArrayZipData_");
     }
 
-    if (!flagset['K'] && vtype) {
+    if (vtype) {
         *type = vtype->valuestring;
+    }
 
+    /* only infer the media format from the array type if the input did not set it; the
+       array type is returned regardless, as the callers check it (e.g. the source pattern) */
+    if (!flagset['K'] && vtype) {
         if (strstr(*type, "int8")) {
             cfg->mediabyte = 1;
         } else if (strstr(*type, "int16")) {
@@ -4200,10 +4257,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     } else if (strcmp(argv[i] + 2, "dumpjson") == 0) {
                         cfg->jsonfile[0] = '-';
 
-                        if (i + 1 >= argc) {
+                        /* --dumpjson followed by nothing or another option prints to stdout, by a number
+                           selects the dump mode, and by anything else (including an absolute or ./ path,
+                           which used to be read as a number and silently ignored) names the output file */
+                        if (i + 1 >= argc || (argv[i + 1][0] == '-' && argv[i + 1][1] != '\0')) {
                             cfg->isdumpjson = 1;
-                            i++;
-                        } else if (i + 1 < argc && (isalpha((int)(argv[i + 1][0])) || argv[i + 1][0] == '-')) {
+                        } else if (!isdigit((int)(argv[i + 1][0]))) {
                             cfg->isdumpjson = 1;
                             memcpy(cfg->jsonfile, argv[i + 1], MIN(strlen(argv[i + 1]), MAX_PATH_LENGTH));
                             i++;

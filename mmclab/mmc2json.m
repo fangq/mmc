@@ -45,6 +45,7 @@ Optode.Source = copycfg(cfg, 'srcparam1', Optode.Source, 'Param1');
 Optode.Source = copycfg(cfg, 'srcparam2', Optode.Source, 'Param2');
 Optode.Source = copycfg(cfg, 'srctype', Optode.Source, 'Type');
 Optode.Source = copycfg(cfg, 'srcnum', Optode.Source, 'SrcNum');
+Optode.Source = copycfg(cfg, 'srcid', Optode.Source, 'ID');
 
 if (isfield(cfg, 'detpos') && ~isempty(cfg.detpos))
     Optode.Detector = struct();
@@ -55,7 +56,9 @@ if (isfield(cfg, 'detpos') && ~isempty(cfg.detpos))
     end
 end
 if (isfield(cfg, 'srcpattern') && ~isempty(cfg.srcpattern))
-    Optode.Source.Pattern = single(cfg.srcpattern);
+    % a row-major JData array, [srcnum, Nx, Ny] for multiple patterns; mmc only reads
+    % the compressed form, and takes the pattern count from its first dimension
+    Optode.Source.Pattern = jdataencode(single(cfg.srcpattern), 'Compression', 'zlib', 'CompressArraySize', 0, 'Base64', 1);
 end
 
 %% define the domain and optical properties
@@ -74,7 +77,7 @@ if (isfield(cfg, 'node') && ~isempty(cfg.node) && isfield(cfg, 'elem') && ~isemp
         savemmcmesh(fname, node, elem);
     else
         Mesh.MeshNode = single(node);
-        Mesh.MeshElem = uint32(elem);
+        Mesh.MeshElem = int32(elem);  % signed: uint32 clamps the -1/-2 labels of wide-field source/detector domains to 0
         if (isfield(cfg, 'edgeroi'))
             Mesh.MeshROI = single(cfg.edgeroi);
         elseif (isfield(cfg, 'noderoi'))
@@ -85,7 +88,7 @@ if (isfield(cfg, 'node') && ~isempty(cfg.node) && isfield(cfg, 'elem') && ~isemp
     end
 
     if (~isfield(cfg, 'e0'))
-        cfg.e0 = tsearchn(node, elem(:, 1:4), cfg.srcpos);
+        cfg.e0 = tsearchn(node, elem(:, 1:4), cfg.srcpos(1, 1:3));  % mmc locates any other sources itself
     end
     Mesh = copycfg(cfg, 'e0', Mesh, 'InitElem');
 
@@ -141,7 +144,9 @@ if (isfield(cfg, 'method'))
 end
 
 if (isfield(cfg, 'outputtype'))
-    outputtypemap = struct('flux', 'x', 'fluence', 'f', 'energy', 'e', 'jacobian', 'j', 'wl', 'l', 'wp', 'p');
+    outputtypemap = struct('flux', 'x', 'fluence', 'f', 'energy', 'e', 'jacobian', 'j', 'wl', 'l', 'wp', 'p', ...
+                           'rf', 'r', 'rfmus', 's', 'adjoint', 'a', 'adjoint_dcoeff', 'd', 'adjoint_mus', 'u', ...
+                           'adjoint_musp', 'v', 'adjoint_mua_d', 'w', 'adjoint_mua_musp', 'q');
     if (isfield(outputtypemap, cfg.outputtype))
         Session.OutputType = outputtypemap.(cfg.outputtype);
     else
