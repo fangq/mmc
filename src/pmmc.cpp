@@ -130,7 +130,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     GET_SCALAR_FIELD(user_cfg, mcx_config, isreflect, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, isspecular, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, ismomentum, py::bool_);
-    GET_SCALAR_FIELD(user_cfg, mcx_config, issaveexit, py::bool_);
+    GET_SCALAR_FIELD(user_cfg, mcx_config, issaveexit, py::int_); /* 2 saves a detector image */
     GET_SCALAR_FIELD(user_cfg, mcx_config, isextdet, py::bool_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issave2pt, py::bool_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issavedet, py::int_);
@@ -1149,10 +1149,12 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
                 field_dim[3] = 0;
 
                 if (field_dim[0] * field_dim[1] > 0) {
-                    auto partial_path = py::array_t<float, py::array::f_style>(std::initializer_list<size_t>({field_dim[0], field_dim[1], field_dim[2]}));
-                    memcpy(partial_path.mutable_data(), mcx_config.exportdetected,
-                           field_dim[0] * field_dim[1] * field_dim[2] * sizeof(float));
-                    output["detp"] = partial_path;
+                    /* bin the detected photons into a detparam1.w x detparam2.w x maxgate image, as mmclab */
+                    auto detimage = py::array_t<float, py::array::f_style>(std::initializer_list<size_t>({field_dim[0], field_dim[1], field_dim[2]}));
+                    float* detmap = static_cast<float*>(detimage.mutable_data());
+                    memset(detmap, 0, field_dim[0] * field_dim[1] * field_dim[2] * sizeof(float));
+                    mesh_getdetimage(detmap, mcx_config.exportdetected, mcx_config.detectedcount, &mcx_config, &mesh);
+                    output["detp"] = detimage;
                 }
             }
 
