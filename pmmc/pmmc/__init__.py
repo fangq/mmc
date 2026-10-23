@@ -89,6 +89,8 @@ except ImportError:  # pragma: no cover
         "please first install pmcx module to use utility functions such as 'detweight', 'meanpath' etc"
     )
 
+from .mmclab import mmclab, mmcsrcdomain, mmcaddsrc, mmcadddet, mmcraytrace
+
 __version__ = "0.3.12"
 
 __all__ = (
@@ -122,4 +124,9 @@ __all__ = (
     "plotshapes",
     "plotphotons",
     "plotvol",
+    "mmclab",
+    "mmcsrcdomain",
+    "mmcaddsrc",
+    "mmcadddet",
+    "mmcraytrace",
 )
