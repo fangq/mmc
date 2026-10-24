@@ -10,7 +10,7 @@ USERCCFLAGS=-DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT
 
 DUMMY:=$(shell mkdir -p built/cjson)
 
-ifneq (,$(filter $(MAKECMDGOALS),cuda cudamex cudaoct optix optixmex optixoct))
+ifneq (,$(filter $(MAKECMDGOALS),cuda cudamex cudaoct optix optixmex optixoct cudaunittest optixunittest))
     FILES+=mmc_cu_host
     USERCCFLAGS+=-DUSE_CUDA
     CUCCOPT= -DUSE_ATOMIC -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC $(USERCUCCOPT)
@@ -18,7 +18,7 @@ ifneq (,$(filter $(MAKECMDGOALS),cuda cudamex cudaoct optix optixmex optixoct))
     LIBCUDART=-L$(LIBOPENCLDIR) -lcudart
 endif
 
-ifneq (,$(filter $(MAKECMDGOALS),optix optixmex optixoct))
+ifneq (,$(filter $(MAKECMDGOALS),optix optixmex optixoct optixunittest))
     PTXSOURCE=mmc_optix_utils
     FILES+=$(PTXSOURCE) mmc_optix_host
     OPTIXPROGRAM=mmc_optix_core
@@ -43,3 +43,6 @@ unittest: makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -DMMC_EXAMPLE_DIR=\"$(abspath ../examples)\" -o $(OBJDIR)/test_mmc$(OBJSUFFIX) ../test/unit/test_mmc.c
 	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/mmc_unittest $(OBJDIR)/test_mmc$(OBJSUFFIX) $(filter-out $(OBJDIR)/mmc$(OBJSUFFIX),$(OBJS)) $(USERARFLAGS) $(EXTRALIB)
 	$(BINDIR)/mmc_unittest
+
+##  the same unit tests linked with the CUDA (and OptiX) backends, which add their GPU cases ##
+cudaunittest optixunittest: unittest

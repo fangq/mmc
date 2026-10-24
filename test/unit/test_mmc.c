@@ -28,6 +28,7 @@ the OpenCL tests are skipped when no OpenCL device is found.
 #include <math.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include "mmc_host.h"
 #include "mmc_utils.h"
@@ -38,6 +39,14 @@ the OpenCL tests are skipped when no OpenCL device is found.
 
 #ifdef USE_OPENCL
     #include "mmc_cl_host.h"
+#endif
+
+#ifdef USE_CUDA
+    #include "mmc_cu_host.h"
+#endif
+
+#ifdef USE_OPTIX
+    #include "mmc_optix_host.h"
 #endif
 
 int ntest = 0, nfail = 0;
@@ -153,6 +162,10 @@ static long file_size(const char* fname) {
     return len;
 }
 
+static int mkdir_p(const char* dir) {
+    return (mkdir(dir, 0755) == 0 || access(dir, F_OK) == 0) ? 0 : -1;
+}
+
 static void write_file(const char* fname, const void* buf, size_t len) {
     FILE* fp = fopen(fname, "wb");
 
@@ -162,11 +175,17 @@ static void write_file(const char* fname, const void* buf, size_t len) {
     }
 }
 
+/** an optional change of the settings after parsing and before mmc_prep, for the
+    fields that only mmclab/pmmc set, such as adjointmode */
+static void (*run_premut)(mcconfig*, tetmesh*) = NULL;
+
 /** results of one short MMC call */
 typedef struct {
     double normalizer;
     int detected;
     int ran;
+    double wsum;   /**< sum of the first output slot (all gates), for comparing backends */
+    double jsum;   /**< sum of the first adjoint Jacobian block, for comparing backends */
 } RunResult;
 
 /**
@@ -201,6 +220,10 @@ static RunResult run_mmc(const char* args, void (*check)(mcconfig*, tetmesh*)) {
     mmc_init_from_cmd(&cfg, &mesh, &tracer, argc, argv);
     cfg.flog = devnull;
 
+    if (run_premut) {
+        run_premut(&cfg, &mesh);
+    }
+
     if (cfg.isgpuinfo == 0) {
         mmc_prep(&cfg, &mesh, &tracer);
 
@@ -208,6 +231,18 @@ static RunResult run_mmc(const char* args, void (*check)(mcconfig*, tetmesh*)) {
             mmc_run_mp(&cfg, &mesh, &tracer);
         }
 
+#ifdef USE_CUDA
+        else if (cfg.compute == cbCUDA) {
+            mmc_run_cu(&cfg, &mesh, &tracer);
+        }
+
+#endif
+#ifdef USE_OPTIX
+        else if (cfg.compute == cbOptiX) {
+            mmc_run_optix(&cfg, &mesh, &tracer);
+        }
+
+#endif
 #ifdef USE_OPENCL
         else {
             mmc_run_cl(&cfg, &mesh, &tracer);
@@ -215,6 +250,22 @@ static RunResult run_mmc(const char* args, void (*check)(mcconfig*, tetmesh*)) {
 
 #endif
         res.ran = 1;
+
+        if (mesh.weight) {
+            size_t datalen = (cfg.method == rtBLBadouelGrid) ? cfg.crop0.z : (cfg.basisorder ? mesh.nn : mesh.ne);
+
+            for (size_t k = 0; k < datalen * cfg.maxgate; k++) {
+                res.wsum += mesh.weight[k];
+            }
+
+            if (cfg.exportjacob) {
+                datalen = (cfg.method == rtBLBadouelGrid) ? cfg.crop0.z : mesh.nn;
+
+                for (size_t k = 0; k < datalen; k++) {
+                    res.jsum += cfg.exportjacob[k];
+                }
+            }
+        }
     }
 
     res.normalizer = cfg.his.normalizer;
@@ -374,6 +425,11 @@ static void test_immc(void) {
  *  OpenCL runs: tracer variants, RF and the adjoint Jacobians
  *---------------------------------------------------------------------------*/
 
+static void mut_adjointnodal(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    cfg->adjointmode = 1;
+}
+
 static void test_opencl(void) {
     if (!hasocl) {
         printf("no OpenCL device, skip the OpenCL tests\n");
@@ -397,6 +453,47 @@ static void test_opencl(void) {
         sprintf(msg, "OpenCL case %d runs", i + 1);
         EXPECT_TRUE(r.ran, msg);
     }
+
+    /* more OpenCL variants: a fixed thread configuration (-A 0), replay, a focused or
+       divergent source, respin, RF with elem-based output, two patterns, the mus/musp
+       adjoints, and the trajectory output */
+    const char* more[] = {
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -A 0 -t 1000 -T 64 -s utclA0",
+        "--bench dmmc-cube60 -G 1 -E utdet.mch -O J -M H -C 1 -s utclrep",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -r 2 -s utclr2",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 0 -O R --json {\"Forward\":{\"Omega\":6.28e8}} -s utclrf0",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 --json {\"Optode\":{\"Source\":{\"Dir\":[0,0,1,\"_NaN_\"]}}} -s utclnan",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 --json {\"Optode\":{\"Source\":{\"Dir\":[0,0,1,\"_Inf_\"]}}} -s utclinf",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 --json {\"Optode\":{\"Source\":{\"Dir\":[0,0,1,\"-_Inf_\"]}}} -s utclninf",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -s utclmp --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],"
+        "\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O U --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclU",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O V --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclV",
+        "--bench dmmc-cube60 -G 1 -n 50 -E 1 -M H -C 1 -D M -s utcltraj",
+    };
+
+    for (int i = 0; i < (int)(sizeof(more) / sizeof(more[0])); i++) {
+        RunResult r = run_mmc(more[i], NULL);
+        sprintf(msg, "OpenCL variant %d runs", i + 1);
+        EXPECT_TRUE(r.ran, msg);
+    }
+
+    /* the nodal-approximation mesh adjoint (adjointmode 1, set by mmclab/pmmc), alone,
+       dual, and dual with RF */
+    const char* adj[] = {
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O A --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclna",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O W --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclnw",
+        "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O W --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclnwrf",
+    };
+    run_premut = mut_adjointnodal;
+
+    for (int i = 0; i < (int)(sizeof(adj) / sizeof(adj[0])); i++) {
+        RunResult r = run_mmc(adj[i], NULL);
+        sprintf(msg, "OpenCL nodal adjoint %d runs", i + 1);
+        EXPECT_TRUE(r.ran, msg);
+    }
+
+    run_premut = NULL;
 }
 
 /*-----------------------------------------------------------------------------
@@ -915,6 +1012,214 @@ static void test_moreio(void) {
 }
 
 /*-----------------------------------------------------------------------------
+ *  tracer variants: several patterns, replay outputs, JSON variants, -N
+ *---------------------------------------------------------------------------*/
+
+static void check_jsonvariants(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    EXPECT_NEAR(cfg->prop[1].mus, 1.5, 1e-6, "Media given as 4-element arrays");
+    EXPECT_TRUE(isinf(cfg->srcdir.w) && cfg->srcdir.w > 0, "Dir with _Inf_ focus");
+    EXPECT_EQ(cfg->checkpt[1], 20, "Session.Checkpoints");
+    EXPECT_EQ(cfg->detnum, 2, "Detector object with two Pos rows");
+    EXPECT_TRUE(cfg->detpos && cfg->detpos[1].y == 2.f && cfg->detpos[1].w == 1.f, "the rows share R");
+    EXPECT_TRUE(cfg->detdir && cfg->detdir[1].z == -1.f, "Detector.Dir rows of a detector object");
+}
+
+static void check_detobject(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    EXPECT_EQ(cfg->detnum, 1, "a single Detector object is one detector");
+    EXPECT_TRUE(cfg->detpos && cfg->detpos[0].y == 6.f && cfg->detpos[0].w == 1.5f, "the Pos and R of a Detector object");
+    EXPECT_TRUE(cfg->detdir && cfg->detdir[0].z == -1.f, "the Dir of a Detector object");
+    EXPECT_TRUE(cfg->detparam1.x == 10.f && cfg->detparam2.w == 4.f, "Detector Param1/Param2 are read from the detector");
+}
+
+static void check_detrows(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    EXPECT_EQ(cfg->detnum, 2, "Detector as [x,y,z,r] rows");
+    EXPECT_TRUE(cfg->detpos && cfg->detpos[1].y == 2.f && cfg->detpos[1].w == 2.f, "the radius in the 4th column");
+}
+
+static void check_srcdirrows(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    EXPECT_TRUE(isnan(cfg->srcdir.w), "Dir row 1 with _NaN_");
+    EXPECT_TRUE(cfg->srcdata && isinf(cfg->srcdata[1].srcdir.w) && cfg->srcdata[1].srcdir.w < 0, "Dir row 2 with -_Inf_");
+}
+
+static void check_patfile(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    EXPECT_TRUE(cfg->srcpattern && cfg->srcpattern[3] == 4.f, "Pattern Data read from a file name");
+}
+
+static void check_netdoc(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    EXPECT_EQ(cfg->extrasrclen, 2, "-N loads the downloaded two-source JSON");
+}
+
+static void test_variants(void) {
+    char args[2048], msg[256];
+    RunResult r;
+    const char* method[] = {"P", "H", "B", "S"};
+
+    /* two patterns simulated at once with each CPU tracer, nodal and elem-based outputs */
+    for (int i = 0; i < 4; i++) {
+        for (int c = 0; c < 2; c++) {
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 -G -1 -n 300 -E 1 -M %s -C %d -s utmp%s%d --json "
+                     "{\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],"
+                     "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", method[i], c, method[i], c);
+            r = run_mmc(args, NULL);
+            sprintf(msg, "two patterns with -M %s -C %d", method[i], c);
+            EXPECT_TRUE(r.ran && r.normalizer > 0, msg);
+        }
+    }
+
+    /* elem-based output with the SSE Badouel tracer, and atomic updates */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 300 -E 1 -M S -C 0 -s utS0", NULL);
+    EXPECT_TRUE(r.ran && r.normalizer > 0, "-M S -C 0");
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 300 -E 1 -M B -C 0 --atomic 1 -s utB0a", NULL);
+    EXPECT_TRUE(r.ran && r.normalizer > 0, "-M B -C 0 --atomic 1");
+
+    /* replayed Jacobian, weighted path length and scattering count with each tracer */
+    const char* rtype[] = {"J", "L", "P"};
+
+    for (int i = 0; i < 4; i++) {
+        if (method[i][0] == 'H') {
+            continue;  /* tested in test_outputs */
+        }
+
+        for (int j = 0; j < 3; j++) {
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 -G -1 -E utdet.mch -O %s -M %s -C %d -s utrp%s%s",
+                     rtype[j], method[i], method[i][0] != 'P', method[i], rtype[j]);
+            r = run_mmc(args, NULL);
+            sprintf(msg, "replay -O %s with -M %s", rtype[j], method[i]);
+            EXPECT_TRUE(r.ran, msg);
+        }
+    }
+
+    /* JSON variants: Media as numeric arrays, an infinite focus, checkpoints and the
+       directions of a detector array object */
+    {
+        const char* json = "{\"Session\":{\"Photons\":100,\"RNGSeed\":1,\"ID\":\"utjv\",\"Checkpoints\":[10,20,30]},"
+                           "\"Domain\":{\"Media\":[[0,0,1,1],[0.01,1.5,0.9,1.37]]},"
+                           "\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},"
+                           "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},"
+                           "\"Optode\":{\"Source\":{\"Pos\":[2,8,0],\"Dir\":[0,0,1,\"_Inf_\"]},"
+                           "\"Detector\":{\"Pos\":[[2,6,0],[2,2,0]],\"R\":1,\"Dir\":[[0,0,-1],[0,0,-1,0]]}}}";
+        write_file("utjv.json", json, strlen(json));
+        parse_mmc("-f utjv.json", check_jsonvariants);
+
+        json = "{\"Session\":{\"Photons\":100,\"RNGSeed\":1,\"ID\":\"utjd\"},\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},"
+               "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},"
+               "\"Optode\":{\"Source\":{\"Pos\":[[2,8,0,1],[8,2,0,1]],\"Dir\":[[0,0,1,\"_NaN_\"],[0,0,1,\"-_Inf_\"]]}}}";
+        write_file("utjd.json", json, strlen(json));
+        parse_mmc("-f utjd.json", check_srcdirrows);
+
+        float pat[4] = {1, 2, 3, 4};
+        write_file("utjpat.bin", pat, sizeof(pat));
+        parse_mmc("--bench dmmc-cube60 --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
+                  "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":\"utjpat.bin\"}}}}", check_patfile);
+
+        /* a single detector object, and an array of [x,y,z,r] rows */
+        json = "{\"Session\":{\"Photons\":100,\"RNGSeed\":1,\"ID\":\"utjo\"},\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},"
+               "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},\"Optode\":{\"Source\":{\"Pos\":[2,8,0],\"Dir\":[0,0,1],\"Param1\":[9,9,9,9]},"
+               "\"Detector\":{\"Pos\":[2,6,0],\"R\":1.5,\"Dir\":[0,0,-1],\"Param1\":[10,0,0,4],\"Param2\":[0,10,0,4]}}}";
+        write_file("utjo.json", json, strlen(json));
+        parse_mmc("-f utjo.json", check_detobject);
+        json = "{\"Session\":{\"Photons\":100,\"RNGSeed\":1,\"ID\":\"utjr\"},\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},"
+               "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},\"Optode\":{\"Source\":{\"Pos\":[2,8,0],\"Dir\":[0,0,1]},"
+               "\"Detector\":[[2,6,0,1],[2,2,0,2]]}}";
+        write_file("utjr.json", json, strlen(json));
+        parse_mmc("-f utjr.json", check_detrows);
+
+        write_file("utbad.json", "{\"Session\":{\"Photons\":", 22);
+        EXPECT_EXIT(parse_mmc("-f utbad.json", NULL), "a malformed JSON input file");
+    }
+
+    /* -N with a stand-in curl that answers the NeuroJSON.io queries offline */
+    {
+        char cwd[4096], path[8192];
+        const char* curl = "#!/bin/sh\n"
+                           "case \"$*\" in\n"
+                           "  *nosuchdb*) echo '{\"error\":\"not_found\"}';;\n"
+                           "  *_find*) echo '{\"docs\":[{\"_id\":\"_design\"},{\"_id\":\"utdoc1\"},{\"_id\":\"utdoc2\"}]}';;\n"
+                           "  *_all_docs*) echo '{\"rows\":[{\"id\":\"utdoc1\"},{\"id\":\".hidden\"}]}';;\n"
+                           "  *) cat utmsdump.json;;\n"
+                           "esac\n";
+        const char* oldpath = getenv("PATH");
+
+        if (mkdir_p("utbin") == 0 && getcwd(cwd, sizeof(cwd))) {
+            write_file("utbin/curl", curl, strlen(curl));
+            chmod("utbin/curl", 0755);
+            snprintf(path, sizeof(path), "%s/utbin:%s", cwd, oldpath ? oldpath : "/usr/bin:/bin");
+            char* savedpath = strdup(oldpath ? oldpath : "");
+            setenv("PATH", path, 1);
+
+            EXPECT_EXIT_OK(parse_mmc("-N", NULL), "-N lists the simulations of the database");
+            EXPECT_EXIT_OK(parse_mmc("-N {\"selector\":{}}", NULL), "-N with a query selector");
+            EXPECT_EXIT_OK(parse_mmc("-N limit=2", NULL), "-N with a query string");
+            EXPECT_EXIT(parse_mmc("-N nosuchdb=1", NULL), "-N with a failed query");
+            parse_mmc("-N utdoc1", check_netdoc);
+            parse_mmc("-N mmc/utdoc1", NULL);
+            parse_mmc("-N https://neurojson.io:7777/mmc/utdoc1", NULL);
+            EXPECT_TRUE(1, "-N downloads a simulation by name, path and URL");
+
+            setenv("PATH", savedpath, 1);
+            free(savedpath);
+        }
+    }
+
+    /* the library entry points used by the Python module */
+    {
+        long len = file_size("utmsdump.json");
+        char* jbuf = (char*)calloc(len + 1, 1);
+        FILE* fp = fopen("utmsdump.json", "rb");
+        mcconfig cfg;
+        tetmesh mesh;
+        raytracer tracer;
+
+        if (fp && fread(jbuf, len, 1, fp) == 1) {
+            memset(flagset, 0, sizeof(flagset));
+            memset(&tracer, 0, sizeof(tracer));
+            quiet_begin();
+            mmc_init_from_json(&cfg, &mesh, &tracer, jbuf, NULL);
+            cfg.flog = stdout;
+            mmc_reset(&cfg, &mesh, &tracer);
+            quiet_end();
+            cfg.flog = stdout;
+            mmc_cleanup(&cfg, &mesh, &tracer);
+            EXPECT_TRUE(1, "mmc_init_from_json and mmc_reset");
+        }
+
+        if (fp) {
+            fclose(fp);
+        }
+
+        free(jbuf);
+    }
+
+    /* more detected photons in one thread than the initial detector buffer holds */
+#ifdef _OPENMP
+    {
+        int nthread = omp_get_max_threads();
+        omp_set_num_threads(1);
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G -1 -n %d -E 1 -M H -C 1 -d 1 -s utbuf --json "
+                 "{\"Domain\":{\"Media\":[{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1},{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1}]},"
+                 "\"Optode\":{\"Detector\":[{\"Pos\":[30,30,60],\"R\":100}]}}", DET_PHOTON_BUF + 1000);
+        r = run_mmc(args, NULL);
+        EXPECT_TRUE(r.ran && r.detected > DET_PHOTON_BUF, "the detector buffer grows past DET_PHOTON_BUF");
+        omp_set_num_threads(nthread);
+    }
+#endif
+
+    /* a device number list */
+    {
+        char list[MAX_DEVICE] = {0}, arg[] = "1,2,2,3";
+        char* argv[] = {"mmc", "-G", arg, NULL};
+        EXPECT_EQ(mcx_readarg(3, argv, 1, list, "bytenumlist"), 2, "mcx_readarg bytenumlist");
+        EXPECT_TRUE(list[0] == 1 && list[1] == 2 && list[2] == 3, "bytenumlist removes duplicates");
+    }
+}
+
+/*-----------------------------------------------------------------------------
  *  utility functions called directly
  *---------------------------------------------------------------------------*/
 
@@ -987,6 +1292,169 @@ static void test_utilfuncs(void) {
 }
 
 /*-----------------------------------------------------------------------------
+ *  GPU backends: the same feature cases on OpenCL, CUDA and OptiX; OpenCL and CUDA
+ *  must run every case and agree on the output, OptiX is only reported
+ *---------------------------------------------------------------------------*/
+
+/** run one case in a new process (this program re-executed with --runone), so that an
+    error exit or a crash is reported instead of ending the test program; a forked child
+    can not be used because the GPU drivers do not survive a fork after their initialization.
+    returns 0: ran, >0: exit code, <0: -signal */
+static int run_isolated(const char* args, RunResult* res) {
+    char resfile[] = "utrunoneXXXXXX";
+    int status = 0, fd = mkstemp(resfile);
+    pid_t pid;
+
+    memset(res, 0, sizeof(*res));
+
+    if (fd < 0) {
+        return 255;
+    }
+
+    close(fd);
+    fflush(stdout);
+    pid = fork();
+
+    if (pid == 0) {
+        if (getenv("MMC_UNITTEST_VERBOSE") == NULL && freopen("/dev/null", "w", stderr) == NULL) {
+            exit(254);
+        }
+
+        execl("/proc/self/exe", "mmc_unittest", "--runone", resfile, args, (char*)NULL);
+        exit(251);
+    }
+
+    waitpid(pid, &status, 0);
+
+    FILE* fp = fopen(resfile, "rb");
+
+    if (fp) {
+        if (fread(res, sizeof(*res), 1, fp) != 1) {
+            res->ran = 0;
+        }
+
+        fclose(fp);
+    }
+
+    remove(resfile);
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -WTERMSIG(status);
+}
+
+/** the --runone mode of run_isolated: run one case and save its RunResult */
+static int run_one(const char* resfile, const char* args) {
+    RunResult r = run_mmc(args, NULL);
+    FILE* fp = fopen(resfile, "wb");
+
+    if (fp) {
+        fwrite(&r, sizeof(r), 1, fp);
+        fclose(fp);
+    }
+
+    return r.ran ? 0 : 252;
+}
+
+static void test_gpubackends(void) {
+    const char* det = "{\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
+    const struct {
+        const char* name;
+        const char* args;
+        int usedet;
+    } cases[] = {
+        {"grid fluence (-M G)",              "-M G", 0},
+        {"grid, reflection (-b 1)",          "-M G -b 1", 0},
+        {"grid, energy output (-O E)",       "-M G -O E", 0},
+        {"grid, 5 time gates",               "-M G --json {\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":1e-9}}", 0},
+        {"grid, detected photons (-d 1)",    "-M G -d 1 -x 1 -q 1", 1},
+        {"grid, RF forward (-O R)",          "-M G -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0},
+        {"grid, replay Jacobian (-O J)",     "-M G -E utdet.mch -O J", 0},
+        {"grid, adjoint J_mua (-O A)",       "-M G -O A", 1},
+        {"grid, adjoint J_D (-O D)",         "-M G -O D", 1},
+        {"grid, adjoint J_mus (-O U)",       "-M G -O U", 1},
+        {"grid, adjoint J_musp (-O V)",      "-M G -O V", 1},
+        {"grid, dual adjoint (-O Q)",        "-M G -O Q", 1},
+        {"grid, isotropic source",           "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"isotropic\",\"Pos\":[30,45,15]}}}", 0},
+        {"grid, cone source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"cone\",\"Param1\":[0.4,0,0,0]}}}", 0},
+        {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0},
+        {"grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
+                                             "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0},
+        {"grid, trajectories (-D M)",        "-M G -D M", 0},
+        {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0},
+        {"mesh elem (-M H -C 0)",            "-M H -C 0", 0},
+        {"mesh, adjoint J_mua (-C 1 -O A)",  "-M H -C 1 -O A", 1},
+        {"mesh, adjoint J_musp (-C 1 -O V)", "-M H -C 1 -O V", 1},
+    };
+    const struct {
+        const char* name;
+        const char* flag;
+        int available;
+        int strict;
+    } backend[] = {
+        {"opencl", "--compute opencl", hasocl, 1},
+#ifdef USE_CUDA
+        {"cuda", "--compute cuda", 1, 1},
+#else
+        {"cuda", "--compute cuda", 0, 1},
+#endif
+#ifdef USE_OPTIX
+        {"optix", "--compute optix", 1, 0},
+#else
+        {"optix", "--compute optix", 0, 0},
+#endif
+    };
+    const int ncase = (int)(sizeof(cases) / sizeof(cases[0]));
+    double refsum[64] = {0.}, refjsum[64] = {0.};
+    char args[2048], msg[512];
+
+    for (int b = 0; b < 3; b++) {
+        if (!backend[b].available) {
+            continue;
+        }
+
+        printf("%s backend feature check:\n", backend[b].name);
+
+        for (int i = 0; i < ncase; i++) {
+            RunResult r;
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 %s -G 1 -n 20000 -E 1234 %s -s utgb%d%d%s%s",
+                     backend[b].flag, cases[i].args, b, i, cases[i].usedet ? " --json " : "", cases[i].usedet ? det : "");
+            int ret = run_isolated(args, &r);
+
+            if (ret == 0 && b == 0) {
+                refsum[i] = r.wsum;
+                refjsum[i] = r.jsum;
+            }
+
+            if (ret == 0) {
+                double rel = (refsum[i] != 0.) ? fabs(r.wsum - refsum[i]) / fabs(refsum[i]) : 0.;
+                double jrel = (refjsum[i] != 0.) ? fabs(r.jsum - refjsum[i]) / fabs(refjsum[i]) : 0.;
+                printf("  %-34s ok, output sum %.6g (%.1f%% from opencl)", cases[i].name, r.wsum, rel * 100.);
+
+                if (r.jsum != 0. || refjsum[i] != 0.) {
+                    printf(", Jacobian sum %.6g (%.1f%%)", r.jsum, jrel * 100.);
+                }
+
+                if (cases[i].usedet) {
+                    printf(", %d detected", r.detected);
+                }
+
+                printf("\n");
+
+                if (backend[b].strict && b > 0 && refsum[i] != 0.) {
+                    sprintf(msg, "%s: %s agrees with opencl within 5%%", backend[b].name, cases[i].name);
+                    EXPECT_TRUE(rel < 0.05 && jrel < 0.05, msg);
+                }
+            } else {
+                printf("  %-34s %s %d\n", cases[i].name, ret > 0 ? "NOT SUPPORTED, exit code" : "CRASHED, signal", ret > 0 ? ret : -ret);
+            }
+
+            if (backend[b].strict) {
+                sprintf(msg, "%s: %s runs", backend[b].name, cases[i].name);
+                EXPECT_TRUE(ret == 0, msg);
+            }
+        }
+    }
+}
+
+/*-----------------------------------------------------------------------------
  *  entry point
  *---------------------------------------------------------------------------*/
 
@@ -995,6 +1463,10 @@ int main(int argc, char** argv) {
 
     devnull = fopen("/dev/null", "w");
     hasocl = (getenv("MMC_UNITTEST_NO_OPENCL") == NULL);
+
+    if (argc == 4 && strcmp(argv[1], "--runone") == 0) {
+        return run_one(argv[2], argv[3]);
+    }
 
     if (getcwd(cwd, sizeof(cwd)) == NULL || mkdtemp(tmpdir) == NULL || chdir(tmpdir)) {
         printf("FAIL can not create a temporary folder\n");
@@ -1007,11 +1479,13 @@ int main(int argc, char** argv) {
     test_immc();
     test_inputfiles();
     test_moreio();
+    test_variants();
     test_utilfuncs();
     test_cmdopts();
     test_mmclab_path();
     test_clerrors();
     test_opencl();
+    test_gpubackends();
 
     if (chdir(cwd) == 0) {
         char cmd[4200];
