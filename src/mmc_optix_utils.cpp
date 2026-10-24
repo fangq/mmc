@@ -28,6 +28,8 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     MMC_FPRINTF(cfg->flog, "optix init complete:  \t%d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
+    prepBoundParams(cfg, mesh, &optixcfg);
+
     std::string ptxcodestr = std::string(mmcShaderPtx);
     createModule(cfg, &optixcfg, ptxcodestr);
     MMC_FPRINTF(cfg->flog, "optix module complete:  \t%d ms\n", GetTimeMillis() - tic0);
@@ -95,13 +97,21 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
-    /* the launched and escaped energy sums follow the output grids, see saveEnergy */
-    float* energybuf = optixcfg.outputHostBuffer + optixcfg.outputBufferSize - 4;
-    double energy[2] = {(double)energybuf[0] + energybuf[2], (double)energybuf[1] + energybuf[3]};
+    /* the launched and escaped energy sums of each pattern follow the output grids, see saveEnergy */
+    float* energybuf = optixcfg.outputHostBuffer + optixcfg.outputBufferSize - 4 * cfg->srcnum;
+    double energy[2] = {0.0, 0.0};
 
-    if (cfg->energytot && cfg->energyesc) {
-        cfg->energytot[0] += energy[0];
-        cfg->energyesc[0] += energy[1];
+    if (cfg->energytot == NULL) {
+        cfg->energytot = (double*)calloc(cfg->srcnum, sizeof(double));
+        cfg->energyesc = (double*)calloc(cfg->srcnum, sizeof(double));
+    }
+
+    for (int j = 0; j < cfg->srcnum; j++) {
+        double etot = (double)energybuf[j * 4] + energybuf[j * 4 + 2], eesc = (double)energybuf[j * 4 + 1] + energybuf[j * 4 + 3];
+        cfg->energytot[j] += etot;
+        cfg->energyesc[j] += eesc;
+        energy[0] += etot;
+        energy[1] += eesc;
     }
 
     // detected photons: the counter, then the records, as the OpenCL/CUDA hosts store them
@@ -159,9 +169,17 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
         fflush(cfg->flog);
 
-        double normalizer = mesh_normalize(mesh, cfg, energy[0] - energy[1], energy[0], 0);
-        MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
-                               1, energy[0], (energy[0] > 0.0) ? 100.f * (energy[0] - energy[1]) / energy[0] : 0.f, normalizer));
+        double sum_normalizer = 0.0;
+
+        for (int j = 0; j < cfg->srcnum; j++) {
+            double etot = cfg->energytot[j], eabs = cfg->energytot[j] - cfg->energyesc[j];
+            double normalizer = mesh_normalize(mesh, cfg, eabs, etot, j);
+            sum_normalizer += normalizer;
+            MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
+                                   j + 1, etot, (etot > 0.0) ? 100.f * eabs / etot : 0.f, normalizer));
+        }
+
+        cfg->his.normalizer = sum_normalizer / cfg->srcnum;
         MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
                     GetTimeMillis() - tic0);
         fflush(cfg->flog);
@@ -207,10 +225,10 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
 }
 
 /**
- * @brief prepare launch parameters
+ * @brief reject the unsupported settings and set the launch parameters that stay the
+ * same during a run, before the module is compiled
  */
-void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
-                      OptixParams* optixcfg) {
+void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
     if (cfg->method != rtBLBadouelGrid) {
         mcx_error(-1, "Optix MMC only supports dual grid mode", __FILE__, __LINE__);
     }
@@ -230,21 +248,8 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         mcx_error(-1, "Optix MMC does not support multiple sources; use --compute cuda or opencl", __FILE__, __LINE__);
     }
 
-    switch (cfg->srctype) {
-        case stPencil:
-        case stIsotropic:
-        case stCone:
-        case stGaussian:
-        case stPlanar:
-        case stArcSin:
-        case stDisk:
-        case stZGaussian:
-        case stLine:
-        case stSlit:
-            break;
-
-        default:
-            mcx_error(-1, "Optix MMC does not support this source type (pattern, fourier, fourierx, fourierx2d, pencilarray, pattern3d, hyperboloid, ring); use --compute cuda or opencl", __FILE__, __LINE__);
+    if ((cfg->srctype == stPattern || cfg->srctype == stPattern3D) && cfg->srcpattern == NULL) {
+        mcx_error(-1, "the pattern source has no pattern data", __FILE__, __LINE__);
     }
 
     if (cfg->issavedet && (cfg->issaveseed || cfg->ismomentum || cfg->isextdet || cfg->issaveexit > 1)) {
@@ -278,6 +283,36 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         mcx_error(-1, "Medium type count exceeds limit.", __FILE__, __LINE__);
     }
 
+    /* the settings that stay the same during a run, which createModule binds as
+       constants so that the compiler removes the code of the unused features */
+    memset(&optixcfg->launchParams, 0, sizeof(optixcfg->launchParams));
+    optixcfg->launchParams.srctype = cfg->srctype;
+    optixcfg->launchParams.focus = cfg->srcdir.w;
+    optixcfg->launchParams.srcnum = cfg->srcnum;
+    optixcfg->launchParams.isreflect = cfg->isreflect;
+    optixcfg->launchParams.outputtype = static_cast<int>(cfg->outputtype);
+    optixcfg->launchParams.omega = cfg->omega;
+    optixcfg->launchParams.srcid = (cfg->extrasrclen > 0) ? -1 : 0;
+    optixcfg->launchParams.extrasrclen = cfg->extrasrclen;
+    optixcfg->launchParams.issavedet = (cfg->issavedet && cfg->detnum > 0);
+    optixcfg->launchParams.issaveexit = (cfg->issaveexit > 0);
+    optixcfg->launchParams.detnum = cfg->detnum;
+    optixcfg->launchParams.maxmedia = mesh->prop;
+
+    if (cfg->e0 == -1) {
+        optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
+    } else {
+        optixcfg->launchParams.mediumid0 = MAX(mesh->type[cfg->e0 - 1], 0);  /* labels <= 0: the ambient medium */
+    }
+}
+
+/**
+ * @brief prepare launch parameters
+ */
+void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
+                      OptixParams* optixcfg) {
+    int timeSteps = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
+
     for (int i = 0; i <= mesh->prop; ++i) {
         optixcfg->launchParams.medium[i].mua = mesh->med[i].mua;
         optixcfg->launchParams.medium[i].mus = mesh->med[i].mus;
@@ -286,7 +321,6 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     }
 
     // source setup
-    optixcfg->launchParams.srctype = cfg->srctype;
     optixcfg->launchParams.srcpos = make_float3(cfg->srcpos.x,
                                     cfg->srcpos.y,
                                     cfg->srcpos.z);
@@ -309,10 +343,11 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.nmax = make_float3(mesh->nmax.x - mesh->nmin.x,
                                   mesh->nmax.y - mesh->nmin.y,
                                   mesh->nmax.z - mesh->nmin.z);
+    /* the output holds srcnum interleaved fields for a pattern source shared by srcnum patterns */
     optixcfg->launchParams.crop0 = make_uint4(cfg->crop0.x,
                                    cfg->crop0.y,
                                    cfg->crop0.z,
-                                   cfg->crop0.z * timeSteps);
+                                   cfg->crop0.z * timeSteps * cfg->srcnum);
     optixcfg->launchParams.dstep = 1.0f / cfg->steps.x;  /* the dual grid voxel size (--gridsize), not unitinmm */
 
     // time-gate settings
@@ -321,24 +356,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.Rtstep = 1.0f / cfg->tstep;
     optixcfg->launchParams.maxgate = cfg->maxgate;
 
-    // init medium ID using element based
-    if (cfg->e0 == -1) {
-        optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
-    } else {
-        optixcfg->launchParams.mediumid0 = MAX(mesh->type[cfg->e0 - 1], 0);  /* labels <= 0: the ambient medium */
-    }
-
-    // simulation flags
-    optixcfg->launchParams.isreflect = cfg->isreflect;
-
-    // output type
-    optixcfg->launchParams.outputtype = static_cast<int>(cfg->outputtype);
-
-    // RF / adjoint settings
-    optixcfg->launchParams.omega = cfg->omega;
     optixcfg->launchParams.oneoverc0 = (float)(3.335640951981520e-12);
-    optixcfg->launchParams.srcid = (cfg->extrasrclen > 0) ? -1 : 0;
-    optixcfg->launchParams.extrasrclen = cfg->extrasrclen;
 
     // number of photons for each thread
     int totalthread = cfg->nthread;
@@ -360,7 +378,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 
     // output buffer (single precision); 4x for RF (re1, re2, im1, im2)
     int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
-    optixcfg->outputBufferSize = optixcfg->launchParams.crop0.w * (isrfforward ? 4 : 2) + 4;  /* + the energy sums */
+    optixcfg->outputBufferSize = optixcfg->launchParams.crop0.w * (isrfforward ? 4 : 2) + 4 * cfg->srcnum;  /* + the energy sums */
     optixcfg->outputHostBuffer = (float*)calloc(optixcfg->outputBufferSize, sizeof(float));
     optixcfg->outputBuffer.alloc_and_upload(optixcfg->outputHostBuffer,
                                             optixcfg->outputBufferSize);
@@ -387,11 +405,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.seedbuffer = optixcfg->seedBuffer.d_pointer();
 
     // detected photons: detectors, a counter plus the records, and the per-thread scratch
-    optixcfg->launchParams.issavedet = (cfg->issavedet && cfg->detnum > 0);
-    optixcfg->launchParams.issaveexit = (cfg->issaveexit > 0);
-    optixcfg->launchParams.detnum = cfg->detnum;
     optixcfg->launchParams.maxdetphoton = cfg->maxdetphoton;
-    optixcfg->launchParams.maxmedia = mesh->prop;
 
     if (optixcfg->launchParams.issavedet) {
         size_t reclen = 2 * mesh->prop + 2 + optixcfg->launchParams.issaveexit * 6;
@@ -417,6 +431,28 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 
     if (hseed) {
         free(hseed);
+    }
+
+    // pattern source: the intensities, srcnum per pixel, and for srcnum > 1 patterns sharing the
+    // photons, the per-thread launch pixel and per-pattern energy sums
+    optixcfg->launchParams.srcpattern = 0;
+    optixcfg->launchParams.slotbuffer = 0;
+    optixcfg->launchParams.energybuffer = 0;
+
+    if ((cfg->srctype == stPattern || cfg->srctype == stPattern3D) && cfg->srcpattern) {
+        size_t patlen = (cfg->srctype == stPattern) ? (size_t)(cfg->srcparam1.w * cfg->srcparam2.w)
+                        : (size_t)(cfg->srcparam1.x * cfg->srcparam1.y * cfg->srcparam1.z);
+        optixcfg->srcpatternBuffer.alloc_and_upload(cfg->srcpattern, patlen * cfg->srcnum);
+        optixcfg->launchParams.srcpattern = optixcfg->srcpatternBuffer.d_pointer();
+    }
+
+    if (cfg->srcnum > 1) {
+        optixcfg->slotBuffer.alloc(sizeof(uint) * totalthread);
+        float* hen = (float*)calloc((size_t)totalthread * 4 * cfg->srcnum, sizeof(float));
+        optixcfg->energyBuffer.alloc_and_upload(hen, (size_t)totalthread * 4 * cfg->srcnum);
+        free(hen);
+        optixcfg->launchParams.slotbuffer = optixcfg->slotBuffer.d_pointer();
+        optixcfg->launchParams.energybuffer = optixcfg->energyBuffer.d_pointer();
     }
 
     // upload extra source list if in multi-source mode
@@ -521,6 +557,19 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
 
     // pipelineLinkOptions
     optixcfg->pipelineLinkOptions.maxTraceDepth = 1;
+
+    /* bind the launch parameters that stay the same during a run (set by prepBoundParams)
+       as constants, so that the compiler removes the branches of the unused source types
+       and features, as the OpenCL backend does with its JIT macros */
+#define MMC_BIND(field) {offsetof(MMCParam, field), sizeof(optixcfg->launchParams.field), &optixcfg->launchParams.field, #field}
+    OptixModuleCompileBoundValueEntry bound[] = {
+        MMC_BIND(srctype), MMC_BIND(focus), MMC_BIND(srcnum), MMC_BIND(isreflect), MMC_BIND(outputtype),
+        MMC_BIND(omega), MMC_BIND(srcid), MMC_BIND(extrasrclen), MMC_BIND(issavedet), MMC_BIND(issaveexit),
+        MMC_BIND(detnum), MMC_BIND(maxmedia), MMC_BIND(mediumid0)
+    };
+#undef MMC_BIND
+    optixcfg->moduleCompileOptions.boundValues = bound;
+    optixcfg->moduleCompileOptions.numBoundValues = sizeof(bound) / sizeof(bound[0]);
 
     char log[2048];
     size_t logsize = sizeof(log);
@@ -861,6 +910,9 @@ void clearOptixParams(OptixParams* optixcfg) {
     optixcfg->detposBuffer.free();
     optixcfg->detBuffer.free();
     optixcfg->ppathBuffer.free();
+    optixcfg->srcpatternBuffer.free();
+    optixcfg->slotBuffer.free();
+    optixcfg->energyBuffer.free();
     free(optixcfg->outputHostBuffer);
 
     optixPipelineDestroy(optixcfg->pipeline);

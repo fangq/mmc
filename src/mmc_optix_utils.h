@@ -82,6 +82,9 @@ struct OptixParams {
     osc::CUDABuffer detposBuffer;
     osc::CUDABuffer detBuffer;
     osc::CUDABuffer ppathBuffer;
+    osc::CUDABuffer srcpatternBuffer;   /**< pattern source intensities */
+    osc::CUDABuffer slotBuffer;         /**< per-thread pattern pixel (srcnum > 1) */
+    osc::CUDABuffer energyBuffer;       /**< per-thread energy sums of each pattern (srcnum > 1) */
 
     /*! buffer for output storage */
     float* outputHostBuffer;
@@ -104,6 +107,7 @@ void createHitgroupPrograms(OptixParams* optixcfg);
 OptixTraversableHandle buildAccel(tetmesh* mesh, OptixParams* optixcfg);
 void createPipeline(OptixParams* optixcfg);
 void buildSBT(tetmesh* mesh, OptixParams* optixcfg);
+void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg);
 void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
                       OptixParams* optixcfg);
 void clearOptixParams(OptixParams* optixcfg);

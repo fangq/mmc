@@ -187,6 +187,8 @@ typedef struct {
     double wsum;   /**< sum of the first output slot (all gates), for comparing backends */
     double jsum;   /**< sum of the first adjoint Jacobian block, for comparing backends */
     double imsum;  /**< sum of the RF imaginary output (exportadjoint), for comparing backends */
+    double cen[3]; /**< grid mode: the fluence-weighted centroid (voxels), for comparing source shapes */
+    double rms;    /**< grid mode: the fluence-weighted RMS distance from the centroid (voxels) */
 } RunResult;
 
 /**
@@ -257,6 +259,34 @@ static RunResult run_mmc(const char* args, void (*check)(mcconfig*, tetmesh*)) {
 
             for (size_t k = 0; k < datalen * cfg.maxgate; k++) {
                 res.wsum += mesh.weight[k];
+            }
+
+            /* the spatial moments of a grid output, all gates and patterns */
+            if (cfg.method == rtBLBadouelGrid && cfg.crop0.x > 0) {
+                double m0 = 0., m1[3] = {0., 0., 0.}, m2 = 0.;
+
+                for (size_t k = 0; k < datalen * cfg.maxgate * cfg.srcnum; k++) {
+                    size_t vox = (k / cfg.srcnum) % datalen;
+                    double w = mesh.weight[k], p[3] = {(double)(vox % cfg.crop0.x), (double)((vox % cfg.crop0.y) / cfg.crop0.x), (double)(vox / cfg.crop0.y)};
+
+                    m0 += w;
+
+                    for (int d = 0; d < 3; d++) {
+                        m1[d] += w * p[d];
+                        m2 += w * p[d] * p[d];
+                    }
+                }
+
+                if (m0 > 0.) {
+                    double c2 = 0.;
+
+                    for (int d = 0; d < 3; d++) {
+                        res.cen[d] = m1[d] / m0;
+                        c2 += res.cen[d] * res.cen[d];
+                    }
+
+                    res.rms = sqrt(fmax(m2 / m0 - c2, 0.));
+                }
             }
 
             if (cfg.omega > 0.f && cfg.exportadjoint && !MCX_IS_ADJOINT_TYPE(cfg.outputtype)) {
@@ -1469,7 +1499,7 @@ static void test_gpubackends(void) {
         {"grid, gaussian source",            "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"gaussian\",\"Pos\":[30,45,15],\"Param1\":[1,0,0,0]}}}", 0, 1},
         {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0, 1},
         {"grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
-                                             "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 0},
+                                             "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1},
         {"grid, trajectories (-D M)",        "-M G -D M", 0, 0},
         {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0, 0},
         {"mesh elem (-M H -C 0)",            "-M H -C 0", 0, 0},
@@ -1567,6 +1597,61 @@ static void test_gpubackends(void) {
 }
 
 /*-----------------------------------------------------------------------------
+ *  OptiX source types: the fluence of each source type matches the CPU tracer. Only
+ *  OptiX launches photons from arbitrary positions; the CPU tracer searches the launch
+ *  element among e0 and the retessellated (-1 labeled) source elements, so these cases
+ *  keep every launch position inside the initial tetrahedron of dmmc-cube60, which makes
+ *  the CPU tracer a valid reference here (the OpenCL/CUDA kernel lacks pencilarray,
+ *  pattern3d, hyperboloid and ring)
+ *---------------------------------------------------------------------------*/
+
+static void test_optixsources(void) {
+#ifdef USE_OPTIX
+    char p3d[512] = "", args[2048], msg[512];
+    int len = 0;
+
+    for (int i = 0; i < 64; i++) {
+        len += snprintf(p3d + len, sizeof(p3d) - len, "%s%g", i ? "," : "", (i % 5) * 0.25);
+    }
+
+    const char* src[][2] = {
+        {"pattern", "\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":1,\"Data\":[1,0.2,0.2,1]}"},
+        {"2 patterns sharing photons", "\"Type\":\"pattern\",\"SrcNum\":2,\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}"},
+        {"fourier", "\"Type\":\"fourier\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,1]"},
+        {"fourierx", "\"Type\":\"fourierx\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,4],\"Param2\":[1,1,0,0]"},
+        {"fourierx2d", "\"Type\":\"fourierx2d\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,4],\"Param2\":[1,1,0,0]"},
+        {"pencilarray", "\"Type\":\"pencilarray\",\"Pos\":[25,40,15],\"Param1\":[10,0,0,3],\"Param2\":[0,10,0,3]"},
+        {"pattern3d", NULL},
+        {"hyperboloid", "\"Type\":\"hyperboloid\",\"Pos\":[30,45,15],\"Param1\":[2,5,10,0]"},
+        {"ring sector", "\"Type\":\"ring\",\"Pos\":[30,45,15],\"Param1\":[6,3,0,3.14]"},
+        {"focused gaussian", "\"Type\":\"gaussian\",\"Pos\":[30,45,15],\"Dir\":[0,0,1,20],\"Param1\":[1,0.0005,0,0]"},
+        {"diverging slit", "\"Type\":\"slit\",\"Pos\":[25,45,15],\"Dir\":[0,0,1,-10],\"Param1\":[10,0,0,0]"},
+    };
+    char p3dsrc[1024];
+
+    snprintf(p3dsrc, sizeof(p3dsrc), "\"Type\":\"pattern3d\",\"Pos\":[28,43,13],\"Param1\":[4,4,4,0],\"Pattern\":{\"Nx\":4,\"Ny\":4,\"Nz\":4,\"Data\":[%s]}", p3d);
+    src[6][1] = p3dsrc;
+
+    printf("optix source types vs the CPU tracer:\n");
+
+    for (int i = 0; i < (int)(sizeof(src) / sizeof(src[0])); i++) {
+        RunResult rc, ro;
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 --compute sse -M G -n 100000 -E 1234 -s utos%dc --json {\"Optode\":{\"Source\":{%s}}}", i, src[i][1]);
+        run_isolated(args, &rc);
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 --compute optix -M G -n 100000 -E 4321 -s utos%do --json {\"Optode\":{\"Source\":{%s}}}", i, src[i][1]);
+        int ret = run_isolated(args, &ro);
+        double dc = sqrt(pow(ro.cen[0] - rc.cen[0], 2) + pow(ro.cen[1] - rc.cen[1], 2) + pow(ro.cen[2] - rc.cen[2], 2));
+
+        printf("  %-28s centroid off by %.3f voxel, RMS radius %.3f vs %.3f, fluence sum %.1f%% off\n", src[i][0], dc,
+               ro.rms, rc.rms, rc.wsum != 0. ? 100. * fabs(ro.wsum - rc.wsum) / rc.wsum : 0.);
+        sprintf(msg, "optix: the %s source gives the fluence of the CPU tracer", src[i][0]);
+        EXPECT_TRUE(ret == 0 && rc.ran && dc < 0.2 && fabs(ro.rms - rc.rms) < 0.01 * rc.rms && fabs(ro.wsum - rc.wsum) < 0.03 * rc.wsum, msg);
+    }
+
+#endif
+}
+
+/*-----------------------------------------------------------------------------
  *  entry point
  *---------------------------------------------------------------------------*/
 
@@ -1598,6 +1683,7 @@ int main(int argc, char** argv) {
     test_clerrors();
     test_opencl();
     test_gpubackends();
+    test_optixsources();
     test_meshsurf();
 
     if (chdir(cwd) == 0) {

@@ -19,7 +19,7 @@ typedef struct MCX_ExtraSrc {
 
 /* maximum property number; the launch parameters, mostly this table, must stay within the
    OptiX limit (MMCParam of 64192 bytes works, 16 bytes more fails pipeline creation) */
-#define MAX_PROP           3984
+#define MAX_PROP           3968
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */
 #define MCX_SRC_ISOTROPIC  1  /**<  isotropic source, no param */
@@ -37,6 +37,8 @@ typedef struct MCX_ExtraSrc {
 #define MCX_SRC_SLIT       13 /**<  a collimated line source */
 #define MCX_SRC_PENCILARRAY 14 /**<  a rectangular array of pencil beams */
 #define MCX_SRC_PATTERN3D  15  /**<  a 3D pattern source, starting from srcpos, srcparam1.{x,y,z} define the x/y/z dimensions */
+#define MCX_SRC_HYPERBOLOID 16 /**<  a hyperboloid Gaussian beam, srcparam1.x=waist radius, .y=distance to the waist, .z=Rayleigh range */
+#define MCX_SRC_RING       17  /**<  a ring or a ring sector, srcparam1.x/y=outer/inner radius, .z/.w=angular range */
 
 constexpr unsigned int INITIAL_MEDIUM_UNKNOWN = std::numeric_limits<unsigned int>::max();
 constexpr unsigned int AMBIENT_MEDIUM_ID = 0;
@@ -95,6 +97,11 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     int detnum;                    /**< number of detectors */
     int maxdetphoton;              /**< size of the detected photon buffer */
     int maxmedia;                  /**< number of media, excluding 0 */
+    float focus;                   /**< srcdir.w: focal length of a wide-field source, nan: isotropic, -inf: Lambertian */
+    int srcnum;                    /**< number of patterns sharing the photons of a pattern source */
+    CUdeviceptr srcpattern;        /**< pattern source intensities, srcnum per pixel (srcnum>1) */
+    CUdeviceptr slotbuffer;        /**< per-thread pattern pixel (srcnum>1) of the current photon */
+    CUdeviceptr energybuffer;      /**< per-thread launched/escaped energy of each pattern (srcnum>1) */
 
     Medium medium[MAX_PROP];
 } MMCParam;
