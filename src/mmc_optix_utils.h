@@ -86,6 +86,8 @@ struct OptixParams {
     osc::CUDABuffer slotBuffer;         /**< per-thread pattern pixel (srcnum > 1) */
     osc::CUDABuffer energyBuffer;       /**< per-thread energy sums of each pattern (srcnum > 1) */
     osc::CUDABuffer voxtypeBuffer;      /**< the medium label of each voxel (adjoint J_mus/J_musp) */
+    osc::CUDABuffer trajBuffer;         /**< trajectory records (-D M) */
+    osc::CUDABuffer photonidBuffer;     /**< per-thread photon index (-D M) */
 
     /*! buffer for output storage */
     float* outputHostBuffer;

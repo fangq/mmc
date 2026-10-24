@@ -104,6 +104,10 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     CUdeviceptr energybuffer;      /**< per-thread launched/escaped energy of each pattern (srcnum>1) */
     CUdeviceptr voxtypebuffer;     /**< the medium label of each grid voxel, for the J_mus/J_musp chain rule */
     int savevoxtype;               /**< 1 to record the medium label of each voxel (-O U/V/Q) */
+    CUdeviceptr trajbuffer;        /**< trajectories (-D M): a uint counter, then maxjumpdebug records */
+    CUdeviceptr photonidbuffer;    /**< per-thread index of the current photon, for the trajectory records */
+    int savetraj;                  /**< 1 to save the photon trajectories (-D M) */
+    int maxjumpdebug;              /**< the number of trajectory records the buffer holds */
 
     Medium medium[MAX_PROP];
 } MMCParam;

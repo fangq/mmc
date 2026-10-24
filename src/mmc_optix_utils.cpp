@@ -12,6 +12,7 @@
 #include "mmc_cuda_query_gpu.h"
 #include "mmc_tictoc.h"
 #include "mmc_cu_host.h"
+#include "mmc_const.h"
 #include "incbin.h"
 
 INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
@@ -136,6 +137,23 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         MMC_FPRINTF(cfg->flog, "detected %u photons, total: %d\n", ndet, cfg->detectedcount);
     }
 
+    // trajectories: the counter, then the records, as the OpenCL/CUDA hosts store them
+    if (optixcfg.launchParams.savetraj) {
+        unsigned int ntraj = 0;
+        CUDA_ASSERT(cudaMemcpy(&ntraj, (void*)optixcfg.trajBuffer.d_pointer(), sizeof(unsigned int), cudaMemcpyDeviceToHost));
+
+        if (ntraj > cfg->maxjumpdebug) {
+            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the saved trajectory positions (%u) are more than what your have specified (%d), please use the --maxjumpdebug option to specify a greater number\n" S_RESET, ntraj, cfg->maxjumpdebug);
+            ntraj = cfg->maxjumpdebug;
+        }
+
+        cfg->exportdebugdata = (float*)realloc(cfg->exportdebugdata, sizeof(float) * MCX_DEBUG_REC_LEN * (cfg->debugdatalen + ntraj));
+        CUDA_ASSERT(cudaMemcpy(cfg->exportdebugdata + (size_t)MCX_DEBUG_REC_LEN * cfg->debugdatalen, (float*)optixcfg.trajBuffer.d_pointer() + 1,
+                               sizeof(float) * MCX_DEBUG_REC_LEN * ntraj, cudaMemcpyDeviceToHost));
+        cfg->debugdatalen += ntraj;
+        MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\n", ntraj, cfg->debugdatalen);
+    }
+
     MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
                 energy[0], (energy[0] > 0.0) ? (energy[0] - energy[1]) / energy[0] * 100.f : 0.f);
     fflush(cfg->flog);
@@ -215,6 +233,18 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
             fflush(cfg->flog);
         }
 
+        if (optixcfg.launchParams.savetraj && cfg->parentid == mpStandalone && cfg->exportdebugdata) {
+            MMC_FPRINTF(cfg->flog, "saving trajectory data to file ...\t");
+            cfg->his.colcount = MCX_DEBUG_REC_LEN;
+            cfg->his.savedphoton = cfg->debugdatalen;
+            cfg->his.totalphoton = cfg->nphoton;
+            cfg->his.detected = 0;
+            cfg->his.seedbyte = 0;
+            mcx_savedetphoton(cfg->exportdebugdata, NULL, cfg->debugdatalen, 0, cfg);
+            MMC_FPRINTF(cfg->flog, "saving trajectory data complete : %d ms\n\n", GetTimeMillis() - tic0);
+            fflush(cfg->flog);
+        }
+
         if (optixcfg.launchParams.issavedet && cfg->parentid == mpStandalone && cfg->exportdetected) {
             MMC_FPRINTF(cfg->flog, "saving detected photon data to file ...\t");
             cfg->his.totalphoton = cfg->nphoton;
@@ -275,10 +305,6 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
         mcx_error(-1, "Optix MMC does not save the surface reflectance (-X 1); use --compute cuda or opencl", __FILE__, __LINE__);
     }
 
-    if (cfg->debuglevel & dlTraj) {
-        mcx_error(-1, "Optix MMC does not save photon trajectories (-D M); use --compute cuda or opencl", __FILE__, __LINE__);
-    }
-
     if (cfg->mcmethod == mmMCML) {
         mcx_error(-1, "Optix MMC only supports the MCX (micro-Beer-Lambert) method, not -m 1", __FILE__, __LINE__);
     }
@@ -313,6 +339,7 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
     optixcfg->launchParams.issaveexit = (cfg->issaveexit > 0);
     optixcfg->launchParams.detnum = cfg->detnum;
     optixcfg->launchParams.maxmedia = mesh->prop;
+    optixcfg->launchParams.savetraj = ((cfg->debuglevel & dlTraj) != 0);
     optixcfg->launchParams.savevoxtype = (cfg->issave2pt && (cfg->outputtype == otAdjointMus || cfg->outputtype == otAdjointMusp
                                           || cfg->outputtype == otAdjointMuaMusp));
 
@@ -464,6 +491,16 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         optixcfg->launchParams.srcpattern = optixcfg->srcpatternBuffer.d_pointer();
     }
 
+    // trajectories (-D M): a counter, then the records, and the per-thread photon index
+    if (optixcfg->launchParams.savetraj) {
+        optixcfg->launchParams.maxjumpdebug = cfg->maxjumpdebug;
+        optixcfg->trajBuffer.alloc(sizeof(float) * (1 + (size_t)MCX_DEBUG_REC_LEN * cfg->maxjumpdebug));
+        CUDA_ASSERT(cudaMemset((void*)optixcfg->trajBuffer.d_pointer(), 0, sizeof(float)));
+        optixcfg->photonidBuffer.alloc(sizeof(uint) * totalthread);
+        optixcfg->launchParams.trajbuffer = optixcfg->trajBuffer.d_pointer();
+        optixcfg->launchParams.photonidbuffer = optixcfg->photonidBuffer.d_pointer();
+    }
+
     if (optixcfg->launchParams.savevoxtype) {
         optixcfg->voxtypeBuffer.alloc(sizeof(int) * cfg->crop0.z);
         CUDA_ASSERT(cudaMemset((void*)optixcfg->voxtypeBuffer.d_pointer(), 0, sizeof(int) * cfg->crop0.z));
@@ -603,7 +640,7 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
     OptixModuleCompileBoundValueEntry bound[] = {
         MMC_BIND(srctype), MMC_BIND(focus), MMC_BIND(srcnum), MMC_BIND(isreflect), MMC_BIND(outputtype),
         MMC_BIND(omega), MMC_BIND(srcid), MMC_BIND(extrasrclen), MMC_BIND(issavedet), MMC_BIND(issaveexit),
-        MMC_BIND(detnum), MMC_BIND(maxmedia), MMC_BIND(mediumid0), MMC_BIND(savevoxtype)
+        MMC_BIND(detnum), MMC_BIND(maxmedia), MMC_BIND(mediumid0), MMC_BIND(savevoxtype), MMC_BIND(savetraj)
     };
 #undef MMC_BIND
     optixcfg->moduleCompileOptions.boundValues = bound;
@@ -950,6 +987,8 @@ void clearOptixParams(OptixParams* optixcfg) {
     optixcfg->ppathBuffer.free();
     optixcfg->srcdataBuffer.free();
     optixcfg->voxtypeBuffer.free();
+    optixcfg->trajBuffer.free();
+    optixcfg->photonidBuffer.free();
     optixcfg->srcpatternBuffer.free();
     optixcfg->slotBuffer.free();
     optixcfg->energyBuffer.free();

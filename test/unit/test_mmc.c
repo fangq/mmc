@@ -33,6 +33,7 @@ the OpenCL tests are skipped when no OpenCL device is found.
 #include "mmc_host.h"
 #include "mmc_utils.h"
 #include "mmc_mesh.h"
+#include "mmc_const.h"
 #include "mmc_raytrace.h"
 #include "zmat/zmatlib.h"
 #include "ubj/ubj.h"
@@ -189,6 +190,8 @@ typedef struct {
     double imsum;  /**< sum of the RF imaginary output (exportadjoint), for comparing backends */
     double cen[3]; /**< grid mode: the fluence-weighted centroid (voxels), for comparing source shapes */
     double rms;    /**< grid mode: the fluence-weighted RMS distance from the centroid (voxels) */
+    int ntraj;     /**< number of saved trajectory points (-D M) */
+    int trajok;    /**< 1 if every trajectory point has a valid photon index and weight */
 } RunResult;
 
 /**
@@ -253,6 +256,17 @@ static RunResult run_mmc(const char* args, void (*check)(mcconfig*, tetmesh*)) {
 
 #endif
         res.ran = 1;
+        res.ntraj = cfg.debugdatalen;
+        res.trajok = (cfg.debugdatalen > 0);
+
+        for (int k = 0; k < cfg.debugdatalen && cfg.exportdebugdata; k++) {
+            float* rec = cfg.exportdebugdata + k * MCX_DEBUG_REC_LEN;
+            unsigned int id = *(unsigned int*)rec;
+
+            if (id >= cfg.nphoton || !(rec[4] > 0.f && rec[4] <= 1.f)) {
+                res.trajok = 0;
+            }
+        }
 
         if (mesh.weight) {
             size_t datalen = (cfg.method == rtBLBadouelGrid) ? cfg.crop0.z : (cfg.basisorder ? mesh.nn : mesh.ne);
@@ -1502,7 +1516,7 @@ static void test_gpubackends(void) {
                                              "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1},
         {"grid, 2 sources, a field each",   "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"ID\":-1,\"Pos\":[[30,45,0,0.5],[20,30,0,0.5]],"
                                              "\"Dir\":[[0,0,1,0],[0,0,1,0]]}}}", 0, 1},
-        {"grid, trajectories (-D M)",        "-M G -D M", 0, 0},
+        {"grid, trajectories (-D M)",        "-M G -D M", 0, 1},
         {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0, 0},
         {"mesh elem (-M H -C 0)",            "-M H -C 0", 0, 0},
         {"mesh, adjoint J_mua (-C 1 -O A)",  "-M H -C 1 -O A", 1, 0},
@@ -1573,6 +1587,15 @@ static void test_gpubackends(void) {
                 if ((backend[b].strict || cases[i].optix == 1) && b > 0 && refsum[i] != 0.) {
                     sprintf(msg, "%s: %s agrees with opencl within 5%%", backend[b].name, cases[i].name);
                     EXPECT_TRUE(rel < 0.05 && jrel < 0.05 && imrel < 0.05, msg);
+                }
+
+                /* the trajectory points are the launch, the scattering events and the end of each
+                   photon: the same count per photon as opencl, within the noise */
+                if (strstr(cases[i].args, "-D M") && b == 0) {
+                    refdet[i] = r.ntraj;
+                } else if (strstr(cases[i].args, "-D M") && refdet[i] > 0) {
+                    sprintf(msg, "%s: %s saves as many valid trajectory points as opencl", backend[b].name, cases[i].name);
+                    EXPECT_TRUE(r.trajok && fabs((double)r.ntraj - refdet[i]) < 0.03 * refdet[i], msg);
                 }
 
                 if (cases[i].usedet && b == 0) {

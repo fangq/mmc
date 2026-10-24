@@ -572,6 +572,24 @@ __device__ __forceinline__ void saveDetPhoton(const optixray& r) {
 }
 
 /**
+ * @brief Save a trajectory point (-D M) in the record layout of the other backends: photon
+ * index, position, weight and, in place of the element index, the medium label
+ */
+__device__ __forceinline__ void saveTraj(const optixray& r, const uint& id) {
+    uint pos = atomicAdd((unsigned int*)gcfg.trajbuffer, 1u);
+
+    if (pos < (uint)gcfg.maxjumpdebug) {
+        float* rec = (float*)gcfg.trajbuffer + 1 + (size_t)pos * 6;
+        rec[0] = __uint_as_float(id);
+        rec[1] = r.p0.x;
+        rec[2] = r.p0.y;
+        rec[3] = r.p0.z;
+        rec[4] = r.weight;
+        rec[5] = __uint_as_float((r.mediumid >= DEAD_MEDIUM_ID) ? 0u : r.mediumid);  /* 0 once the photon has ended */
+    }
+}
+
+/**
  * @brief Accumulate output quantities to a 3D grid
  */
 __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop,
@@ -806,6 +824,13 @@ extern "C" __global__ void __raygen__rg() {
             launchPhoton(r, rng);
             islaunch = false;
 
+            if (gcfg.savetraj) {
+                /* the photon index of the OpenCL/CUDA kernels: consecutive in each thread */
+                uint id = launchindex.x * gcfg.threadphoton + min(launchindex.x, (uint)gcfg.oddphoton) + ndone;
+                ((uint*)gcfg.photonidbuffer)[launchindex.x] = id;
+                saveTraj(r, id);
+            }
+
             if (gcfg.srcnum > 1) {
                 accumPatternEnergy(0, r.weight);
             } else {
@@ -824,6 +849,10 @@ extern "C" __global__ void __raygen__rg() {
         // when a photon escapes or tof reaches the upper limit
         if (!(r.mediumid != DEAD_MEDIUM_ID && r.photontimer < gcfg.tend)) {
             float wesc = (gcfg.omega != 0.f) ? sqrtf(r.weight * r.weight + r.weight_im * r.weight_im) : r.weight;
+
+            if (gcfg.savetraj) {
+                saveTraj(r, ((uint*)gcfg.photonidbuffer)[launchindex.x]);
+            }
 
             if (gcfg.srcnum > 1) {
                 accumPatternEnergy(1, wesc);
@@ -1004,6 +1033,10 @@ extern "C" __global__ void __miss__ms() {
     // scattering event
     r.dir = selectScatteringDirection(r.dir, currprop.g, rng);
     r.slen = rng.rand_next_scatlen();
+
+    if (gcfg.savetraj) {
+        saveTraj(r, ((uint*)gcfg.photonidbuffer)[optixGetLaunchIndex().x]);
+    }
 
     // update rng
     setRNG(rng);
