@@ -58,7 +58,7 @@ end
 if (isfield(cfg, 'srcpattern') && ~isempty(cfg.srcpattern))
     % a row-major JData array, [srcnum, Nx, Ny] for multiple patterns; mmc only reads
     % the compressed form, and takes the pattern count from its first dimension
-    Optode.Source.Pattern = jdataencode(single(cfg.srcpattern), 'Compression', 'zlib', 'CompressArraySize', 0, 'Base64', 1);
+    Optode.Source.Pattern = jdataencode(single(cfg.srcpattern), 'AnnotateArray', 1, 'Compression', 'zlib', 'CompressArraySize', 0, 'Base64', 1);
 end
 
 %% define the domain and optical properties
@@ -165,6 +165,9 @@ Session = copycfg(cfg, 'nphoton', Session, 'Photons');
 Forward.T0 = cfg.tstart;
 Forward.T1 = cfg.tend;
 Forward.Dt = cfg.tstep;
+if (isfield(cfg, 'omega') && ~isempty(cfg.omega) && cfg.omega > 0)
+    Forward.Omega = cfg.omega;  % modulation angular frequency (rad/s) of RF simulations
+end
 Forward = copycfg(cfg, 'nout', Forward, 'N0');
 
 %% assemble the complete input, save to a JSON or UBJSON input file

@@ -2777,6 +2777,10 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
     cJSON_AddNumberToObject(obj, "T1", cfg->tend);
     cJSON_AddNumberToObject(obj, "Dt", cfg->tstep);
 
+    if (cfg->omega > 0.f) { /* modulation angular frequency (rad/s) of RF simulations */
+        cJSON_AddNumberToObject(obj, "Omega", cfg->omega);
+    }
+
     if (cfg->nout > 1.f) {
         cJSON_AddNumberToObject(obj, "N0", cfg->nout);
     }
