@@ -1500,6 +1500,8 @@ static void test_gpubackends(void) {
         {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0, 1},
         {"grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
                                              "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1},
+        {"grid, 2 sources, a field each",   "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"ID\":-1,\"Pos\":[[30,45,0,0.5],[20,30,0,0.5]],"
+                                             "\"Dir\":[[0,0,1,0],[0,0,1,0]]}}}", 0, 1},
         {"grid, trajectories (-D M)",        "-M G -D M", 0, 0},
         {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0, 0},
         {"mesh elem (-M H -C 0)",            "-M H -C 0", 0, 0},
@@ -1646,6 +1648,18 @@ static void test_optixsources(void) {
                ro.rms, rc.rms, rc.wsum != 0. ? 100. * fabs(ro.wsum - rc.wsum) / rc.wsum : 0.);
         sprintf(msg, "optix: the %s source gives the fluence of the CPU tracer", src[i][0]);
         EXPECT_TRUE(ret == 0 && rc.ran && dc < 0.2 && fabs(ro.rms - rc.rms) < 0.01 * rc.rms && fabs(ro.wsum - rc.wsum) < 0.03 * rc.wsum, msg);
+    }
+
+    /* ID=2 of 2 sources launches every photon from the 2nd source, the same as a single
+       source there (the OpenCL/CUDA kernel launches them from the element of the 1st) */
+    {
+        RunResult r1, r2;
+        run_isolated("--bench dmmc-cube60 --compute optix -M G -n 100000 -E 1234 -s utos2a --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"ID\":2,"
+                     "\"Pos\":[[30,45,0,1],[20,30,0,1]],\"Dir\":[[0,0,1,0],[0,0,1,0]]}}}", &r2);
+        run_isolated("--bench dmmc-cube60 --compute optix -M G -n 100000 -E 4321 -s utos2b --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"Pos\":[20,30,0],\"Dir\":[0,0,1]}}}", &r1);
+        double dc = sqrt(pow(r2.cen[0] - r1.cen[0], 2) + pow(r2.cen[1] - r1.cen[1], 2) + pow(r2.cen[2] - r1.cen[2], 2));
+        printf("  %-28s centroid off by %.3f voxel, fluence sum %.1f%% off\n", "2nd of 2 sources (ID=2)", dc, r1.wsum != 0. ? 100. * fabs(r2.wsum - r1.wsum) / r1.wsum : 0.);
+        EXPECT_TRUE(r1.ran && r2.ran && dc < 0.2 && fabs(r2.wsum - r1.wsum) < 0.02 * r1.wsum, "optix: ID=2 of 2 sources launches from the 2nd source");
     }
 
 #endif

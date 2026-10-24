@@ -180,6 +180,20 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         }
 
         cfg->his.normalizer = sum_normalizer / cfg->srcnum;
+
+        /* multi-source mode: mesh_normalize scales the field of the first source slot, the
+           other slots use the same factor, as the OpenCL/CUDA backends do */
+        if (cfg->extrasrclen > cfg->srcnum && optixcfg.launchParams.srcid < 0) {
+            size_t slotlen = (size_t)cfg->crop0.z * cfg->maxgate;
+
+            for (size_t i = slotlen; i < fieldlen_o; i++) {
+                mesh->weight[i] *= cfg->his.normalizer;
+
+                if (isrfforward_o && cfg->exportadjoint) {
+                    cfg->exportadjoint[i] *= cfg->his.normalizer;
+                }
+            }
+        }
         MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
                     GetTimeMillis() - tic0);
         fflush(cfg->flog);
@@ -244,8 +258,8 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
         mcx_error(-1, "Optix MMC does not support photon replay or the replay outputs (-O J/L/P); use --compute cuda or opencl", __FILE__, __LINE__);
     }
 
-    if (cfg->extrasrclen > 0) {
-        mcx_error(-1, "Optix MMC does not support multiple sources; use --compute cuda or opencl", __FILE__, __LINE__);
+    if (cfg->extrasrclen > 0 && cfg->srcnum > 1) {
+        mcx_error(-1, "Optix MMC does not support multiple pattern sources sharing photons (SrcNum > 1); use --compute cuda or opencl", __FILE__, __LINE__);
     }
 
     if ((cfg->srctype == stPattern || cfg->srctype == stPattern3D) && cfg->srcpattern == NULL) {
@@ -292,7 +306,7 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
     optixcfg->launchParams.isreflect = cfg->isreflect;
     optixcfg->launchParams.outputtype = static_cast<int>(cfg->outputtype);
     optixcfg->launchParams.omega = cfg->omega;
-    optixcfg->launchParams.srcid = (cfg->extrasrclen > 0) ? -1 : 0;
+    optixcfg->launchParams.srcid = (cfg->extrasrclen > 0 && cfg->srcid == 0) ? -1 : cfg->srcid;  /* < 0: a field per source slot, > 0: one source slot */
     optixcfg->launchParams.extrasrclen = cfg->extrasrclen;
     optixcfg->launchParams.issavedet = (cfg->issavedet && cfg->detnum > 0);
     optixcfg->launchParams.issaveexit = (cfg->issaveexit > 0);
@@ -311,7 +325,6 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
  */
 void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
                       OptixParams* optixcfg) {
-    int timeSteps = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
 
     for (int i = 0; i <= mesh->prop; ++i) {
         optixcfg->launchParams.medium[i].mua = mesh->med[i].mua;
@@ -343,11 +356,13 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.nmax = make_float3(mesh->nmax.x - mesh->nmin.x,
                                   mesh->nmax.y - mesh->nmin.y,
                                   mesh->nmax.z - mesh->nmin.z);
-    /* the output holds srcnum interleaved fields for a pattern source shared by srcnum patterns */
+    /* the output holds srcnum interleaved fields for a pattern source shared by srcnum patterns,
+       or one field per source slot in the multi-source mode */
+    int nslots = (cfg->extrasrclen > 0 && optixcfg->launchParams.srcid < 0) ? cfg->extrasrclen : 1;
     optixcfg->launchParams.crop0 = make_uint4(cfg->crop0.x,
                                    cfg->crop0.y,
                                    cfg->crop0.z,
-                                   cfg->crop0.z * timeSteps * cfg->srcnum);
+                                   cfg->crop0.z * cfg->maxgate * cfg->srcnum * nslots);
     optixcfg->launchParams.dstep = 1.0f / cfg->steps.x;  /* the dual grid voxel size (--gridsize), not unitinmm */
 
     // time-gate settings
@@ -446,18 +461,32 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         optixcfg->launchParams.srcpattern = optixcfg->srcpatternBuffer.d_pointer();
     }
 
-    if (cfg->srcnum > 1) {
+    if (cfg->srcnum > 1 || nslots > 1) {
         optixcfg->slotBuffer.alloc(sizeof(uint) * totalthread);
+        optixcfg->launchParams.slotbuffer = optixcfg->slotBuffer.d_pointer();
+    }
+
+    if (cfg->srcnum > 1) {
         float* hen = (float*)calloc((size_t)totalthread * 4 * cfg->srcnum, sizeof(float));
         optixcfg->energyBuffer.alloc_and_upload(hen, (size_t)totalthread * 4 * cfg->srcnum);
         free(hen);
-        optixcfg->launchParams.slotbuffer = optixcfg->slotBuffer.d_pointer();
         optixcfg->launchParams.energybuffer = optixcfg->energyBuffer.d_pointer();
     }
 
     // upload extra source list if in multi-source mode
     if (cfg->extrasrclen > 0 && cfg->srcdata != NULL) {
-        optixcfg->srcdataBuffer.alloc_and_upload(cfg->srcdata, cfg->extrasrclen);
+        /* the kernel has no elements: replace the enclosing element of each source, found by
+           mesh_init_srcdata_eid, by its medium, -1 to find the medium by ray tracing */
+        ExtraSrc* hsrc = (ExtraSrc*)malloc(sizeof(ExtraSrc) * cfg->extrasrclen);
+        memcpy(hsrc, cfg->srcdata, sizeof(ExtraSrc) * cfg->extrasrclen);
+
+        for (int i = 0; i < cfg->extrasrclen; i++) {
+            int eid = (int)hsrc[i].srcparam2.w;
+            hsrc[i].srcparam2.w = (eid > 0 && eid <= (int)mesh->ne) ? (float)MAX(mesh->type[eid - 1], 0) : -1.f;
+        }
+
+        optixcfg->srcdataBuffer.alloc_and_upload(hsrc, cfg->extrasrclen);
+        free(hsrc);
         optixcfg->launchParams.srcdatabuffer = optixcfg->srcdataBuffer.d_pointer();
     } else {
         optixcfg->launchParams.srcdatabuffer = 0;
@@ -910,6 +939,7 @@ void clearOptixParams(OptixParams* optixcfg) {
     optixcfg->detposBuffer.free();
     optixcfg->detBuffer.free();
     optixcfg->ppathBuffer.free();
+    optixcfg->srcdataBuffer.free();
     optixcfg->srcpatternBuffer.free();
     optixcfg->slotBuffer.free();
     optixcfg->energyBuffer.free();

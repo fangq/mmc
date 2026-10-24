@@ -74,12 +74,17 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
     r.weight = 1.0f;
     r.weight_im = 0.0f;  /**< initialize imaginary weight to zero */
 
-    /* multi-source mode: randomly select source from gcfgsrc[] */
-    if (gcfg.srcid < 0 && gcfg.extrasrclen > 0) {
-        int srcslot = (int)(rng.uniform(0.0f, 1.0f) * gcfg.extrasrclen);
+    /* multi-source mode, as in the OpenCL/CUDA kernel: srcid < 0 picks a source slot at
+       random for each photon, whose deposits go to the field of that slot; srcid > 0
+       launches all photons from slot srcid-1 into a single field */
+    if (gcfg.extrasrclen > 0 && (gcfg.srcid < 0 || (gcfg.srcid > 0 && gcfg.srcid <= gcfg.extrasrclen))) {
+        int srcslot;
 
-        if (srcslot >= gcfg.extrasrclen) {
-            srcslot = gcfg.extrasrclen - 1;
+        if (gcfg.srcid < 0) {
+            srcslot = min((int)(rng.uniform(0.0f, 1.0f) * gcfg.extrasrclen), gcfg.extrasrclen - 1);
+            ((uint*)gcfg.slotbuffer)[optixGetLaunchIndex().x] = srcslot;
+        } else {
+            srcslot = gcfg.srcid - 1;
         }
 
         ExtraSrc src = ((ExtraSrc*)gcfg.srcdatabuffer)[srcslot];
@@ -123,7 +128,9 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
 
         r.slen = rng.rand_next_scatlen();
         r.photontimer = 0.0f;
-        r.mediumid = gcfg.mediumid0;
+
+        /* the host stores the medium enclosing each source in srcparam2.w, < 0 if unknown */
+        r.mediumid = (src.srcparam2.w >= 0.f) ? (unsigned int)src.srcparam2.w : INITIAL_MEDIUM_UNKNOWN;
 
         if (r.mediumid == INITIAL_MEDIUM_UNKNOWN) {
             getInitialMediumId(r, rng);
@@ -462,7 +469,8 @@ __device__ __forceinline__ void saveToBufferIm(const uint& eid, const float& w) 
 }
 
 /**
- * @brief The pattern pixel of the current photon of a pattern source shared by srcnum patterns
+ * @brief The pattern pixel of the current photon of a pattern source shared by srcnum
+ * patterns, or the source slot of the photon in the multi-source mode
  */
 __device__ __forceinline__ uint threadSlot() {
     return ((uint*)gcfg.slotbuffer)[optixGetLaunchIndex().x];
@@ -487,6 +495,11 @@ __device__ __forceinline__ void saveOutput(uint eid, const float& w, const float
         }
 
         return;
+    }
+
+    /* multi-source mode: the field of each source slot follows that of the previous slot */
+    if (gcfg.srcid < 0 && gcfg.extrasrclen > 0) {
+        eid += threadSlot() * gcfg.crop0.z * gcfg.maxgate;
     }
 
     saveToBuffer(eid, w);
