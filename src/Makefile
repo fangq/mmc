@@ -31,3 +31,15 @@ include $(ROOTDIR)/commons/Makefile_common.mk
 
 ## mmc_utils.c embeds the OpenCL kernel; recompile whenever mmc_core.cl changes ##
 $(OBJDIR)/mmc_utils$(OBJSUFFIX): $(CLSOURCE)
+
+##  Host unit tests (test/unit), linked with the same objects as mmc except its main() ##
+##  and built with the flags of the default goal (ssemath, or omp on arm64 macOS)      ##
+unittest: CCFLAGS+= -O3 $(OPENMP) $(FASTMATH)
+unittest: ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
+ifeq ($(.DEFAULT_GOAL),ssemath)
+unittest: CCFLAGS+=$(SSEFLAGS) -DUSE_SSE2 -DMMC_USE_SSE_MATH
+endif
+unittest: makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
+	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -DMMC_EXAMPLE_DIR=\"$(abspath ../examples)\" -o $(OBJDIR)/test_mmc$(OBJSUFFIX) ../test/unit/test_mmc.c
+	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/mmc_unittest $(OBJDIR)/test_mmc$(OBJSUFFIX) $(filter-out $(OBJDIR)/mmc$(OBJSUFFIX),$(OBJS)) $(USERARFLAGS) $(EXTRALIB)
+	$(BINDIR)/mmc_unittest

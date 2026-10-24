@@ -74,9 +74,11 @@ set -- $a
 if [ $# -ne 2 ] || [ "$1" = "$2" ]; then echo "fail: ROI g has no effect ($a)"; fail=$((fail + 1)); else echo "ok"; fi
 
 echo "test photon replay ... "
-temp=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60b -G -1 -n 1e5 -S 0 -q 1 -s replaytest -D T $PARAM > /dev/null 2>&1 &&
-       "$MMC" --bench dmmc-cube60b -G -1 -E replaytest_detp.jdt -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'simulated.*photons|absorbed: *[0-9.]+%')
-if [ -z "$temp" ]; then echo "fail to replay detected photons"; fail=$((fail + 1)); else echo "ok"; fi
+# the baseline saves the detected photons and their seeds (-d 1 -q 1) in an .mch file; the
+# replay must launch exactly the detected photons, i.e. its total launched energy equals their count
+ndet=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -n 1e5 -S 0 -d 1 -q 1 -F mc2 -s replaytest -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'detected [0-9]+ photons' | grep -o -E '[0-9]+')
+nrep=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -E replaytest.mch -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'total simulated energy: *[0-9]+' | grep -o -E '[0-9]+$')
+if [ -z "$ndet" ] || [ "$ndet" = "0" ] || [ "$ndet" != "$nrep" ]; then echo "fail to replay detected photons (detected ${ndet:-none}, replayed ${nrep:-none})"; fail=$((fail + 1)); else echo "ok"; fi
 
 echo "test step-by-step photon trajectories ... "
 if ! MMC="$MMC" sh "$TESTDIR/testtraj.sh" > "$WORKDIR/traj.log" 2>&1; then
