@@ -352,12 +352,13 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
     float w_re = r.weight, w_im = r.weight_im;
 
     if (isrf) {
-        // complex Beer-Lambert per segment: w_new = w * segdecay * exp(i*phase)
+        // complex Beer-Lambert per segment: w_new = w * segdecay * exp(-i*phase), the sign
+        // that the deposit (w0-w)/(mua + i*omega*n/c0) below and the OpenCL/CUDA kernels use
         float a_im = gcfg.omega * prop.n * gcfg.oneoverc0;
         float a_mag2 = prop.mua * prop.mua + a_im * a_im;
         // new weight after one segment
-        float new_re = segdecay * (w_re * rfcos - w_im * rfsin);
-        float new_im = segdecay * (w_re * rfsin + w_im * rfcos);
+        float new_re = segdecay * (w_re * rfcos + w_im * rfsin);
+        float new_im = segdecay * (w_im * rfcos - w_re * rfsin);
         float dw_re = w_re - new_re;
         float dw_im = w_im - new_im;
         segloss    = (a_mag2 > 0.f) ? (dw_re * prop.mua + dw_im * a_im) / a_mag2 : 0.f;
@@ -383,8 +384,8 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
     // iterate over the rest of the segments
     for (int i = 1; i < segcount; ++i) {
         if (isrf) {
-            float new_re2 = segdecay * (w_re * rfcos - w_im * rfsin);
-            float new_im2 = segdecay * (w_re * rfsin + w_im * rfcos);
+            float new_re2 = segdecay * (w_re * rfcos + w_im * rfsin);
+            float new_im2 = segdecay * (w_im * rfcos - w_re * rfsin);
             float dw_re2 = w_re - new_re2;
             float dw_im2 = w_im - new_im2;
             float a_im = gcfg.omega * prop.n * gcfg.oneoverc0;

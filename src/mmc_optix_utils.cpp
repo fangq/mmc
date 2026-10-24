@@ -216,7 +216,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
                                    cfg->crop0.y,
                                    cfg->crop0.z,
                                    cfg->crop0.z * timeSteps);
-    optixcfg->launchParams.dstep = 1.0f / cfg->unitinmm;
+    optixcfg->launchParams.dstep = 1.0f / cfg->steps.x;  /* the dual grid voxel size (--gridsize), not unitinmm */
 
     // time-gate settings
     optixcfg->launchParams.tstart = cfg->tstart;
