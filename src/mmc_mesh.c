@@ -1282,7 +1282,12 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
             for (int j = 0; j < pmesh->elemlen; ++j) {
                 int nexteid = fnb[(i * pmesh->elemlen) + j];
 
-                if ((nexteid > 0 && pmesh->type[nexteid - 1] != pmesh->type[i]) || nexteid == 0) {
+                /* labels <= 0 (the void and the wide-field source/detector domains, -1/-2)
+                   are all the ambient medium 0 of the OptiX kernel; nexteid < 0 marks a face
+                   already added from the neighboring element */
+                int mytype = MAX(pmesh->type[i], 0), nexttype = (nexteid > 0) ? MAX(pmesh->type[nexteid - 1], 0) : 0;
+
+                if (nexteid >= 0 && nexttype != mytype) {
                     // face node
                     pmesh->face[pmesh->nface].x = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][0]] - 1;
                     pmesh->face[pmesh->nface].y = pmesh->elem[(i * pmesh->elemlen) + out[ifaceorder[j]][1]] - 1;
@@ -1298,8 +1303,8 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                     vec_mult((float3*)&vnorm, mag, (float3*)&vnorm);
                     pmesh->fnorm[pmesh->nface] = vnorm;
                     // front and back media types
-                    pmesh->front[pmesh->nface] = ((nexteid == 0) ? 0 : pmesh->type[nexteid - 1]);
-                    pmesh->back[pmesh->nface] = pmesh->type[i];
+                    pmesh->front[pmesh->nface] = nexttype;
+                    pmesh->back[pmesh->nface] = mytype;
                     fnb[(i * pmesh->elemlen) + j] = -1;
 
                     if (nexteid > 0) {

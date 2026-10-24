@@ -95,6 +95,19 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     MMC_FPRINTF(cfg->flog, "transfer complete:        %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
+    /* the launched and escaped energy sums follow the output grids, see saveEnergy */
+    float* energybuf = optixcfg.outputHostBuffer + optixcfg.outputBufferSize - 4;
+    double energy[2] = {(double)energybuf[0] + energybuf[2], (double)energybuf[1] + energybuf[3]};
+
+    if (cfg->energytot && cfg->energyesc) {
+        cfg->energytot[0] += energy[0];
+        cfg->energyesc[0] += energy[1];
+    }
+
+    MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
+                energy[0], (energy[0] > 0.0) ? (energy[0] - energy[1]) / energy[0] * 100.f : 0.f);
+    fflush(cfg->flog);
+
     int isrfforward_o = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
     size_t fieldlen_o = optixcfg.launchParams.crop0.w;
 
@@ -125,11 +138,9 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
         fflush(cfg->flog);
 
-        // not used if cfg->method == rtBLBadouelGrid
-        // for now assume initial weight of each photon is 1.0
-        float energyabs = 0.0f, energytot = cfg->nphoton;
-
-        mesh_normalize(mesh, cfg, energyabs, energytot, 0);
+        double normalizer = mesh_normalize(mesh, cfg, energy[0] - energy[1], energy[0], 0);
+        MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
+                               1, energy[0], (energy[0] > 0.0) ? 100.f * (energy[0] - energy[1]) / energy[0] : 0.f, normalizer));
         MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
                     GetTimeMillis() - tic0);
         fflush(cfg->flog);
@@ -280,7 +291,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     if (cfg->e0 == -1) {
         optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
     } else {
-        optixcfg->launchParams.mediumid0 = mesh->type[cfg->e0 - 1];
+        optixcfg->launchParams.mediumid0 = MAX(mesh->type[cfg->e0 - 1], 0);  /* labels <= 0: the ambient medium */
     }
 
     // simulation flags
@@ -315,7 +326,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 
     // output buffer (single precision); 4x for RF (re1, re2, im1, im2)
     int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
-    optixcfg->outputBufferSize = optixcfg->launchParams.crop0.w * (isrfforward ? 4 : 2);
+    optixcfg->outputBufferSize = optixcfg->launchParams.crop0.w * (isrfforward ? 4 : 2) + 4;  /* + the energy sums */
     optixcfg->outputHostBuffer = (float*)calloc(optixcfg->outputBufferSize, sizeof(float));
     optixcfg->outputBuffer.alloc_and_upload(optixcfg->outputHostBuffer,
                                             optixcfg->outputBufferSize);
@@ -754,7 +765,7 @@ void buildSBT(tetmesh* mesh, OptixParams* optixcfg) {
     float4* fnorm = (float4*)calloc(mesh->nface, sizeof(float4));
 
     for (size_t i = 0; i < mesh->nface; ++i) {
-        uint media = (mesh->front[i] << 16) | (0xFF & mesh->back[i]);
+        uint media = (mesh->front[i] << 16) | (0xFFFF & mesh->back[i]);  /* the kernel reads 16 bits each */
         fnorm[i] = make_float4(mesh->fnorm[i].x, mesh->fnorm[i].y, mesh->fnorm[i].z,
                                *(float*)&media);
     }
