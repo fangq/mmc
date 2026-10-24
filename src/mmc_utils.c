@@ -2175,10 +2175,31 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         dets = FIND_JSON_OBJ("Detector", "Optode.Detector", Optode);
 
         if (dets) {
-            cJSON* det = dets;
+            cJSON* det = dets->child;
+            cJSON* posrows = cJSON_IsObject(dets) ? FIND_JSON_OBJ("Pos", "Optode.Detector.Pos", dets) : NULL;
 
-            if (!FIND_JSON_OBJ("Pos", "Optode.Detector.Pos", dets)) {
-                det = dets->child;
+            if (posrows && cJSON_IsArray(posrows) && posrows->child) {
+                /* a single object: {"Pos":[x,y,z(,r)],"R":r} for one detector, or
+                   {"Pos":[[x,y,z(,r)],...],"R":r} for one detector per row sharing R */
+                cJSON* rad = FIND_JSON_OBJ("R", "Optode.Detector.R", dets);
+                cJSON* row = cJSON_IsArray(posrows->child) ? posrows->child : posrows;
+
+                cfg->detnum = (row == posrows) ? 1 : cJSON_GetArraySize(posrows);
+                cfg->detpos = (float4*)calloc(cfg->detnum, sizeof(float4));
+
+                for (i = 0; i < cfg->detnum && row; i++, row = row->next) {
+                    if (cJSON_GetArraySize(row) < 3) {
+                        MMC_ERROR(-1, "Optode.Detector.Pos must have at least 3 elements per detector");
+                    }
+
+                    cfg->detpos[i].x = row->child->valuedouble;
+                    cfg->detpos[i].y = row->child->next->valuedouble;
+                    cfg->detpos[i].z = row->child->next->next->valuedouble;
+                    cfg->detpos[i].w = row->child->next->next->next ? row->child->next->next->next->valuedouble :
+                                       (rad ? rad->valuedouble : 0.f);
+                }
+
+                det = NULL;
             }
 
             if (det) {
@@ -2186,17 +2207,21 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 cfg->detpos = (float4*)malloc(sizeof(float4) * cfg->detnum);
 
                 for (i = 0; i < cfg->detnum; i++) {
-                    cJSON* pos = dets, *rad = NULL;
-                    rad = FIND_JSON_OBJ("R", "Optode.Detector.R", det);
+                    cJSON* pos = det, *rad = NULL;
 
                     if (cJSON_IsObject(det)) { /* {"Pos":[..],"R":r,"Dir":[..]}; may carry more than 2 fields */
+                        rad = FIND_JSON_OBJ("R", "Optode.Detector.R", det);
                         pos = FIND_JSON_OBJ("Pos", "Optode.Detector.Pos", det);
+                    } else if (cJSON_GetArraySize(det) >= 4) { /* [x,y,z,r] */
+                        rad = det->child->next->next->next;
                     }
 
-                    if (pos) {
+                    if (pos && cJSON_GetArraySize(pos) >= 3) {
                         cfg->detpos[i].x = pos->child->valuedouble;
                         cfg->detpos[i].y = pos->child->next->valuedouble;
                         cfg->detpos[i].z = pos->child->next->next->valuedouble;
+                    } else {
+                        MMC_ERROR(-1, "Optode.Detector.Pos must have at least 3 elements per detector");
                     }
 
                     if (rad) {
@@ -2212,7 +2237,10 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             }
 
 
-            subitem = FIND_JSON_OBJ("Param1", "Optode.Detector.Param1", src);
+            /* the wide-field detector parameters belong to the (first) detector object */
+            cJSON* detobj = cJSON_IsObject(dets) ? dets : ((dets->child && cJSON_IsObject(dets->child)) ? dets->child : NULL);
+
+            subitem = FIND_JSON_OBJ("Param1", "Optode.Detector.Param1", detobj);
 
             if (subitem && cJSON_GetArraySize(subitem) == 4) {
                 cfg->detparam1.x = subitem->child->valuedouble;
@@ -2230,7 +2258,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 }
             }
 
-            subitem = FIND_JSON_OBJ("Param2", "Optode.Detector.Param2", src);
+            subitem = FIND_JSON_OBJ("Param2", "Optode.Detector.Param2", detobj);
 
             if (subitem && cJSON_GetArraySize(subitem) == 4) {
                 cfg->detparam2.x = subitem->child->valuedouble;
@@ -2376,7 +2404,8 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             cfg->detdir = (float4*)calloc(cfg->detnum, sizeof(float4));
 
             for (di = 0; di < cfg->detnum; di++) {
-                cJSON* d = cJSON_GetArrayItem(ddir, di);
+                /* one Dir row per detector, or a single [x,y,z] row for one detector object */
+                cJSON* d = cJSON_IsArray(ddir->child) ? cJSON_GetArrayItem(ddir, di) : (di == 0 ? ddir : NULL);
 
                 if (d && d->child) {
                     cfg->detdir[di].x = d->child->valuedouble;

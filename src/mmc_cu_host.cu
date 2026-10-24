@@ -346,7 +346,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         if (cfg->exportadjoint == NULL && cfg->method == rtBLBadouelGrid) {
             if (isrfforward) {
                 /* For RF forward: stores imaginary fluence field of same size as real */
-                cfg->exportadjoint = (float*)calloc(fieldlen, sizeof(float));
+                cfg->exportadjoint = (float*)calloc((size_t)meshlen * cfg->maxgate, sizeof(float));  /* fieldlen is set later */
             } else if (MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->extrasrclen > 0) {
                 /* For adjoint Jacobian: allocate after simulation; leave as NULL for now */
             }

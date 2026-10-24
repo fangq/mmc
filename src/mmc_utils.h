@@ -224,7 +224,7 @@ typedef struct MMC_config {
     float tstart;                  /**<start time in second*/
     float tstep;                   /**<time step in second*/
     float tend;                    /**<end time in second*/
-    float3 steps;               /**<voxel sizes along x/y/z in mm*/
+    FLOAT3 steps;                  /**<voxel sizes along x/y/z in mm; FLOAT3 (not float3, which is 16 bytes in the SSE/OpenCL C units but 12 in the CUDA units) keeps one mcconfig layout across all units*/
     uint3 dim;                     /**<dim.x is the initial element number in MMC, dim.y is faceid*/
     uint4 crop0;                   /**<sub-volume for cache*/
     uint4 crop1;                   /**<the other end of the caching box*/
