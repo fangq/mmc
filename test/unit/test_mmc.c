@@ -34,6 +34,7 @@ the OpenCL tests are skipped when no OpenCL device is found.
 #include "mmc_utils.h"
 #include "mmc_mesh.h"
 #include "mmc_const.h"
+#include "nifti1.h"
 #include "mmc_raytrace.h"
 #include "zmat/zmatlib.h"
 #include "ubj/ubj.h"
@@ -517,7 +518,7 @@ static void test_opencl(void) {
         "--bench dmmc-cube60 -G 1 -n 2000 -E 1 --json {\"Optode\":{\"Source\":{\"Dir\":[0,0,1,\"_Inf_\"]}}} -s utclinf",
         "--bench dmmc-cube60 -G 1 -n 2000 -E 1 --json {\"Optode\":{\"Source\":{\"Dir\":[0,0,1,\"-_Inf_\"]}}} -s utclninf",
         "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -s utclmp --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],"
-        "\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}",
+        "\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}",
         "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O U --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclU",
         "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O V --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}} -s utclV",
         "--bench dmmc-cube60 -G 1 -n 50 -E 1 -M H -C 1 -D M -s utcltraj",
@@ -1009,7 +1010,7 @@ static void test_moreio(void) {
                            "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1]}}}}", NULL),
                    "--dumpjson of a pattern source");
     EXPECT_EXIT_OK(run_mmc("--bench dmmc-cube60 -G -1 --dumpjson utpat2dump.json --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\","
-                           "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,"
+                           "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,"
                            "\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", NULL),
                    "--dumpjson of two patterns");
     EXPECT_TRUE(file_size("utpatdump.json") > 0 && file_size("utpat2dump.json") > 0, "the pattern sources are dumped");
@@ -1115,8 +1116,8 @@ static void test_variants(void) {
     for (int i = 0; i < 4; i++) {
         for (int c = 0; c < 2; c++) {
             snprintf(args, sizeof(args), "--bench dmmc-cube60 -G -1 -n 300 -E 1 -M %s -C %d -s utmp%s%d --json "
-                     "{\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],"
-                     "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", method[i], c, method[i], c);
+                     "{\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"SrcNum\":2,\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],"
+                     "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", method[i], c, method[i], c);
             r = run_mmc(args, NULL);
             sprintf(msg, "two patterns with -M %s -C %d", method[i], c);
             EXPECT_TRUE(r.ran && r.normalizer > 0, msg);
@@ -1309,6 +1310,49 @@ static void check_cubesurf(mcconfig* cfg, tetmesh* mesh) {
     EXPECT_TRUE(mesh->fnorm && fabs(mesh->fnorm[0].z + 1.f) < 1e-6, "the bottom face normal points outward (-z)");
 }
 
+
+/* mesh_validate, the mmclab/pmmc entry, on a surface-only mesh and on incomplete meshes */
+static void check_validate_surf(mcconfig* cfg, tetmesh* mesh) {
+    mesh_validate(mesh, cfg);
+    EXPECT_TRUE(cfg->e0 == -1 && mesh->nface == 12, "mesh_validate prepares a surface-only mesh for OptiX");
+}
+static void check_validate_surfcl(mcconfig* cfg, tetmesh* mesh) {
+    cfg->compute = cbOpenCL;
+    mesh_validate(mesh, cfg);
+}
+static void check_validate_surfnonode(mcconfig* cfg, tetmesh* mesh) {
+    mesh->nn = 0;
+    mesh_validate(mesh, cfg);
+}
+static void check_validate_nosurf(mcconfig* cfg, tetmesh* mesh) {
+    cfg->surfnum = 0;
+    mesh_validate(mesh, cfg);
+}
+static void check_validate_nonode(mcconfig* cfg, tetmesh* mesh) {
+    mesh->node = NULL;
+    mesh_validate(mesh, cfg);
+}
+
+/* mesh_savedetphoton writes the detected photons (.mch) or the trajectories (.mct) */
+static void check_savedetphoton(mcconfig* cfg, tetmesh* mesh) {
+    float ppath[2 * 3] = {1, 2.f, 0.5f, 1, 3.f, 0.25f};
+    unsigned char seeds[2 * 4] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    (void)mesh;
+    cfg->his.colcount = 3;
+    cfg->his.detected = 2;
+    cfg->his.savedphoton = 2;
+    cfg->issaveseed = 1;
+    strcpy(cfg->session, "utsdp");
+    mesh_savedetphoton(ppath, seeds, 2, 4, cfg);
+    EXPECT_EQ(file_size("utsdp.mch"), (long)(sizeof(history) + sizeof(ppath) + sizeof(seeds)), "mesh_savedetphoton saves the photons and seeds");
+    cfg->his.detected = 0;
+    strcpy(cfg->rootpath, ".");
+    mesh_savedetphoton(ppath, NULL, 2, 0, cfg);
+    EXPECT_TRUE(file_size("utsdp.mct") > 0, "mesh_savedetphoton saves trajectories as .mct");
+    cfg->rootpath[0] = '\0';
+}
+
 static void test_meshsurf(void) {
     char badrow[256];
 
@@ -1334,6 +1378,13 @@ static void test_meshsurf(void) {
         EXPECT_EXIT(parse_mmc("-f utsurfbad.json --compute optix -M G", NULL), badmsg[i]);
     }
 
+    parse_mmc("-f utsurf.json --compute optix -M G", check_validate_surf);
+    EXPECT_EXIT(parse_mmc("-f utsurf.json --compute optix -M G", check_validate_surfcl), "mesh_validate: a surface-only mesh needs OptiX");
+    EXPECT_EXIT(parse_mmc("-f utsurf.json --compute optix -M G", check_validate_surfnonode), "mesh_validate: a surface-only mesh needs nodes");
+    EXPECT_EXIT(parse_mmc("-f utsurf.json --compute optix -M G", check_validate_nosurf), "mesh_validate: a mesh without elements or surface");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60", check_validate_nonode), "mesh_validate: a mesh without nodes");
+    parse_mmc("--bench dmmc-cube60", check_savedetphoton);
+
     /* an open surface (the last face removed) is only a warning */
     write_cubesurf("utsurfopen.json", "[4,1,5,1,0]");
     parse_mmc("-f utsurfopen.json --compute optix -M G", NULL);
@@ -1350,6 +1401,520 @@ static void test_meshsurf(void) {
     run_isolated("--bench dmmc-cube60 --compute optix -M G -n 20000 -E 1234 -s utsurftet", &rt);
     EXPECT_TRUE(ret == 0 && rt.wsum > 0. && fabs(rs.wsum - rt.wsum) / rt.wsum < 0.01, "OptiX gives the same fluence from MeshSurf as from the tetrahedral mesh");
 #endif
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  JSON input: malformed mesh, media, source, pattern and detector fields, which
+ *  must be reported as errors, and the less common valid layouts
+ *---------------------------------------------------------------------------*/
+
+/** write a JSON input of a one-tetrahedron mesh with the given Session members (starting
+    with a comma), Domain, Mesh and Source contents and Detector member (starting with a
+    comma); an empty or NULL value uses the default */
+static void write_tetjson(const char* fname, const char* session, const char* domain, const char* mesh,
+                          const char* source, const char* detector) {
+    char buf[4096];
+
+    snprintf(buf, sizeof(buf), "{\"Session\":{\"Photons\":100,\"RNGSeed\":1,\"ID\":\"utje\"%s},"
+             "\"Domain\":{%s},\"Mesh\":{%s},"
+             "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},\"Optode\":{\"Source\":{%s}%s}}",
+             session, (domain && domain[0]) ? domain : "\"Media\":[[0,0,1,1],[0.01,1,0.9,1.37]]", mesh ? mesh : "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1",
+             source ? source : "\"Pos\":[0.2,0.2,0],\"Dir\":[0,0,1]", detector);
+    write_file(fname, buf, strlen(buf));
+}
+
+static void check_srcrows3(mcconfig* cfg, tetmesh* mesh) {
+    EXPECT_EQ(cfg->extrasrclen, 3, "3 rows of a source field set 3 sources");
+}
+
+static void test_jsonedge(void) {
+    const char* tetelem = "\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1";
+    char mesh[1024];
+    const struct {
+        const char* session, *domain, *mesh, *source, *detector, *msg;
+    } bad[] = {
+        {"", "", "\"MeshNode\":[[0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1", NULL, "", "a MeshNode row without 3 numbers"},
+        {"", "", "\"MeshNode\":{\"_ArrayType_\":\"int32\",\"_ArraySize_\":[4,3],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":12,\"_ArrayZipData_\":\"eJxjYEAARgZUgI0PAABsAAQ=\"},"
+         "\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1", NULL, "", "a JData MeshNode that is not single precision"},
+        {"", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":[[1,2,3,4]],\"InitElem\":1", NULL, "", "a MeshElem row without 5 integers"},
+        {"", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":{\"_ArrayType_\":\"single\",\"_ArraySize_\":[1,5],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":5,\"_ArrayZipData_\":\"eJxjYGiwZ2BgcAAiIG4AYXsAGsIC/w==\"}"
+         ",\"InitElem\":1", NULL, "", "a JData MeshElem that is not int32"},
+        {"", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshSurf\":{\"_ArrayType_\":\"single\",\"_ArraySize_\":[1,5],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":5,\"_ArrayZipData_\":\"eJxjYGiwZ2BgcAAiIAazGQAZfgI/\"}"
+         "", NULL, "", "a JData MeshSurf that is not int32"},
+        {"", "", NULL, NULL, "", NULL},  /* placeholder for the MeshROI cases below */
+        {"", "\"Media\":[[0,0,1,1],5]", NULL, NULL, "", "a medium that is neither an object nor an array"},
+        {"", "\"Media\":[[0,0,1,1],[0.01,1,0.9,1.37]],\"Step\":[]", NULL, NULL, "", "an empty Domain.Step"},
+        {"", "", NULL, "\"Pos\":[[0.2,0.2,0,1],[0.3,0.2,0,1]],\"Dir\":[[0,0,1],[0,0,1],[0,0,1]]", "", "Dir rows that do not match Pos"},
+        {"", "", NULL, "\"Pos\":[[0.2,0.2,0,1],[0.3,0.2,0,1]],\"Dir\":[0,0,1],\"Param1\":[[0,0,0,0],[0,0,0,0],[0,0,0,0]]", "", "Param1 rows that do not match Pos"},
+        {"", "", NULL, "\"Pos\":[[0.2,0.2,0,1],[0.3,0.2,0,1]],\"Dir\":[0,0,1],\"Param2\":[[0,0,0,0],[0,0,0,0],[0,0,0,0]]", "", "Param2 rows that do not match Pos"},
+        {"", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
+         "\"Pattern\":{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[2,2],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":4,\"_ArrayZipData_\":\"eJxjZGBgBAAACQAD\"}",
+         "", "a compressed pattern that is not single precision"},
+        {"", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
+         "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,2]}", "", "an incomplete pattern"},
+        {"", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
+         "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":\"utnosuchpattern.bin\"}", "", "a missing pattern file"},
+        {"", "", NULL, NULL, ",\"Detector\":{\"Pos\":[[0.2,0.2],[0.3,0.3,0]],\"R\":1}", "detector rows without 3 numbers"},
+        {"", "", NULL, NULL, ",\"Detector\":[{\"Pos\":[0.2,0.2],\"R\":1}]", "a detector object without 3 numbers"},
+        {",\"OutputFormat\":\"nosuchformat\"", "", NULL, NULL, "", "an unknown output format"},
+        {",\"RayTracer\":\"q\"", "", NULL, NULL, "", "an unknown ray tracer"},
+        {",\"OutputType\":\"z\"", "", NULL, NULL, "", "an unknown output type"},
+        {"", "", "\"InitElem\":1", NULL, "", "no mesh"},
+        {"", "", "\"MeshID\":\"onecube\"", NULL, "", "no initial element"},
+    };
+
+    for (int i = 0; i < (int)(sizeof(bad) / sizeof(bad[0])); i++) {
+        if (bad[i].msg == NULL) {
+            continue;
+        }
+
+        write_tetjson("utje.json", bad[i].session, bad[i].domain, bad[i].mesh, bad[i].source, bad[i].detector);
+        EXPECT_EXIT(parse_mmc("-f utje.json", NULL), bad[i].msg);
+    }
+
+    /* MeshROI: rows of different lengths, a JData array that is not single precision, and a
+       single row of per-node values */
+    snprintf(mesh, sizeof(mesh), "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],%s,\"MeshROI\":[[1,2],[1]]", tetelem);
+    write_tetjson("utje.json", "", "", mesh, NULL, "");
+    EXPECT_EXIT(parse_mmc("-f utje.json", NULL), "MeshROI rows of different lengths");
+    snprintf(mesh, sizeof(mesh), "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],%s,\"MeshROI\":{\"_ArrayType_\":\"int32\",\"_ArraySize_\":[4],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":4,\"_ArrayZipData_\":\"eJxjZGBgYETCAAA4AAU=\"}"
+             "", tetelem);
+    write_tetjson("utje.json", "", "", mesh, NULL, "");
+    EXPECT_EXIT(parse_mmc("-f utje.json", NULL), "a JData MeshROI that is not single precision");
+    snprintf(mesh, sizeof(mesh), "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],%s,\"MeshROI\":[0.1,0.1,0.1,0.1]", tetelem);
+    write_tetjson("utje.json", "", "", mesh, NULL, "");
+    EXPECT_EXIT_OK(parse_mmc("-f utje.json", NULL), "a single row of per-node MeshROI values");
+
+    /* a source field given as rows sets the source count when Pos has one row; the
+       directions of a detector object may carry a 4th number */
+    write_tetjson("utje.json", "", "", NULL, "\"Pos\":[0.2,0.2,0],\"Dir\":[[0,0,1],[0,0,1,\"_NaN_\"],[0,0,1,\"_Inf_\"]]", "");
+    parse_mmc("-f utje.json", check_srcrows3);
+    write_tetjson("utje.json", "", "", NULL, "\"Pos\":[0.2,0.2,0],\"Dir\":[0,0,1],\"Param1\":[[0,0,0,0],[0,0,0,0],[0,0,0,0]]", "");
+    parse_mmc("-f utje.json", check_srcrows3);
+    write_tetjson("utje.json", "", "", NULL, "\"Pos\":[0.2,0.2,0],\"Dir\":[0,0,1],\"Param2\":[[0,0,0,0],[0,0,0,0],[0,0,0,0]]", "");
+    parse_mmc("-f utje.json", check_srcrows3);
+    write_tetjson("utje.json", "", "", NULL, NULL, ",\"Detector\":[{\"Pos\":[0.2,0.2,0],\"R\":1,\"Dir\":[0,0,-1,0.5]}]");
+    EXPECT_EXIT_OK(parse_mmc("-f utje.json", NULL), "a detector direction with a 4th number");
+
+    /* a second JSON input replaces the mesh, ROI and patterns of the first */
+    snprintf(mesh, sizeof(mesh), "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],%s,\"MeshROI\":[0.1,0.1,0.1,0.1]", tetelem);
+    write_tetjson("utje.json", "", "", mesh, NULL, "");
+    EXPECT_EXIT_OK(parse_mmc("-f utje.json --json {\"Mesh\":{\"MeshNode\":[[0,0,0],[2,0,0],[0,2,0],[0,0,2]],\"MeshElem\":[[1,2,3,4,1]],"
+                             "\"MeshROI\":[0.2,0.2,0.2,0.2]}}", NULL), "--json replaces the mesh of the input file");
+
+    EXPECT_EXIT_OK(parse_mmc("-f utje.json --dumpjson 3", NULL), "--dumpjson 3 saves the parsed input");
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  output writers, JData decoding and helpers called directly, malformed mesh
+ *  files, and source layouts the other tests do not use
+ *---------------------------------------------------------------------------*/
+
+static void check_writers(mcconfig* cfg, tetmesh* mesh) {
+    size_t len = cfg->crop0.z;
+    unsigned int* mask = (unsigned int*)calloc(len, sizeof(unsigned int));
+    float vol[8] = {1, 2, 3, 4, 5, 6, 7, 8}, field[4] = {1, 2, 3, 4};
+    uint dims[3] = {2, 2, 2};
+    float voxsize[3] = {1.f, 1.f, 1.f};
+
+    mask[0] = 1 | DET_MASK;
+    mcx_savenii((OutputType*)mask, len, (char*)"utmask", NIFTI_TYPE_UINT32, ofNifti, cfg);
+    EXPECT_TRUE(file_size("utmask.nii") > 0, "mcx_savenii saves a label/detector mask as 16-bit pairs");
+    free(mask);
+    EXPECT_EXIT(mcx_savenii((OutputType*)mesh->weight, len, (char*)"utbadfmt", NIFTI_TYPE_FLOAT64, ofMC2, cfg), "mcx_savenii with a format other than NIfTI/Analyze");
+
+    mcx_savefloatjnii(vol, 3, dims, voxsize, (char*)"utfj", cfg);
+    mcx_savefloatbnii(vol, 3, dims, voxsize, (char*)"utfb", cfg);
+    EXPECT_TRUE(file_size("utfj.jnii") > 0 && file_size("utfb.bnii") > 0, "float JNIfTI and BNIfTI outputs");
+
+    cfg->outputformat = ofTX3;
+    strcpy(cfg->session, "uttx3");
+    mcx_savedata(mesh->weight, len, cfg, 0);
+    EXPECT_TRUE(file_size("uttx3.tx3") > 0, "the tx3 output format");
+    cfg->outputformat = ofASCII;
+
+    mcx_printlog(cfg, (char*)"unit test log line");
+    mcx_normalize(field, 2.f, 4);
+    EXPECT_NEAR(field[3], 8.f, 1e-6, "mcx_normalize scales the field");
+    EXPECT_NEAR(mesh_getreff_approx(1.37, 1.0), -1.440 / (1.37 * 1.37) + 0.710 / 1.37 + 0.668 + 0.0636 * 1.37, 1e-12,
+                "mesh_getreff_approx");
+
+    /* mcx_clearcfg frees the optional arrays */
+    cfg->nodemua = (float*)calloc(4, sizeof(float));
+    cfg->nodemusp = (float*)calloc(4, sizeof(float));
+    cfg->shapedata = strdup("{}");
+    cfg->energytot = (double*)calloc(1, sizeof(double));
+    cfg->energyesc = (double*)calloc(1, sizeof(double));
+}
+
+static void check_jdatadecode(mcconfig* cfg, tetmesh* mesh) {
+    const char* arr[] = {
+        "{\"_ArrayType_\":\"int16\",\"_ArraySize_\":[2],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":2,\"_ArrayZipData_\":\"eJxjZGBiAAAADAAE\"}",
+        "{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[4],\"_ArrayData_\":\"AQIDBA==\"}",
+    };
+    void* vol = NULL;
+    int ndim;
+    uint dims[3] = {1, 1, 1};
+    char* type = NULL;
+
+    (void)mesh;
+
+    for (int i = 0; i < 2; i++) {
+        cJSON* obj = cJSON_Parse(arr[i]);
+        vol = malloc(4);  /* decoding replaces an existing buffer */
+        mcx_jdatadecode(&vol, &ndim, dims, 3, &type, obj, cfg);
+        EXPECT_TRUE(vol != NULL, i ? "mcx_jdatadecode of base64 _ArrayData_" : "mcx_jdatadecode of a zipped int16 array");
+        free(vol);
+        cJSON_Delete(obj);
+    }
+
+    EXPECT_EQ(cfg->mediabyte, 1, "mcx_jdatadecode sets the media format from the array type");
+    EXPECT_EXIT({cJSON * o = cJSON_Parse("{\"_ArrayType_\":\"double\",\"_ArraySize_\":[1],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipData_\":\"AA==\"}"); vol = NULL;
+                 mcx_jdatadecode(&vol, &ndim, dims, 3, &type, o, cfg);
+                }, "mcx_jdatadecode of an 8-byte array");
+    EXPECT_EXIT({cJSON * o = cJSON_Parse("{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[1]}"); vol = NULL;
+                 mcx_jdatadecode(&vol, &ndim, dims, 3, &type, o, cfg);
+                }, "mcx_jdatadecode without array data");
+}
+
+static void test_morecover(void) {
+    RunResult r;
+
+    parse_mmc("--bench dmmc-cube60 -M G", check_writers);
+    parse_mmc("--bench dmmc-cube60", check_jdatadecode);
+
+    /* malformed node and element files of a mesh given by MeshID */
+    {
+        const char* json = "{\"Session\":{\"Photons\":10,\"ID\":\"utmf\"},\"Domain\":{\"Media\":[[0,0,1,1],[0.01,1,0.9,1.37]]},"
+                           "\"Mesh\":{\"MeshID\":\"utmf\",\"InitElem\":1},\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},"
+                           "\"Optode\":{\"Source\":{\"Pos\":[0.2,0.2,0],\"Dir\":[0,0,1]}}}";
+        const char* goodnode = "1 4\n1 0 0 0\n2 1 0 0\n3 0 1 0\n4 0 0 1\n";
+        const char* goodelem = "1 1\n1 1 2 3 4 1\n";
+
+        write_file("utmf.json", json, strlen(json));
+        EXPECT_EXIT(parse_mmc("-f utmf.json", NULL), "a missing node file");
+        write_file("node_utmf.dat", "abc\n", 4);
+        EXPECT_EXIT(parse_mmc("-f utmf.json", NULL), "a node file without a header");
+        write_file("node_utmf.dat", "1 4\n1 0 0 0\n", 12);
+        EXPECT_EXIT(parse_mmc("-f utmf.json", NULL), "a node file with missing rows");
+        write_file("node_utmf.dat", goodnode, strlen(goodnode));
+        EXPECT_EXIT(parse_mmc("-f utmf.json", NULL), "a missing element file");
+        write_file("elem_utmf.dat", "abc\n", 4);
+        EXPECT_EXIT(parse_mmc("-f utmf.json", NULL), "an element file without a header");
+        write_file("elem_utmf.dat", "1 2\n1 1 2 3 4 1\n", 16);
+        EXPECT_EXIT(parse_mmc("-f utmf.json", NULL), "an element file with missing rows");
+        write_file("elem_utmf.dat", goodelem, strlen(goodelem));
+        EXPECT_EXIT_OK(parse_mmc("-f utmf.json", NULL), "a valid node/element file pair");
+    }
+
+    /* a wide-field source tilted away from z, and a diverging planar beam */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 300 -E 1 -s utgt --json {\"Optode\":{\"Source\":{\"Type\":\"gaussian\",\"Pos\":[30,45,15],"
+                "\"Dir\":[0,0.6,0.8],\"Param1\":[1,0,0,0]}}}", NULL);
+    EXPECT_TRUE(r.ran && r.normalizer > 0, "a gaussian beam tilted away from z");
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 300 -E 1 -s utpd --json {\"Optode\":{\"Source\":{\"Type\":\"planar\",\"Pos\":[28,43,15],"
+                "\"Dir\":[0,0,1,-10],\"Param1\":[4,0,0,0],\"Param2\":[0,4,0,0]}}}", NULL);
+    EXPECT_TRUE(r.ran && r.normalizer > 0, "a diverging planar beam");
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  command line options and settings checks of the mmc binary that the other
+ *  tests do not reach
+ *---------------------------------------------------------------------------*/
+
+static void test_cmdedge(void) {
+    const char* json = "{\"Session\":{\"Photons\":100,\"RNGSeed\":1,\"ID\":\"utce\"},\"Domain\":{\"Media\":[[0,0,1,1],[0.01,1,0.9,1.37]]},"
+                       "\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},"
+                       "\"Optode\":{\"Source\":{\"Pos\":[2,8,0],\"Dir\":[0,0,1]}}}";
+    char args[2048];
+
+    /* options parsed without a simulation */
+    parse_mmc("--bench dmmc-cube60 -Z 1 -R 2 -I -D 3 --compute 1", NULL);
+    EXPECT_TRUE(1, "-Z, -R, -I, numeric -D and --compute");
+    snprintf(args, sizeof(args), "-f %s", json);
+    parse_mmc(args, NULL);
+    EXPECT_TRUE(1, "-f with an inline JSON input");
+    parse_mmc("--bench dmmc-cube60 --json {\"Session\":{\"Photons\":10}} --json {\"Session\":{\"Photons\":20}}", NULL);
+    EXPECT_TRUE(1, "a second --json replaces the first");
+    parse_mmc("--bench dmmc-cube60 --kernel " MMC_EXAMPLE_DIR "/../src/mmc_core.cl --kernel " MMC_EXAMPLE_DIR "/../src/mmc_core.cl", NULL);
+    EXPECT_TRUE(1, "a second --kernel replaces the first");
+    EXPECT_EXIT_OK(parse_mmc("--bench", NULL), "--bench without a name lists the benchmarks");
+    EXPECT_EXIT_OK(parse_mmc("--bench dmmc-cube60 --dumpjson", NULL), "--dumpjson without a file name");
+    parse_mmc("--bench dmmc-cube60 --root utnosuchdir -l", NULL);
+    EXPECT_TRUE(1, "-l falls back to stdout if the log file can not be created");
+
+    EXPECT_EXIT(parse_mmc("-i -f utce.json", NULL), "both the interactive mode and an input file");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json", NULL), "--json without a JSON fragment");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -E utdet.mch -O A", NULL), "an adjoint output in the replay mode");
+
+    /* the checks of mcx_validatecfg */
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Forward\":{\"T0\":1e-9,\"T1\":0,\"Dt\":1e-10}}", NULL), "a reversed time window");
+    parse_mmc("--bench dmmc-cube60 --json {\"Forward\":{\"T0\":0,\"T1\":1e-9,\"Dt\":5e-9}}", NULL);
+    EXPECT_TRUE(1, "a time step longer than the time window is shortened");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Optode\":{\"Source\":{\"Dir\":[0,0,2]}}}", NULL), "a source direction that is not a unit vector");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Forward\":{\"T0\":1e-9,\"T1\":1e-9,\"Dt\":1e-10}}", NULL), "tend equal to tstart");
+    EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle --json {\"Optode\":{\"Source\":{\"ID\":3,\"Pos\":[[30,45,0,1],[20,30,0,1]],"
+                                "\"Dir\":[[0,0,1],[0,0,1]]}}}", NULL), "mmc_validate_config: a source ID beyond the sources");
+    parse_mmc("--bench dmmc-cube60 -E -1", NULL);
+    EXPECT_TRUE(1, "a negative seed is replaced by the time");
+
+#ifdef USE_OPENCL
+    /* mesh-mode Jacobians saved as JNIfTI and BNIfTI, dual and RF, under a root folder */
+    if (hasocl) {
+        RunResult r;
+        const char* det = "{\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
+        const char* detrf = "{\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
+
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O W -F jnii --root . -s utjw --json %s", det);
+        r = run_mmc(args, NULL);
+        EXPECT_TRUE(r.ran && file_size("utjw_jmua.jnii") > 0 && file_size("utjw_jd.jnii") > 0, "dual mesh Jacobians saved as JNIfTI");
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O Q -F bnii -s utjq --json %s", detrf);
+        r = run_mmc(args, NULL);
+        EXPECT_TRUE(r.ran && file_size("utjq_jmua.bnii") > 0 && file_size("utjq_jmusp.bnii") > 0, "RF dual mesh Jacobians saved as BNIfTI");
+    }
+#endif
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  JSON writer branches, buffer reuse, detected photon and trajectory files in
+ *  every format, and malformed .mch replay files
+ *---------------------------------------------------------------------------*/
+
+static void check_savebranches(mcconfig* cfg, tetmesh* mesh) {
+    float ppath[2 * MCX_DEBUG_REC_LEN];
+    unsigned char seeds[2 * 16];
+    const int fmt[3] = {ofBJNifti, ofJNifti, ofMC2};
+
+    /* the JSON writer: -b 2, normalization and reflectance flags beyond 1, a root folder,
+       a modulation frequency, an outer refractive index and a mesh name */
+    cfg->isreflect = 2;
+    cfg->isnormalized = 2;
+    cfg->issaveref = 2;
+    cfg->omega = 6.28e8f;
+    cfg->nout = 1.2f;
+    strcpy(cfg->rootpath, ".");
+    mcx_savejdata((char*)"utsjb.json", cfg);
+    EXPECT_TRUE(file_size("utsjb.json") > 0, "--dumpjson of the less common settings");
+    cfg->isreflect = 1;
+    cfg->isnormalized = 1;
+    cfg->issaveref = 0;
+    cfg->omega = 0.f;
+
+    /* mesh_getvolume recomputes the volumes, freeing the OptiX triangle arrays */
+    mesh->fnode = (FLOAT3*)malloc(sizeof(FLOAT3));
+    mesh->fnorm = (FLOAT3*)malloc(sizeof(FLOAT3));
+    mesh->face = (uint3*)malloc(sizeof(uint3));
+    mesh->front = (uint*)malloc(sizeof(uint));
+    mesh->back = (uint*)malloc(sizeof(uint));
+    mesh_getvolume(mesh, cfg);
+    EXPECT_TRUE(mesh->fnode == NULL && mesh->face == NULL, "mesh_getvolume frees the OptiX triangle arrays");
+
+    /* trajectory records with seeds, written and appended in each format under a root folder */
+    for (int i = 0; i < 2 * MCX_DEBUG_REC_LEN; i++) {
+        ppath[i] = (float)(i % MCX_DEBUG_REC_LEN) + 1.f;
+    }
+
+    memset(seeds, 7, sizeof(seeds));
+    cfg->issaveseed = 1;
+    cfg->his.detected = 0;
+    cfg->his.savedphoton = 2;
+    cfg->his.colcount = MCX_DEBUG_REC_LEN;
+    cfg->his.seedbyte = 16;
+    strcpy(cfg->session, "utsdb");
+
+    for (int f = 0; f < 3; f++) {
+        cfg->outputformat = fmt[f];
+        mcx_savedetphoton(ppath, seeds, 2, 0, cfg);
+        mcx_savedetphoton(ppath, seeds, 2, 1, cfg);
+    }
+
+    EXPECT_TRUE(file_size("utsdb_traj.jdb") > 0 && file_size("utsdb_traj.jdt") > 0 && file_size("utsdb.mct") > 0,
+                "trajectories with seeds in .jdb, .jdt and .mct, written and appended");
+    cfg->outputformat = ofASCII;
+    cfg->rootpath[0] = '\0';
+}
+
+/** write a .mch file of the given header fields and payload size, for the replay tests */
+static void write_mch(const char* fname, int maxmedia, int savedphoton, int colcount, int seedbyte, size_t payload) {
+    history his;
+    FILE* fp = fopen(fname, "wb");
+    char* buf = (char*)calloc(payload + 1, 1);
+
+    memset(&his, 0, sizeof(his));
+    memcpy(his.magic, "MCXH", 4);
+    his.version = 1;
+    his.maxmedia = maxmedia;
+    his.savedphoton = savedphoton;
+    his.detected = savedphoton;
+    his.colcount = colcount;
+    his.seedbyte = seedbyte;
+
+    if (fp) {
+        fwrite(&his, sizeof(his), 1, fp);
+        fwrite(buf, 1, payload, fp);
+        fclose(fp);
+    }
+
+    free(buf);
+}
+
+static void check_mchfiles(mcconfig* cfg, tetmesh* mesh) {
+    (void)cfg;
+    write_file("utshort.mch", "MCXH", 4);
+    write_mch("utnoseed.mch", mesh->prop, 0, 3, 0, 0);
+    write_mch("utmedia.mch", mesh->prop + 5, 2, 3, 16, 2 * 3 * 4 + 2 * 16);
+    write_mch("utnoseeds.mch", mesh->prop, 2, 3, 16, 2 * 3 * 4 + 8);
+}
+
+static void test_morecover2(void) {
+    parse_mmc("--bench dmmc-cube60 -M G", check_savebranches);
+
+    parse_mmc("--bench dmmc-cube60", check_mchfiles);
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -E utshort.mch -O J", NULL), "a truncated .mch header");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -E utmedia.mch -O J", NULL), "a .mch file of different media");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -E utnoseeds.mch -O J", NULL), "a .mch file with truncated seeds");
+    parse_mmc("--bench dmmc-cube60 -E utnoseed.mch", NULL);
+    EXPECT_TRUE(1, "a .mch file without seeds is not replayed");
+}
+
+
+/*-----------------------------------------------------------------------------
+ *  .inp variants, source rotations, unit scaling of the mmclab path, CPU tracer
+ *  branches and settings checks of the mmc binary
+ *---------------------------------------------------------------------------*/
+
+/** copy onecube.inp to fname, replacing the first occurrence of from by to */
+static void write_inpvariant(const char* fname, const char* from, const char* to) {
+    long len = file_size("onecube.inp");
+    char* buf = (char*)calloc(len + 1, 1), *out = (char*)calloc(len + strlen(to) + 1, 1);
+    FILE* fp = fopen("onecube.inp", "rb");
+
+    if (fp && fread(buf, len, 1, fp) == 1) {
+        char* hit = strstr(buf, from);
+
+        if (hit) {
+            memcpy(out, buf, hit - buf);
+            strcat(out, to);
+            strcat(out, hit + strlen(from));
+            write_file(fname, out, strlen(out));
+        }
+    }
+
+    if (fp) {
+        fclose(fp);
+    }
+
+    free(buf);
+    free(out);
+}
+
+static void check_surfunit(mcconfig* cfg, tetmesh* mesh) {
+    float mua0 = mesh->med[1].mua;
+
+    cfg->unitinmm = 2.f;
+    mesh_validate(mesh, cfg);
+    EXPECT_NEAR(mesh->med[1].mua, 2.f * mua0, 1e-6, "mesh_validate scales a surface-only mesh by the length unit");
+}
+
+static void test_morecover3(void) {
+    RunResult r;
+    char args[2048];
+
+    /* .inp: a focal length after the direction, a reversed time window, a time step longer
+       than the window, and the mesh found under --root */
+    write_inpvariant("utdirw.inp", "0. 0. 1.", "0. 0. 1. 5");
+    parse_mmc("-f utdirw.inp", NULL);
+    write_inpvariant("utgate.inp", "0.e+00 5.e-09 5e-10", "1e-9 0 1e-10");
+    EXPECT_EXIT(parse_mmc("-f utgate.inp", NULL), ".inp with a reversed time window");
+    write_inpvariant("utstep.inp", "0.e+00 5.e-09 5e-10", "0 1e-9 5e-9");
+    parse_mmc("-f utstep.inp", NULL);
+    parse_mmc("-f onecube.inp --root .", NULL);
+    EXPECT_TRUE(1, ".inp with a focal length, a long time step and --root");
+
+    /* sources tilted away from z, and a wide-field source outside every element */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 300 -E 1 -s utiso --json {\"Optode\":{\"Source\":{\"Type\":\"isotropic\",\"Pos\":[30,45,15],"
+                "\"Dir\":[0.6,0,0.8]}}}", NULL);
+    EXPECT_TRUE(r.ran && r.normalizer > 0, "an isotropic source with a tilted reference direction");
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 10 -E 1 -s utout --json {\"Optode\":{\"Source\":{\"Type\":\"planar\",\"Pos\":[28,43,-10],"
+                        "\"Param1\":[4,0,0,0],\"Param2\":[0,4,0,0]}}}", NULL), "a wide-field source outside the mesh");
+
+    /* MCML weights with element-based output */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 300 -E 1 -M H -C 0 -m 1 -s utmcml0", NULL);
+    EXPECT_TRUE(r.ran && r.normalizer > 0, "MCML weights with element-based output");
+
+    /* the mmclab path with a length unit, in mesh and dual-grid modes, and on a surface */
+    run_mmclab_path("--bench dmmc-cube60 -G -1 -n 100 -E 1 -M H -C 1 -u 2 -s utmlu", NULL);
+    run_mmclab_path("--bench dmmc-cube60 -G -1 -n 100 -E 1 -M G -u 2 -s utmlg", NULL);
+    EXPECT_TRUE(1, "the mmclab path scales the media by the length unit");
+    write_cubesurf("utsurf.json", NULL);
+    parse_mmc("-f utsurf.json --compute optix -M G", check_surfunit);
+
+    /* settings checks of the mmc binary */
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -n 0", NULL), "no photons");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -E utdet.mch -O J --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"SrcNum\":2,"
+                          "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", NULL),
+                "several patterns in the replay mode");
+    EXPECT_EXIT(parse_mmc("-f utce.json -i", NULL), "an input file before the interactive mode");
+    parse_mmc("--bench dmmc-cube60 -G 3", NULL);
+    EXPECT_TRUE(1, "-G with a device number");
+
+#ifdef USE_OPENCL
+    if (hasocl) {
+        /* the remaining combinations of the mesh Jacobian outputs */
+        const char* det = "{\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
+        const char* detrf = "{\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
+
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O A -F bnii -s utja --json %s", det);
+        r = run_mmc(args, NULL);
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O W -F bnii -s utjwb --json %s", det);
+        run_mmc(args, NULL);
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O A -F jnii -s utjar --json %s", detrf);
+        run_mmc(args, NULL);
+        EXPECT_TRUE(r.ran && file_size("utja_jmua.bnii") > 0 && file_size("utjar_jmua.jnii") > 0, "single, dual and RF mesh Jacobian files");
+    }
+#endif
+}
+
+
+/* the mmclab path: wide-field detector elements (label -2), and the defaults of a negative
+   seed and of -d 1 without detectors */
+static void mut_extdet(mcconfig* cfg, tetmesh* mesh) {
+    cfg->isextdet = 1;
+    mesh->type[mesh->ne - 1] = -2;
+}
+static void mut_seeddet(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    cfg->seed = -1;
+    cfg->issavedet = 1;
+    cfg->detnum = 0;
+}
+
+static void test_morecover4(void) {
+    char args[1024];
+
+    EXPECT_EXIT_OK(run_mmclab_path("--bench dmmc-cube60 -G -1 -n 100 -E 1 -M H -C 1 -s utmlx", mut_extdet), "the mmclab path with wide-field detector elements");
+    EXPECT_EXIT_OK(run_mmclab_path("--bench dmmc-cube60 -G -1 -n 100 -M H -C 1 -s utmls", mut_seeddet), "the mmclab path with a negative seed and no detectors");
+
+    /* an .inp mesh without, or with a malformed, media property file */
+    if (system("for f in node elem facenb velem; do cp ${f}_onecube.dat ${f}_utnp.dat; done") == 0) {
+        write_inpvariant("utnp.inp", "onecube ", "utnp ");
+        EXPECT_EXIT(parse_mmc("-f utnp.inp", NULL), "an .inp mesh without a media property file");
+        write_file("prop_utnp.dat", "abc\n", 4);
+        EXPECT_EXIT(parse_mmc("-f utnp.inp", NULL), "an .inp mesh with a malformed media property file");
+    }
+
+#ifdef USE_OPENCL
+    if (hasocl) {
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O W -F jnii -s utjwr --json "
+                 "{\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}");
+        RunResult r = run_mmc(args, NULL);
+        EXPECT_TRUE(r.ran && file_size("utjwr_jd.jnii") > 0, "RF dual mesh Jacobians saved as JNIfTI");
+    }
+#endif
+    (void)args;
 }
 
 /*-----------------------------------------------------------------------------
@@ -1513,7 +2078,7 @@ static void test_gpubackends(void) {
         {"grid, gaussian source",            "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"gaussian\",\"Pos\":[30,45,15],\"Param1\":[1,0,0,0]}}}", 0, 1},
         {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0, 1},
         {"grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
-                                             "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1},
+                                             "\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1},
         {"grid, 2 sources, a field each",   "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"ID\":-1,\"Pos\":[[30,45,0,0.5],[20,30,0,0.5]],"
                                              "\"Dir\":[[0,0,1,0],[0,0,1,0]]}}}", 0, 1},
         {"grid, trajectories (-D M)",        "-M G -D M", 0, 1},
@@ -1641,7 +2206,7 @@ static void test_optixsources(void) {
 
     const char* src[][2] = {
         {"pattern", "\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":1,\"Data\":[1,0.2,0.2,1]}"},
-        {"2 patterns sharing photons", "\"Type\":\"pattern\",\"SrcNum\":2,\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}"},
+        {"2 patterns sharing photons", "\"Type\":\"pattern\",\"SrcNum\":2,\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}"},
         {"fourier", "\"Type\":\"fourier\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,1]"},
         {"fourierx", "\"Type\":\"fourierx\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,4],\"Param2\":[1,1,0,0]"},
         {"fourierx2d", "\"Type\":\"fourierx2d\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,4],\"Param2\":[1,1,0,0]"},
@@ -1755,6 +2320,12 @@ int main(int argc, char** argv) {
     test_inputfiles();
     test_moreio();
     test_variants();
+    test_jsonedge();
+    test_morecover();
+    test_cmdedge();
+    test_morecover2();
+    test_morecover3();
+    test_morecover4();
     test_utilfuncs();
     test_cmdopts();
     test_mmclab_path();
