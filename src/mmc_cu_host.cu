@@ -228,6 +228,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
 
     MCXReporter* greporter;
     int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
+    /* J_mus/J_musp (U, V and the second half of Q) multiply J_D by a per-medium chain-rule factor;
+       in grid mode the kernel records the medium label of each voxel it deposits into */
+    int ismusjacob = (cfg->outputtype == otAdjointMus || cfg->outputtype == otAdjointMusp || cfg->outputtype == otAdjointMuaMusp);
+    int* gvoxtype = NULL;
     /* For adjoint/multi-source mode, expand meshlen to cover all source slots.
      * cfg->srcid > 0 selects a single slot from srcdata, so the field buffer collapses to one slot. */
     uint nsrcslots = (cfg->extrasrclen > 0 && cfg->srcid <= 0) ? (uint)cfg->extrasrclen : 1u;
@@ -593,6 +597,11 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         CUDA_ASSERT(cudaMalloc((void**) &gdebugdata, sizeof(float) * (debuglen * cfg->maxjumpdebug)));
     }
 
+    if (ismusjacob && cfg->issave2pt && cfg->method == rtBLBadouelGrid) {
+        CUDA_ASSERT(cudaMalloc((void**) &gvoxtype, sizeof(int) * cfg->crop0.z));
+        CUDA_ASSERT(cudaMemset(gvoxtype, 0, sizeof(int) * cfg->crop0.z));
+    }
+
     if (cfg->seed == SEED_FROM_FILE) {
         CUDA_ASSERT(cudaMalloc((void**)&greplayweight, sizeof(float)*cfg->nphoton));
         CUDA_ASSERT(cudaMemcpy(greplayweight, cfg->replayweight, sizeof(float)*cfg->nphoton, cudaMemcpyHostToDevice));
@@ -685,7 +694,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             gtype, (int*)gfacenb, gsrcelem, gnormal, \
             gnodemua_cu, gnodemusp_cu, \
             gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter, \
-            gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata)
+            gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata, gvoxtype)
 
             switch (variant) {
                 case 0:
@@ -1115,7 +1124,9 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
             float* gdeldotdel_jac = NULL;
             float* gnvol_jac = NULL;
             int compute_jmua = (cfg->outputtype == otAdjoint || isdual);
-            int compute_jd   = (cfg->outputtype == otAdjointDcoeff || isdual);
+            /* J_D is also the source of the mus/musp Jacobians (U, V), scaled per element in the kernel */
+            int compute_jd   = (cfg->outputtype == otAdjointDcoeff || cfg->outputtype == otAdjointMus ||
+                                cfg->outputtype == otAdjointMusp || isdual);
 
             /* upload elem (int4 -> int*) */
             CUDA_ASSERT(cudaMalloc((void**)&gelem_jac, sizeof(int) * mesh->ne * mesh->elemlen));
@@ -1171,6 +1182,16 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
             if ((!isnodal_approx && compute_jmua) || compute_jd) {
                 /* full FEM kernel: one thread per element; nodal output via atomic scatter */
                 size_t adjgridsize = ((size_t)mesh->ne + adjblocksize - 1) / adjblocksize;
+                float* gmedscale_cu = NULL;
+
+                /* J_mus/J_musp: the kernel multiplies each element's J_D by the factor of its label */
+                if (ismusjacob) {
+                    float* medscale = mesh_getmusscale(mesh, cfg->outputtype != otAdjointMus);
+                    CUDA_ASSERT(cudaMalloc((void**)&gmedscale_cu, sizeof(float) * (mesh->prop + 1)));
+                    CUDA_ASSERT(cudaMemcpy(gmedscale_cu, medscale, sizeof(float) * (mesh->prop + 1), cudaMemcpyHostToDevice));
+                    free(medscale);
+                }
+
                 mmc_adjoint_mesh_full_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
                     gfield_re_cu, gfield_im_cu,
                     gelem_jac, gevol_jac, gdeldotdel_jac,
@@ -1178,8 +1199,12 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                     gjd_cu,
                     (unsigned int)mesh->ne, (unsigned int)mesh->nn, (unsigned int)cfg->maxgate,
                     Ns, Nd, (unsigned int)mesh->elemlen,
-                    /*isnodal*/ 1);
+                    /*isnodal*/ 1, gtype, gmedscale_cu);
                 CUDA_ASSERT(cudaDeviceSynchronize());
+
+                if (gmedscale_cu) {
+                    CUDA_ASSERT(cudaFree(gmedscale_cu));
+                }
             }
 
             CUDA_ASSERT(cudaFree(gfield_re_cu));
@@ -1322,11 +1347,27 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
             }
 
             if (isdual || cfg->outputtype != otAdjoint) {
+                float* gmedscale_cu = NULL;
+
+                /* J_mus/J_musp: the kernel multiplies each voxel's J_D by the factor of the medium
+                   label recorded there during the simulation */
+                if (gvoxtype) {
+                    float* medscale = mesh_getmusscale(mesh, cfg->outputtype != otAdjointMus);
+                    CUDA_ASSERT(cudaMalloc((void**)&gmedscale_cu, sizeof(float) * (mesh->prop + 1)));
+                    CUDA_ASSERT(cudaMemcpy(gmedscale_cu, medscale, sizeof(float) * (mesh->prop + 1), cudaMemcpyHostToDevice));
+                    free(medscale);
+                }
+
                 mmc_adjoint_dcoeff_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
                     gfield_re_cu, gfield_im_cu, gadjoint_tmp_cu,
                     pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd,
-                    (unsigned int)cfg->dim.x, (unsigned int)cfg->dim.y);
+                    (unsigned int)cfg->dim.x, (unsigned int)cfg->dim.y,
+                    gvoxtype, gmedscale_cu);
                 CUDA_ASSERT(cudaDeviceSynchronize());
+
+                if (gmedscale_cu) {
+                    CUDA_ASSERT(cudaFree(gmedscale_cu));
+                }
             }
 
             CUDA_ASSERT(cudaFree(gfield_re_cu));
@@ -1498,6 +1539,10 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
     if (cfg->debuglevel & dlTraj) {
         CUDA_ASSERT(cudaFree(gdebugdata));
+    }
+
+    if (gvoxtype) {
+        CUDA_ASSERT(cudaFree(gvoxtype));
     }
 
     CUDA_ASSERT(cudaFree(greporter));

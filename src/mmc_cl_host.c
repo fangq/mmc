@@ -111,9 +111,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_mem* gproperty = NULL, *gparam = NULL, *gsrcpattern = NULL, *greplayweight = NULL, *greplaytime = NULL, *greplayseed = NULL; /*read-only buffers*/
     cl_mem* gweight = NULL, *gdref = NULL, *gdetphoton = NULL, *gseed = NULL, *genergy = NULL, *greporter = NULL, *gdebugdata = NULL;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
+    cl_mem* gvoxtype = NULL;  /* grid-mode J_mus/J_musp: medium label of each voxel, recorded by the kernel */
 
     int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
     int savevolume = (cfg->issave2pt != 0);
+    /* J_mus/J_musp (U, V and the second half of Q) multiply J_D by a per-medium chain-rule factor */
+    int ismusjacob = (cfg->outputtype == otAdjointMus || cfg->outputtype == otAdjointMusp || cfg->outputtype == otAdjointMuaMusp);
+    int savevoxtype = (ismusjacob && savevolume && cfg->method == rtBLBadouelGrid);
     /* cfg->srcid > 0 selects a single slot from srcdata, collapsing the field buffer to one slot. */
     cl_uint nsrcslots = (cfg->extrasrclen > 0 && cfg->srcid <= 0) ? (cl_uint)cfg->extrasrclen : 1u;
     /* Compute the output length in 64-bit first and bail out cleanly if it cannot
@@ -224,6 +228,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         gphotonseed = (cl_mem*)calloc(workdev, sizeof(cl_mem));
         greporter = (cl_mem*)calloc(workdev, sizeof(cl_mem));
         gdebugdata = (cl_mem*)calloc(workdev, sizeof(cl_mem));
+        gvoxtype = (cl_mem*)calloc(workdev, sizeof(cl_mem));
 
         gnode = (cl_mem*)calloc(workdev, sizeof(cl_mem));
         gelem = (cl_mem*)calloc(workdev, sizeof(cl_mem));
@@ -453,6 +458,12 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 greplayseed[i] = NULL;
             }
 
+            if (savevoxtype) {
+                int* zerotype = (int*)calloc(cfg->crop0.z, sizeof(int));
+                OCL_TRY(((gvoxtype[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(int) * cfg->crop0.z, zerotype, &status), status)));
+                free(zerotype);
+            }
+
             free(Pseed);
             free(energy);
             Pseed = NULL;
@@ -554,6 +565,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         if (cfg->isnodalmusp) {
             snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_NODAL_MUSP");
+        }
+
+        if (savevoxtype) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SAVE_VOXTYPE");
         }
 
         /* IS_RF / IS_MULTISRC / SAVE_DETPHOTON: persistent per-photon state gates.
@@ -704,6 +719,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             OCL_ASSERT((clSetKernelArg(mcxkernel[i], 24, sizeof(cl_mem), (void*)(greplayseed + i))));
             OCL_ASSERT((clSetKernelArg(mcxkernel[i], 25, sizeof(cl_mem), (void*)(gphotonseed + i))));
             OCL_ASSERT((clSetKernelArg(mcxkernel[i], 26, sizeof(cl_mem), ((cfg->debuglevel & dlTraj) ? (void*)(gdebugdata + i) : NULL) )));
+            OCL_ASSERT((clSetKernelArg(mcxkernel[i], 27, sizeof(cl_mem), (savevoxtype ? (void*)(gvoxtype + i) : NULL) )));
         }
 
         if (status != CL_SUCCESS) {
@@ -1134,7 +1150,9 @@ is more than what your have specified (%d), please use the -H option to specify 
             size_t single_exportlen  = adjointlen * (isrfforward ? 2 : 1);
             size_t exportlen_adj     = single_exportlen * (isdual ? 2 : 1);
             int compute_jmua = (cfg->outputtype == otAdjoint || isdual);
-            int compute_jd   = (cfg->outputtype == otAdjointDcoeff || isdual);
+            /* J_D is also the source of the mus/musp Jacobians (U, V), scaled per element in the kernel */
+            int compute_jd   = (cfg->outputtype == otAdjointDcoeff || cfg->outputtype == otAdjointMus ||
+                                cfg->outputtype == otAdjointMusp || isdual);
 
             /* exportfield (= mesh->weight) is node-major for basisorder=1, sized
              * nn * extrasrclen * maxgate doubles -- NOT fieldlen, which is sized
@@ -1205,6 +1223,16 @@ is more than what your have specified (%d), please use the -H option to specify 
 
             free(hzero);
 
+            /* J_mus/J_musp: the kernel multiplies each element's J_D by the factor of its label */
+            cl_mem gcl_medscale = (cl_mem)0;
+
+            if (ismusjacob) {
+                float* medscale = mesh_getmusscale(mesh, cfg->outputtype != otAdjointMus);
+                gcl_medscale = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (mesh->prop + 1), medscale, &status);
+                OCL_ASSERT(status);
+                free(medscale);
+            }
+
             size_t adj_local = 256;
 
             /* nodal-approximation J_mua kernel (one thread per node) */
@@ -1250,6 +1278,8 @@ is more than what your have specified (%d), please use the -H option to specify 
                 OCL_ASSERT(clSetKernelArg(kern, 11, sizeof(cl_uint), &Nd));
                 OCL_ASSERT(clSetKernelArg(kern, 12, sizeof(cl_uint), &elemlen_arg));
                 OCL_ASSERT(clSetKernelArg(kern, 13, sizeof(cl_int),  &isnodal_arg));
+                OCL_ASSERT(clSetKernelArg(kern, 14, sizeof(cl_mem),  gcl_medscale ? (void*)(gtype + 0) : NULL));
+                OCL_ASSERT(clSetKernelArg(kern, 15, sizeof(cl_mem),  gcl_medscale ? &gcl_medscale : NULL));
                 size_t adj_global = ((mesh->ne + adj_local - 1) / adj_local) * adj_local;
                 OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
                 OCL_ASSERT(clFinish(mcxqueue[0]));
@@ -1267,6 +1297,10 @@ is more than what your have specified (%d), please use the -H option to specify 
 
             if (gcl_deldotdel) {
                 clReleaseMemObject(gcl_deldotdel);
+            }
+
+            if (gcl_medscale) {
+                clReleaseMemObject(gcl_medscale);
             }
 
             if (gcl_nvol) {
@@ -1416,9 +1450,49 @@ is more than what your have specified (%d), please use the -H option to specify 
                 OCL_ASSERT(clSetKernelArg(dcoeff_kern, 6, sizeof(cl_uint), &Nd));
                 OCL_ASSERT(clSetKernelArg(dcoeff_kern, 7, sizeof(cl_uint), &Nx));
                 OCL_ASSERT(clSetKernelArg(dcoeff_kern, 8, sizeof(cl_uint), &Ny));
+
+                /* J_mus/J_musp: the kernel multiplies each voxel's J_D by the factor of the medium
+                   label recorded there during the simulation (merged over the devices if several) */
+                cl_mem gcl_medscale = (cl_mem)0, gcl_voxtype = (cl_mem)0;
+
+                if (savevoxtype) {
+                    float* medscale = mesh_getmusscale(mesh, cfg->outputtype != otAdjointMus);
+                    gcl_medscale = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * (mesh->prop + 1), medscale, &status);
+                    OCL_ASSERT(status);
+                    free(medscale);
+
+                    if (workdev > 1) {
+                        int* voxtype = (int*)calloc(cfg->crop0.z, sizeof(int));
+                        int* devtype = (int*)malloc(sizeof(int) * cfg->crop0.z);
+
+                        for (i = 0; i < workdev; i++) {
+                            OCL_ASSERT(clEnqueueReadBuffer(mcxqueue[i], gvoxtype[i], CL_TRUE, 0, sizeof(int) * cfg->crop0.z, devtype, 0, NULL, NULL));
+
+                            for (size_t k = 0; k < cfg->crop0.z; k++) {
+                                voxtype[k] = (devtype[k] > 0) ? devtype[k] : voxtype[k];
+                            }
+                        }
+
+                        gcl_voxtype = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int) * cfg->crop0.z, voxtype, &status);
+                        OCL_ASSERT(status);
+                        free(devtype);
+                        free(voxtype);
+                    }
+                }
+
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 9, sizeof(cl_mem), gcl_medscale ? (gcl_voxtype ? &gcl_voxtype : (void*)(gvoxtype + 0)) : NULL));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 10, sizeof(cl_mem), gcl_medscale ? &gcl_medscale : NULL));
                 OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], dcoeff_kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
                 OCL_ASSERT(clFinish(mcxqueue[0]));
                 clReleaseKernel(dcoeff_kern);
+
+                if (gcl_medscale) {
+                    clReleaseMemObject(gcl_medscale);
+                }
+
+                if (gcl_voxtype) {
+                    clReleaseMemObject(gcl_voxtype);
+                }
             }
 
             OCL_ASSERT(clReleaseMemObject(gcl_field_re));
@@ -1629,6 +1703,10 @@ is more than what your have specified (%d), please use the -H option to specify 
             clReleaseMemObject(gdebugdata[i]);
         }
 
+        if (gvoxtype && gvoxtype[i])         {
+            clReleaseMemObject(gvoxtype[i]);
+        }
+
         if (greplayweight && greplayweight[i]) {
             clReleaseMemObject(greplayweight[i]);
         }
@@ -1655,6 +1733,7 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(gdetected);
     free(gphotonseed);
     free(gdebugdata);
+    free(gvoxtype);
     free(greporter);
 
     free(gnode);

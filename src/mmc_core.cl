@@ -617,11 +617,21 @@ __device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, _
  * \param[out] visit: statistics counters of this thread
  */
 
+/* recording the medium label of each grid voxel (adjoint J_mus/J_musp) costs nothing
+   unless requested: compiled out on OpenCL without -DMCX_SAVE_VOXTYPE, a uniform branch on CUDA */
+#ifdef __NVCC__
+    #define SAVE_VOXTYPE  (gvoxtype != NULL)
+#elif defined(MCX_SAVE_VOXTYPE)
+    #define SAVE_VOXTYPE  1
+#else
+    #define SAVE_VOXTYPE  0
+#endif
+
 MMC_TEMPLATE
 __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __local float* ppath, __global int* elem, __global float* weight,
         int type, __global int* facenb, __global float4* normal, __constant Medium* gmed,
         __global float* gnodemua, __global float* gnodemusp,
-        __global float* replayweight, __global float* replaytime) {
+        __global float* replayweight, __global float* replaytime, __global int* gvoxtype) {
 
     float Lmin;
     float ww, totalloss = 0.f;
@@ -991,6 +1001,13 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                     }
 
                     if (newidx != r->oldidx) {
+                        /* adjoint J_mus/J_musp: record the medium label of each voxel the photon
+                           enters, once per voxel crossing, for the per-voxel chain-rule factor of
+                           D(mus) applied in mmc_adjoint_dcoeff_kernel */
+                        if (SAVE_VOXTYPE && type > 0) {
+                            gvoxtype[idx.z * gcfg->crop0.y + idx.y * gcfg->crop0.x + idx.x] = type;
+                        }
+
 #ifndef DO_NOT_SAVE
 
                         if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1) || GPU_PARAM(gcfg, srcid) < 0) {
@@ -1762,7 +1779,8 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                           __global int* type, __global int* facenb,  __global int* srcelem, __global float4* normal, __constant Medium* gmed,
                           __global float* gnodemua, __global float* gnodemusp,
                           __global float* n_det, __global uint* detectedphoton, __local float* energytot, __local float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
-                          __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata) {
+                          __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata,
+                          __global int* gvoxtype) {
 
     int oldeid, fixcount = 0;
     ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0.f};
@@ -1830,7 +1848,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 
     while (1) { /*propagate a photon until exit*/
-        r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime);
+        r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
         (*raytet)++;
 
         if (r.pout.x == MMC_UNDEFINED) {
@@ -1903,7 +1921,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 GPUDEBUG(("P %f %f %f %d %u %e\n", r.pout.x, r.pout.y, r.pout.z, r.eid, id, r.slen));
             }
 
-            r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime);
+            r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
             (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
@@ -1921,7 +1939,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
             while (r.pout.x == MMC_UNDEFINED && fixcount++ < MAX_TRIAL) {
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
-                r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime);
+                r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
                 (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
@@ -2083,7 +2101,8 @@ __kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophot
         __global float* gnodemua, __global float* gnodemusp,
         __global float* n_det, __global uint* detectedphoton,
         __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
-        __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata) {
+        __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata,
+        __global int* gvoxtype) {
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
@@ -2154,7 +2173,7 @@ __kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophot
                              gnodemua, gnodemusp,
                              n_det, detectedphoton, sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum),
                              sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), t, &raytet,
-                             srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata);
+                             srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata, gvoxtype);
     }
 
     for (int i = 0; i < GPU_PARAM(gcfg, srcnum); i++) {
@@ -2298,14 +2317,16 @@ __kernel void mmc_adjoint_kernel(__global float* gfield_re, __global float* gfie
 __global__ void mmc_adjoint_dcoeff_kernel(float* gfield_re, float* gfield_im, float* gadjoint,
         unsigned int dimxyz, unsigned int maxgate,
         unsigned int Ns, unsigned int Nd,
-        unsigned int Nx, unsigned int Ny) {
+        unsigned int Nx, unsigned int Ny,
+        int* gvoxtype, float* gmedscale) {
     unsigned int vox = blockIdx.x * blockDim.x + threadIdx.x;
 #else
 __kernel void mmc_adjoint_dcoeff_kernel(__global float* gfield_re, __global float* gfield_im,
                                         __global float* gadjoint,
                                         unsigned int dimxyz, unsigned int maxgate,
                                         unsigned int Ns, unsigned int Nd,
-                                        unsigned int Nx, unsigned int Ny) {
+                                        unsigned int Nx, unsigned int Ny,
+                                        __global int* gvoxtype, __global float* gmedscale) {
     unsigned int vox = get_global_id(0);
 #endif
 
@@ -2320,6 +2341,26 @@ __kernel void mmc_adjoint_dcoeff_kernel(__global float* gfield_re, __global floa
     unsigned int iz  = vox / Nxy;
 
     size_t adjointlen = (size_t)dimxyz * Ns * Nd;
+
+    /* J_mus/J_musp: chain-rule factor of the medium recorded in this voxel during the simulation;
+       a voxel without deposits (its J_D comes from the finite-difference gradient of its
+       neighbors) takes the label of a neighbor */
+    float jdscale = 1.f;
+
+    if (gmedscale) {
+        int label = gvoxtype[vox];
+
+        if (label <= 0) {
+            label = (ix > 0 && gvoxtype[vox - 1] > 0) ? gvoxtype[vox - 1] :
+                    (ix + 1 < Nx && gvoxtype[vox + 1] > 0) ? gvoxtype[vox + 1] :
+                    (iy > 0 && gvoxtype[vox - Nx] > 0) ? gvoxtype[vox - Nx] :
+                    (iy + 1 < Ny && gvoxtype[vox + Nx] > 0) ? gvoxtype[vox + Nx] :
+                    (iz > 0 && gvoxtype[vox - Nxy] > 0) ? gvoxtype[vox - Nxy] :
+                    (iz + 1 < Nz && gvoxtype[vox + Nxy] > 0) ? gvoxtype[vox + Nxy] : 0;
+        }
+
+        jdscale = (label > 0) ? gmedscale[label] : 0.f;
+    }
 
     for (unsigned int s = 0; s < Ns; s++) {
         float gsx_re = mmc_fd_grad(gfield_re, vox, s, maxgate, dimxyz, ix, Nx, 1);
@@ -2339,17 +2380,17 @@ __kernel void mmc_adjoint_dcoeff_kernel(__global float* gfield_re, __global floa
             float gdz_re = mmc_fd_grad(gfield_re, vox, Ns + d, maxgate, dimxyz, iz, Nz, Nxy);
 
             unsigned int out_idx = vox + (unsigned int)((size_t)(s * Nd + d) * dimxyz);
-            gadjoint[out_idx] = gsx_re * gdx_re + gsy_re * gdy_re + gsz_re * gdz_re;
+            gadjoint[out_idx] = jdscale * (gsx_re * gdx_re + gsy_re * gdy_re + gsz_re * gdz_re);
 
             if (gfield_im != 0) {
                 float gdx_im = mmc_fd_grad(gfield_im, vox, Ns + d, maxgate, dimxyz, ix, Nx, 1);
                 float gdy_im = mmc_fd_grad(gfield_im, vox, Ns + d, maxgate, dimxyz, iy, Ny, Nx);
                 float gdz_im = mmc_fd_grad(gfield_im, vox, Ns + d, maxgate, dimxyz, iz, Nz, Nxy);
 
-                gadjoint[out_idx] -= gsx_im * gdx_im + gsy_im * gdy_im + gsz_im * gdz_im;
-                gadjoint[out_idx + (unsigned int)(adjointlen)] =
-                    gsx_re * gdx_im + gsy_re * gdy_im + gsz_re * gdz_im
-                    + gsx_im * gdx_re + gsy_im * gdy_re + gsz_im * gdz_re;
+                gadjoint[out_idx] -= jdscale * (gsx_im * gdx_im + gsy_im * gdy_im + gsz_im * gdz_im);
+                gadjoint[out_idx + (unsigned int)(adjointlen)] = jdscale *
+                        (gsx_re * gdx_im + gsy_re * gdy_im + gsz_re * gdz_im
+                         + gsx_im * gdx_re + gsy_im * gdy_re + gsz_im * gdz_re);
             }
         }
     }
@@ -2388,6 +2429,8 @@ __kernel void mmc_adjoint_dcoeff_kernel(__global float* gfield_re, __global floa
  * @param[in]  Ns, Nd      number of source and detector slots
  * @param[in]  elemlen     usually 4 for tets
  * @param[in]  isnodal     0=element-based output; nonzero=nodal output (atomic scatter)
+ * @param[in]  gtype       element labels, used with gmedscale
+ * @param[in]  gmedscale   per-medium factor converting J_D to J_mus or J_musp (NULL: none)
  */
 #ifdef __NVCC__
 __global__ void mmc_adjoint_mesh_full_kernel(float* gfield_re, float* gfield_im,
@@ -2395,7 +2438,7 @@ __global__ void mmc_adjoint_mesh_full_kernel(float* gfield_re, float* gfield_im,
         float* gjmua, float* gjd,
         unsigned int ne, unsigned int nn, unsigned int maxgate,
         unsigned int Ns, unsigned int Nd, unsigned int elemlen,
-        int isnodal) {
+        int isnodal, int* gtype, float* gmedscale) {
     unsigned int t = blockIdx.x * blockDim.x + threadIdx.x;
 #else
 __kernel void mmc_adjoint_mesh_full_kernel(__global float* gfield_re, __global float* gfield_im,
@@ -2403,7 +2446,7 @@ __kernel void mmc_adjoint_mesh_full_kernel(__global float* gfield_re, __global f
         __global float* gjmua, __global float* gjd,
         unsigned int ne, unsigned int nn, unsigned int maxgate,
         unsigned int Ns, unsigned int Nd, unsigned int elemlen,
-        int isnodal) {
+        int isnodal, __global int* gtype, __global float* gmedscale) {
     unsigned int t = get_global_id(0);
 #endif
 
@@ -2487,6 +2530,13 @@ __kernel void mmc_adjoint_mesh_full_kernel(__global float* gfield_re, __global f
             jmua_im *= -0.1f * Ve;
             jd_re   *= -1.f;
             jd_im   *= -1.f;
+
+            /* J_mus/J_musp: chain-rule factor of D(mus) of this element's medium */
+            if (gmedscale) {
+                float jdscale = (gtype[t] > 0) ? gmedscale[gtype[t]] : 0.f;
+                jd_re *= jdscale;
+                jd_im *= jdscale;
+            }
 
             unsigned int sdpair = s * Nd + d;
 
