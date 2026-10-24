@@ -719,8 +719,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         if (savevolume && cfg->exportadjoint == NULL && isrfforward) {
             /* Grid and mesh paths both need an imag fluence buffer when RF is on so
-             * the adjoint Jacobian post-processing can read phi_im(node). */
-            cfg->exportadjoint = (float*)calloc(fieldlen, sizeof(float));
+             * the adjoint Jacobian post-processing can read phi_im(node). The kernel
+             * accumulates per element (fieldlen), but mesh_normalize indexes it per
+             * node (nn * maxgate per slot) when basisorder=1, which is longer on
+             * meshes with more nodes than elements */
+            size_t nodelen = (cfg->method != rtBLBadouelGrid && cfg->basisorder) ?
+                             (size_t)mesh->nn * cfg->maxgate * cfg->srcnum * nsrcslots : 0;
+            cfg->exportadjoint = (float*)calloc(MAX(fieldlen, nodelen), sizeof(float));
         }
 
         if (cfg->exportdetected == NULL) {

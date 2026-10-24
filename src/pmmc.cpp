@@ -526,11 +526,11 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             throw py::value_error("the 'kernelfile' field must be a non-empty string");
         }
 
-        if (kernelfile.size() > MAX_SESSION_LENGTH) {
+        if (kernelfile.size() >= MAX_PATH_LENGTH) {
             throw py::value_error("the 'kernelfile' field is too long");
         }
 
-        strncpy(mcx_config.kernelfile, kernelfile.c_str(), MAX_SESSION_LENGTH);
+        strncpy(mcx_config.kernelfile, kernelfile.c_str(), MAX_PATH_LENGTH - 1);
     }
 
 

@@ -94,7 +94,14 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
     pos = 0;
 
     mesh->nn += edgelist.size();
+
+    int issharednode = (cfg->node == mesh->node); /* a JSON mesh: cfg owns the node buffer, see mesh_clear */
     mesh->node = (FLOAT3*)realloc((void*)mesh->node, sizeof(FLOAT3) * (mesh->nn));
+
+    if (issharednode) {
+        cfg->node = mesh->node;
+        cfg->nodenum = mesh->nn;
+    }
     mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * mesh->nn * cfg->maxgate);
     memset(mesh->weight, 0, sizeof(double)*mesh->nn * cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
 

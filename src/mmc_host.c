@@ -70,6 +70,8 @@ int mmc_init_from_cmd(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, int argc,
 
     if (cfg->isgpuinfo == 0) {
         mesh_init_from_cfg(mesh, cfg);
+    } else {
+        mesh_init(mesh);  /* mmc_cleanup frees the mesh, which -L/-I leave unloaded */
     }
 
     return 0;
@@ -142,6 +144,15 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     }
 
     mcx_prep(cfg);
+
+    /* mcx_prep appends the detectors as adjoint sources in the mmc binary, after mesh_loadelem
+       sized the output buffer for the sources alone; resize it for every source/detector slot */
+    if (mesh->weight && cfg->extrasrclen > cfg->srcnum) {
+        size_t datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ((cfg->basisorder) ? mesh->nn : mesh->ne);
+        free(mesh->weight);
+        mesh->weight = (double*)calloc(datalen * cfg->maxgate * cfg->extrasrclen, sizeof(double));
+    }
+
     tracer_init(tracer, mesh, cfg->method);
     tracer_prep(tracer, cfg);
 
@@ -415,11 +426,16 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         MMCDEBUG(cfg, dlTime, (cfg->flog, "saving detected photons ..."));
 
 #ifndef MCX_CONTAINER
-
-        if (cfg->issaveexit) {
-            mcx_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount, (sizeof(RandType)*RAND_BUF_LEN), cfg);
-        }
-
+        /* fill the header as mmc_run_cl does; the 4th parameter of mcx_savedetphoton is the append flag */
+        cfg->his.totalphoton = cfg->nphoton;
+        cfg->his.unitinmm = cfg->unitinmm;
+        cfg->his.savedphoton = cfg->detectedcount;
+        cfg->his.detected = cfg->detectedcount;
+        cfg->his.seedbyte = (cfg->exportseed) ? (sizeof(RandType) * RAND_BUF_LEN) : 0;
+        cfg->his.detnum = cfg->detnum;
+        cfg->his.srcnum = cfg->srcnum;
+        cfg->his.colcount = (2 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2; /* visit.reclen */
+        mcx_savedetphoton(cfg->exportdetected, (void*)(cfg->exportseed), cfg->detectedcount, 0, cfg);
 #endif
 
         if (cfg->issaveexit == 2) {

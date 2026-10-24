@@ -104,7 +104,7 @@ const char shortopt[] = {'h', 'E', 'f', 'n', 'A', 't', 'T', 's', 'a', 'g', 'b', 
                          'd', 'r', 'S', 'e', 'U', 'R', 'l', 'L', 'I', '-', 'u', 'C', 'M',
                          'i', 'V', 'O', '-', 'F', 'q', 'x', 'P', 'k', 'v', 'm', '-', '-',
                          'J', 'o', 'H', '-', 'W', 'X', '-', 'c', 'Q', '-', 'Z', 'N', 'j',
-                         '-', '-', '\0'
+                         '-', '-', '-', '\0'
                         };
 
 /**
@@ -124,7 +124,7 @@ const char* fullopt[] = {"--help", "--seed", "--input", "--photon", "--autopilot
                          "--debugphoton", "--compileropt", "--optlevel", "--maxdetphoton",
                          "--buffer", "--workload", "--saveref", "--gridsize", "--compute",
                          "--bench", "--dumpjson", "--zip", "--net", "--json", "--maxjumpdebug",
-                         "--srcid", ""
+                         "--srcid", "--kernel", ""
                         };
 
 extern char pathsep;
@@ -176,7 +176,8 @@ const char* outputformat[] = {"ascii", "bin", "nii", "hdr", "mc2", "tx3", "jnii"
  */
 
 const char* srctypeid[] = {"pencil", "isotropic", "cone", "gaussian", "planar",
-                           "pattern", "fourier", "arcsine", "disk", "fourierx", "fourierx2d", "zgaussian", "line", "slit", ""
+                           "pattern", "fourier", "arcsine", "disk", "fourierx", "fourierx2d", "zgaussian", "line", "slit",
+                           "pencilarray", "pattern3d", "hyperboloid", "ring", ""
                           };
 
 /**
@@ -328,7 +329,7 @@ void mcx_initcfg(mcconfig* cfg) {
     memset(cfg->workload, 0, MAX_DEVICE * sizeof(float));
     cfg->deviceid[0] = '1'; /*use the first GPU device by default*/
     memset(cfg->compileropt, 0, MAX_PATH_LENGTH);
-    memset(cfg->kernelfile, 0, MAX_SESSION_LENGTH);
+    memset(cfg->kernelfile, 0, MAX_PATH_LENGTH);
     cfg->maxdetphoton = 1000000;
     cfg->exportfield = NULL;
     cfg->exportdetected = NULL;
@@ -609,6 +610,37 @@ void mcx_savenii(OutputType* dat, size_t len, char* name, int type32bit, int out
 }
 
 /**
+ * @brief Return the "Description" string of the JNIfTI header for an output type
+ *
+ * @param[in] type: output type, an enum TOutputType value
+ */
+
+static const char* mmc_outputdesc(int type) {
+    static const char* typestr[] = {
+        "MMC volumetric output: Fluence rate (W/mm^2)",
+        "MMC volumetric output: Fluence (J/mm^2)",
+        "MMC volumetric output: Energy deposit (J)",
+        "MMC volumetric output: Jacobian for mua (J/mm)",
+        "MMC volumetric output: Weighted path length",
+        "MMC volumetric output: Weighted scattering count",
+        "MMC volumetric output: Frequency-domain (RF) output, real and imaginary parts",
+        "MMC volumetric output: RF Jacobian for mus, real and imaginary parts",
+        "MMC volumetric output: Adjoint Jacobian for mua",
+        "MMC volumetric output: Adjoint Jacobian for the diffusion coefficient D",
+        "MMC volumetric output: Adjoint Jacobian for mus",
+        "MMC volumetric output: Adjoint Jacobian for mus'",
+        "MMC volumetric output: Adjoint Jacobians for mua and D",
+        "MMC volumetric output: Adjoint Jacobians for mua and mus'"
+    };
+
+    if (type < 0 || type >= (int)(sizeof(typestr) / sizeof(typestr[0]))) {
+        return "MMC volumetric output";
+    }
+
+    return typestr[type];
+}
+
+/**
  * @brief Save volumetric output (fluence etc) to a binary JNIfTI/JSON/JData format file
  *
  * @param[in] dat: volumetric data to be saved
@@ -702,15 +734,7 @@ void mcx_savebnii(void* vol, int ndim, uint* dims, float* voxelsize, char* name,
     UBJ_WRITE_KEY(root, "SliceTime", uint8, 0);
     UBJ_WRITE_KEY(root, "TimeOffset", uint8, 0);
 
-    if (cfg->outputtype >= 0) {
-        const char* typestr[] = {"MMC volumetric output: Fluence rate (W/mm^2)", "MMC volumetric output: Fluence (J/mm^2)",
-                                 "MMC volumetric output: Voxel-wise energy deposit (J)", "MMC volumetric output: Jacobian for mua (J/mm)", "MMC volumetric output: Scattering count",
-                                 "MMC volumetric output: Partial momentum transfer"
-                                };
-        UBJ_WRITE_KEY(root, "Description", string, typestr[(int)cfg->outputtype]);
-    } else {
-        UBJ_WRITE_KEY(root, "Description", string, "MMC volumetric output");
-    }
+    UBJ_WRITE_KEY(root, "Description", string, mmc_outputdesc(cfg->outputtype));
 
     UBJ_WRITE_KEY(root, "AuxFile", string, "");
     UBJ_WRITE_KEY(root, "QForm", uint8, 0);
@@ -838,15 +862,7 @@ void mcx_savejnii(void* vol, int ndim, uint* dims, float* voxelsize, char* name,
     cJSON_AddNumberToObject(hdr, "SliceTime", 0);
     cJSON_AddNumberToObject(hdr, "TimeOffset", 0);
 
-    if (cfg->outputtype >= 0) {
-        const char* typestr[] = {"MMC volumetric output: Fluence rate (W/mm^2)", "MMC volumetric output: Fluence (J/mm^2)",
-                                 "MMC volumetric output: Voxel-wise energy deposit (J)", "MMC volumetric output: Jacobian for mua (J/mm)", "MMC volumetric output: Scattering count",
-                                 "MMC volumetric output: Partial momentum transfer"
-                                };
-        cJSON_AddStringToObject(hdr, "Description", typestr[(int)cfg->outputtype]);
-    } else {
-        cJSON_AddStringToObject(hdr, "Description", "MMC volumetric output");
-    }
+    cJSON_AddStringToObject(hdr, "Description", mmc_outputdesc(cfg->outputtype));
 
     cJSON_AddStringToObject(hdr, "AuxFile", "");
     cJSON_AddNumberToObject(hdr, "QForm", 0);
@@ -1451,7 +1467,7 @@ void mcx_error(const int id, const char* msg, const char* file, const int linenu
 
 void mcx_assert(const int ret, const char* file, const int linenum) {
     if (!ret) {
-        mcx_error(ret, "input error", file, linenum);
+        mcx_error(-1, "input error", file, linenum);  /* ret is 0 here, which would exit as a success */
     }
 }
 
@@ -1946,6 +1962,10 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
             if (subitem) {
                 cfg->srctype = mcx_keylookup(subitem->valuestring, srctypeid);
+
+                if (cfg->srctype == -1) {
+                    MMC_ERROR(-6, "the specified source type is not supported");
+                }
             }
 
             if (FIND_JSON_OBJ("ID", "Optode.Source.ID", src)) {
@@ -2336,11 +2356,12 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
     }
 
     if (Forward) {
-        cfg->tstart = FIND_JSON_KEY("T0", "Forward.T0", Forward, 0.0, valuedouble);
-        cfg->tend  = FIND_JSON_KEY("T1", "Forward.T1", Forward, 0.0, valuedouble);
-        cfg->tstep = FIND_JSON_KEY("Dt", "Forward.Dt", Forward, 0.0, valuedouble);
+        /* missing keys keep the current values, so that a partial --json fragment does not reset them */
+        cfg->tstart = FIND_JSON_KEY("T0", "Forward.T0", Forward, cfg->tstart, valuedouble);
+        cfg->tend  = FIND_JSON_KEY("T1", "Forward.T1", Forward, cfg->tend, valuedouble);
+        cfg->tstep = FIND_JSON_KEY("Dt", "Forward.Dt", Forward, cfg->tstep, valuedouble);
         cfg->nout = FIND_JSON_KEY("N0", "Forward.N0", Forward, cfg->nout, valuedouble);
-        cfg->omega = FIND_JSON_KEY("Omega", "Forward.Omega", Forward, 0.0, valuedouble);
+        cfg->omega = FIND_JSON_KEY("Omega", "Forward.Omega", Forward, cfg->omega, valuedouble);
 
         cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
     }
@@ -2369,6 +2390,27 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                     }
 
                     if (d->child->next && d->child->next->next && d->child->next->next->next) {
+                        cfg->detdir[di].w = d->child->next->next->next->valuedouble;
+                    }
+                }
+            }
+        } else if (dets && cfg->detnum > 0) {
+            /* a "Dir" given in each detector object, {"Pos":[..],"R":r,"Dir":[..]}, as mcx reads it */
+            cJSON* det = dets->child;
+
+            for (int di = 0; di < cfg->detnum && det; di++, det = det->next) {
+                cJSON* d = cJSON_IsObject(det) ? cJSON_GetObjectItem(det, "Dir") : NULL;
+
+                if (d && cJSON_IsArray(d) && cJSON_GetArraySize(d) >= 3) {
+                    if (cfg->detdir == NULL) {
+                        cfg->detdir = (float4*)calloc(cfg->detnum, sizeof(float4));
+                    }
+
+                    cfg->detdir[di].x = d->child->valuedouble;
+                    cfg->detdir[di].y = d->child->next->valuedouble;
+                    cfg->detdir[di].z = d->child->next->next->valuedouble;
+
+                    if (d->child->next->next->next) {
                         cfg->detdir[di].w = d->child->next->next->next->valuedouble;
                     }
                 }
@@ -2551,7 +2593,7 @@ void mcx_loadconfig(FILE* in, mcconfig* cfg) {
     }
 
     if (in == stdin) {
-        MMC_FPRINTF(stdout, "Please specify the source type [pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d|zgaussian|line|slit]:\n\t");
+        MMC_FPRINTF(stdout, "Please specify the source type [pencil|isotropic|cone|gaussian|planar|pattern|fourier|arcsine|disk|fourierx|fourierx2d|zgaussian|line|slit|pencilarray|pattern3d|hyperboloid|ring]:\n\t");
     }
 
     if (fscanf(in, "%s", srctypestr) == 1 && srctypestr[0]) {
@@ -3601,7 +3643,9 @@ void mcx_validatecfg(mcconfig* cfg) {
         cfg->seed = time(NULL);
     }
 
-    if (cfg->compute != cbSSE && (cfg->method != rtBLBadouelGrid && cfg->method != rtBLBadouel)) {
+    /* the GPU backends only implement the branchless Badouel tracers; -G -1 (gpuid > MAX_DEVICE)
+       runs on the CPU, as -c sse does, which supports all tracers */
+    if (cfg->compute != cbSSE && cfg->gpuid <= MAX_DEVICE && (cfg->method != rtBLBadouelGrid && cfg->method != rtBLBadouel)) {
         cfg->method = rtBLBadouel;
     }
 
@@ -4041,7 +4085,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     break;
 
                 case 'F':
-                    if (i >= argc) {
+                    if (i + 1 >= argc) {
                         MMC_ERROR(-1, "incomplete input");
                     }
 
@@ -4128,6 +4172,10 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         cfg->compute = mcx_keylookup(argv[++i], computebackend);
                     } else {
                         i = mcx_readarg(argc, argv, i, &(cfg->compute), "int");
+                    }
+
+                    if (cfg->compute < 0) {
+                        MMC_ERROR(-2, "the specified compute backend is not supported");
                     }
 
                     break;
@@ -4275,6 +4323,8 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                         }
                     } else if (strcmp(argv[i] + 2, "debugphoton") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->debugphoton), "int");
+                    } else if (strcmp(argv[i] + 2, "kernel") == 0) {
+                        i = mcx_readarg(argc, argv, i, cfg->kernelfile, "string");
                     } else if (strcmp(argv[i] + 2, "maxjumpdebug") == 0) {
                         i = mcx_readarg(argc, argv, i, &(cfg->maxjumpdebug), "int");
                     } else if (strcmp(argv[i] + 2, "gridsize") == 0) {
@@ -4388,10 +4438,13 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
         return;
     }
 
+    /* his.detected is 0 for trajectory data, which is saved in .mct, not over the .mch file */
+    char filetag = ((cfg->his.detected == 0 && cfg->his.savedphoton) ? 't' : 'h');
+
     if (cfg->rootpath[0]) {
-        sprintf(fhistory, "%s%c%s.mch", cfg->rootpath, pathsep, cfg->session);
+        sprintf(fhistory, "%s%c%s.mc%c", cfg->rootpath, pathsep, cfg->session, filetag);
     } else {
-        sprintf(fhistory, "%s.mch", cfg->session);
+        sprintf(fhistory, "%s.mc%c", cfg->session, filetag);
     }
 
     if (doappend) {
@@ -4406,6 +4459,11 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
 
     fwrite(&(cfg->his), sizeof(history), 1, fp);
     fwrite(ppath, sizeof(float), count * cfg->his.colcount, fp);
+
+    if (cfg->issaveseed && seeds != NULL && cfg->his.seedbyte) { /* the seeds that -E file.mch replays */
+        fwrite(seeds, cfg->his.seedbyte, count, fp);
+    }
+
     fclose(fp);
 }
 
@@ -4504,6 +4562,7 @@ where possible parameters include (the first item in [] is the default value)\n\
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\
  -W '50,30,20' (--workload)    workload for active devices; normalized by sum\n\
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
+ --kernel my_simu.cl           user specified OpenCL kernel source file\n\
 \n"S_BOLD S_CYAN"\
 == Output options ==\n"S_RESET"\
  -s sessionid  (--session)     a string used to tag all output file names\n\

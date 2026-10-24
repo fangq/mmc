@@ -1750,6 +1750,7 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
     if (isref) {
         data = mesh->dref;
         datalen = mesh->nf;
+        nslots = cfg->srcnum;  /* mesh->dref holds nf * maxgate values per source */
     }
 
     if (cfg->rootpath[0]) {
@@ -1767,7 +1768,7 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
             cfg->dim.z = datalen;
         }
 
-        mcx_savedata(mesh->weight, (size_t)datalen * cfg->maxgate * nslots, cfg, isref);
+        mcx_savedata(data, (size_t)datalen * cfg->maxgate * nslots, cfg, isref);  /* the surface reflectance if isref */
         cfg->dim = dim0;
         return;
     }

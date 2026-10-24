@@ -509,7 +509,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
 #ifdef MMC_USE_SSE
 
-inline __m128 rcp_nr(const __m128 a) {
+static inline __m128 rcp_nr(const __m128 a) {
     const __m128 r = _mm_rcp_ps(a);
     return _mm_sub_ps(_mm_add_ps(r, r), _mm_mul_ps(_mm_mul_ps(r, a), r));
 }
@@ -528,7 +528,7 @@ inline __m128 rcp_nr(const __m128 a) {
  * \param[out] d: current ray direction
  */
 
-inline int havel_sse4(float3* vecN, float3* bary, const __m128 o, const __m128 d) {
+static inline int havel_sse4(float3* vecN, float3* bary, const __m128 o, const __m128 d) {
     const __m128 n = _mm_load_ps(&vecN->x);
     const __m128 det = _mm_dp_ps(n, d, 0x7f);
 

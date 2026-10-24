@@ -289,7 +289,7 @@ typedef struct MMC_config {
     char deviceid[MAX_DEVICE];
     float workload[MAX_DEVICE];
     char compileropt[MAX_PATH_LENGTH];
-    char kernelfile[MAX_SESSION_LENGTH];
+    char kernelfile[MAX_PATH_LENGTH];
     char* clsource;
     int parentid;
     int optlevel;
