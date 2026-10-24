@@ -104,6 +104,27 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         cfg->energyesc[0] += energy[1];
     }
 
+    // detected photons: the counter, then the records, as the OpenCL/CUDA hosts store them
+    if (optixcfg.launchParams.issavedet) {
+        size_t reclen = 2 * mesh->prop + 2 + optixcfg.launchParams.issaveexit * 6;
+        unsigned int ndet = 0;
+        CUDA_ASSERT(cudaMemcpy(&ndet, (void*)optixcfg.detBuffer.d_pointer(), sizeof(unsigned int), cudaMemcpyDeviceToHost));
+
+        if (ndet > cfg->maxdetphoton) {
+            MMC_FPRINTF(cfg->flog, S_RED "WARNING: the detected photon (%u) is more than what your have specified (%d), please use the -H option to specify a greater number\n" S_RESET, ndet, cfg->maxdetphoton);
+            ndet = cfg->maxdetphoton;
+        }
+
+        float* hrec = (float*)malloc(sizeof(float) * (1 + reclen * ndet));
+        CUDA_ASSERT(cudaMemcpy(hrec, (void*)optixcfg.detBuffer.d_pointer(), sizeof(float) * (1 + reclen * ndet), cudaMemcpyDeviceToHost));
+        cfg->exportdetected = (float*)realloc(cfg->exportdetected, sizeof(float) * reclen * (cfg->detectedcount + ndet + 1));
+        memcpy(cfg->exportdetected + reclen * cfg->detectedcount, hrec + 1, sizeof(float) * reclen * ndet);
+        free(hrec);
+        cfg->detectedcount += ndet;
+        cfg->his.detected += ndet;
+        MMC_FPRINTF(cfg->flog, "detected %u photons, total: %d\n", ndet, cfg->detectedcount);
+    }
+
     MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
                 energy[0], (energy[0] > 0.0) ? (energy[0] - energy[1]) / energy[0] * 100.f : 0.f);
     fflush(cfg->flog);
@@ -154,6 +175,19 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
             mesh_saveweight(mesh, cfg, 0);
             MMC_FPRINTF(cfg->flog, "saving data complete : %d ms\n\n",
                         GetTimeMillis() - tic0);
+            fflush(cfg->flog);
+        }
+
+        if (optixcfg.launchParams.issavedet && cfg->parentid == mpStandalone && cfg->exportdetected) {
+            MMC_FPRINTF(cfg->flog, "saving detected photon data to file ...\t");
+            cfg->his.totalphoton = cfg->nphoton;
+            cfg->his.unitinmm = cfg->unitinmm;
+            cfg->his.savedphoton = cfg->detectedcount;
+            cfg->his.detected = cfg->detectedcount;
+            cfg->his.colcount = 2 * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 2;
+            cfg->his.seedbyte = 0;
+            mcx_savedetphoton(cfg->exportdetected, NULL, cfg->detectedcount, 0, cfg);
+            MMC_FPRINTF(cfg->flog, "saving detected photon data complete : %d ms\n\n", GetTimeMillis() - tic0);
             fflush(cfg->flog);
         }
     }
@@ -213,8 +247,8 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
             mcx_error(-1, "Optix MMC does not support this source type (pattern, fourier, fourierx, fourierx2d, pencilarray, pattern3d, hyperboloid, ring); use --compute cuda or opencl", __FILE__, __LINE__);
     }
 
-    if (cfg->issavedet && cfg->detnum > 0) {
-        mcx_error(-1, "Optix MMC does not save detected photons (-d 1); use --compute cuda or opencl, or set -d 0", __FILE__, __LINE__);
+    if (cfg->issavedet && (cfg->issaveseed || cfg->ismomentum || cfg->isextdet || cfg->issaveexit > 1)) {
+        mcx_error(-1, "Optix MMC saves detected photons without seeds (-q 1), momentum transfer, wide-field detectors or detector images (-x 2); use --compute cuda or opencl", __FILE__, __LINE__);
     }
 
     if (cfg->issaveref) {
@@ -351,6 +385,35 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
 
     optixcfg->seedBuffer.alloc_and_upload(hseed, totalthread);
     optixcfg->launchParams.seedbuffer = optixcfg->seedBuffer.d_pointer();
+
+    // detected photons: detectors, a counter plus the records, and the per-thread scratch
+    optixcfg->launchParams.issavedet = (cfg->issavedet && cfg->detnum > 0);
+    optixcfg->launchParams.issaveexit = (cfg->issaveexit > 0);
+    optixcfg->launchParams.detnum = cfg->detnum;
+    optixcfg->launchParams.maxdetphoton = cfg->maxdetphoton;
+    optixcfg->launchParams.maxmedia = mesh->prop;
+
+    if (optixcfg->launchParams.issavedet) {
+        size_t reclen = 2 * mesh->prop + 2 + optixcfg->launchParams.issaveexit * 6;
+        float4* hdet = (float4*)malloc(sizeof(float4) * cfg->detnum);
+
+        for (uint i = 0; i < cfg->detnum; i++) {
+            hdet[i] = make_float4(cfg->detpos[i].x, cfg->detpos[i].y, cfg->detpos[i].z, cfg->detpos[i].w);
+        }
+
+        optixcfg->detposBuffer.alloc_and_upload(hdet, cfg->detnum);
+        free(hdet);
+
+        float* hrec = (float*)calloc(1 + reclen * cfg->maxdetphoton, sizeof(float));
+        optixcfg->detBuffer.alloc_and_upload(hrec, 1 + reclen * cfg->maxdetphoton);
+        free(hrec);
+
+        optixcfg->ppathBuffer.alloc(sizeof(float) * (2 * mesh->prop + 1) * totalthread);
+
+        optixcfg->launchParams.detposbuffer = optixcfg->detposBuffer.d_pointer();
+        optixcfg->launchParams.detbuffer = optixcfg->detBuffer.d_pointer();
+        optixcfg->launchParams.ppathbuffer = optixcfg->ppathBuffer.d_pointer();
+    }
 
     if (hseed) {
         free(hseed);
@@ -795,6 +858,9 @@ void clearOptixParams(OptixParams* optixcfg) {
     optixcfg->asBuffer.free();
     optixcfg->seedBuffer.free();
     optixcfg->outputBuffer.free();
+    optixcfg->detposBuffer.free();
+    optixcfg->detBuffer.free();
+    optixcfg->ppathBuffer.free();
     free(optixcfg->outputHostBuffer);
 
     optixPipelineDestroy(optixcfg->pipeline);

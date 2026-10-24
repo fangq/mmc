@@ -1454,7 +1454,8 @@ static void test_gpubackends(void) {
         {"grid, reflection (-b 1)",          "-M G -b 1", 0, 1},
         {"grid, energy output (-O E)",       "-M G -O E", 0, 1},
         {"grid, 5 time gates",               "-M G --json {\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":1e-9}}", 0, 1},
-        {"grid, detected photons (-d 1)",    "-M G -d 1 -x 1 -q 1", 1, 0},
+        {"grid, detected photons (-d 1)",    "-M G -d 1 -x 1", 1, 1},
+        {"grid, detected photons with seeds", "-M G -d 1 -q 1", 1, 0},
         {"grid, RF forward (-O R)",          "-M G -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0, 1},
         {"grid, replay Jacobian (-O J)",     "-M G -E utdet.mch -O J", 0, 0},
         {"grid, adjoint J_mua (-O A)",       "-M G -O A", 1, 0},
@@ -1495,6 +1496,7 @@ static void test_gpubackends(void) {
     };
     const int ncase = (int)(sizeof(cases) / sizeof(cases[0]));
     double refsum[64] = {0.}, refjsum[64] = {0.}, refimsum[64] = {0.};
+    int refdet[64] = {0};
     char args[2048], msg[512];
 
     for (int b = 0; b < 3; b++) {
@@ -1539,6 +1541,14 @@ static void test_gpubackends(void) {
                 if ((backend[b].strict || cases[i].optix) && b > 0 && refsum[i] != 0.) {
                     sprintf(msg, "%s: %s agrees with opencl within 5%%", backend[b].name, cases[i].name);
                     EXPECT_TRUE(rel < 0.05 && jrel < 0.05 && imrel < 0.05, msg);
+                }
+
+                if (cases[i].usedet && b == 0) {
+                    refdet[i] = r.detected;
+                } else if (cases[i].usedet && (backend[b].strict || cases[i].optix) && refdet[i] > 0) {
+                    /* the detected counts are Poisson-like: within 4 standard deviations of their difference */
+                    sprintf(msg, "%s: %s detects as many photons as opencl", backend[b].name, cases[i].name);
+                    EXPECT_TRUE(fabs((double)r.detected - refdet[i]) <= 4. * sqrt((double)r.detected + refdet[i]), msg);
                 }
             } else {
                 printf("  %-34s %s %d\n", cases[i].name, ret > 0 ? "NOT SUPPORTED, exit code" : "CRASHED, signal", ret > 0 ? ret : -ret);

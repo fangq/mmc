@@ -78,6 +78,11 @@ struct OptixParams {
     /*! buffer for extra source list (adjoint/multi-source mode) */
     osc::CUDABuffer srcdataBuffer;
 
+    /*! detected photon output: detectors, records and the per-thread partial-path scratch */
+    osc::CUDABuffer detposBuffer;
+    osc::CUDABuffer detBuffer;
+    osc::CUDABuffer ppathBuffer;
+
     /*! buffer for output storage */
     float* outputHostBuffer;
     unsigned int outputBufferSize;

@@ -329,6 +329,68 @@ __device__ __forceinline__ void saveToBufferIm(const uint& eid, const float& w) 
 }
 
 /**
+ * @brief The per-thread detected photon scratch: nscat per medium, ppath per medium and the
+ * initial weight (2*maxmedia+1 floats), the same as the ppath array of the OpenCL/CUDA kernels
+ */
+__device__ __forceinline__ float* threadPath() {
+    return (float*)gcfg.ppathbuffer + optixGetLaunchIndex().x * (2 * gcfg.maxmedia + 1);
+}
+
+/**
+ * @brief Clear the detected photon scratch of a newly launched photon
+ */
+__device__ __forceinline__ void clearPath(const float& w0) {
+    float* ppath = threadPath();
+
+    for (int i = 0; i < 2 * gcfg.maxmedia; i++) {
+        ppath[i] = 0.f;
+    }
+
+    ppath[2 * gcfg.maxmedia] = w0;
+}
+
+/**
+ * @brief Save an exiting photon if it leaves through a detector, in the record layout of the
+ * other backends: detector id, nscat and ppath per medium, exit position and direction
+ * (if issaveexit), initial weight
+ */
+__device__ __forceinline__ void saveDetPhoton(const optixray& r) {
+    for (int i = 0; i < gcfg.detnum; i++) {
+        float4 det = ((float4*)gcfg.detposbuffer)[i];
+        float dx = det.x - r.p0.x, dy = det.y - r.p0.y, dz = det.z - r.p0.z;
+
+        if (dx * dx + dy * dy + dz * dz < det.w * det.w) {
+            unsigned int idx = atomicAdd((unsigned int*)gcfg.detbuffer, 1u);
+
+            if (idx < (unsigned int)gcfg.maxdetphoton) {
+                const int reclen = 2 * gcfg.maxmedia + 2 + gcfg.issaveexit * 6;
+                float* rec = (float*)gcfg.detbuffer + 1 + (size_t)idx * reclen;
+                float* ppath = threadPath();
+
+                rec[0] = (float)(i + 1);
+
+                for (int j = 0; j < 2 * gcfg.maxmedia; j++) {
+                    rec[1 + j] = ppath[j];
+                }
+
+                if (gcfg.issaveexit) {
+                    rec[2 * gcfg.maxmedia + 1] = r.p0.x;
+                    rec[2 * gcfg.maxmedia + 2] = r.p0.y;
+                    rec[2 * gcfg.maxmedia + 3] = r.p0.z;
+                    rec[2 * gcfg.maxmedia + 4] = r.dir.x;
+                    rec[2 * gcfg.maxmedia + 5] = r.dir.y;
+                    rec[2 * gcfg.maxmedia + 6] = r.dir.z;
+                }
+
+                rec[reclen - 1] = ppath[2 * gcfg.maxmedia];
+            }
+
+            return;
+        }
+    }
+}
+
+/**
  * @brief Accumulate output quantities to a 3D grid
  */
 __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop,
@@ -532,6 +594,10 @@ extern "C" __global__ void __raygen__rg() {
     optixray r;
     launchPhoton(r, rng);
 
+    if (gcfg.issavedet) {
+        clearPath(r.weight);
+    }
+
     int ndone = 0;  // number of simulated photons
 
     /* launched and escaped energy of this thread, as the other backends tally them: the
@@ -553,6 +619,10 @@ extern "C" __global__ void __raygen__rg() {
             if (ndone < nphoton) {
                 launchPhoton(r, rng);
                 accumEnergy(energytot, energytot2, r.weight);
+
+                if (gcfg.issavedet) {
+                    clearPath(r.weight);
+                }
             }
         }
     }
@@ -607,6 +677,10 @@ extern "C" __global__ void __closesthit__ch() {
     // wide-field source photon crosses from its launch plane to the tissue surface
     if (r.mediumid != AMBIENT_MEDIUM_ID) {
         accumulateOutput(r, currprop, lmove);
+
+        if (gcfg.issavedet) {
+            threadPath()[gcfg.maxmedia + r.mediumid - 1] += lmove;  /* the partial path per medium */
+        }
     }
 
     // update photon position
@@ -641,6 +715,10 @@ extern "C" __global__ void __closesthit__ch() {
     // terminate once a ray leaves the tissue for the ambient medium, also at a
     // matched boundary or without -b 1, the same as the other tracers do on exit
     if (r.mediumid == AMBIENT_MEDIUM_ID) {
+        if (gcfg.issavedet) {
+            saveDetPhoton(r);
+        }
+
         r.mediumid = DEAD_MEDIUM_ID;
     }
 
@@ -683,6 +761,13 @@ extern "C" __global__ void __miss__ms() {
 
     // save output; for RF mode, also updates r.weight and r.weight_im inside
     accumulateOutput(r, currprop, lmove);
+
+    // the partial path and the scattering count of this medium
+    if (gcfg.issavedet) {
+        float* ppath = threadPath();
+        ppath[gcfg.maxmedia + r.mediumid - 1] += lmove;
+        ppath[r.mediumid - 1] += 1.f;
+    }
 
     // update photon position
     r.p0 += r.dir * lmove;

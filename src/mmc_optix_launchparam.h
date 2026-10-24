@@ -17,7 +17,9 @@ typedef struct MCX_ExtraSrc {
 } ExtraSrc;
 #endif
 
-#define MAX_PROP           4000              /*maximum property number*/
+/* maximum property number; the launch parameters, mostly this table, must stay within the
+   OptiX limit (MMCParam of 64192 bytes works, 16 bytes more fails pipeline creation) */
+#define MAX_PROP           3984
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */
 #define MCX_SRC_ISOTROPIC  1  /**<  isotropic source, no param */
@@ -85,6 +87,14 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     int srcid;                     /**< < 0 for multi-source mode */
     int extrasrclen;               /**< number of extra sources */
     CUdeviceptr srcdatabuffer;     /**< device pointer to extra source array (ExtraSrc) */
+    CUdeviceptr detposbuffer;      /**< detectors: x, y, z, radius (float4, detnum) */
+    CUdeviceptr detbuffer;         /**< detected photons: a uint counter, then maxdetphoton records */
+    CUdeviceptr ppathbuffer;       /**< per-thread scratch: nscat and ppath per medium, initial weight */
+    int issavedet;                 /**< 1 to save detected photons */
+    int issaveexit;                /**< 1 to save the exit positions and directions */
+    int detnum;                    /**< number of detectors */
+    int maxdetphoton;              /**< size of the detected photon buffer */
+    int maxmedia;                  /**< number of media, excluding 0 */
 
     Medium medium[MAX_PROP];
 } MMCParam;
