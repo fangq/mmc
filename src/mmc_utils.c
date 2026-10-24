@@ -1753,11 +1753,11 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                 if (cJSON_IsArray(subitem)) {
                     int collen, rowlen = cJSON_GetArraySize(subitem);
-                    subitem = subitem->child;
 
-                    if (cJSON_IsArray(subitem)) {
+                    if (cJSON_IsArray(subitem->child)) {
+                        subitem = subitem->child;
                         collen = cJSON_GetArraySize(subitem);
-                    } else {
+                    } else {  /* a flat list of per-node values is a single row */
                         collen = rowlen;
                         rowlen = 1;
                     }
@@ -1797,6 +1797,8 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         /* a surface-only mesh has no elements; OptiX then finds the initial medium by tracing a ray from the source */
         if (cfg->surfnum > 0 && !FIND_JSON_OBJ("InitElem", "Mesh.InitElem", Mesh)) {
             cfg->e0 = -1;
+        } else if (cfg->e0 > 0 && !FIND_JSON_OBJ("InitElem", "Mesh.InitElem", Mesh)) {
+            /* keep the InitElem of an earlier input, such as -f before a partial --json */
         } else {
             cfg->e0 = FIND_JSON_KEY("InitElem", "Mesh.InitElem", Mesh, (MMC_ERROR(-1, "InitElem must be given"), 0.0), valueint);
         }
@@ -2151,6 +2153,12 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         count++;
                     }
                 }
+            }
+
+            /* the number of patterns sharing the photons, which mcx_savejdata writes; a 3-D
+               JData pattern below also gives it as its first dimension */
+            if (FIND_JSON_OBJ("SrcNum", "Optode.Source.SrcNum", src)) {
+                cfg->srcnum = FIND_JSON_KEY("SrcNum", "Optode.Source.SrcNum", src, cfg->srcnum, valueint);
             }
 
             subitem = FIND_JSON_OBJ("Pattern", "Optode.Source.Pattern", src);
@@ -2622,16 +2630,7 @@ void mcx_loadconfig(FILE* in, mcconfig* cfg) {
     /*if(cfg->maxgate>gates)*/
     cfg->maxgate = gates;
 
-    MMC_ASSERT(fscanf(in, "%s", cfg->meshtag) == 1);
-
-    if (cfg->rootpath[0]) {
-#ifdef WIN32
-        sprintf(comment, "%s\\%s", cfg->rootpath, cfg->meshtag);
-#else
-        sprintf(comment, "%s/%s", cfg->rootpath, cfg->meshtag);
-#endif
-        memcpy(cfg->meshtag, comment, MAX_SESSION_LENGTH);
-    }
+    MMC_ASSERT(fscanf(in, "%s", cfg->meshtag) == 1);  /* mesh_filenames adds the root folder to the mesh files */
 
     comm = fgets(comment, MAX_PATH_LENGTH, in);
 
