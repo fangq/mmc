@@ -388,6 +388,35 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     }
 
 
+    if (user_cfg.contains("face")) {
+        /* a surface-only mesh for OptiX: 3 node indices (1-based), the inner and the outer labels */
+        auto f_style_volume = py::array_t < int, py::array::f_style | py::array::forcecast >::ensure(user_cfg["face"]);
+
+        if (!f_style_volume) {
+            throw py::value_error("Invalid face field value");
+        }
+
+        auto buffer_info = f_style_volume.request();
+
+        if (buffer_info.shape.size() != 2 || buffer_info.shape.at(0) == 0 || buffer_info.shape.at(1) != 5) {
+            throw py::value_error("the 'face' field (a surface-only mesh for OptiX) must have 5 columns: 3 node indices, the inner and the outer labels");
+        }
+
+        mcx_config.surfnum = buffer_info.shape.at(0);
+
+        if (mcx_config.surf) {
+            free(mcx_config.surf);
+        }
+
+        mcx_config.surf = (int*) malloc(mcx_config.surfnum * 5 * sizeof(int));
+        auto val = static_cast<int*>(buffer_info.ptr);
+
+        for (int j = 0; j < 5; j++)
+            for (int i = 0; i < (int)mcx_config.surfnum; i++) {
+                mcx_config.surf[i * 5 + j] = val[j * mcx_config.surfnum + i];
+            }
+    }
+
     if (user_cfg.contains("facenb")) {
         auto f_style_volume = py::array_t < int, py::array::f_style | py::array::forcecast >::ensure(user_cfg["facenb"]);
 
@@ -875,6 +904,10 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
                 throw py::value_error("Log output file can not be written");
             }
         }
+    }
+
+    if (mesh.ne == 0 && mcx_config.surfnum > 0) {
+        return;  /* a surface-only mesh for OptiX: no element data to derive */
     }
 
     if (mesh.evol == NULL) {

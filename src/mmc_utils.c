@@ -348,6 +348,8 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->elemlen = 0;
     cfg->node = NULL;
     cfg->elem = NULL;
+    cfg->surf = NULL;
+    cfg->surfnum = 0;
     cfg->roitype = rtNone;
     cfg->roidata = NULL;
 
@@ -462,6 +464,10 @@ void mcx_clearcfg(mcconfig* cfg) {
 
     if (cfg->elem) {
         free(cfg->elem);
+    }
+
+    if (cfg->surf) {
+        free(cfg->surf);
     }
 
     if (cfg->roidata) {
@@ -1691,6 +1697,52 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 }
             }
 
+            /* a surface-only mesh for OptiX: 5 columns, the 3 node indices (1-based) of each
+               triangle, the label of the inner (back) side and that of the outer (front) side;
+               the triangle normal, by the right-hand rule, points from the inner to the outer side */
+            subitem = FIND_JSON_OBJ("MeshSurf", "Mesh.MeshSurf", Mesh);
+
+            if (subitem) {
+                if (cfg->surf) {
+                    free(cfg->surf);
+                    cfg->surf = NULL;
+                }
+
+                if (cJSON_IsArray(subitem)) {
+                    cfg->surfnum = cJSON_GetArraySize(subitem);
+                    subitem = subitem->child;
+                    cfg->surf = (int*)malloc(sizeof(int) * cfg->surfnum * 5);
+
+                    for (int i = 0; i < cfg->surfnum; i++) {
+                        if (cJSON_GetArraySize(subitem) != 5) {
+                            MMC_ERROR(-1, "Each row in MeshSurf must have 5 integers: 3 node indices, the inner and the outer labels");
+                        }
+
+                        tmp = subitem->child;
+
+                        for (int j = 0; j < 5; j++) {
+                            cfg->surf[i * 5 + j] = tmp->valueint;
+                            tmp = tmp->next;
+                        }
+
+                        subitem = subitem->next;
+                    }
+                } else {
+                    mcx_jdatadecode((void**)&cfg->surf, &ndim, dims, 2, &type, subitem, cfg);
+
+                    if (!strstr(type, "int32") || ndim != 2 || dims[1] != 5) {
+                        if (cfg->surf) {
+                            free(cfg->surf);
+                            cfg->surf = NULL;
+                        }
+
+                        MMC_ERROR(-1, "Mesh.MeshSurf JData-annotated array must be an N x 5 'int32' array");
+                    } else {
+                        cfg->surfnum = dims[0];
+                    }
+                }
+            }
+
             subitem = FIND_JSON_OBJ("MeshROI", "Mesh.MeshROI", Mesh);
 
             if (subitem) {
@@ -1742,7 +1794,12 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             }
         }
 
-        cfg->e0 = FIND_JSON_KEY("InitElem", "Mesh.InitElem", Mesh, (MMC_ERROR(-1, "InitElem must be given"), 0.0), valueint);
+        /* a surface-only mesh has no elements; OptiX then finds the initial medium by tracing a ray from the source */
+        if (cfg->surfnum > 0 && !FIND_JSON_OBJ("InitElem", "Mesh.InitElem", Mesh)) {
+            cfg->e0 = -1;
+        } else {
+            cfg->e0 = FIND_JSON_KEY("InitElem", "Mesh.InitElem", Mesh, (MMC_ERROR(-1, "InitElem must be given"), 0.0), valueint);
+        }
 
         if (!flagset['u']) {
             cfg->unitinmm = FIND_JSON_KEY("LengthUnit", "Mesh.LengthUnit", Mesh, 1.0, valuedouble);
@@ -2951,7 +3008,7 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
 
     if (cfg->meshtag[0] && cfg->nodenum == 0) {
         cJSON_AddStringToObject(obj, "MeshID", cfg->meshtag);
-    } else if (cfg->nodenum && cfg->elemnum) {
+    } else if (cfg->nodenum && (cfg->elemnum || cfg->surfnum)) {
         uint dims[2] = {0};
         cJSON_AddItemToObject(obj, "MeshNode", sub = cJSON_CreateObject());
 
@@ -2962,13 +3019,26 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
             MMC_ERROR(-10, "saving node data to JSON failed");
         }
 
-        cJSON_AddItemToObject(obj, "MeshElem", sub = cJSON_CreateObject());
+        if (cfg->elemnum) {
+            cJSON_AddItemToObject(obj, "MeshElem", sub = cJSON_CreateObject());
 
-        dims[0] = cfg->elemnum;
-        dims[1] = cfg->elemlen + 1;
+            dims[0] = cfg->elemnum;
+            dims[1] = cfg->elemlen + 1;
 
-        if (mcx_jdataencode((void*)cfg->elem, 2, dims, "int32", 4, cfg->zipid, sub, 0, 0, cfg)) {
-            MMC_ERROR(-10, "saving elem data to JSON failed");
+            if (mcx_jdataencode((void*)cfg->elem, 2, dims, "int32", 4, cfg->zipid, sub, 0, 0, cfg)) {
+                MMC_ERROR(-10, "saving elem data to JSON failed");
+            }
+        }
+
+        if (cfg->surfnum) {
+            cJSON_AddItemToObject(obj, "MeshSurf", sub = cJSON_CreateObject());
+
+            dims[0] = cfg->surfnum;
+            dims[1] = 5;
+
+            if (mcx_jdataencode((void*)cfg->surf, 2, dims, "int32", 4, cfg->zipid, sub, 0, 0, cfg)) {
+                MMC_ERROR(-10, "saving surface data to JSON failed");
+            }
         }
 
         if (cfg->roidata) {

@@ -780,6 +780,29 @@ example, The `MeshID` field under the `Mesh` object is the same as
 Line\#6 in onecube.inp; the `InitElem` under `Mesh` is the same as 
 Line\#7; the `Forward.T0` is the same as the first number in Line\#5, etc.
 
+For the OptiX backend (`--compute optix`), the `Mesh` object can also give a
+surface-only mesh instead of a tetrahedral one: `MeshNode` (N x 3) and
+`MeshSurf` (F x 5), without `MeshElem` and `InitElem`. Each row of `MeshSurf`
+holds the 3 node indices (1-based) of a triangle, the label of its inner side
+and the label of its outer side, where label 0 (or a negative label) is the
+space outside the domain. The triangle normal, by the right-hand rule
+(n2-n1)x(n3-n1), must point from the inner to the outer side. This is the same
+labeled surface that MMC extracts from a tetrahedral mesh for OptiX. A surface
+that is not closed is reported as a warning. The initial medium of the photons
+is found by tracing a ray from the source, so no initial element is needed;
+the output is the dual-grid (`-M G`) fluence. For example
+
+        "Mesh": {
+            "MeshNode": [[0,0,0],[60,0,0],[60,60,0],[0,60,0],
+                         [0,0,60],[60,0,60],[60,60,60],[0,60,60]],
+            "MeshSurf": [[1,4,3,1,0],[1,3,2,1,0],[5,6,7,1,0],[5,7,8,1,0],
+                         [1,2,6,1,0],[1,6,5,1,0],[2,3,7,1,0],[2,7,6,1,0],
+                         [3,4,8,1,0],[3,8,7,1,0],[4,1,5,1,0],[4,5,8,1,0]]
+        }
+
+defines a 60 mm cube of medium 1. In mmclab, the same input is given by
+`cfg.node` and a 5-column `cfg.face` with `cfg.compute='optix'`.
+
 An MMC JSON input file must be a valid JSON text file. You can validate your 
 input file by running a JSON validator, for example <http://jsonlint.com/> You 
 should always use `...` to quote a `name` and separate parallel items 

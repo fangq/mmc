@@ -339,6 +339,9 @@ typedef struct MMC_config {
     int* elem;                     /**<tetrahedron node indices from json input*/
     unsigned int elemnum;          /**<total number of elem*/
     unsigned int elemlen;          /**<number of nodes per elem*/
+    int* surf;                     /**<surface triangles from json input (Mesh.MeshSurf), 5 columns: 3 node
+                                        indices (1-based), inner label, outer label; OptiX only*/
+    unsigned int surfnum;          /**<total number of surface triangles*/
     enum TROIType roitype;         /**<mesh roi type: rtNone: unknown, rtEdge: edge-roi, rtNode: node-roi, rtFace: face-roi */
     float* roidata;                /**<mesh roi (edge/node/face) data*/
     char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/

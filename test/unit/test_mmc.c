@@ -1227,6 +1227,88 @@ static void test_variants(void) {
 }
 
 /*-----------------------------------------------------------------------------
+ *  surface-only meshes (Mesh.MeshSurf) for OptiX
+ *---------------------------------------------------------------------------*/
+
+static int run_isolated(const char* args, RunResult* res);
+
+/** write a 60 mm cube as a surface mesh: 12 outward triangles, label 1 inside, 0 outside,
+    with the media and source of the dmmc-cube60 benchmark; extra replaces the last rows */
+static void write_cubesurf(const char* fname, const char* extra) {
+    const int quad[6][4] = {{0, 3, 2, 1}, {4, 5, 6, 7}, {0, 1, 5, 4}, {1, 2, 6, 5}, {2, 3, 7, 6}, {3, 0, 4, 7}};
+    char buf[4096];
+    int len = snprintf(buf, sizeof(buf), "{\"Session\":{\"ID\":\"utsurf\",\"Photons\":20000,\"RNGSeed\":1648335518,\"DoMismatch\":0},"
+                       "\"Domain\":{\"Media\":[{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1},{\"mua\":0.005,\"mus\":1.0,\"g\":0.01,\"n\":1.37}]},"
+                       "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},\"Optode\":{\"Source\":{\"Pos\":[30.1,30.2,0.0],\"Dir\":[0,0,1]}},"
+                       "\"Mesh\":{\"MeshNode\":[[0,0,0],[60,0,0],[60,60,0],[0,60,0],[0,0,60],[60,0,60],[60,60,60],[0,60,60]],\"MeshSurf\":[");
+
+    for (int i = 0; i < 6; i++) {
+        if (extra && i == 5) {
+            len += snprintf(buf + len, sizeof(buf) - len, ",%s", extra);
+            break;
+        }
+
+        len += snprintf(buf + len, sizeof(buf) - len, "%s[%d,%d,%d,1,0],[%d,%d,%d,1,0]", i ? "," : "",
+                        quad[i][0] + 1, quad[i][1] + 1, quad[i][2] + 1, quad[i][0] + 1, quad[i][2] + 1, quad[i][3] + 1);
+    }
+
+    snprintf(buf + len, sizeof(buf) - len, "]}}");
+    write_file(fname, buf, strlen(buf));
+}
+
+static void check_cubesurf(mcconfig* cfg, tetmesh* mesh) {
+    EXPECT_EQ(mesh->nface, 12, "MeshSurf gives the OptiX triangles");
+    EXPECT_EQ(mesh->ne, 0, "a surface-only mesh has no elements");
+    EXPECT_EQ(cfg->e0, -1, "the initial medium of a surface-only mesh is found by ray tracing");
+    EXPECT_TRUE(mesh->face && mesh->face[0].x == 0 && mesh->face[0].y == 3 && mesh->face[0].z == 2, "MeshSurf node indices become 0-based");
+    EXPECT_TRUE(mesh->back && mesh->front && mesh->back[0] == 1 && mesh->front[0] == 0, "inner/outer labels become back/front");
+    EXPECT_TRUE(mesh->fnorm && fabs(mesh->fnorm[0].z + 1.f) < 1e-6, "the bottom face normal points outward (-z)");
+}
+
+static void test_meshsurf(void) {
+    char badrow[256];
+
+    write_cubesurf("utsurf.json", NULL);
+    parse_mmc("-f utsurf.json --compute optix -M G", check_cubesurf);
+
+    /* other backends and outputs walk elements */
+    EXPECT_EXIT(parse_mmc("-f utsurf.json --compute opencl -M G", NULL), "a surface-only mesh is rejected by OpenCL");
+    EXPECT_EXIT(parse_mmc("-f utsurf.json -G -1", NULL), "a surface-only mesh is rejected on the CPU");
+
+    /* invalid surfaces: a node index out of range, the same inner and outer labels, a label
+       beyond the media, a zero-area triangle, and a row without 5 columns */
+    const char* bad[] = {"[3,4,9,1,0],[3,1,5,1,0]", "[3,4,8,1,1],[3,1,5,1,0]", "[3,4,8,2,0],[3,1,5,1,0]",
+                         "[3,3,8,1,0],[3,1,5,1,0]", "[3,4,8,1],[3,1,5,1,0]"
+                        };
+    const char* badmsg[] = {"MeshSurf node index out of range", "MeshSurf with the same inner and outer labels",
+                            "MeshSurf label beyond the media", "MeshSurf zero-area triangle", "MeshSurf row without 5 columns"
+                           };
+
+    for (int i = 0; i < 5; i++) {
+        snprintf(badrow, sizeof(badrow), "%s", bad[i]);
+        write_cubesurf("utsurfbad.json", badrow);
+        EXPECT_EXIT(parse_mmc("-f utsurfbad.json --compute optix -M G", NULL), badmsg[i]);
+    }
+
+    /* an open surface (the last face removed) is only a warning */
+    write_cubesurf("utsurfopen.json", "[4,1,5,1,0]");
+    parse_mmc("-f utsurfopen.json --compute optix -M G", NULL);
+    EXPECT_TRUE(1, "an open MeshSurf is accepted with a warning");
+
+    /* --dumpjson writes MeshSurf, which is read back */
+    EXPECT_EXIT_OK(run_mmc("-f utsurf.json --compute optix -M G --dumpjson utsurfdump.json", NULL), "--dumpjson of a surface-only mesh");
+    parse_mmc("-f utsurfdump.json --compute optix -M G", check_cubesurf);
+
+#ifdef USE_OPTIX
+    /* the surface cube and the tetrahedral dmmc-cube60 benchmark are the same domain */
+    RunResult rs, rt;
+    int ret = run_isolated("-f utsurf.json --compute optix -M G -E 1234 -s utsurfrun", &rs);
+    run_isolated("--bench dmmc-cube60 --compute optix -M G -n 20000 -E 1234 -s utsurftet", &rt);
+    EXPECT_TRUE(ret == 0 && rt.wsum > 0. && fabs(rs.wsum - rt.wsum) / rt.wsum < 0.01, "OptiX gives the same fluence from MeshSurf as from the tetrahedral mesh");
+#endif
+}
+
+/*-----------------------------------------------------------------------------
  *  utility functions called directly
  *---------------------------------------------------------------------------*/
 
@@ -1506,6 +1588,7 @@ int main(int argc, char** argv) {
     test_clerrors();
     test_opencl();
     test_gpubackends();
+    test_meshsurf();
 
     if (chdir(cwd) == 0) {
         char cmd[4200];

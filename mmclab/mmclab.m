@@ -59,6 +59,9 @@ function varargout = mmclab(varargin)
 %     *cfg.node:        node array for the input tetrahedral mesh, 3 columns: (x,y,z)
 %     *cfg.elem:        element array for the input tetrahedral mesh, 4 columns
 %     *cfg.elemprop:    element property index for input tetrahedral mesh
+%     cfg.face:        (OptiX only) a surface-only mesh used instead of cfg.elem, 5 columns:
+%                      3 node indices (1-based), the inner and the outer medium labels;
+%                      the triangle normal (right-hand rule) points from inner to outer
 %     *cfg.tstart:      starting time of the simulation (in seconds)
 %     *cfg.tstep:       time-gate width of the simulation (in seconds)
 %     *cfg.tend:        ending time of the simulation (in second)
@@ -337,6 +340,24 @@ end
 
 len = length(cfg);
 for i = 1:len
+    % a surface-only mesh for OptiX: cfg.node plus a 5-column cfg.face, [n1 n2 n3 inner outer],
+    % without cfg.elem; the element preprocessing below does not apply
+    if (isfield(cfg(i), 'face') && size(cfg(i).face, 2) == 5 && isfield(cfg(i), 'node') && ...
+        (~isfield(cfg(i), 'elem') || isempty(cfg(i).elem)))
+        if (~(isfield(cfg(i), 'compute') && strcmp(cfg(i).compute, 'optix')))
+            error('a surface-only mesh (cfg.face with 5 columns, no cfg.elem) requires cfg.compute=''optix''');
+        end
+        if (~isfield(cfg(i), 'nphoton'))
+            error('cfg.nphoton field is missing');
+        end
+        if (~isfield(cfg(i), 'prop') || size(cfg(i).prop, 1) < max(max(cfg(i).face(:, 4:5))) + 1)
+            error('cfg.prop field is missing or insufficient');
+        end
+        if (~isfield(cfg(i), 'method') || isempty(cfg(i).method))
+            cfg(i).method = 'grid';
+        end
+        continue
+    end
     if (~isfield(cfg(i), 'node') || ~isfield(cfg(i), 'elem'))
         error('cfg.node or cfg.elem is missing');
     end

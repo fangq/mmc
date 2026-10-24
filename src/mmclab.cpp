@@ -983,6 +983,29 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
             }
 
         printf("mmc.elem=[%d,%d];\n", mesh->ne, mesh->elemlen);
+    } else if (strcmp(name, "face") == 0) {
+        /* a surface-only mesh for OptiX: 3 node indices (1-based), the inner and the outer labels */
+        arraydim = mxGetDimensions(item);
+
+        if (arraydim[0] <= 0 || arraydim[1] != 5) {
+            MEXERROR("the 'face' field (a surface-only mesh for OptiX) must have 5 columns: 3 node indices, the inner and the outer labels");
+        }
+
+        double* val = mxGetPr(item);
+        cfg->surfnum = arraydim[0];
+
+        if (cfg->surf) {
+            free(cfg->surf);
+        }
+
+        cfg->surf = (int*)malloc(sizeof(int) * 5 * cfg->surfnum);
+
+        for (j = 0; j < 5; j++)
+            for (i = 0; i < (int)cfg->surfnum; i++) {
+                cfg->surf[i * 5 + j] = (int)val[j * cfg->surfnum + i];
+            }
+
+        printf("mmc.face=[%d,5];\n", cfg->surfnum);
     } else if (strcmp(name, "noderoi") == 0) {
         arraydim = mxGetDimensions(item);
 

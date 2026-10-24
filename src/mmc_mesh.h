@@ -159,6 +159,8 @@ void mesh_filenames(const char* format, char* foutput, mcconfig* cfg);
 void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref);
 void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int Ns, int Nd, int isrfforward, int isdual);
 float* mesh_getmusscale(tetmesh* mesh, int ismusp);
+void mesh_loadsurf(tetmesh* mesh, mcconfig* cfg);
+int mesh_compareu64(const void* a, const void* b);
 void mesh_savedetphoton(float* ppath, void* seeds, int count, int seedbyte, mcconfig* cfg);
 void mesh_getdetimage(float* detmap, float* ppath, int count, mcconfig* cfg, tetmesh* mesh);
 void mesh_savedetimage(float* detmap, mcconfig* cfg);
