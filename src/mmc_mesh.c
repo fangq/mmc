@@ -243,8 +243,47 @@ void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
         free(mesh->faceroi);
         mesh->faceroi = NULL;
     }
+
+    /* the OptiX triangle surface */
+    free(mesh->fnode);
+    free(mesh->fnorm);
+    free(mesh->face);
+    free(mesh->front);
+    free(mesh->back);
+    mesh->fnode = NULL;
+    mesh->fnorm = NULL;
+    mesh->face = NULL;
+    mesh->front = NULL;
+    mesh->back = NULL;
+    mesh->nface = 0;
 }
 
+/**
+ * @brief Per-medium chain-rule factors converting the adjoint J_D into J_mus or J_musp, as mcx does
+ *
+ * With D = 1/(3*(1-g)*mus): J_mus = J_D * 3*D^2*(1-g) = J_D / (3*(1-g)*mus^2) and
+ * J_musp = J_D * 3*D^2 = J_D / (3*(1-g)^2*mus^2). The GPU adjoint kernels multiply J_D by the
+ * factor of each element's label (mesh mode) or of the label recorded in each voxel during the
+ * simulation (grid mode); a medium with mus=0 or g=1 gets 0.
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] ismusp: 1 for J_musp, 0 for J_mus
+ * @return a malloc-ed table of prop+1 factors, indexed by the medium label
+ */
+
+float* mesh_getmusscale(tetmesh* mesh, int ismusp) {
+    float* scale = (float*)calloc(mesh->prop + 1, sizeof(float));
+
+    for (int i = 1; i <= mesh->prop; i++) {
+        float mus = mesh->med[i].mus, onemg = 1.f - mesh->med[i].g;
+
+        if (mus > 0.f && onemg > 0.f) {
+            scale[i] = ismusp ? 1.f / (3.f * onemg * onemg * mus * mus) : 1.f / (3.f * onemg * mus * mus);
+        }
+    }
+
+    return scale;
+}
 
 #ifndef MCX_CONTAINER
 
@@ -1987,32 +2026,6 @@ void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int Ns, int Nd, in
     }
 }
 
-/**
- * @brief Per-medium chain-rule factors converting the adjoint J_D into J_mus or J_musp, as mcx does
- *
- * With D = 1/(3*(1-g)*mus): J_mus = J_D * 3*D^2*(1-g) = J_D / (3*(1-g)*mus^2) and
- * J_musp = J_D * 3*D^2 = J_D / (3*(1-g)^2*mus^2). The GPU adjoint kernels multiply J_D by the
- * factor of each element's label (mesh mode) or of the label recorded in each voxel during the
- * simulation (grid mode); a medium with mus=0 or g=1 gets 0.
- *
- * @param[in] mesh: the mesh object
- * @param[in] ismusp: 1 for J_musp, 0 for J_mus
- * @return a malloc-ed table of prop+1 factors, indexed by the medium label
- */
-
-float* mesh_getmusscale(tetmesh* mesh, int ismusp) {
-    float* scale = (float*)calloc(mesh->prop + 1, sizeof(float));
-
-    for (int i = 1; i <= mesh->prop; i++) {
-        float mus = mesh->med[i].mus, onemg = 1.f - mesh->med[i].g;
-
-        if (mus > 0.f && onemg > 0.f) {
-            scale[i] = ismusp ? 1.f / (3.f * onemg * onemg * mus * mus) : 1.f / (3.f * onemg * mus * mus);
-        }
-    }
-
-    return scale;
-}
 
 
 /**
