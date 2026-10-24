@@ -170,6 +170,58 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         mcx_error(-1, "Optix MMC only supports dual grid mode", __FILE__, __LINE__);
     }
 
+    /* reject the features that the OptiX kernel does not implement, rather than
+       returning silently wrong outputs */
+    if (MCX_IS_ADJOINT_TYPE(cfg->outputtype)) {
+        mcx_error(-1, "Optix MMC does not support the adjoint Jacobian outputs (-O A/D/U/V/W/Q); use --compute cuda or opencl", __FILE__, __LINE__);
+    }
+
+    if (cfg->seed == SEED_FROM_FILE || cfg->outputtype == otJacobian || cfg->outputtype == otWL ||
+            cfg->outputtype == otWP || cfg->outputtype == otRFmus) {
+        mcx_error(-1, "Optix MMC does not support photon replay or the replay outputs (-O J/L/P); use --compute cuda or opencl", __FILE__, __LINE__);
+    }
+
+    if (cfg->extrasrclen > 0) {
+        mcx_error(-1, "Optix MMC does not support multiple sources; use --compute cuda or opencl", __FILE__, __LINE__);
+    }
+
+    switch (cfg->srctype) {
+        case stPencil:
+        case stIsotropic:
+        case stCone:
+        case stGaussian:
+        case stPlanar:
+        case stArcSin:
+        case stDisk:
+        case stZGaussian:
+        case stLine:
+        case stSlit:
+            break;
+
+        default:
+            mcx_error(-1, "Optix MMC does not support this source type (pattern, fourier, fourierx, fourierx2d, pencilarray, pattern3d, hyperboloid, ring); use --compute cuda or opencl", __FILE__, __LINE__);
+    }
+
+    if (cfg->issavedet && cfg->detnum > 0) {
+        mcx_error(-1, "Optix MMC does not save detected photons (-d 1); use --compute cuda or opencl, or set -d 0", __FILE__, __LINE__);
+    }
+
+    if (cfg->issaveref) {
+        mcx_error(-1, "Optix MMC does not save the surface reflectance (-X 1); use --compute cuda or opencl", __FILE__, __LINE__);
+    }
+
+    if (cfg->debuglevel & dlTraj) {
+        mcx_error(-1, "Optix MMC does not save photon trajectories (-D M); use --compute cuda or opencl", __FILE__, __LINE__);
+    }
+
+    if (cfg->mcmethod == mmMCML) {
+        mcx_error(-1, "Optix MMC only supports the MCX (micro-Beer-Lambert) method, not -m 1", __FILE__, __LINE__);
+    }
+
+    if (cfg->isnodalmua || cfg->isnodalmusp) {
+        mcx_error(-1, "Optix MMC does not support per-node optical properties (nodemua/nodemusp)", __FILE__, __LINE__);
+    }
+
     int timeSteps = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
 
     if (timeSteps < 1) {

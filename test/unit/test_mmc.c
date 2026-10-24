@@ -186,6 +186,7 @@ typedef struct {
     int ran;
     double wsum;   /**< sum of the first output slot (all gates), for comparing backends */
     double jsum;   /**< sum of the first adjoint Jacobian block, for comparing backends */
+    double imsum;  /**< sum of the RF imaginary output (exportadjoint), for comparing backends */
 } RunResult;
 
 /**
@@ -256,6 +257,12 @@ static RunResult run_mmc(const char* args, void (*check)(mcconfig*, tetmesh*)) {
 
             for (size_t k = 0; k < datalen * cfg.maxgate; k++) {
                 res.wsum += mesh.weight[k];
+            }
+
+            if (cfg.omega > 0.f && cfg.exportadjoint && !MCX_IS_ADJOINT_TYPE(cfg.outputtype)) {
+                for (size_t k = 0; k < datalen * cfg.maxgate; k++) {
+                    res.imsum += cfg.exportadjoint[k];
+                }
             }
 
             if (cfg.exportjacob) {
@@ -1359,29 +1366,32 @@ static void test_gpubackends(void) {
         const char* name;
         const char* args;
         int usedet;
+        int optix;   /**< 1: OptiX must run it and agree with opencl; 0: OptiX must reject it */
     } cases[] = {
-        {"grid fluence (-M G)",              "-M G", 0},
-        {"grid, reflection (-b 1)",          "-M G -b 1", 0},
-        {"grid, energy output (-O E)",       "-M G -O E", 0},
-        {"grid, 5 time gates",               "-M G --json {\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":1e-9}}", 0},
-        {"grid, detected photons (-d 1)",    "-M G -d 1 -x 1 -q 1", 1},
-        {"grid, RF forward (-O R)",          "-M G -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0},
-        {"grid, replay Jacobian (-O J)",     "-M G -E utdet.mch -O J", 0},
-        {"grid, adjoint J_mua (-O A)",       "-M G -O A", 1},
-        {"grid, adjoint J_D (-O D)",         "-M G -O D", 1},
-        {"grid, adjoint J_mus (-O U)",       "-M G -O U", 1},
-        {"grid, adjoint J_musp (-O V)",      "-M G -O V", 1},
-        {"grid, dual adjoint (-O Q)",        "-M G -O Q", 1},
-        {"grid, isotropic source",           "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"isotropic\",\"Pos\":[30,45,15]}}}", 0},
-        {"grid, cone source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"cone\",\"Param1\":[0.4,0,0,0]}}}", 0},
-        {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0},
+        {"grid fluence (-M G)",              "-M G", 0, 1},
+        {"grid, reflection (-b 1)",          "-M G -b 1", 0, 1},
+        {"grid, energy output (-O E)",       "-M G -O E", 0, 1},
+        {"grid, 5 time gates",               "-M G --json {\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":1e-9}}", 0, 1},
+        {"grid, detected photons (-d 1)",    "-M G -d 1 -x 1 -q 1", 1, 0},
+        {"grid, RF forward (-O R)",          "-M G -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0, 1},
+        {"grid, replay Jacobian (-O J)",     "-M G -E utdet.mch -O J", 0, 0},
+        {"grid, adjoint J_mua (-O A)",       "-M G -O A", 1, 0},
+        {"grid, adjoint J_D (-O D)",         "-M G -O D", 1, 0},
+        {"grid, adjoint J_mus (-O U)",       "-M G -O U", 1, 0},
+        {"grid, adjoint J_musp (-O V)",      "-M G -O V", 1, 0},
+        {"grid, dual adjoint (-O Q)",        "-M G -O Q", 1, 0},
+        {"grid, isotropic source",           "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"isotropic\",\"Pos\":[30,45,15]}}}", 0, 1},
+        {"grid, cone source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"cone\",\"Param1\":[0.4,0,0,0]}}}", 0, 1},
+        {"grid, planar source",              "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"planar\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,0],\"Param2\":[0,4,0,0]}}}", 0, 1},
+        {"grid, gaussian source",            "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"gaussian\",\"Pos\":[30,45,15],\"Param1\":[1,0,0,0]}}}", 0, 1},
+        {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0, 1},
         {"grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
-                                             "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0},
-        {"grid, trajectories (-D M)",        "-M G -D M", 0},
-        {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0},
-        {"mesh elem (-M H -C 0)",            "-M H -C 0", 0},
-        {"mesh, adjoint J_mua (-C 1 -O A)",  "-M H -C 1 -O A", 1},
-        {"mesh, adjoint J_musp (-C 1 -O V)", "-M H -C 1 -O V", 1},
+                                             "\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 0},
+        {"grid, trajectories (-D M)",        "-M G -D M", 0, 0},
+        {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0, 0},
+        {"mesh elem (-M H -C 0)",            "-M H -C 0", 0, 0},
+        {"mesh, adjoint J_mua (-C 1 -O A)",  "-M H -C 1 -O A", 1, 0},
+        {"mesh, adjoint J_musp (-C 1 -O V)", "-M H -C 1 -O V", 1, 0},
     };
     const struct {
         const char* name;
@@ -1402,7 +1412,7 @@ static void test_gpubackends(void) {
 #endif
     };
     const int ncase = (int)(sizeof(cases) / sizeof(cases[0]));
-    double refsum[64] = {0.}, refjsum[64] = {0.};
+    double refsum[64] = {0.}, refjsum[64] = {0.}, refimsum[64] = {0.};
     char args[2048], msg[512];
 
     for (int b = 0; b < 3; b++) {
@@ -1421,15 +1431,21 @@ static void test_gpubackends(void) {
             if (ret == 0 && b == 0) {
                 refsum[i] = r.wsum;
                 refjsum[i] = r.jsum;
+                refimsum[i] = r.imsum;
             }
 
             if (ret == 0) {
                 double rel = (refsum[i] != 0.) ? fabs(r.wsum - refsum[i]) / fabs(refsum[i]) : 0.;
                 double jrel = (refjsum[i] != 0.) ? fabs(r.jsum - refjsum[i]) / fabs(refjsum[i]) : 0.;
+                double imrel = (refimsum[i] != 0.) ? fabs(r.imsum - refimsum[i]) / fabs(refimsum[i]) : 0.;
                 printf("  %-34s ok, output sum %.6g (%.1f%% from opencl)", cases[i].name, r.wsum, rel * 100.);
 
                 if (r.jsum != 0. || refjsum[i] != 0.) {
                     printf(", Jacobian sum %.6g (%.1f%%)", r.jsum, jrel * 100.);
+                }
+
+                if (r.imsum != 0. || refimsum[i] != 0.) {
+                    printf(", imaginary sum %.6g (%.1f%%)", r.imsum, imrel * 100.);
                 }
 
                 if (cases[i].usedet) {
@@ -1438,17 +1454,21 @@ static void test_gpubackends(void) {
 
                 printf("\n");
 
-                if (backend[b].strict && b > 0 && refsum[i] != 0.) {
+                if ((backend[b].strict || cases[i].optix) && b > 0 && refsum[i] != 0.) {
                     sprintf(msg, "%s: %s agrees with opencl within 5%%", backend[b].name, cases[i].name);
-                    EXPECT_TRUE(rel < 0.05 && jrel < 0.05, msg);
+                    EXPECT_TRUE(rel < 0.05 && jrel < 0.05 && imrel < 0.05, msg);
                 }
             } else {
                 printf("  %-34s %s %d\n", cases[i].name, ret > 0 ? "NOT SUPPORTED, exit code" : "CRASHED, signal", ret > 0 ? ret : -ret);
             }
 
-            if (backend[b].strict) {
+            if (backend[b].strict || cases[i].optix) {
                 sprintf(msg, "%s: %s runs", backend[b].name, cases[i].name);
                 EXPECT_TRUE(ret == 0, msg);
+            } else {
+                /* OptiX must report an unsupported feature as an error, not crash or run */
+                sprintf(msg, "%s: %s is rejected with an error", backend[b].name, cases[i].name);
+                EXPECT_TRUE(ret > 0, msg);
             }
         }
     }
