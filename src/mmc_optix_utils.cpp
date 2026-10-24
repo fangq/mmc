@@ -11,6 +11,7 @@
 #include "mmc_optix_utils.h"
 #include "mmc_cuda_query_gpu.h"
 #include "mmc_tictoc.h"
+#include "mmc_cu_host.h"
 #include "incbin.h"
 
 INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
@@ -199,6 +200,10 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         fflush(cfg->flog);
     }
 
+    // adjoint Jacobians from the fields of the source and detector slots, by the CUDA kernels
+    mmc_cu_adjoint_grid(cfg, mesh, mesh->weight, fieldlen_o, isrfforward_o,
+                        optixcfg.launchParams.savevoxtype ? (int*)optixcfg.voxtypeBuffer.d_pointer() : NULL, tic0);
+
 #ifndef MCX_CONTAINER
     #pragma omp master
     {
@@ -249,10 +254,6 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
 
     /* reject the features that the OptiX kernel does not implement, rather than
        returning silently wrong outputs */
-    if (MCX_IS_ADJOINT_TYPE(cfg->outputtype)) {
-        mcx_error(-1, "Optix MMC does not support the adjoint Jacobian outputs (-O A/D/U/V/W/Q); use --compute cuda or opencl", __FILE__, __LINE__);
-    }
-
     if (cfg->seed == SEED_FROM_FILE || cfg->outputtype == otJacobian || cfg->outputtype == otWL ||
             cfg->outputtype == otWP || cfg->outputtype == otRFmus) {
         mcx_error(-1, "Optix MMC does not support photon replay or the replay outputs (-O J/L/P); use --compute cuda or opencl", __FILE__, __LINE__);
@@ -312,6 +313,8 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
     optixcfg->launchParams.issaveexit = (cfg->issaveexit > 0);
     optixcfg->launchParams.detnum = cfg->detnum;
     optixcfg->launchParams.maxmedia = mesh->prop;
+    optixcfg->launchParams.savevoxtype = (cfg->issave2pt && (cfg->outputtype == otAdjointMus || cfg->outputtype == otAdjointMusp
+                                          || cfg->outputtype == otAdjointMuaMusp));
 
     if (cfg->e0 == -1) {
         optixcfg->launchParams.mediumid0 = INITIAL_MEDIUM_UNKNOWN;
@@ -461,6 +464,12 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         optixcfg->launchParams.srcpattern = optixcfg->srcpatternBuffer.d_pointer();
     }
 
+    if (optixcfg->launchParams.savevoxtype) {
+        optixcfg->voxtypeBuffer.alloc(sizeof(int) * cfg->crop0.z);
+        CUDA_ASSERT(cudaMemset((void*)optixcfg->voxtypeBuffer.d_pointer(), 0, sizeof(int) * cfg->crop0.z));
+        optixcfg->launchParams.voxtypebuffer = optixcfg->voxtypeBuffer.d_pointer();
+    }
+
     if (cfg->srcnum > 1 || nslots > 1) {
         optixcfg->slotBuffer.alloc(sizeof(uint) * totalthread);
         optixcfg->launchParams.slotbuffer = optixcfg->slotBuffer.d_pointer();
@@ -594,7 +603,7 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
     OptixModuleCompileBoundValueEntry bound[] = {
         MMC_BIND(srctype), MMC_BIND(focus), MMC_BIND(srcnum), MMC_BIND(isreflect), MMC_BIND(outputtype),
         MMC_BIND(omega), MMC_BIND(srcid), MMC_BIND(extrasrclen), MMC_BIND(issavedet), MMC_BIND(issaveexit),
-        MMC_BIND(detnum), MMC_BIND(maxmedia), MMC_BIND(mediumid0)
+        MMC_BIND(detnum), MMC_BIND(maxmedia), MMC_BIND(mediumid0), MMC_BIND(savevoxtype)
     };
 #undef MMC_BIND
     optixcfg->moduleCompileOptions.boundValues = bound;
@@ -940,6 +949,7 @@ void clearOptixParams(OptixParams* optixcfg) {
     optixcfg->detBuffer.free();
     optixcfg->ppathBuffer.free();
     optixcfg->srcdataBuffer.free();
+    optixcfg->voxtypeBuffer.free();
     optixcfg->srcpatternBuffer.free();
     optixcfg->slotBuffer.free();
     optixcfg->energyBuffer.free();

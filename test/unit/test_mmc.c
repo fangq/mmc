@@ -1478,7 +1478,7 @@ static void test_gpubackends(void) {
         const char* name;
         const char* args;
         int usedet;
-        int optix;   /**< 1: OptiX must run it and agree with opencl; 0: OptiX must reject it */
+        int optix;   /**< 1: OptiX must run it and agree with opencl; 2: run it (test_optixadjoint compares it); 0: reject it */
     } cases[] = {
         {"grid fluence (-M G)",              "-M G", 0, 1},
         {"grid, reflection (-b 1)",          "-M G -b 1", 0, 1},
@@ -1488,11 +1488,11 @@ static void test_gpubackends(void) {
         {"grid, detected photons with seeds", "-M G -d 1 -q 1", 1, 0},
         {"grid, RF forward (-O R)",          "-M G -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0, 1},
         {"grid, replay Jacobian (-O J)",     "-M G -E utdet.mch -O J", 0, 0},
-        {"grid, adjoint J_mua (-O A)",       "-M G -O A", 1, 0},
-        {"grid, adjoint J_D (-O D)",         "-M G -O D", 1, 0},
-        {"grid, adjoint J_mus (-O U)",       "-M G -O U", 1, 0},
-        {"grid, adjoint J_musp (-O V)",      "-M G -O V", 1, 0},
-        {"grid, dual adjoint (-O Q)",        "-M G -O Q", 1, 0},
+        {"grid, adjoint J_mua (-O A)",       "-M G -O A", 1, 2},
+        {"grid, adjoint J_D (-O D)",         "-M G -O D", 1, 2},
+        {"grid, adjoint J_mus (-O U)",       "-M G -O U", 1, 2},
+        {"grid, adjoint J_musp (-O V)",      "-M G -O V", 1, 2},
+        {"grid, dual adjoint (-O Q)",        "-M G -O Q", 1, 2},
         {"grid, isotropic source",           "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"isotropic\",\"Pos\":[30,45,15]}}}", 0, 1},
         {"grid, cone source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"cone\",\"Param1\":[0.4,0,0,0]}}}", 0, 1},
         {"grid, planar source",              "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"planar\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,0],\"Param2\":[0,4,0,0]}}}", 0, 1},
@@ -1570,7 +1570,7 @@ static void test_gpubackends(void) {
 
                 printf("\n");
 
-                if ((backend[b].strict || cases[i].optix) && b > 0 && refsum[i] != 0.) {
+                if ((backend[b].strict || cases[i].optix == 1) && b > 0 && refsum[i] != 0.) {
                     sprintf(msg, "%s: %s agrees with opencl within 5%%", backend[b].name, cases[i].name);
                     EXPECT_TRUE(rel < 0.05 && jrel < 0.05 && imrel < 0.05, msg);
                 }
@@ -1666,6 +1666,47 @@ static void test_optixsources(void) {
 }
 
 /*-----------------------------------------------------------------------------
+ *  OptiX adjoint Jacobians: a different random stream than OpenCL (CUDA replays that of
+ *  OpenCL), so they are compared statistically with more photons; J_mus and J_musp are
+ *  J_D times a factor of the medium label recorded in each voxel, the same for all
+ *  backends in a homogeneous medium
+ *---------------------------------------------------------------------------*/
+
+static void test_optixadjoint(void) {
+#ifdef USE_OPTIX
+    const char* det = "{\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
+    const char* out[] = {"A", "D", "U", "V"};
+    const char* name[] = {"J_mua", "J_D", "J_mus", "J_musp"};
+    const double tol[] = {0.05, 0.2, 0.2, 0.2};  /* J_D varies ~4% (1 sd) between seeds at 1e6 photons */
+    double jo[2][4];
+    char args[1024], msg[256];
+
+    if (!hasocl) {
+        return;
+    }
+
+    printf("optix adjoint Jacobians vs opencl (1e6 photons):\n");
+
+    for (int i = 0; i < 4; i++) {
+        for (int b = 0; b < 2; b++) {
+            RunResult r;
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 --compute %s -G 1 -M G -O %s -n 1000000 -E %d -s utoa%d%d --json %s",
+                     b ? "optix" : "opencl", out[i], b ? 4321 : 1234, i, b, det);
+            run_isolated(args, &r);
+            jo[b][i] = r.jsum;
+        }
+
+        printf("  %-7s sum %.5g vs %.5g (%.1f%%)\n", name[i], jo[1][i], jo[0][i], jo[0][i] != 0. ? 100. * fabs(jo[1][i] - jo[0][i]) / fabs(jo[0][i]) : 0.);
+        sprintf(msg, "optix: %s agrees with opencl within the noise of 1e6 photons", name[i]);
+        EXPECT_TRUE(jo[0][i] != 0. && fabs(jo[1][i] - jo[0][i]) < tol[i] * fabs(jo[0][i]), msg);
+    }
+
+    EXPECT_NEAR(jo[1][2] / jo[1][1], jo[0][2] / jo[0][1], 0.01 * fabs(jo[0][2] / jo[0][1]), "optix: J_mus/J_D is the chain-rule factor of opencl");
+    EXPECT_NEAR(jo[1][3] / jo[1][1], jo[0][3] / jo[0][1], 0.01 * fabs(jo[0][3] / jo[0][1]), "optix: J_musp/J_D is the chain-rule factor of opencl");
+#endif
+}
+
+/*-----------------------------------------------------------------------------
  *  entry point
  *---------------------------------------------------------------------------*/
 
@@ -1698,6 +1739,7 @@ int main(int argc, char** argv) {
     test_opencl();
     test_gpubackends();
     test_optixsources();
+    test_optixadjoint();
     test_meshsurf();
 
     if (chdir(cwd) == 0) {

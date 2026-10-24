@@ -102,6 +102,8 @@ typedef struct __attribute__((aligned(16))) MMC_Parameter {
     CUdeviceptr srcpattern;        /**< pattern source intensities, srcnum per pixel (srcnum>1) */
     CUdeviceptr slotbuffer;        /**< per-thread pattern pixel (srcnum>1) of the current photon */
     CUdeviceptr energybuffer;      /**< per-thread launched/escaped energy of each pattern (srcnum>1) */
+    CUdeviceptr voxtypebuffer;     /**< the medium label of each grid voxel, for the J_mus/J_musp chain rule */
+    int savevoxtype;               /**< 1 to record the medium label of each voxel (-O U/V/Q) */
 
     Medium medium[MAX_PROP];
 } MMCParam;

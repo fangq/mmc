@@ -1290,150 +1290,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
         }
 
         /* Adjoint Jacobian post-processing (grid mode only) */
-        if (cfg->issave2pt && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method == rtBLBadouelGrid &&
-                cfg->extrasrclen > 0 && cfg->detdir != NULL && cfg->exportfield) {
-            unsigned int Ns = (unsigned int)(cfg->extrasrclen - cfg->detnum);
-            unsigned int Nd = (unsigned int)cfg->detnum;
-            unsigned int pure_voxels = (unsigned int)cfg->crop0.z;
-            int isdual  = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
-
-            size_t adjointlen = (size_t)pure_voxels * Ns * Nd;
-            size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
-            size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
-
-            /* Convert double exportfield to float for GPU processing */
-            float* hfield_re = (float*)malloc(sizeof(float) * fieldlen);
-            float* hfield_im = isrfforward ? (float*)malloc(sizeof(float) * fieldlen) : NULL;
-
-            for (size_t k = 0; k < fieldlen; k++) {
-                hfield_re[k] = (float)cfg->exportfield[k];
-            }
-
-            if (isrfforward && cfg->exportadjoint) {
-                for (size_t k = 0; k < fieldlen; k++) {
-                    hfield_im[k] = cfg->exportadjoint[k];
-                }
-            }
-
-            float* gfield_re_cu = NULL, *gfield_im_cu = NULL;
-            float* gadjoint_mua_cu = NULL, *gadjoint_tmp_cu = NULL;
-            CUDA_ASSERT(cudaMalloc((void**)&gfield_re_cu, sizeof(float) * fieldlen));
-            CUDA_ASSERT(cudaMemcpy(gfield_re_cu, hfield_re, sizeof(float) * fieldlen, cudaMemcpyHostToDevice));
-            free(hfield_re);
-
-            if (hfield_im) {
-                CUDA_ASSERT(cudaMalloc((void**)&gfield_im_cu, sizeof(float) * fieldlen));
-                CUDA_ASSERT(cudaMemcpy(gfield_im_cu, hfield_im, sizeof(float) * fieldlen, cudaMemcpyHostToDevice));
-                free(hfield_im);
-            }
-
-            if (isdual) {
-                CUDA_ASSERT(cudaMalloc((void**)&gadjoint_mua_cu, sizeof(float) * single_exportlen));
-                CUDA_ASSERT(cudaMemset(gadjoint_mua_cu, 0, sizeof(float) * single_exportlen));
-            }
-
-            CUDA_ASSERT(cudaMalloc((void**)&gadjoint_tmp_cu, sizeof(float) * single_exportlen));
-            CUDA_ASSERT(cudaMemset(gadjoint_tmp_cu, 0, sizeof(float) * single_exportlen));
-
-            size_t adjblocksize = 256;
-            size_t adjgridsize  = (pure_voxels + (unsigned int)adjblocksize - 1) / adjblocksize;
-
-            if (isdual || cfg->outputtype == otAdjoint) {
-                mmc_adjoint_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
-                    gfield_re_cu, gfield_im_cu,
-                    isdual ? gadjoint_mua_cu : gadjoint_tmp_cu,
-                    pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd);
-                CUDA_ASSERT(cudaDeviceSynchronize());
-            }
-
-            if (isdual || cfg->outputtype != otAdjoint) {
-                float* gmedscale_cu = NULL;
-
-                /* J_mus/J_musp: the kernel multiplies each voxel's J_D by the factor of the medium
-                   label recorded there during the simulation */
-                if (gvoxtype) {
-                    float* medscale = mesh_getmusscale(mesh, cfg->outputtype != otAdjointMus);
-                    CUDA_ASSERT(cudaMalloc((void**)&gmedscale_cu, sizeof(float) * (mesh->prop + 1)));
-                    CUDA_ASSERT(cudaMemcpy(gmedscale_cu, medscale, sizeof(float) * (mesh->prop + 1), cudaMemcpyHostToDevice));
-                    free(medscale);
-                }
-
-                mmc_adjoint_dcoeff_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
-                    gfield_re_cu, gfield_im_cu, gadjoint_tmp_cu,
-                    pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd,
-                    (unsigned int)cfg->dim.x, (unsigned int)cfg->dim.y,
-                    gvoxtype, gmedscale_cu);
-                CUDA_ASSERT(cudaDeviceSynchronize());
-
-                if (gmedscale_cu) {
-                    CUDA_ASSERT(cudaFree(gmedscale_cu));
-                }
-            }
-
-            CUDA_ASSERT(cudaFree(gfield_re_cu));
-
-            if (gfield_im_cu) {
-                CUDA_ASSERT(cudaFree(gfield_im_cu));
-            }
-
-            /* Allocate separate Jacobian buffer; exportadjoint keeps RF imaginary fluence */
-            if (cfg->exportjacob) {
-                free(cfg->exportjacob);
-            }
-
-            cfg->exportjacob = (float*)malloc(sizeof(float) * exportlen_adj);
-
-            float Vvox = cfg->unitinmm * cfg->unitinmm * cfg->unitinmm;
-
-            if (isdual) {
-                float* hmua    = (float*)malloc(sizeof(float) * single_exportlen);
-                float* hsecond = (float*)malloc(sizeof(float) * single_exportlen);
-                CUDA_ASSERT(cudaMemcpy(hmua,    gadjoint_mua_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
-                CUDA_ASSERT(cudaMemcpy(hsecond, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
-                CUDA_ASSERT(cudaFree(gadjoint_mua_cu));
-                CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
-
-                for (size_t k = 0; k < single_exportlen; k++) {
-                    hmua[k]    *= -Vvox;
-                    hsecond[k] *= -cfg->unitinmm;
-                }
-
-                if (!isrfforward) {
-                    memcpy(cfg->exportjacob,              hmua,    adjointlen * sizeof(float));
-                    memcpy(cfg->exportjacob + adjointlen, hsecond, adjointlen * sizeof(float));
-                } else {
-                    memcpy(cfg->exportjacob,                   hmua,                 adjointlen * sizeof(float));
-                    memcpy(cfg->exportjacob + adjointlen,      hsecond,              adjointlen * sizeof(float));
-                    memcpy(cfg->exportjacob + 2 * adjointlen,  hmua + adjointlen,    adjointlen * sizeof(float));
-                    memcpy(cfg->exportjacob + 3 * adjointlen,  hsecond + adjointlen, adjointlen * sizeof(float));
-                }
-
-                free(hmua);
-                free(hsecond);
-            } else {
-                CUDA_ASSERT(cudaMemcpy(cfg->exportjacob, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
-                CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
-
-                float adj_scale = (cfg->outputtype == otAdjoint) ? -Vvox : -cfg->unitinmm;
-
-                for (size_t k = 0; k < single_exportlen; k++) {
-                    cfg->exportjacob[k] *= adj_scale;
-                }
-            }
-
-            MMC_FPRINTF(cfg->flog, "adjoint Jacobian computation complete: %d ms\n", GetTimeMillis() - tic);
-
-#ifndef MCX_CONTAINER
-
-            if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
-                MMC_FPRINTF(cfg->flog, "saving adjoint Jacobian to file ...\t");
-                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
-                MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
-                mcx_fflush(cfg->flog);
-            }
-
-#endif
-        }
+        mmc_cu_adjoint_grid(cfg, mesh, cfg->exportfield, fieldlen, isrfforward, gvoxtype, tic);
 
 #ifndef MCX_CONTAINER
 
@@ -1596,5 +1453,167 @@ void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
 #ifdef _OPENMP
     }
+#endif
+}
+
+/**
+ * @brief Grid-mode adjoint Jacobian post-processing, shared by the CUDA and OptiX hosts
+ *
+ * Computes J_mua (-O A), J_D/J_mus/J_musp (-O D/U/V) or both (-O W/Q) from the
+ * per-slot fields of the sources and the detectors, using the CUDA kernels of mmc_core.cu,
+ * and stores them in cfg->exportjacob (saved to file in the standalone binary).
+ *
+ * \param[in] field: the normalized fields of all source/detector slots (datalen*maxgate per slot)
+ * \param[in] fieldlen: the length of field
+ * \param[in] isrfforward: 1 if cfg->exportadjoint holds the RF imaginary fields
+ * \param[in] gvoxtype: device array of the medium label of each voxel (J_mus/J_musp), or NULL
+ * \param[in] tic: the start time for the timing printouts
+ */
+void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fieldlen, int isrfforward, int* gvoxtype, unsigned int tic) {
+    if (!(cfg->issave2pt && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method == rtBLBadouelGrid &&
+            cfg->extrasrclen > 0 && cfg->detdir != NULL && field)) {
+        return;
+    }
+
+    unsigned int Ns = (unsigned int)(cfg->extrasrclen - cfg->detnum);
+    unsigned int Nd = (unsigned int)cfg->detnum;
+    unsigned int pure_voxels = (unsigned int)cfg->crop0.z;
+    int isdual  = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
+
+    size_t adjointlen = (size_t)pure_voxels * Ns * Nd;
+    size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
+    size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
+
+    /* Convert double exportfield to float for GPU processing */
+    float* hfield_re = (float*)malloc(sizeof(float) * fieldlen);
+    float* hfield_im = isrfforward ? (float*)malloc(sizeof(float) * fieldlen) : NULL;
+
+    for (size_t k = 0; k < fieldlen; k++) {
+        hfield_re[k] = (float)field[k];
+    }
+
+    if (isrfforward && cfg->exportadjoint) {
+        for (size_t k = 0; k < fieldlen; k++) {
+            hfield_im[k] = cfg->exportadjoint[k];
+        }
+    }
+
+    float* gfield_re_cu = NULL, *gfield_im_cu = NULL;
+    float* gadjoint_mua_cu = NULL, *gadjoint_tmp_cu = NULL;
+    CUDA_ASSERT(cudaMalloc((void**)&gfield_re_cu, sizeof(float) * fieldlen));
+    CUDA_ASSERT(cudaMemcpy(gfield_re_cu, hfield_re, sizeof(float) * fieldlen, cudaMemcpyHostToDevice));
+    free(hfield_re);
+
+    if (hfield_im) {
+        CUDA_ASSERT(cudaMalloc((void**)&gfield_im_cu, sizeof(float) * fieldlen));
+        CUDA_ASSERT(cudaMemcpy(gfield_im_cu, hfield_im, sizeof(float) * fieldlen, cudaMemcpyHostToDevice));
+        free(hfield_im);
+    }
+
+    if (isdual) {
+        CUDA_ASSERT(cudaMalloc((void**)&gadjoint_mua_cu, sizeof(float) * single_exportlen));
+        CUDA_ASSERT(cudaMemset(gadjoint_mua_cu, 0, sizeof(float) * single_exportlen));
+    }
+
+    CUDA_ASSERT(cudaMalloc((void**)&gadjoint_tmp_cu, sizeof(float) * single_exportlen));
+    CUDA_ASSERT(cudaMemset(gadjoint_tmp_cu, 0, sizeof(float) * single_exportlen));
+
+    size_t adjblocksize = 256;
+    size_t adjgridsize  = (pure_voxels + (unsigned int)adjblocksize - 1) / adjblocksize;
+
+    if (isdual || cfg->outputtype == otAdjoint) {
+        mmc_adjoint_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
+            gfield_re_cu, gfield_im_cu,
+            isdual ? gadjoint_mua_cu : gadjoint_tmp_cu,
+            pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd);
+        CUDA_ASSERT(cudaDeviceSynchronize());
+    }
+
+    if (isdual || cfg->outputtype != otAdjoint) {
+        float* gmedscale_cu = NULL;
+
+        /* J_mus/J_musp: the kernel multiplies each voxel's J_D by the factor of the medium
+           label recorded there during the simulation */
+        if (gvoxtype) {
+            float* medscale = mesh_getmusscale(mesh, cfg->outputtype != otAdjointMus);
+            CUDA_ASSERT(cudaMalloc((void**)&gmedscale_cu, sizeof(float) * (mesh->prop + 1)));
+            CUDA_ASSERT(cudaMemcpy(gmedscale_cu, medscale, sizeof(float) * (mesh->prop + 1), cudaMemcpyHostToDevice));
+            free(medscale);
+        }
+
+        mmc_adjoint_dcoeff_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
+            gfield_re_cu, gfield_im_cu, gadjoint_tmp_cu,
+            pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd,
+            (unsigned int)cfg->dim.x, (unsigned int)cfg->dim.y,
+            gvoxtype, gmedscale_cu);
+        CUDA_ASSERT(cudaDeviceSynchronize());
+
+        if (gmedscale_cu) {
+            CUDA_ASSERT(cudaFree(gmedscale_cu));
+        }
+    }
+
+    CUDA_ASSERT(cudaFree(gfield_re_cu));
+
+    if (gfield_im_cu) {
+        CUDA_ASSERT(cudaFree(gfield_im_cu));
+    }
+
+    /* Allocate separate Jacobian buffer; exportadjoint keeps RF imaginary fluence */
+    if (cfg->exportjacob) {
+        free(cfg->exportjacob);
+    }
+
+    cfg->exportjacob = (float*)malloc(sizeof(float) * exportlen_adj);
+
+    float Vvox = cfg->unitinmm * cfg->unitinmm * cfg->unitinmm;
+
+    if (isdual) {
+        float* hmua    = (float*)malloc(sizeof(float) * single_exportlen);
+        float* hsecond = (float*)malloc(sizeof(float) * single_exportlen);
+        CUDA_ASSERT(cudaMemcpy(hmua,    gadjoint_mua_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
+        CUDA_ASSERT(cudaMemcpy(hsecond, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
+        CUDA_ASSERT(cudaFree(gadjoint_mua_cu));
+        CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
+
+        for (size_t k = 0; k < single_exportlen; k++) {
+            hmua[k]    *= -Vvox;
+            hsecond[k] *= -cfg->unitinmm;
+        }
+
+        if (!isrfforward) {
+            memcpy(cfg->exportjacob,              hmua,    adjointlen * sizeof(float));
+            memcpy(cfg->exportjacob + adjointlen, hsecond, adjointlen * sizeof(float));
+        } else {
+            memcpy(cfg->exportjacob,                   hmua,                 adjointlen * sizeof(float));
+            memcpy(cfg->exportjacob + adjointlen,      hsecond,              adjointlen * sizeof(float));
+            memcpy(cfg->exportjacob + 2 * adjointlen,  hmua + adjointlen,    adjointlen * sizeof(float));
+            memcpy(cfg->exportjacob + 3 * adjointlen,  hsecond + adjointlen, adjointlen * sizeof(float));
+        }
+
+        free(hmua);
+        free(hsecond);
+    } else {
+        CUDA_ASSERT(cudaMemcpy(cfg->exportjacob, gadjoint_tmp_cu, sizeof(float) * single_exportlen, cudaMemcpyDeviceToHost));
+        CUDA_ASSERT(cudaFree(gadjoint_tmp_cu));
+
+        float adj_scale = (cfg->outputtype == otAdjoint) ? -Vvox : -cfg->unitinmm;
+
+        for (size_t k = 0; k < single_exportlen; k++) {
+            cfg->exportjacob[k] *= adj_scale;
+        }
+    }
+
+    MMC_FPRINTF(cfg->flog, "adjoint Jacobian computation complete: %d ms\n", GetTimeMillis() - tic);
+
+#ifndef MCX_CONTAINER
+
+    if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
+        MMC_FPRINTF(cfg->flog, "saving adjoint Jacobian to file ...\t");
+        mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
+        MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
+        mcx_fflush(cfg->flog);
+    }
+
 #endif
 }

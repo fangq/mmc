@@ -621,6 +621,13 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
 
     // find the information of the first segment
     uint oldeid = getTimeFrame(currtof) + getVoxelIdx(segmid);
+
+    /* adjoint J_mus/J_musp: the medium label of each voxel the photon deposits in, for the
+       chain-rule factor applied per voxel by the adjoint post-processing */
+    if (gcfg.savevoxtype) {
+        ((int*)gcfg.voxtypebuffer)[getVoxelIdx(segmid)] = r.mediumid;
+    }
+
     float oldweight = segloss;
     float oldweight_im = segloss_im;
 
@@ -648,6 +655,10 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
         // save when entering a new element or during the last segment
         if (neweid != oldeid) {
             saveOutput(oldeid, oldweight, oldweight_im, isrf);
+
+            if (gcfg.savevoxtype) {
+                ((int*)gcfg.voxtypebuffer)[getVoxelIdx(segmid)] = r.mediumid;
+            }
 
             // reset oldeid and weight bucket
             oldeid = neweid;

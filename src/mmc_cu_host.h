@@ -56,6 +56,7 @@ extern "C" {
 typedef unsigned char uchar;
 
 void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer);
+void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fieldlen, int isrfforward, int* gvoxtype, unsigned int tic);
 
 #ifdef  __cplusplus
 }
