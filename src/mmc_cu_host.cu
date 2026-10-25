@@ -347,13 +347,14 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         }
 
         /* Pre-allocate exportadjoint for RF imaginary part or adjoint Jacobian */
-        if (cfg->exportadjoint == NULL && cfg->method == rtBLBadouelGrid) {
-            if (isrfforward) {
-                /* For RF forward: stores imaginary fluence field of same size as real */
-                cfg->exportadjoint = (float*)calloc((size_t)meshlen * cfg->maxgate, sizeof(float));  /* fieldlen is set later */
-            } else if (MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->extrasrclen > 0) {
-                /* For adjoint Jacobian: allocate after simulation; leave as NULL for now */
-            }
+        if (cfg->exportadjoint == NULL && isrfforward) {
+            /* RF forward: the imaginary fluence, laid out as the real one; as in the
+               OpenCL host, sized per node when basis order 1 spreads the per-element
+               field onto nodes (nn can exceed ne).  Element- and node-based output
+               lost the imaginary part when this was allocated for the grid alone. */
+            size_t nodelen = (cfg->method != rtBLBadouelGrid && cfg->basisorder) ?
+                             (size_t)mesh->nn * cfg->maxgate * cfg->srcnum * nsrcslots : 0;
+            cfg->exportadjoint = (float*)calloc(MAX((size_t)meshlen * cfg->maxgate, nodelen), sizeof(float));  /* fieldlen is set later */
         }
 
         if (cfg->exportdetected == NULL) {
@@ -972,10 +973,18 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                         for (j = 0; j < mesh->ne; j++) {
                             for (srcid = 0; srcid < cfg->srcnum; srcid++) {
                                 float ww = field[(i * mesh->ne + j) * cfg->srcnum + srcid] * 0.25f;
+                                /* RF forward: the imaginary part goes onto the nodes too, or
+                                   nodal RF output carries the real part only */
+                                float ww_im = (isrfforward && cfg->exportadjoint && cfg->srcnum == 1)
+                                              ? field[i * mesh->ne + j + fieldlen] * 0.25f : 0.f;
                                 int k;
 
                                 for (k = 0; k < mesh->elemlen; k++) {
                                     cfg->exportfield[(i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1) * cfg->srcnum + srcid] += ww;
+
+                                    if (ww_im != 0.f) {
+                                        cfg->exportadjoint[i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1] += ww_im;
+                                    }
                                 }
                             }
                         }

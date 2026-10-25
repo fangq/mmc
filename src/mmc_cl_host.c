@@ -1037,10 +1037,18 @@ is more than what your have specified (%d), please use the -H option to specify 
                         for (j = 0; j < mesh->ne; j++) {
                             for (srcid = 0; srcid < cfg->srcnum; srcid++) {
                                 float ww = field[(i * mesh->ne + j) * cfg->srcnum + srcid] * 0.25f;
+                                /* RF forward: the imaginary part goes onto the nodes too, or
+                                   nodal RF output carries the real part only */
+                                float ww_im = (isrfforward && cfg->exportadjoint && cfg->srcnum == 1)
+                                              ? field[i * mesh->ne + j + fieldlen] * 0.25f : 0.f;
                                 int k;
 
                                 for (k = 0; k < mesh->elemlen; k++) {
                                     cfg->exportfield[(i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1) * cfg->srcnum + srcid] += ww;
+
+                                    if (ww_im != 0.f) {
+                                        cfg->exportadjoint[i * mesh->nn + mesh->elem[j * mesh->elemlen + k] - 1] += ww_im;
+                                    }
                                 }
                             }
                         }

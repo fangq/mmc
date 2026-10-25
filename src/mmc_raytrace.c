@@ -63,6 +63,33 @@ static inline float mmc_fluence_deposit(float w0, float w1, float mua, float len
 }
 
 /**
+ * RF forward (frequency domain) deposit of one step on the CPU.  The photon's complex
+ * weight is |w| e^{-i omega t}: r->weight stays the real, decaying magnitude, so the
+ * roulette, escape and absorption tallies are unchanged, and the phase is omega times
+ * the time of flight.  A step of length len that starts at weight w0 and phase phase0
+ * deposits the fluence
+ *     w0 e^{-i phase0} (1 - e^{-(mua + i a) len}) / (mua + i a),   a = omega n / c0,
+ * the complex Beer-Lambert deposit the OpenCL/CUDA/OptiX kernels make.
+ */
+static inline void mmc_rf_deposit(float w0, double phase0, float mua, float a, float len, float* re, float* im) {
+    double E = exp(-(double)mua * len), c = cos((double)a * len), s = sin((double)a * len);
+    double nr = 1.0 - E * c, ni = E * s, z2 = (double)mua * mua + (double)a * a, fr, fi;
+
+    if (z2 < (double)EPS * EPS) {
+        fr = len;
+        fi = 0.0;
+    } else {
+        fr = (nr * mua + ni * a) / z2;
+        fi = (ni * mua - nr * a) / z2;
+    }
+
+    c = cos(phase0);
+    s = sin(phase0);
+    *re = (float)(w0 * (fr * c + fi * s));
+    *im = (float)(w0 * (fi * c - fr * s));
+}
+
+/**
  * \mapping from edge index to node index
  */
 
@@ -1572,6 +1599,15 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                 ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
             }
 
+            /* RF forward: see mmc_rf_deposit; the step started at photontimer - Lmove*rc */
+            int isrf = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE && cfg->exportadjoint != NULL);
+            float ww_im = 0.f, rfa = cfg->omega * rc;
+            double rfphase0 = (double)cfg->omega * (r->photontimer - r->Lmove * rc);
+
+            if (isrf && cfg->method == rtBLBadouel) {
+                mmc_rf_deposit(currweight, rfphase0, prop->mua, rfa, r->Lmove, &ww, &ww_im);
+            }
+
             T = _mm_set1_ps(r->Lmove);
             T = _mm_add_ps(S, _mm_mul_ps(O, T));
             _mm_store_ps(&(r->p0.x), T);
@@ -1586,6 +1622,11 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                                 #pragma omp atomic
                                 tracer->mesh->weight[r->oldidx] += r->oldweight;
+
+                                if (isrf) {
+                                    #pragma omp atomic
+                                    cfg->exportadjoint[r->oldidx] += (float)r->oldweight_im;
+                                }
                             } else if (cfg->srctype == stPattern) {
                                 for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                     #pragma omp atomic
@@ -1595,14 +1636,21 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
 
                             r->oldidx = newidx;
                             r->oldweight = ww;
+                            r->oldweight_im = ww_im;
                         } else {
                             r->oldweight += ww;
+                            r->oldweight_im += ww_im;
                         }
 
                         if (r->faceid == -2 || !r->isend) {
                             if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                                 #pragma omp atomic
                                 tracer->mesh->weight[newidx] += r->oldweight;
+
+                                if (isrf) {
+                                    #pragma omp atomic
+                                    cfg->exportadjoint[newidx] += (float)r->oldweight_im;
+                                }
                             } else if (cfg->srctype == stPattern) {
                                 for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                     #pragma omp atomic
@@ -1611,6 +1659,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             }
 
                             r->oldweight = 0.f;
+                            r->oldweight_im = 0.f;
                         }
                     } else {
                         float dstep, segloss, w0;
@@ -1619,6 +1668,9 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         seg = (seg << 1);
                         dstep = r->Lmove / seg;
                         segloss = expf(-prop->mua * dstep);
+                        /* RF: each sub-segment deposits from its own starting weight and phase */
+                        float rfds = dstep, rfw = currweight, segre = 0.f, segim = 0.f;
+                        double rfph = rfphase0;
                         T =  _mm_mul_ps(O, _mm_set1_ps(dstep)); /*step*/
                         O =  _mm_sub_ps(S, _mm_load_ps(&(tracer->mesh->nmin.x)));
                         S =  _mm_add_ps(O, _mm_mul_ps(T, _mm_set1_ps(0.5f))); /*starting point*/
@@ -1637,10 +1689,21 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                             unsigned int newidx = idx.z * cfg->crop0.y + idx.y * cfg->crop0.x + idx.x + tshift;
                             r->oldidx = (r->oldidx == 0xFFFFFFFF) ? newidx : r->oldidx;
 
+                            if (isrf) {
+                                mmc_rf_deposit(rfw, rfph, prop->mua, rfa, rfds, &segre, &segim);
+                                rfw *= segloss;
+                                rfph += (double)rfa * rfds;
+                            }
+
                             if (newidx != r->oldidx) {
                                 if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                                     #pragma omp atomic
                                     tracer->mesh->weight[r->oldidx] += r->oldweight;
+
+                                    if (isrf) {
+                                        #pragma omp atomic
+                                        cfg->exportadjoint[r->oldidx] += (float)r->oldweight_im;
+                                    }
                                 } else if (cfg->srctype == stPattern) {
                                     for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
@@ -1651,15 +1714,22 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                                 }
 
                                 r->oldidx = newidx;
-                                r->oldweight = w0 * totalloss;
+                                r->oldweight = isrf ? segre : w0 * totalloss;
+                                r->oldweight_im = segim;
                             } else {
-                                r->oldweight += w0 * totalloss;
+                                r->oldweight += isrf ? segre : w0 * totalloss;
+                                r->oldweight_im += segim;
                             }
 
                             if (r->faceid == -2 || !r->isend) {
                                 if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                                     #pragma omp atomic
                                     tracer->mesh->weight[newidx] += r->oldweight;
+
+                                    if (isrf) {
+                                        #pragma omp atomic
+                                        cfg->exportadjoint[newidx] += (float)r->oldweight_im;
+                                    }
                                 } else if (cfg->srctype == stPattern) {
                                     for (pidx = 0; pidx < cfg->srcnum; pidx++) {
                                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
@@ -1670,6 +1740,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                                 }
 
                                 r->oldweight = 0.f;
+                                r->oldweight_im = 0.f;
                             }
 
                             w0 *= segloss;
@@ -1679,11 +1750,17 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                 } else {
                     int i;
                     ww *= 1.f / 3.f;
+                    ww_im *= 1.f / 3.f;
 
                     if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                         for (i = 0; i < 3; i++) {
                             #pragma omp atomic
                             tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
+
+                            if (isrf) {
+                                #pragma omp atomic
+                                cfg->exportadjoint[ee[out[faceidx][i]] - 1 + tshift] += ww_im;
+                            }
                         }
                     } else if (cfg->srctype == stPattern) {
                         for (pidx = 0; pidx < cfg->srcnum; pidx++) {

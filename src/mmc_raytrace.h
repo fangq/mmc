@@ -82,6 +82,7 @@ typedef struct MMC_ray {
     int inroi;            /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
     int roiidx;           /**< edge(0-5), node (0-4) or face (0-4) index in a local element with ROIs */
     int refeid;           /**< reference element id that is used for face-based implicit MMC*/
+    double oldweight_im;  /**< RF forward: imaginary part of the deposit accumulated for oldidx */
 } ray;
 
 /***************************************************************************//**

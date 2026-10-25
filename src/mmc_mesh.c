@@ -1979,11 +1979,11 @@ float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mccon
  * @param[in] cfg: the simulation configuration
  */
 
-void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
+static void mesh_saveweightdata(tetmesh* mesh, mcconfig* cfg, int isref, double* field) {
     FILE* fp;
     int i, j, datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
     char fweight[MAX_FULL_PATH];
-    double* data = mesh->weight;
+    double* data = (field) ? field : mesh->weight;
     /* multi-source / adjoint slot count; >1 only when cfg->extrasrclen > cfg->srcnum */
     int nslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
 
@@ -2054,6 +2054,42 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
     }
 
     fclose(fp);
+}
+
+/**
+ * @brief Save the output field, and for an RF (frequency-domain) forward simulation
+ * its imaginary part too
+ *
+ * The real part (mesh->weight) goes to <session>.<ext> as before.  The imaginary part
+ * of an RF forward run, which mmclab and pmmc return as the imaginary part of a complex
+ * array, is otherwise lost in standalone mode: it is written to <session>_imag.<ext>
+ * in the same format and layout.
+ *
+ * @param[in] mesh: the mesh object
+ * @param[in] cfg: the simulation configuration
+ * @param[in] isref: 1 to save the surface diffuse reflectance (mesh->dref) instead
+ */
+
+void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
+    mesh_saveweightdata(mesh, cfg, isref, NULL);
+
+    if (!isref && cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE && cfg->exportadjoint != NULL) {
+        int datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
+        int nslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
+        size_t len = (size_t)datalen * cfg->maxgate * nslots, k;
+        double* imag = (double*)malloc(sizeof(double) * len);
+        char session[MAX_SESSION_LENGTH];
+
+        for (k = 0; k < len; k++) {
+            imag[k] = cfg->exportadjoint[k];
+        }
+
+        memcpy(session, cfg->session, MAX_SESSION_LENGTH);
+        snprintf(cfg->session, MAX_SESSION_LENGTH, "%s_imag", session);
+        mesh_saveweightdata(mesh, cfg, 0, imag);
+        memcpy(cfg->session, session, MAX_SESSION_LENGTH);
+        free(imag);
+    }
 }
 
 /**
@@ -2510,6 +2546,12 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
                 for (j = 0; j < cfg->maxgate; j++) {
                     mesh->weight[(j * datalen + i) * cfg->srcnum + pair] /= energyelem;
+
+                    /* the RF imaginary part is scaled with the real part, or the
+                       phase of element-based RF output is off */
+                    if (imag_slot) {
+                        imag_slot[j * datalen + i] /= energyelem;
+                    }
                 }
             }
 

@@ -197,6 +197,30 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     t0 = StartTimer();
 
+    /* RF forward (frequency domain) on the CPU: the branchless Badouel tracer deposits
+       the imaginary part of the complex fluence into cfg->exportadjoint, laid out as
+       mesh->weight, for its element- and node-based (-M s) and dual-grid (-M g) output */
+    if (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE) {
+        int nslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
+        size_t datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ((cfg->basisorder) ? mesh->nn : mesh->ne);
+
+        if (!(cfg->method == rtBLBadouelGrid || cfg->method == rtBLBadouel)) {
+            MMC_ERROR(-4, "RF (frequency-domain) simulation on the CPU needs the branch-less Badouel ray-tracer, -M s or -M g");
+        }
+
+        if (cfg->srctype == stPattern && cfg->srcnum > 1) {
+            MMC_ERROR(-4, "RF (frequency-domain) simulation does not support multiple source patterns");
+        }
+
+        if (cfg->exportadjoint == NULL) {
+            cfg->exportadjoint = (float*)calloc(datalen * cfg->maxgate * nslots, sizeof(float));
+
+            if (cfg->exportadjoint == NULL) {
+                MMC_ERROR(-4, "can not allocate the imaginary part of the RF output");
+            }
+        }
+    }
+
     mcx_printheader(cfg);
 
 #if defined(MMC_LOGISTIC) || defined(MMC_SFMT)
