@@ -2464,7 +2464,36 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         }
 
         if (!flagset['O']) {
-            strncpy(val, FIND_JSON_KEY("OutputType", "Session.OutputType", Session, outputtype + cfg->outputtype, valuestring), 1);
+            {
+                /* the letter of mcx -O, or the name mcxlab/pmcx/mmclab/pmmc use for it ("flux",
+                   "adjoint_mus", ...): only the first character used to be read, so "flux" gave
+                   'f' (fluence), "dcs" 'd' and "wl" 'w' */
+                const char* typenames[] = {"flux", "fluence", "energy", "jacobian", "wl", "wp", "rf", "rfmus",
+                                       "adjoint", "adjoint_dcoeff", "adjoint_mus", "adjoint_musp", "adjoint_mua_d", "adjoint_mua_musp", ""};
+                const char typeletters[] = "xfejlprsaduvwq";
+                /* absent: the current type; the macro's fallback would be the tail of the
+                   letter table ("xfej..."), read as a name */
+                cJSON* otype = FIND_JSON_OBJ("OutputType", "Session.OutputType", Session);
+                /* an index until the command line is parsed, a letter after a first load */
+                char curtype[2] = {((size_t)cfg->outputtype < strlen(outputtype)) ? outputtype[(int)cfg->outputtype] : (char)cfg->outputtype, '\0'};
+                const char* typestr = (otype == NULL) ? curtype : otype->valuestring;
+
+                if (typestr == NULL) {
+                    MMC_ERROR(-2, "Session.OutputType must be a string");
+                }
+
+                if (strlen(typestr) > 1) {
+                    int typeid = mcx_keylookup((char*)typestr, typenames);
+
+                    if (typeid < 0) {
+                        MMC_ERROR(-2, "the specified output data type is not recognized");
+                    }
+
+                    val[0] = typeletters[typeid];
+                } else {
+                    strncpy(val, typestr, 1);
+                }
+            }
 
             if (mcx_lookupindex(val, outputtype)) {
                 MMC_ERROR(-2, "the specified output data type is not recognized");
