@@ -80,13 +80,15 @@ nvcc -O3 -ptx --expt-relaxed-constexpr -use_fast_math -m64 $USERDEFS $GPUINC -o 
 CLOPT="-nologo -c -O2 -MT -openmp -EHsc -W1 -D_CRT_SECURE_NO_WARNINGS -D_USE_MATH_DEFINES"
 MMCDEFS="-DMCX_EMBED_CL $USERDEFS -DMMC_USE_SSE -DHAVE_SSE2 -DUSE_SSE2 -DMMC_USE_SSE_MATH"
 
-# zmat, as its Makefile builds it for mmc: miniz for zlib, lzma, lz4; no blosc2/zstd
-ZMATDEFS="-DNO_BLOSC2 -DNO_ZSTD -DNO_ZLIB -D_LARGEFILE64_SOURCE=1"
-ZMATINC="-Izmat -Izmat/miniz -Izmat/easylzma -Izmat/easylzma/pavlov -Izmat/lz4"
+# zmat, as its Makefile builds it for mmc: miniz for zlib, the LZMA SDK, lz4; no
+# blosc2/zstd; with MSVC its threads (block-parallel zlib, LZMA) are Win32's
+ZMATDEFS="-DNO_BLOSC2 -DNO_ZSTD -DNO_ZLIB -D_LARGEFILE64_SOURCE=1 -DZMAT_USE_LZMA_SDK"
+ZMATINC="-Izmat -Izmat/miniz -Izmat/easylzma -Izmat/easylzma/lzma -Izmat/lz4"
 for f in zmatlib miniz/miniz easylzma/compress easylzma/decompress easylzma/lzma_header \
-         easylzma/lzip_header easylzma/common_internal easylzma/pavlov/LzmaEnc easylzma/pavlov/LzmaDec \
-         easylzma/pavlov/LzmaLib easylzma/pavlov/LzFind easylzma/pavlov/Bra easylzma/pavlov/BraIA64 \
-         easylzma/pavlov/Alloc easylzma/pavlov/7zCrc lz4/lz4 lz4/lz4hc; do
+         easylzma/lzip_header easylzma/common_internal lz4/lz4 lz4/lz4hc \
+         easylzma/lzma/{LzmaEnc,LzmaDec,LzmaLib,LzFind,Bra,BraIA64,Alloc,7zCrc,7zCrcOpt,CpuArch} \
+         easylzma/lzma/{Lzma2Dec,Lzma2DecMt,Lzma2Enc,MtCoder,MtDec,Xz,XzCrc64,XzCrc64Opt,XzEnc,XzDec} \
+         easylzma/lzma/{Sha256,Sha256Opt,Delta,Bra86,7zStream,LzFindMt,LzFindOpt,Threads}; do
     cl $CLOPT $ZMATDEFS $ZMATINC -Fo"built/zmat_$(echo $f | tr / _).obj" "zmat/$f.c"
 done
 

@@ -39,7 +39,7 @@ ZMATLIB    :=lib/libzmat.a
 
 LIBOPENCLDIR ?= /usr/local/cuda/lib64
 LIBOPENCL  ?=-lOpenCL
-EXTRALIB   += -lm -lstdc++ -L$(LIBOPENCLDIR)
+EXTRALIB   += -lm -lstdc++ -lpthread -L$(LIBOPENCLDIR)   # pthreads: zmat's parallel zlib/gzip
 
 OPENMP     := -fopenmp
 OPENMPLIB  := -fopenmp
