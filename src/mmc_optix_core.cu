@@ -1,6 +1,12 @@
 #include <iostream>
 #include <limits>
 #include <math.h>
+
+/* M_PIf is new in glibc 2.35 (the CentOS 7 release builder has 2.17), and MSVC
+   defines neither it nor M_PI without _USE_MATH_DEFINES */
+#ifndef M_PIf
+    #define M_PIf 3.14159265358979323846f
+#endif
 #include <stdint.h>
 #include <optix.h>
 #include <optix_device.h>
@@ -20,7 +26,9 @@ constexpr float MAX_ACCUM = 1000.0f;
 constexpr float SAFETY_DISTANCE = 0.0001f; // heuristic to ensure ray cut through triangle
 constexpr float DOUBLE_SAFETY_DISTANCE = SAFETY_DISTANCE * 2.0f;
 constexpr float TWO_PI = 6.28318530717959f;       //2*pi
+#ifndef FLT_EPSILON   // a macro of <float.h>, which MSVC's headers pull in
 constexpr float FLT_EPSILON = 1.19209290E-07F;    //round-off limit
+#endif
 constexpr float EPS = FLT_EPSILON;                //round-off limit
 // simulation configuration and medium optical properties
 extern "C" {
@@ -239,7 +247,7 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
             if (gcfg.srctype == MCX_SRC_ISOTROPIC) { // uniform sphere
                 ang = acosf(2.f * rng.uniform(0.0f, 1.0f) - 1.f);    //sine distribution
             } else {
-                ang = M_PI * rng.uniform(0.0f, 1.0f);    //uniform distribution in zenith angle, arcsine
+                ang = M_PIf * rng.uniform(0.0f, 1.0f);    //uniform distribution in zenith angle, arcsine (single precision, as the rest of the kernel)
             }
         }
 

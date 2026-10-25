@@ -36,6 +36,12 @@
 #pragma clang diagnostic ignored "-Wconstant-logical-operand"
 #endif
 
+/* aligns a struct, written after "struct": MSVC (nvcc on Windows) takes no
+   attribute after the closing brace; the host code defines it in mmc_utils.h */
+#ifndef MMC_ALIGN
+#define MMC_ALIGN(x) __attribute__ ((aligned (x)))
+#endif
+
 #ifdef __NVCC__
 #define __constant const
 #define __private
@@ -265,7 +271,7 @@ typedef struct MMC_FLOAT3 {
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
 #define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
 
-typedef struct MMC_Ray {
+typedef struct MMC_ALIGN(4) MMC_Ray {
     float3 p0;                    /**< current photon position */
     float3 vec;                   /**< current photon direction vector */
     float3 pout;                  /**< the intersection position of the ray to the enclosing tet */
@@ -285,10 +291,10 @@ typedef struct MMC_Ray {
     //float4 bary0;               /**< the Barycentric coordinate of the intersection with the tet */
     float slen0;                  /**< initial unitless scattering length = length*mus */
     unsigned int photonid;        /**< index of the current photon */
-} ray __attribute__ ((aligned (4)));
+} ray;
 
 
-typedef struct MMC_Parameter {
+typedef struct MMC_ALIGN(16) MMC_Parameter {
     float4 srcparam1;             /**< source parameters set 1 */
     float4 srcparam2;             /**< source parameters set 2 */
     uint4  crop0;
@@ -335,12 +341,12 @@ typedef struct MMC_Parameter {
     int    srcpropoffset;          /**< gmed[] index where extra sources start (= prop+1+isextdet) */
     uint   isnodalmua;             /**< 1: read mua per-element from gnodemua centroid (DOT recon); CUDA only */
     uint   isnodalmusp;            /**< 1: read musp per-element from gnodemusp centroid (RF DOT recon); CUDA only */
-} MCXParam __attribute__ ((aligned (16)));
+} MCXParam;
 
-typedef struct MMC_Reporter {
+typedef struct MMC_ALIGN(4) MMC_Reporter {
     float  raytet;
     uint   jumpdebug;
-} MCXReporter  __attribute__ ((aligned (4)));
+} MCXReporter;
 
 /** Extra source entry for multi-source / adjoint-mode simulation */
 #ifndef MCX_EXTRASRC_DEFINED
@@ -353,12 +359,12 @@ typedef struct MCX_ExtraSrc {
 } ExtraSrc;
 #endif
 
-typedef struct MCX_medium {
+typedef struct MMC_ALIGN(16) MCX_medium {
     float mua;                    /**<absorption coeff in 1/mm unit*/
     float mus;                    /**<scattering coeff in 1/mm unit*/
     float g;                      /**<anisotropy*/
     float n;                      /**<refractive index*/
-} Medium __attribute__ ((aligned (16)));
+} Medium;
 
 #ifdef __NVCC__
 __constant__ MCXParam gcfg[1];

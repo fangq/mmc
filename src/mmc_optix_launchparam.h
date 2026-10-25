@@ -1,7 +1,9 @@
 #ifndef _MMC_OPTIX_LAUNCHPARAM_H
 #define _MMC_OPTIX_LAUNCHPARAM_H
 
-#include <limits>
+#include <limits>     // (std::numeric_limits<T>::max)(): <windows.h> defines a max() macro
+
+typedef unsigned int uint;      // glibc defines it as well; MSVC does not
 
 /* ExtraSrc is also defined in mmc_utils.h; define here only for device-only includes */
 #ifndef MCX_EXTRASRC_DEFINED
@@ -40,14 +42,14 @@ typedef struct MCX_ExtraSrc {
 #define MCX_SRC_HYPERBOLOID 16 /**<  a hyperboloid Gaussian beam, srcparam1.x=waist radius, .y=distance to the waist, .z=Rayleigh range */
 #define MCX_SRC_RING       17  /**<  a ring or a ring sector, srcparam1.x/y=outer/inner radius, .z/.w=angular range */
 
-constexpr unsigned int INITIAL_MEDIUM_UNKNOWN = std::numeric_limits<unsigned int>::max();
+constexpr unsigned int INITIAL_MEDIUM_UNKNOWN = (std::numeric_limits<unsigned int>::max)();
 constexpr unsigned int AMBIENT_MEDIUM_ID = 0;
-constexpr unsigned int DEAD_MEDIUM_ID = std::numeric_limits<unsigned int>::max() - 1;
+constexpr unsigned int DEAD_MEDIUM_ID = (std::numeric_limits<unsigned int>::max)() - 1;
 
 /**
  * @brief struct for medium optical properties
  */
-typedef struct __attribute__((aligned(16))) MCX_medium {
+typedef struct __align__(16) MCX_medium {
     float mua;                     /**<absorption coeff in 1/mm unit*/
     float mus;                     /**<scattering coeff in 1/mm unit*/
     float g;                       /**<anisotropy*/
@@ -57,7 +59,7 @@ typedef struct __attribute__((aligned(16))) MCX_medium {
 /**
  * @brief struct for simulation configuration paramaters
  */
-typedef struct __attribute__((aligned(16))) MMC_Parameter {
+typedef struct __align__(16) MMC_Parameter {
     OptixTraversableHandle gashandle;
 
     CUdeviceptr seedbuffer;             /**< rng seed for each thread */

@@ -46,6 +46,12 @@
     #include <omp.h>
 #endif
 
+#ifdef _MSC_VER                     ///< aligns a variable; placed before its declaration, as MSVC requires
+    #define MMC_ALIGN(x) __declspec(align(x))
+#else
+    #define MMC_ALIGN(x) __attribute__ ((aligned(x)))
+#endif
+
 #ifdef __NVCC__
     #define FLOAT3 float3           ///< FLOAT3 is the true float3; in OpenCL, float3 is actually float4; but CUDA supports true float3
 #endif

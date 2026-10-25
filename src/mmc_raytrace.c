@@ -602,7 +602,7 @@ static inline int havel_sse4(float3* vecN, float3* bary, const __m128 o, const _
 float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
     float3 bary = {1e10f, 0.f, 0.f, 0.f};
-    float barypout[4] __attribute__ ((aligned(16)));
+    MMC_ALIGN(16) float barypout[4];
     float rc, currweight, dlen, ww, Lp0, mus;
     int i, j, k, tshift, *enb = NULL, *nextenb = NULL, eid;
     __m128 O, T, S;
@@ -1663,7 +1663,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         }
                     } else {
                         float dstep, segloss, w0;
-                        int4 idx __attribute__ ((aligned(16)));
+                        MMC_ALIGN(16) int4 idx;
                         int i, seg = (int)(r->Lmove / cfg->steps.x) + 1;
                         seg = (seg << 1);
                         dstep = r->Lmove / seg;
@@ -1822,7 +1822,11 @@ void savedebugdata(ray* r, unsigned int id, mcconfig* cfg) {
     unsigned int pos;
     float* gdebugdata = cfg->exportdebugdata;
 
+#ifdef _MSC_VER                 // MSVC knows no "atomic capture" (OpenMP 3.1)
+    #pragma omp critical
+#else
     #pragma omp atomic capture
+#endif
     pos = cfg->debugdatalen++;
 
     if (pos < cfg->maxjumpdebug) {
@@ -2188,7 +2192,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         memcpy(visit->partialpath + offset + 1, r.partialpath, (visit->reclen - 1)*sizeof(float));
 
         if (cfg->issaveseed) {
-            memcpy(visit->photonseed + visit->bufpos * (sizeof(RandType)*RAND_BUF_LEN), r.photonseed, (sizeof(RandType)*RAND_BUF_LEN));
+            memcpy((char*)visit->photonseed + visit->bufpos * (sizeof(RandType)*RAND_BUF_LEN), r.photonseed, (sizeof(RandType)*RAND_BUF_LEN));
         }
 
         visit->bufpos++;

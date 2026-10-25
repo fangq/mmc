@@ -13,9 +13,16 @@
 #include "mmc_tictoc.h"
 #include "mmc_cu_host.h"
 #include "mmc_const.h"
-#include "incbin.h"
 
-INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
+#ifdef _MSC_VER
+    /* incbin needs the GNU assembler: with MSVC the PTX comes as a char array,
+       made from built/mmc_optix_core.ptx with xxd -i (0-terminated) */
+    #include "mmc_optix_core_ptx.h"
+    static const char* mmcShaderPtx = (const char*)mmc_optix_core_ptx;
+#else
+    #include "incbin.h"
+    INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
+#endif
 
 /* -D T (dlTime) prints the time of each OptiX set-up stage and the logs OptiX
    returns when compiling the module and program groups -- as it prints the

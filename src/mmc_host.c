@@ -187,8 +187,8 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
  */
 
 int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
-    RandType ran0[RAND_BUF_LEN] __attribute__ ((aligned(16)));
-    RandType ran1[RAND_BUF_LEN] __attribute__ ((aligned(16)));
+    MMC_ALIGN(16) RandType ran0[RAND_BUF_LEN];
+    MMC_ALIGN(16) RandType ran1[RAND_BUF_LEN];
     unsigned int i, j;
     float raytri = 0.f, raytri0 = 0.f;
     unsigned int threadid = 0, ncomplete = 0, t0, dt, debuglevel = 0;
@@ -262,7 +262,11 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     #pragma omp parallel private(ran0,ran1,threadid,j)
     {
         visitor visit = {0.f, 0.f, 1.f / cfg->tstep, DET_PHOTON_BUF, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL};
+#ifdef _MSC_VER
+        ptrdiff_t id;   // MSVC's OpenMP 2.0 needs a signed loop index
+#else
         size_t id;
+#endif
 
 #ifdef _OPENMP
         unsigned int threadnum = omp_get_num_threads();

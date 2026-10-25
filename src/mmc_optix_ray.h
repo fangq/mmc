@@ -6,7 +6,7 @@
 /**
  * @brief struct for Ray information
  */
-typedef struct __attribute__((aligned(16))) MMC_OptiX_Ray {
+typedef struct __align__(16) MMC_OptiX_Ray {
     float3 p0;                    /**< current photon position */
     float3 dir;                   /**< current photon direction vector */
     float slen;                   /**< the remaining unitless scattering length = length*mus */

@@ -42,6 +42,12 @@
     #define M_PI 3.14159265358979323846
 #endif
 
+#ifdef _MSC_VER
+    #define MMC_TLS __declspec(thread)   ///< thread-local storage
+#else
+    #define MMC_TLS __thread
+#endif
+
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
 #define EPS2       0.1*EPS
@@ -72,8 +78,8 @@ inlinefun float rand_do_roulette(RandType t[RAND_BUF_LEN]) {
 
 //! generate [0,1] random number for the sin/cos of arimuthal angles
 inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN], float* si, float* co) {
-    static __thread V4SF sine[MATH_BLOCK], cosine[MATH_BLOCK];
-    static __thread int pos = (MATH_BLOCK << 2);
+    static MMC_TLS V4SF sine[MATH_BLOCK], cosine[MATH_BLOCK];
+    static MMC_TLS int pos = (MATH_BLOCK << 2);
 
     if (pos >= (MATH_BLOCK << 2)) {
         V4SF ran[MATH_BLOCK];
@@ -97,8 +103,8 @@ inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN], float* si, floa
 
 //! generate [0,1] random number for the next scattering length
 inlinefun float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]) {
-    static __thread V4SF logval[MATH_BLOCK];
-    static __thread int pos = (MATH_BLOCK << 2);
+    static MMC_TLS V4SF logval[MATH_BLOCK];
+    static MMC_TLS int pos = (MATH_BLOCK << 2);
     float res;
 
     if (pos >= (MATH_BLOCK << 2)) {

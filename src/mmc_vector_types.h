@@ -136,6 +136,7 @@ typedef unsigned char uchar;
 
 #else
 
+typedef unsigned int uint;      // glibc defines it as well; MSVC does not
 typedef unsigned char uchar;
 typedef struct FLOAT3 {
     float x, y, z;
