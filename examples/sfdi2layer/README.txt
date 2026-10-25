@@ -16,7 +16,7 @@ retessellated mesh is saved as "**_sfdi.dat".
 The optical properties mimic that of the skull and CSF 
 of a human brain model, and can be found at 
 
-http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/Colin27AtlasMesh#Tissue_optical_properties.
+https://mcx.space/wiki/index.cgi?MMC/Colin27AtlasMesh#Tissue_optical_properties.
 
 Run "createmesh.m" first to generate mesh (before/after 
 retessellation), then run "run_test.sh" to perform the 

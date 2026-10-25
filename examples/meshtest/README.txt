@@ -27,7 +27,7 @@ in the paper (Table 1), respectively.
 1. First, you need to create the 3 meshes to run this example. You 
 need to first download and install iso2mesh version 1.0 or newer from 
 
-  http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
+  https://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
 
 2. Start matlab, run createmesh to create all mesh files
 

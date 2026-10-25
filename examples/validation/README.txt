@@ -18,7 +18,7 @@ package of Monte Carlo eXtreme (MCX) under the mcx/utils directory.
 1. First, you need to create the 3 meshes to run this example. You
 need to first download and install iso2mesh version 1.0 or newer from
 
-  http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
+  https://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
 
 2. Start matlab, run createmesh to create all mesh files. Matlab will
 print a value for variable eid. This value indicates the initial element
@@ -34,7 +34,7 @@ You have to download MCX package from
  svn checkout --username anonymous_user https://orbit.nmr.mgh.harvard.edu/svn/mcextreme/mcextreme_cuda/trunk/ mcx
 
 using the password "anonymous_user". You can also download the pre-compiled
-binary package from http://mcx.sf.net/cgi-bin/index.cgi?Download
+binary package from https://mcx.space/wiki/index.cgi?Download
 
 5. Assuming you have compiled and installed MCX, you can run MCX simulation by
 

@@ -10,7 +10,7 @@ allows you to reproduce Fig. 4 in the paper.
 This example requires the Colin27 atlas mesh. It can be
 downloaded at
 
-http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/Colin27AtlasMesh
+https://mcx.space/wiki/index.cgi?MMC/Colin27AtlasMesh
 
 In the original MMC paper, the V1 atlas mesh was used.
 In this example, we configure to use the V2 atlas mesh.
@@ -22,7 +22,7 @@ is negligible.
 
 1. First, you need to download the Colin27 atlas mesh from
 
-   http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/Colin27AtlasMesh
+   https://mcx.space/wiki/index.cgi?MMC/Colin27AtlasMesh
    
    after download, you should extract file "MMC_Collins_Atlas_Mesh_Version_2L.mat"
    and put it under this folder

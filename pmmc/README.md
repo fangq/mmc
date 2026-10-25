@@ -111,7 +111,8 @@ toolkit and pass `-DBUILD_CUDA=ON` to CMake, for example `CMAKE_ARGS="-DBUILD_CU
 The PMMC module is easy to use. You can use the `pmmc.gpuinfo()` function to first list
 the OpenCL CPUs and GPUs available on your computer, then call the `run()` function to launch
 a photon simulation. The compute backend is selected by `cfg['compute']`: `'opencl'` (default),
-`'sse'` (multi-threaded CPU, `cfg['gpuid']=-1`), or `'cuda'` if pmmc was built with CUDA.
+`'sse'` (multi-threaded CPU, `cfg['gpuid']=-1`), or `'cuda'` if pmmc was built with CUDA;
+`'optix'` is accepted as in mmclab and runs with OpenCL when OptiX is not built in.
 
 A simulation can be defined conveniently in two approaches - a one-liner and a two-liner:
 
@@ -147,6 +148,13 @@ cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.
        'srcpos': [30,30,0], 'srcdir':[0,0,1], 'prop':[[0,0,1,1],[0.005,1,0.01,1.37]]}
 res = pmmc.run(cfg)
 ```
+
+`pmmc.run()` calls the binary module only. `pmmc.mmclab(cfg)` additionally applies the same
+pre- and post-processing as `mmclab.m` (for example, reorienting the elements, finding the
+initial element of the source, and unpacking the detected photon and trajectory data into
+dicts), and is recommended when porting MMCLAB scripts.
+Python ports of all the MMCLAB example scripts can be found in the `example/` folder
+(see `example/README.md`).
 
 ### Reproducible simulations
 

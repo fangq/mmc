@@ -63,7 +63,16 @@ MMC v2026 adds the below key features
   (1.02-1.06x); because of the dynamic scheduling, multi-threaded runs with the same
   seed agree statistically but are not bit-reproducible, use a single thread
   (`OMP_NUM_THREADS=1`) on the CPU to reproduce a run exactly
-* pmmc is bumped to 0.4.0
+* the OptiX-based RT-MMC now supports all source types, multiple sources, detected
+  photons, trajectories (`-D M`), adjoint Jacobians and surface-only meshes
+* the adjoint Jacobians of mus/musp apply the same chain rule as MCX
+* `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
+  all mmclab example scripts are ported to Python under `pmmc/example`
+* input parsing is hardened by fuzzing the JSON inputs and command line options
+* the released Linux binaries and mex files are built in a manylinux2014 container and
+  run on glibc 2.17 or newer; Octave mex files for Windows and macOS are built against
+  Octave 10
+* pmmc is bumped to 0.3.12
 
 this release also fixed a list of bugs, including
 
@@ -322,6 +331,19 @@ The latest release of MMC can be downloaded from the following URL:
 
 <https://mcx.space/#mmc>
 
+The same packages are also attached to the GitHub release page
+(https://github.com/fangq/mmc/releases), and the latest automatically built
+packages can be found at https://mcx.space/nightly/. In addition
+
+- the all-in-one MCX Studio packages bundle mmc with mcx, mcxcl, the MCX Studio
+  GUI and the MATLAB/Octave toolboxes; on Windows, they can be installed using an
+  installer or `winget install coti.mcxstudio`
+- the Python module can be installed using `python3 -m pip install pmmc`
+- a Docker image is available as `fangqq/mmc` on Docker Hub
+- the released Linux binaries and mex files are built in a manylinux2014 container
+  and run on Linux distributions with glibc 2.17 or newer; the Octave mex files for
+  Windows and macOS require Octave 10 or newer
+
 The development branch (not fully tested) of the code can be accessed using 
 Git. However this is not encouraged unless you are a developer. To check out 
 the Git source code, you should use the following command:
@@ -397,6 +419,8 @@ Other compilation options include
       make release  # create a single-threaded optimized binary
       make prof     # this makes a binary to produce profiling info for gprof
       make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
+      make optix    # this compiles mmc with the OptiX-based ray-tracing MMC (RT-MMC), implies cuda
+      make unittest # this builds and runs the host (CPU) unit tests
 
 if you wish to build the mmc mex file to be used in matlab, you should run
 
@@ -410,7 +434,7 @@ similarly, if you wish to build the mex file for GNU Octave, you should run
 
 If you append `-f makefile_sfmt` at the end of any of the above make 
 commands, you will get an executable named `mmc_sfmt`, which uses a fast 
-MT19937 random-number-generator (RNG) instead of the default GLIBC 48bit RNG. 
+MT19937 random-number-generator (RNG) instead of the default xorshift128+ RNG. 
 If your CPU supports SSE4, the fastest binary can be obtained by running the 
 following command:
 
@@ -480,7 +504,7 @@ The full command line options of MMC include the following:
 #          Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          #
 #              https://mcx.space/#mmc  &  https://neurojson.io/               #
 #                                                                             #
-#Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]#
+#Computational Optics & Translational Imaging (COTI) Lab  [https://fanglab.org]#
 #   Department of Bioengineering, Northeastern University, Boston, MA, USA    #
 ###############################################################################
 #    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #
@@ -539,6 +563,7 @@ where possible parameters include (the first item in [] is the default value)
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)
  -W '50,30,20' (--workload)    workload for active devices; normalized by sum
  --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones
+ --kernel my_simu.cl           user specified OpenCL kernel source file
 
 == Output options ==
  -s sessionid  (--session)     a string used to tag all output file names
@@ -1125,5 +1150,5 @@ Reference
 - [3] <https://cygwin.com/setup-x86_64.exe> 
 - [4] <http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html> 
 - [5] <http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath> 
-- [6] <https://mcx.space/cgi-bin/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data> 
+- [6] <https://mcx.space/wiki/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data> 
 - [7] <http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut>

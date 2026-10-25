@@ -9,7 +9,7 @@ Address: Qianqian Fang
          360 Huntington Ave, Boston, MA 02115, USA
          Office:   ISEC 223
          Phone[O]: 617-373-3829
-URL: http://fanglab.org
+URL: https://fanglab.org
 Email: <q.fang at neu.edu>
 
 

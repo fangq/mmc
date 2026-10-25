@@ -39,6 +39,14 @@ Octave).
 After installation, please type "help mmclab" in MATLAB/Octave to print the
 help information.
 
+The Octave mex files released for Windows and macOS require Octave 10 or
+newer; the Linux Octave mex file works with any recent Octave version. The
+released Linux mex files are built against glibc 2.17 and run on most Linux
+distributions released since 2014. MMCLAB can also be installed with the
+all-in-one MCX Studio package. For Python users, the same functionality is
+provided by pmmc ("pip install pmmc"), whose pmmc.mmclab() function accepts
+the same cfg structure (as a dict).
+
 
 == # How to use MMCLAB in MATLAB/Octave ==
 
@@ -57,7 +65,7 @@ the verbose command line options in MMC.
            Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          %
                https://mcx.space/#mmc  &  https://neurojson.io                %
                                                                               %
-  Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
+  Computational Optics & Translational Imaging (COTI) Lab  [https://fanglab.org]%
     Department of Bioengineering, Northeastern University, Boston, MA, USA    %
   #############################################################################%
      The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      %
@@ -111,6 +119,9 @@ the verbose command line options in MMC.
       *cfg.node:        node array for the input tetrahedral mesh, 3 columns: (x,y,z)
       *cfg.elem:        element array for the input tetrahedral mesh, 4 columns
       *cfg.elemprop:    element property index for input tetrahedral mesh
+      cfg.face:        (OptiX only) a surface-only mesh used instead of cfg.elem, 5 columns:
+                       3 node indices (1-based), the inner and the outer medium labels;
+                       the triangle normal (right-hand rule) points from inner to outer
       *cfg.tstart:      starting time of the simulation (in seconds)
       *cfg.tstep:       time-gate width of the simulation (in seconds)
       *cfg.tend:        ending time of the simulation (in second)

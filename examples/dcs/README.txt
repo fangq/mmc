@@ -40,7 +40,7 @@ flow index.
 1. First, you need to create the mesh to run this example. If you have not done it already,
 install iso2mesh from Sourceforge:
 
-    http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
+    https://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Download
     
 2. Start Matlab, run createmesh and make a note of the value of the element ID that encloses
 the source (reported by the createmesh script). Edit "dcs.inp" to set line 7 to this number.

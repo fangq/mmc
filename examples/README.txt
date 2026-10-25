@@ -28,7 +28,7 @@ examples/
 A complex human brain atlas mesh, i.e. Fig. 4 in [Fang2010], can 
 be downloaded separately at the following URL:
 
- http://mcx.sourceforge.net/cgi-bin/index.cgi?MMC/CollinsAtlasMesh
+ https://mcx.space/wiki/index.cgi?MMC/CollinsAtlasMesh
 
 
 Reference: 
