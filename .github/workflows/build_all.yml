@@ -107,7 +107,7 @@ jobs:
             make oct${{ env.OMPONLY }} CC=gcc-12 CXX=g++-12 USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
             otool -L ../mmclab/mmc.mex
           else
-            PATH="$PWD/../octave/octave-9.2.0-w64/mingw64/bin":$PATH
+            PATH="$PWD/../octave/octave-10.3.0-w64/mingw64/bin":$PATH
             which g++
             g++ --version
             make oct CC=gcc CXX=g++ LIBOPENCL='/c/Windows/System32/OpenCL.dll --verbose' LFLAGS='-static-libgcc -static-libstdc++'
@@ -200,8 +200,8 @@ jobs:
           fi
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp "$PWD/octave/octave-9.2.0-w64/mingw64/bin/libgomp-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
-            cp "$PWD/octave/octave-9.2.0-w64/mingw64/bin/libwinpthread-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
+            cp "$PWD/octave/octave-10.3.0-w64/mingw64/bin/libgomp-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
+            cp "$PWD/octave/octave-10.3.0-w64/mingw64/bin/libwinpthread-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
             upx -9 mmclab/octave/${{ env.OCTAVE_ARCH }}/* || true
             7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
           else
