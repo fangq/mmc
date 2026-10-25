@@ -5,7 +5,7 @@ function varargout = mmclab(varargin)
 %          Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          %
 %              https://mcx.space/#mmc  &  https://neurojson.io                %
 %                                                                             %
-% Computational Optics & Translational Imaging (COTI) Lab  [http://fanglab.org]%
+% Computational Optics & Translational Imaging (COTI) Lab [https://fanglab.org]%
 %   Department of Bioengineering, Northeastern University, Boston, MA, USA    %
 % #############################################################################%
 %    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      %
