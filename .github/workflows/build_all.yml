@@ -240,41 +240,90 @@ jobs:
           name: all-mmc-packages-${{ env.RELEASE_TAG }}
           path: packages/mmc-${{ env.RELEASE_TAG }}.zip
 
-  build_cuda_optix:
-    name: Build-only check of the CUDA and OptiX backends
-    runs-on: ubuntu-22.04
+  build_mmc_optix:
+    name: Build+Upload mmc with CUDA and OptiX
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev
-      - name: Install CUDA
-        uses: Jimver/cuda-toolkit@v0.2.10
-        with:
-          cuda: '11.7.0'
-          method: 'network'
-          sub-packages: '["nvcc", "cudart"]'
       - name: Fetch the OptiX headers
         run: |
-          git clone --depth 1 --branch v7.5.0 https://github.com/NVIDIA/optix-dev.git /tmp/optix
-      - name: Build mmc with the CUDA backend
+          git clone --depth 1 --branch v7.5.0 https://github.com/NVIDIA/optix-dev.git ../optix
+      - name: Set up MSVC (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: '14.29'
+      - name: Build mmc with the CUDA and OptiX backends (Linux)
+        if: ${{ runner.os == 'Linux' }}
         run: |
-          cp -a src commons /tmp/ && mkdir -p /tmp/cudabuild && mv /tmp/src /tmp/commons /tmp/cudabuild/
-          cd /tmp/cudabuild/src
-          LIBRARY_PATH=$CUDA_PATH/lib64/stubs make cuda CUDAHOME=$CUDA_PATH
-          ../bin/mmc --version
-      - name: Build mmc with the OptiX backend
+          # in the manylinux2014 image, as the other Linux release builds: GLIBC_2.17 at most
+          docker build --build-arg WITH_CUDA=0 -t mcx-linux-release-builder .github/linux_release_builder
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -v "$(cd ../optix && pwd):/optix:ro" \
+              mcx-linux-release-builder bash .github/linux_release_builder/build_mmc_optix.sh
+      - name: Build mmc with the CUDA and OptiX backends (Windows)
+        if: ${{ runner.os == 'Windows' }}
         run: |
-          cd src
-          LIBRARY_PATH=$CUDA_PATH/lib64/stubs make optix CUDAHOME=$CUDA_PATH OPTIXHOME=/tmp/optix
-          ls -l ../bin/mmc   # not run: the OptiX build links libcuda.so.1 from the GPU driver
+          OPTIXHOME="$(cd ../optix && pwd)" bash .github/windows_release_builder/build_mmc_optix.sh
+          # no GPU here: run the CPU backend (the driver and OpenCL DLLs are delay-loaded)
+          bin/mmc.exe --bench dmmc-cube60 -n 1e5 -c sse -D T -s optixtest > optixtest.log
+          grep "absorbed" optixtest.log
+          rm -f optixtest*
+      - name: Create release tag
+        run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
+      - name: Zip mmc-optix
+        run: |
+          # strip (Linux; MSVC keeps no symbols in the .exe), then compress
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            choco install upx --no-progress
+            upx -9 bin/mmc.exe
+          else
+            sudo apt-get install -y upx-ucl
+            strip bin/mmc
+            upx -9 bin/mmc
+          fi
+          # a standalone mmc package, as the standard one, with this binary
+          PKG=$(mktemp -d)/mmc-optix
+          mkdir -p "$PKG" packages
+          cp -a bin examples matlab README.md README.txt LICENSE.txt AUTHORS.txt ChangeLog.txt "$PKG"/ 2>/dev/null || true
+          cat > "$PKG/README_OPTIX.txt" << 'EOF'
+          This build of MMC adds the NVIDIA CUDA (-c cuda) and OptiX (-c optix)
+          backends to the CPU (-c sse) and OpenCL (-c opencl) backends of the
+          standard mmc package.
+
+          It needs an NVIDIA GPU with driver R515 (Linux) or R516 (Windows) or
+          newer.  OptiX ray-traces with the RT cores of RTX GPUs; it runs the
+          dual-grid method (-M g); the other backends run every method.
+
+            mmc --bench dmmc-cube60 -c optix       # the OptiX backend
+            mmc --bench dmmc-cube60 -c cuda        # the CUDA backend
+            mmc -L                                 # list the GPUs
+
+          See README.txt for everything else.
+          EOF
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            (cd "$PKG/.." && 7z a -tzip "$GITHUB_WORKSPACE/packages/mmc-optix-${{ env.RELEASE_TAG }}.zip" mmc-optix)
+          else
+            (cd "$PKG/.." && zip -FSr --symlink "$GITHUB_WORKSPACE/packages/mmc-optix-${{ env.RELEASE_TAG }}.zip" mmc-optix)
+          fi
+          ls -l packages
+      - name: Upload mmc-optix package
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-mmc-optix-packages-${{ env.RELEASE_TAG }}
+          path: packages/mmc-optix-${{ env.RELEASE_TAG }}.zip
 
   upload_package:
     name: Upload Packages
-    needs: build_all
+    needs: [build_all, build_mmc_optix]
     runs-on: ubuntu-22.04
     if: ${{ github.repository_owner == 'fangq' && github.actor == 'fangq' && github.event_name != 'pull_request'}}
     steps:
