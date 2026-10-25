@@ -68,7 +68,30 @@ MMC v2026 adds the below key features
 * the adjoint Jacobians of mus/musp apply the same chain rule as MCX
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
   all mmclab example scripts are ported to Python under `pmmc/example`
-* input parsing is hardened by fuzzing the JSON inputs and command line options
+* unit tests and coverage: host-side unit tests of the parsers, mesh code, ray tracers
+  and the CUDA/OptiX backends (`make unittest`, 485 checks) raise the line coverage of
+  the host code to about 95%; 68 built-in example tests check every run against golden
+  values; the bugs these tests found were fixed
+* fuzzing: four rounds of JSON-aware mutation fuzzing of the input files and of the
+  command-line options, run on AddressSanitizer builds of mcx, mcxcl and mmc; every
+  crash, hang and memory error they found was fixed
+* hardening: JSON arrays are length-checked before use; JData arrays must carry valid
+  annotations and decode to their declared size; an embedded mesh is checked (node
+  indices, element labels, finite coordinates, InitElem); optical properties, time
+  gates, SrcNum and pattern sizes are validated; string options are bounds-checked;
+  invalid input now stops with an error message instead of crashing or hanging
+* fixes found by fuzzing: photons reaching the time limit on the CPU path are stopped as
+  on the GPU instead of being retraced with an undefined element; the last step before
+  the time limit can no longer be negative; lost photons no longer read outside the
+  mesh; pattern sizes are bounded before their use as indices
+* frequency-domain (RF) forward simulations now also run on the CPU (`-c sse`), and RF
+  output is fixed for element- and node-based runs on all backends (a 19-degree phase
+  error, and a missing imaginary part on the GPU); the standalone binary saves the
+  imaginary part to `<session>_imag.<ext>`; CW, RF and time-domain solutions of every
+  backend were checked against the diffusion solution of a semi-infinite medium (within
+  2% in amplitude and 0.3 degrees in phase)
+* `Session.OutputType` in JSON inputs accepts the names mmclab and pmmc use; only the
+  first letter used to be read
 * the released Linux binaries and mex files are built in a manylinux2014 container and
   run on glibc 2.17 or newer; Octave mex files for Windows and macOS are built against
   Octave 10
