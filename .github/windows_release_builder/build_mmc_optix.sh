@@ -108,6 +108,8 @@ nvcc -c -m64 -use_fast_math -Xptxas -O3 -Xcompiler -MT,-openmp -D_USE_MATH_DEFIN
 # mmc prints its help) on a computer with neither
 "$MSLINK" -nologo -OUT:../bin/mmc.exe built/*.obj -LIBPATH:"$CUDAW/lib/x64" \
           cudart_static.lib cuda.lib OpenCL.lib delayimp.lib -DELAYLOAD:nvcuda.dll -DELAYLOAD:OpenCL.dll
+# the import library and export file link writes as some objects export symbols
+rm -f ../bin/mmc.lib ../bin/mmc.exp
 
 # the OpenMP runtime and the C++ runtime DLL it loads, from the MSVC
 # redistributables (the LLVM OpenMP runtime of -openmp:llvm, libomp140, is
