@@ -477,9 +477,15 @@ int zmat_run(const size_t inputsize, unsigned char* inputstr, size_t* outputsize
                 /* the buffer doubles only when it is full, at most 12 times;
                    any error, or no progress with room left to write (the input
                    ended early), stops it -- the old loop carried on through
-                   errors and wrote through a failed realloc */
+                   errors and wrote through a failed realloc.  miniz, unlike
+                   zlib, may return Z_OK after a block with input and room
+                   both left: that is progress, and inflate is called again */
                 while ((*ret = inflate(&zs, Z_SYNC_FLUSH)) != Z_STREAM_END) {
                     unsigned char* grown;
+
+                    if (*ret == Z_OK && zs.avail_out != 0) {
+                        continue;
+                    }
 
                     if ((*ret != Z_OK && *ret != Z_BUF_ERROR) || zs.avail_out != 0 || count > 12) {
                         inflateEnd(&zs);
