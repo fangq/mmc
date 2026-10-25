@@ -17,6 +17,24 @@
 
 INCTXT(mmcShaderPtx, mmcShaderPtxSize, "built/mmc_optix_core.ptx");
 
+/* -D T (dlTime) prints the time of each OptiX set-up stage and the logs OptiX
+   returns when compiling the module and program groups -- as it prints the
+   OpenCL build log for the OpenCL backend; otherwise this backend reports the
+   same few lines as the OpenCL and CUDA ones */
+static int optixverbose = 0;
+
+#define OPTIX_STAGE(cfg, name, tic) \
+    if (optixverbose) { \
+        MMC_FPRINTF((cfg)->flog, "optix %s complete:  \t%d ms\n", name, GetTimeMillis() - (tic)); \
+        fflush((cfg)->flog); \
+    }
+
+static void optixlog(const char* log, size_t logsize) {
+    if (optixverbose && logsize > 1) {
+        std::cout << log << std::endl;
+    }
+}
+
 void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo* gpu) {
     uint tic0 = StartTimer();
     // ==================================================================
@@ -24,39 +42,41 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     // ==================================================================
     OptixParams optixcfg;
 
+    optixverbose = ((cfg->debuglevel & dlTime) != 0);
+
+    mcx_printheader(cfg);
+    MMC_FPRINTF(cfg->flog, "- code name: [MMC-OptiX] compiled with CUDA [%d] and OptiX [%d.%d]\n",
+                CUDART_VERSION, OPTIX_VERSION / 10000, (OPTIX_VERSION % 10000) / 100);
+    MMC_FPRINTF(cfg->flog, "- compiled with: [RNG] xorshift128+ RNG [Seed Length] 4\n");
+    MMC_FPRINTF(cfg->flog, "initializing streams ...\t");
+    fflush(cfg->flog);
+
     initOptix();
 
     createContext(cfg, &optixcfg);
-    MMC_FPRINTF(cfg->flog, "optix init complete:  \t%d ms\n", GetTimeMillis() - tic0);
+    MMC_FPRINTF(cfg->flog, "init complete : %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     prepBoundParams(cfg, mesh, &optixcfg);
 
     std::string ptxcodestr = std::string(mmcShaderPtx);
     createModule(cfg, &optixcfg, ptxcodestr);
-    MMC_FPRINTF(cfg->flog, "optix module complete:  \t%d ms\n", GetTimeMillis() - tic0);
-    fflush(cfg->flog);
+    OPTIX_STAGE(cfg, "module", tic0);
 
     createRaygenPrograms(&optixcfg);
     createMissPrograms(&optixcfg);
     createHitgroupPrograms(&optixcfg);
-    MMC_FPRINTF(cfg->flog, "optix device programs complete:  \t%d ms\n",
-                GetTimeMillis() - tic0);
-    fflush(cfg->flog);
+    OPTIX_STAGE(cfg, "device programs", tic0);
 
     optixcfg.launchParams.gashandle = buildAccel(mesh, &optixcfg);
-    MMC_FPRINTF(cfg->flog, "optix acceleration structure complete:  \t%d ms\n",
-                GetTimeMillis() - tic0);
-    fflush(cfg->flog);
+    OPTIX_STAGE(cfg, "acceleration structure", tic0);
 
     createPipeline(&optixcfg);
-    MMC_FPRINTF(cfg->flog, "optix pipeline complete:  \t%d ms\n",
-                GetTimeMillis() - tic0);
-    fflush(cfg->flog);
+    OPTIX_STAGE(cfg, "pipeline", tic0);
 
     buildSBT(mesh, &optixcfg);
-    MMC_FPRINTF(cfg->flog, "optix shader binding table complete:  \t%d ms\n",
-                GetTimeMillis() - tic0);
+    OPTIX_STAGE(cfg, "shader binding table", tic0);
+    MMC_FPRINTF(cfg->flog, "build program complete : %d ms\n", GetTimeMillis() - tic0);
     fflush(cfg->flog);
 
     // ==================================================================
@@ -64,15 +84,17 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     // ==================================================================
     prepLaunchParams(cfg, mesh, gpu, &optixcfg);
     CUDA_ASSERT(cudaDeviceSynchronize());
-    MMC_FPRINTF(cfg->flog, "optix launch parameters complete:  \t%d ms\n",
-                GetTimeMillis() - tic0);
-    fflush(cfg->flog);
+    OPTIX_STAGE(cfg, "launch parameters", tic0);
+    MMC_FPRINTF(cfg->flog, "- [device %d(%d): %s] threadph=%d oddphotons=%d np=%.1f nthread=%d repetition=1\n",
+                0, cfg->deviceid[0], optixcfg.deviceProps.name, (int)optixcfg.launchParams.threadphoton,
+                (int)optixcfg.launchParams.oddphoton, (double)cfg->nphoton, (int)optixcfg.launchWidth);
 
     // ==================================================================
     // Launch simulation
     // ==================================================================
     MMC_FPRINTF(cfg->flog, "lauching OptiX for time window [%.1fns %.1fns] ...\n",
                 cfg->tstart * 1e9, cfg->tend * 1e9);
+    MMC_FPRINTF(cfg->flog, "simulation run# 1 ... \n");
     fflush(cfg->flog);
     uint kernel_start_time = GetTimeMillis();
     OPTIX_CHECK(optixLaunch(/*! pipeline we're launching launch: */
@@ -88,8 +110,6 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     uint kernel_runtime = GetTimeMillis() - kernel_start_time;
     MMC_FPRINTF(cfg->flog, "kernel complete:  \t%d ms\nretrieving flux ... \t",
                 GetTimeMillis() - tic0);
-    MMC_FPRINTF(cfg->flog, "simulated %zu photons (%zu) with 1 devices \nMMC simulation speed: %.2f photon/ms\n",
-                cfg->nphoton, cfg->nphoton, (double)cfg->nphoton / kernel_runtime);
     fflush(cfg->flog);
 
     // ==================================================================
@@ -154,6 +174,8 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
         MMC_FPRINTF(cfg->flog, "saved %u trajectory positions, total: %d\n", ntraj, cfg->debugdatalen);
     }
 
+    MMC_FPRINTF(cfg->flog, "\nsimulated %zu photons (%zu) with 1 devices\nMMC simulation speed: %.2f photon/ms\n",
+                cfg->nphoton, cfg->nphoton, (double)cfg->nphoton / MAX(kernel_runtime, 1u));
     MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
                 energy[0], (energy[0] > 0.0) ? (energy[0] - energy[1]) / energy[0] * 100.f : 0.f);
     fflush(cfg->flog);
@@ -185,8 +207,10 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
     // normalize output
     // ==================================================================
     if (cfg->isnormalized) {
-        MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
-        fflush(cfg->flog);
+        if (optixverbose) {
+            MMC_FPRINTF(cfg->flog, "normalizing raw data ...\t");
+            fflush(cfg->flog);
+        }
 
         double sum_normalizer = 0.0;
 
@@ -213,9 +237,11 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
                 }
             }
         }
-        MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
-                    GetTimeMillis() - tic0);
-        fflush(cfg->flog);
+        if (optixverbose) {
+            MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
+                        GetTimeMillis() - tic0);
+            fflush(cfg->flog);
+        }
     }
 
     // adjoint Jacobians from the fields of the source and detector slots, by the CUDA kernels
@@ -574,7 +600,6 @@ void createContext(mcconfig* cfg, OptixParams* optixcfg) {
     CUDA_ASSERT(cudaStreamCreate(&optixcfg->stream));
 
     cudaGetDeviceProperties(&optixcfg->deviceProps, gpuid);
-    std::cout << "Running on device: " << optixcfg->deviceProps.name << std::endl;
 
     CUresult cuRes = cuCtxGetCurrent(&optixcfg->cudaContext);
 
@@ -658,9 +683,7 @@ void createModule(mcconfig* cfg, OptixParams* optixcfg, std::string ptxcode) {
                                          &optixcfg->module
                                         ));
 
-    if (logsize > 1) {
-        std::cout << log << std::endl;
-    }
+    optixlog(log, logsize);
 }
 
 /**
@@ -686,9 +709,7 @@ void createRaygenPrograms(OptixParams* optixcfg) {
                                         &optixcfg->raygenPGs[0]
                                        ));
 
-    if (logsize > 1) {
-        std::cout << log << std::endl;
-    }
+    optixlog(log, logsize);
 }
 
 /**
@@ -714,9 +735,7 @@ void createMissPrograms(OptixParams* optixcfg) {
                                         &optixcfg->missPGs[0]
                                        ));
 
-    if (logsize > 1) {
-        std::cout << log << std::endl;
-    }
+    optixlog(log, logsize);
 }
 
 /**
@@ -742,9 +761,7 @@ void createHitgroupPrograms(OptixParams* optixcfg) {
                                         &optixcfg->hitgroupPGs[0]
                                        ));
 
-    if (logsize > 1) {
-        std::cout << log << std::endl;
-    }
+    optixlog(log, logsize);
 }
 
 /**
@@ -899,9 +916,7 @@ void createPipeline(OptixParams* optixcfg) {
                                     &optixcfg->pipeline
                                    ));
 
-    if (logsize > 1) {
-        std::cout << log << std::endl;
-    }
+    optixlog(log, logsize);
 }
 
 /**
