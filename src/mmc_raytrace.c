@@ -357,7 +357,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
         if ((int)((r->photontimer + r->Lmove * rc - cfg->tstart)*visit->rtstep) >= (int)((cfg->tend - cfg->tstart)*visit->rtstep)) { /*exit time window*/
             r->faceid = -2;
             r->pout.x = MMC_UNDEFINED;
-            r->Lmove = (cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f;
+            r->Lmove = MAX((cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f, 0.f); /* never backwards in time */
         }
 
         if (cfg->mcmethod == mmMCX) {
@@ -633,7 +633,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             if ((int)((r->photontimer + r->Lmove * rc - cfg->tstart)*visit->rtstep) >= (int)((cfg->tend - cfg->tstart)*visit->rtstep)) { /*exit time window*/
                 r->faceid = -2;
                 r->pout.x = MMC_UNDEFINED;
-                r->Lmove = (cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f;
+                r->Lmove = MAX((cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f, 0.f); /* never backwards in time */
             }
 
             if (cfg->mcmethod == mmMCX) {
@@ -877,7 +877,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
         if ((int)((r->photontimer + r->Lmove * rc - cfg->tstart)*visit->rtstep) >= (int)((cfg->tend - cfg->tstart)*visit->rtstep)) { /*exit time window*/
             r->faceid = -2;
             r->pout.x = MMC_UNDEFINED;
-            r->Lmove = (cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f;
+            r->Lmove = MAX((cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f, 0.f); /* never backwards in time */
         }
 
         if (cfg->mcmethod == mmMCX) {
@@ -1510,7 +1510,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
         if ((int)((r->photontimer + r->Lmove * rc - cfg->tstart)*visit->rtstep) > cfg->maxgate - 1) { /*exit time window*/
             r->faceid = -2;
             r->pout.x = MMC_UNDEFINED;
-            r->Lmove = (cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f;
+            r->Lmove = MAX((cfg->tend - r->photontimer) / (prop->n * R_C0) - 1e-4f, 0.f); /* never backwards in time */
         }
 
         if (cfg->mcmethod == mmMCX) {
@@ -1629,6 +1629,11 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         for (i = 0; i < seg; i++) {
                             P = _mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
                             _mm_store_si128((__m128i*) & (idx.x), P);
+                            /* a midpoint rounded just outside the grid, as an extreme
+                               refractive index can make it, must not index past it */
+                            idx.x = MIN(MAX(idx.x, 0), (int)cfg->dim.x - 1);
+                            idx.y = MIN(MAX(idx.y, 0), (int)cfg->dim.y - 1);
+                            idx.z = MIN(MAX(idx.z, 0), (int)cfg->dim.z - 1);
                             unsigned int newidx = idx.z * cfg->crop0.y + idx.y * cfg->crop0.x + idx.x + tshift;
                             r->oldidx = (r->oldidx == 0xFFFFFFFF) ? newidx : r->oldidx;
 
@@ -1856,7 +1861,13 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
         if (r.pout.x == MMC_UNDEFINED) {
-            if (fixcount++ < MAX_TRIAL) {
+            if (r.faceid == -2) {
+                break;    /*reaches the time limit; the tracer leaves pout undefined*/
+            }
+
+            /* fixphoton nudges the photon towards the centroid of its element;
+               one the tracer has moved out of the mesh (eid <= 0) or lost has none */
+            if (r.eid > 0 && r.eid <= (int)mesh->ne && fixcount++ < MAX_TRIAL) {
                 fixphoton((FLOAT3*)&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
                 continue;
             }
@@ -1961,7 +1972,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
 
             fixcount = 0;
 
-            while (r.pout.x == MMC_UNDEFINED && fixcount++ < MAX_TRIAL) {
+            while (r.pout.x == MMC_UNDEFINED && r.eid > 0 && r.eid <= (int)mesh->ne && fixcount++ < MAX_TRIAL) {
                 fixphoton((FLOAT3*)&r.p0, mesh->node, (int*)(mesh->elem + (r.eid - 1)*mesh->elemlen));
                 r.slen = (*tracercore)(&r, tracer, cfg, visit);
 

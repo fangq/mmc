@@ -712,7 +712,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         if ((int)((r->photontimer + r->Lmove * (prop.n * R_C0) - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep)) > GPU_PARAM(gcfg, maxgate) - 1) { /*exit time window*/
             r->faceid = -2;
             r->pout.x = MMC_UNDEFINED;
-            r->Lmove = (gcfg->tend - r->photontimer) / (prop.n * R_C0) - 1e-4f;
+            r->Lmove = fmax((gcfg->tend - r->photontimer) / (prop.n * R_C0) - 1e-4f, 0.f); /* never backwards in time */
         }
 
         totalloss = MCX_MATHFUN(exp)(-prop.mua * r->Lmove);
@@ -1856,7 +1856,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 break;    /*reaches the time limit*/
             }
 
-            if (fixcount++ < MAX_TRIAL) {
+            if (r.eid > 0 && fixcount++ < MAX_TRIAL) {
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
                 continue;
             }
@@ -1937,7 +1937,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
             fixcount = 0;
 
-            while (r.pout.x == MMC_UNDEFINED && fixcount++ < MAX_TRIAL) {
+            while (r.pout.x == MMC_UNDEFINED && r.eid > 0 && fixcount++ < MAX_TRIAL) {
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
                 r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
                 (*raytet)++;
