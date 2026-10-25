@@ -195,7 +195,9 @@ jobs:
         run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
       - name: Zip mmclab
         run: |
+          # strip, then compress, so the packages are as small as they can be (not on macOS)
           if [[ "$RUNNER_OS" != "macOS" ]]; then
+            strip --strip-unneeded mmclab/mmc.mex* || true
             upx -9 mmclab/mmc.mex* || true
           fi
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
@@ -216,10 +218,13 @@ jobs:
       - name: Prepare mmc package
         run: |
           rm -rf .git mmclab webmmc commons src .git_filters .gitattributes .github .travis.yml win32 deploy
+          # the Octave and OpenCL downloads of the Windows job (2.6 GB unpacked)
+          rm -rf octave opencl
       - name: Zip mmc
         run: |
           cd .. && pwd
           if [[ "$RUNNER_OS" != "macOS" ]]; then
+            strip mmc/bin/* || true
             upx -9 mmc/bin/* || true
           fi
           if [[ "$RUNNER_OS" == "Windows" ]]; then
