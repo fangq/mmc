@@ -49,6 +49,9 @@ MMC v2026 adds the below key features
   (`OMP_NUM_THREADS=1`) on the CPU to reproduce a run exactly
 * the OptiX-based RT-MMC now supports all source types, multiple sources, detected\
   photons, trajectories (`-D M`), adjoint Jacobians and surface-only meshes
+* mmc-optix packages for Linux and Windows: mmc with the CUDA (`-c cuda`) and OptiX\
+  (`-c optix`) backends next to the CPU and OpenCL ones, for NVIDIA GPUs with driver\
+  R515 or newer; mmc now also builds with MSVC
 * the adjoint Jacobians of mus/musp apply the same chain rule as MCX
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and\
   all mmclab example scripts are ported to Python under `pmmc/example`
