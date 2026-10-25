@@ -388,8 +388,10 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     }
 
 
-    if (user_cfg.contains("face")) {
-        /* a surface-only mesh for OptiX: 3 node indices (1-based), the inner and the outer labels */
+    if (user_cfg.contains("face") && !(user_cfg.contains("elem") && !user_cfg["elem"].is_none())) {
+        /* a surface-only mesh for OptiX: 3 node indices (1-based), the inner and the outer labels,
+           given instead of cfg["elem"]; with "elem", "face" is not mmc's (it is often the boundary
+           of the tetrahedral mesh) and is ignored, as it was before surface-only meshes */
         auto f_style_volume = py::array_t < int, py::array::f_style | py::array::forcecast >::ensure(user_cfg["face"]);
 
         if (!f_style_volume) {

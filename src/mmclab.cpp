@@ -84,7 +84,7 @@
 
 typedef mwSize dimtype;                                   //! MATLAB type alias for integer type to use for array sizes and dimensions
 
-void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* cfg, tetmesh* mesh);
+void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruct, mcconfig* cfg, tetmesh* mesh);
 void mmclab_usage();
 mxArray* mmclab_assert(mxArray* arr);
 
@@ -240,7 +240,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                     continue;
                 }
 
-                mmc_set_field(prhs[0], tmp, ifield, &cfg, &mesh);
+                mmc_set_field(prhs[0], tmp, ifield, jstruct, &cfg, &mesh);
             }
 
             mexEvalString("pause(.001);");
@@ -741,7 +741,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
  * @param[out] mesh: the mesh data structure
  */
 
-void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* cfg, tetmesh* mesh) {
+void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruct, mcconfig* cfg, tetmesh* mesh) {
     const char* name = mxGetFieldNameByNumber(root, idx);
     const dimtype* arraydim;
     char* jsonshapes = NULL;
@@ -984,7 +984,16 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, mcconfig* 
 
         printf("mmc.elem=[%d,%d];\n", mesh->ne, mesh->elemlen);
     } else if (strcmp(name, "face") == 0) {
-        /* a surface-only mesh for OptiX: 3 node indices (1-based), the inner and the outer labels */
+        /* a surface-only mesh for OptiX: 3 node indices (1-based), the inner and the outer labels,
+           given instead of cfg.elem.  With cfg.elem, cfg.face is not mmc's -- scripts often keep the
+           boundary triangles iso2mesh returns there (redbird does) -- and is ignored, as it was
+           before surface-only meshes were supported */
+        const mxArray* elem = mxGetField(root, jstruct, "elem");
+
+        if (elem != NULL && !mxIsEmpty(elem)) {
+            return;
+        }
+
         arraydim = mxGetDimensions(item);
 
         if (arraydim[0] <= 0 || arraydim[1] != 5) {
