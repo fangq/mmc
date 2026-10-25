@@ -56,10 +56,10 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           #choco install octave.portable --version=8.3.0
-          curl --retry 3 -kL https://ftpmirror.gnu.org/octave/windows/octave-9.2.0-w64.7z --output octave_9.2.7z
-          7z x octave_9.2.7z -ooctave -y
-          rm -rf octave_9.2.7z
-          echo "$PWD/octave/octave-9.2.0-w64/mingw64/bin" >> $GITHUB_PATH
+          curl --retry 3 -kL https://ftpmirror.gnu.org/octave/windows/octave-10.3.0-w64.7z --output octave_10.3.7z
+          7z x octave_10.3.7z -ooctave -y
+          rm -rf octave_10.3.7z
+          echo "$PWD/octave/octave-10.3.0-w64/mingw64/bin" >> $GITHUB_PATH
           choco install upx
           choco install mingw --version=8.1.0
           #echo 'C:\ProgramData\chocolatey\lib\octave.portable\tools\octave\mingw64\bin' >> $GITHUB_PATH
@@ -174,6 +174,19 @@ jobs:
           # POCL versions round single-precision math differently, so allow a few photons to fork
           # at a reflect/escape decision; every step before the fork must still match
           MMCOPT="-G 1 -c opencl" GOLDENTAG=_opencl MAXFORK=0.1 ./testtraj.sh -t 4000 -T 1
+      - name: Rebuild Linux release binaries for glibc 2.17 (manylinux2014)
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        run: |
+          # built on this runner, every binary and mex file needs GLIBC_2.34 and
+          # does not start on Ubuntu 20.04 or older; the manylinux2014 (CentOS 7)
+          # image links them against glibc 2.17 and checks that they do
+          docker build --build-arg WITH_CUDA=0 -t mcx-linux-release-builder .github/linux_release_builder
+          MLROOT=$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")
+          OCTINC=$(dirname "$(dirname "$(find /usr/include -path '*/octave/mex.h' | head -1)")")
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" \
+              -v "$MLROOT:$MLROOT:ro" -e MATLAB_ROOT="$MLROOT" \
+              -v "$OCTINC:/octinc:ro" -e OCTAVE_INCDIR=/octinc \
+              mcx-linux-release-builder bash .github/linux_release_builder/build_mmc.sh
       - name: Create package folder
         run: |
           mkdir packages
