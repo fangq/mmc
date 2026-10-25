@@ -3929,17 +3929,20 @@ void mcx_validatecfg(mcconfig* cfg) {
         double need;
 
         if (cfg->srctype == stPattern) {
-            if (!(cfg->srcparam1.w >= 1.f && cfg->srcparam2.w >= 1.f)) {
-                MMC_ERROR(-2, "a pattern source needs the pattern size, the 4th elements of srcparam1 and srcparam2, to be at least 1");
+            /* below 2^31 too: launchphoton casts them to int, and (int) of a
+               larger float is not a number of pixels */
+            if (!(cfg->srcparam1.w >= 1.f && cfg->srcparam2.w >= 1.f && cfg->srcparam1.w < 2147483648.f && cfg->srcparam2.w < 2147483648.f)) {
+                MMC_ERROR(-2, "a pattern source needs the pattern size, the 4th elements of srcparam1 and srcparam2, to be between 1 and 2^31");
             }
 
-            need = (double)(int)cfg->srcparam1.w * (int)cfg->srcparam2.w * cfg->srcnum;
+            need = floor(cfg->srcparam1.w) * floor(cfg->srcparam2.w) * cfg->srcnum;
         } else {
-            if (!(cfg->srcparam1.x >= 1.f && cfg->srcparam1.y >= 1.f && cfg->srcparam1.z >= 1.f)) {
-                MMC_ERROR(-2, "a pattern3d source needs the pattern size, the first 3 elements of srcparam1, to be at least 1");
+            if (!(cfg->srcparam1.x >= 1.f && cfg->srcparam1.y >= 1.f && cfg->srcparam1.z >= 1.f &&
+                    cfg->srcparam1.x < 2147483648.f && cfg->srcparam1.y < 2147483648.f && cfg->srcparam1.z < 2147483648.f)) {
+                MMC_ERROR(-2, "a pattern3d source needs the pattern size, the first 3 elements of srcparam1, to be between 1 and 2^31");
             }
 
-            need = (double)(int)cfg->srcparam1.x * (int)cfg->srcparam1.y * (int)cfg->srcparam1.z;
+            need = floor(cfg->srcparam1.x) * floor(cfg->srcparam1.y) * floor(cfg->srcparam1.z);
         }
 
         if (srcpatternlen > 0 && need > (double)srcpatternlen) {
