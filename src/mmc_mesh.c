@@ -414,6 +414,7 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
     mesh_loadnode(mesh, cfg);
     mesh_loadelem(mesh, cfg);
     mesh_loadmedia(mesh, cfg);
+    mesh_checkelem(mesh, cfg);
 
     if (issurfonly) {
         cfg->e0 = -1;  /* no elements: the OptiX kernel finds the initial medium by tracing a ray */
@@ -654,6 +655,56 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg) {
 }
 
 /**
+ * @brief Checks a loaded mesh before anything indexes with it
+ *
+ * Every element's node numbers are used to index the node arrays, and its
+ * label to index the media and the per-medium tallies, with no check at the
+ * point of use -- so an element naming a node past the end, or a label past
+ * the media given, is read and written out of bounds in the volume, face and
+ * ray-tracing code.  An embedded MeshNode/MeshElem is whatever the input says,
+ * so it is checked here, once, where the message can say what is wrong.
+ *
+ * @param[in] mesh: the mesh object, with nodes, elements and media loaded
+ * @param[in] cfg: the simulation configuration
+ */
+
+void mesh_checkelem(tetmesh* mesh, mcconfig* cfg) {
+    int i, j;
+    char msg[MAX_PATH_LENGTH];
+
+    for (i = 0; i < mesh->nn; i++) {
+        if (!isfinite(mesh->node[i].x) || !isfinite(mesh->node[i].y) || !isfinite(mesh->node[i].z)) {
+            snprintf(msg, MAX_PATH_LENGTH, "node %d has a coordinate that is not a finite number", i + 1);
+            MESH_ERROR(msg);
+        }
+    }
+
+    for (i = 0; i < mesh->ne; i++) {
+        for (j = 0; j < mesh->elemlen; j++) {
+            int nid = mesh->elem[i * mesh->elemlen + j];
+
+            if (nid < 1 || nid > mesh->nn) {
+                snprintf(msg, MAX_PATH_LENGTH, "element %d refers to node %d, but the mesh has %d nodes", i + 1, nid, mesh->nn);
+                MESH_ERROR(msg);
+            }
+        }
+
+        /* -1 and -2 mark source and detector elements; mesh_loadmedia has
+           already renumbered the detector ones to prop+1, the extra medium
+           it allocates for a wide-field detector */
+        if (mesh->type[i] < -2 || mesh->type[i] > mesh->prop + cfg->isextdet) {
+            snprintf(msg, MAX_PATH_LENGTH, "element %d has label %d, but only media 1 to %d are defined", i + 1, mesh->type[i], mesh->prop);
+            MESH_ERROR(msg);
+        }
+    }
+
+    if (mesh->ne > 0 && cfg->e0 > mesh->ne) {
+        snprintf(msg, MAX_PATH_LENGTH, "InitElem is %d, but the mesh has %d elements", cfg->e0, mesh->ne);
+        MESH_ERROR(msg);
+    }
+}
+
+/**
  * @brief Load optical property file and initialize the related mesh properties
  *
  * @param[in] mesh: the mesh object
@@ -828,6 +879,12 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
         /* one slot per source for multi-source (srcid<=0) and adjoint runs, as in mesh_validate */
         mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * ((cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum));
 
+        /* nodes or voxels times time gates times sources: too many for memory
+           gives NULL, which the tracer then accumulates into */
+        if (mesh->weight == NULL) {
+            MESH_ERROR("not enough memory for the output: reduce the mesh, grid or number of time gates");
+        }
+
         for (i = 0; i < mesh->ne; i++) {
             for (j = 0; j < mesh->elemlen; j++) {
                 mesh->elem[i * mesh->elemlen + j] = cfg->elem[i * (mesh->elemlen + 1) + j];
@@ -862,6 +919,12 @@ void mesh_loadelem(tetmesh* mesh, mcconfig* cfg) {
     datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
     /* one slot per source for multi-source (srcid<=0) and adjoint runs, as in mesh_validate */
     mesh->weight = (double*)calloc(sizeof(double) * datalen, cfg->maxgate * ((cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum));
+
+    /* nodes or voxels times time gates times sources: too many for memory
+       gives NULL, which the tracer then accumulates into */
+    if (mesh->weight == NULL) {
+        MESH_ERROR("not enough memory for the output: reduce the mesh, grid or number of time gates");
+    }
 
     for (i = 0; i < mesh->ne; i++) {
         pe = mesh->elem + i * mesh->elemlen;
@@ -2562,6 +2625,12 @@ void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
         cfg->basisorder = 0;
         mesh->weight = (double*)calloc(sizeof(double) * cfg->crop0.z * cfg->srcnum, cfg->maxgate);
 
+        /* nodes or voxels times time gates times sources: too many for memory
+           gives NULL, which the tracer then accumulates into */
+        if (mesh->weight == NULL) {
+            MESH_ERROR("not enough memory for the output: reduce the mesh, grid or number of time gates");
+        }
+
         if (cfg->unitinmm != 1.f) {
             for (i = 1; i <= mesh->prop; i++) {
                 mesh->med[i].mus *= cfg->unitinmm;
@@ -2614,6 +2683,12 @@ void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
         /* For adjoint Jacobian mode, field buffer needs nsrcslots = extrasrclen = srcnum + detnum slots */
         int nsrcslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
         mesh->weight = (double*)calloc(sizeof(double) * datalen * nsrcslots, cfg->maxgate);
+
+        /* nodes or voxels times time gates times sources: too many for memory
+           gives NULL, which the tracer then accumulates into */
+        if (mesh->weight == NULL) {
+            MESH_ERROR("not enough memory for the output: reduce the mesh, grid or number of time gates");
+        }
     }
 
     if (cfg->unitinmm != 1.f) {

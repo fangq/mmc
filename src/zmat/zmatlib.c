@@ -429,6 +429,12 @@ int zmat_run(const size_t inputsize, unsigned char* inputstr, size_t* outputsize
               * base64 decoding
               */
             *outputbuf = base64_decode((const unsigned char*)inputstr, inputsize, outputsize);
+
+            /* not base64: NULL, with the output size never set */
+            if (*outputbuf == NULL) {
+                *outputsize = 0;
+                return -1;
+            }
         } else if (zipid == zmZlib || zipid == zmGzip) {
             /**
               * zlib (.zip) or gzip (.gz) decompression
@@ -452,6 +458,11 @@ int zmat_run(const size_t inputsize, unsigned char* inputstr, size_t* outputsize
             buflen[0] = inputsize * 4;
             *outputbuf = (unsigned char*)malloc(buflen[0]);
 
+            if (*outputbuf == NULL) {
+                inflateEnd(&zs);
+                return -5;
+            }
+
             zs.avail_in = inputsize; /* size of input, string + terminator*/
             zs.next_in = inputstr; /* input char array*/
             zs.avail_out = buflen[0]; /* size of output*/
@@ -463,8 +474,30 @@ int zmat_run(const size_t inputsize, unsigned char* inputstr, size_t* outputsize
             if (zipid == zmZlib) {
 #endif
 
-                while ((*ret = inflate(&zs, Z_SYNC_FLUSH)) != Z_STREAM_END && *ret != Z_DATA_ERROR && count <= 12) {
-                    *outputbuf = (unsigned char*)realloc(*outputbuf, (buflen[0] << count));
+                /* the buffer doubles only when it is full, at most 12 times;
+                   any error, or no progress with room left to write (the input
+                   ended early), stops it -- the old loop carried on through
+                   errors and wrote through a failed realloc */
+                while ((*ret = inflate(&zs, Z_SYNC_FLUSH)) != Z_STREAM_END) {
+                    unsigned char* grown;
+
+                    if ((*ret != Z_OK && *ret != Z_BUF_ERROR) || zs.avail_out != 0 || count > 12) {
+                        inflateEnd(&zs);
+                        free(*outputbuf);
+                        *outputbuf = NULL;
+                        return -3;
+                    }
+
+                    grown = (unsigned char*)realloc(*outputbuf, (buflen[0] << count));
+
+                    if (grown == NULL) {
+                        inflateEnd(&zs);
+                        free(*outputbuf);
+                        *outputbuf = NULL;
+                        return -5;
+                    }
+
+                    *outputbuf = grown;
                     zs.next_out =  (Bytef*)(*outputbuf + zs.total_out);
                     zs.avail_out = (buflen[0] << count) - zs.total_out; /* size of output*/
                     count++;

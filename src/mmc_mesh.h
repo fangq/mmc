@@ -148,6 +148,7 @@ void mesh_loadnode(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadelem(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadfaceneighbor(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadmedia(tetmesh* mesh, mcconfig* cfg);
+void mesh_checkelem(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadelemvol(tetmesh* mesh, mcconfig* cfg);
 void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg);
 

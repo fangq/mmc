@@ -1865,7 +1865,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.faceid = -1;
         }
 
-        if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0 && r.faceid >= 0) {
+        if (cfg->issavedet && r.Lmove > 0.f && r.faceid >= 0 && mesh->type[r.eid - 1] > 0) { /* faceid first: a photon the tracer gave up on has faceid -1 and eid ID_UNDEFINED */
             r.partialpath[mesh->prop - 1 + ((cfg->implicit && (!(r.inroi) != !(r.roitype))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
 
             if (cfg->debuglevel & dlMove) {
@@ -1878,7 +1878,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             break;    /*reaches the time limit*/
         }
 
-        if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
+        if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && r.eid != ID_UNDEFINED && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
             if (cfg->debuglevel & dlTraj) {
                 savedebugdata(&r, (unsigned int)id, cfg);
             }
@@ -2047,7 +2047,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             }
         }
 
-        if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
+        if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && r.eid != ID_UNDEFINED && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
             if (cfg->debuglevel & dlTraj) {
                 savedebugdata(&r, (unsigned int)id, cfg);
             }
@@ -2075,7 +2075,12 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.partialpath[(mesh->prop << 1) - 1 + (r.inroi ? mesh->prop : mesh->type[r.eid - 1])] += mom;    /*the third medianum block stores the momentum transfer*/
         }
 
-        r.partialpath[(r.inroi ? mesh->prop : mesh->type[r.eid - 1]) - 1]++;                      /*the first medianum block stores the scattering event counts*/
+        /* a tissue element only, as for the momentum above: a label of 0 or
+           less has no slot, and a background given a scattering coefficient
+           scatters photons there, which indexed one slot before the array */
+        if (r.inroi || mesh->type[r.eid - 1] > 0) {
+            r.partialpath[(r.inroi ? mesh->prop : mesh->type[r.eid - 1]) - 1]++;                      /*the first medianum block stores the scattering event counts*/
+        }
     }
 
     if (cfg->issavedet && exitdet > 0) {
