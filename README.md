@@ -1,36 +1,61 @@
-Mesh-based Monte Carlo (MMC) - SSE4, OpenCL, CUDA and OptiX
-==============================================
+![](https://mcx.space/img/mcx_wiki_banner.png)
 
+Mesh-based Monte Carlo (MMC)
+============================
 
 -   Author: Qianqian Fang (q.fang at neu.edu)
--   License: GNU General Public License version 3 (GPL v3), see License.txt
+-   License: GNU General Public License version 3 (GPLv3)
 -   Version: 3.0.0 (v2026, Egg Tart)
--   URL: <https://mcx.space/mmc>
+-   Website: <https://mcx.space/#mmc>
+-   Download: <https://mcx.space/wiki/?Get>
+-   Discussion: <https://groups.google.com/g/mmc-users> (MMC) and <https://groups.google.com/g/mcx-users> (all MCX software)
 
 ![Mex and Binaries](https://github.com/fangq/mmc/actions/workflows/build_all.yml/badge.svg)
 
-Table of Content:
+MMC is a Monte Carlo simulator of light transport in 3D turbid media, such as
+biological tissues, represented by **tetrahedral meshes**. Meshes follow curved
+boundaries and thin layers far more accurately than voxels, and use fewer elements
+where the anatomy is simple. MMC runs on multi-core CPUs and on GPUs through four
+interchangeable backends - SSE/OpenMP, OpenCL, CUDA and OptiX - and shares its input
+format, MATLAB/Python interfaces and output formats with its voxel-based sibling,
+[MCX](https://github.com/fangq/mcx).
+
+MMC can be used in four ways:
+
+| Mode | What it is | Best for |
+|---|---|---|
+| **`mmc` command line** | a standalone executable reading a JSON input file | batch jobs, clusters, scripting, reproducible inputs |
+| **MMCLAB** (MATLAB/Octave) | `mmclab(cfg)`, which also prepares the mesh for you | meshing and simulating in one script, image reconstruction |
+| **PMMC** (Python) | `pmmc.run(cfg)` / `pmmc.mmclab(cfg)`, installed with `pip` | Python/NumPy workflows with [pyiso2mesh](https://pypi.org/project/iso2mesh/) |
+| **MCX Studio** (GUI) | a graphical editor and viewer that runs mcx, mcxcl and mmc | inspecting meshes, sources and results |
+
+Table of Contents
+-----------------
 
   * [What's New](#whats-new)
   * [Introduction](#introduction)
-  * [Download and Compile MMC](#download-and-compile-mmc)
-  * [Running Simulations](#running-simulations)
-    + [Preparation](#preparation)
-    + [Command line options](#command-line-options)
-    + [Input files](#input-files)
-    + [JSON-formatted input files](#json-formatted-input-files)
-    + [Photon debugging information using -D flag](#photon-debugging-information-using--d-flag)
-    + [Plotting the Results](#plotting-the-results)
-  * [Known issues and TODOs](#known-issues-and-todos)
-  * [Getting Involved](#getting-involved)
+  * [Choosing a backend](#choosing-a-backend)
+  * [Installation and configuration](#installation-and-configuration)
+  * [Quick start](#quick-start)
+  * [Preparing a mesh](#preparing-a-mesh)
+  * [Key concepts](#key-concepts)
+  * [Running the mmc command line](#running-the-mmc-command-line)
+  * [JSON input file format](#json-input-file-format)
+  * [Sources](#sources)
+  * [Detectors and detected photon data](#detectors-and-detected-photon-data)
+  * [Output quantities, files and formats](#output-quantities-files-and-formats)
+  * [Reading MMC data in MATLAB and Python](#reading-mmc-data-in-matlab-and-python)
+  * [Using MMCLAB in MATLAB and Octave](#using-mmclab-in-matlab-and-octave)
+  * [Using PMMC in Python](#using-pmmc-in-python)
+  * [Using MCX Studio](#using-mcx-studio)
+  * [Advanced features](#advanced-features)
+  * [Performance and best practices](#performance-and-best-practices)
+  * [Testing](#testing)
+  * [Known limitations](#known-limitations)
+  * [Getting help](#getting-help)
+  * [Contributing](#contributing)
+  * [Publications and how to cite](#publications-and-how-to-cite)
   * [Acknowledgement](#acknowledgement)
-    + [SSE Math library by Julien Pommier](#sse-math-library-by-julien-pommier)
-    + [cJSON library by Dave Gamble](#cjson-library-by-dave-gamble)
-    + [SFMT library by Mutsuo Saito, Makoto Matsumoto and Hiroshima University](#sfmt-library-by-mutsuo-saito--makoto-matsumoto-and-hiroshima-university)
-    + [drand48_r port for libgw32c by Free Software Foundation](#drand48-r-port-for-libgw32c-by-free-software-foundation)
-    + [git-rcs-keywords by Martin Turon (turon) at Github](#git-rcs-keywords-by-martin-turon--turon--at-github)
-  * [Reference](#reference)
-
 
 What's New
 -------------
@@ -125,902 +150,886 @@ this release also fixed a list of bugs, including
 * pmmc macOS wheels are tagged with their actual architecture instead of
   `universal2`, and the Intel macOS module links the OpenMP runtime
 
-The full changelog is listed below
+The most important changes since v2025.10 are summarized below; `ChangeLog.txt`
+lists all of them, with their commit hashes.
 
-* 2026-10-21 [99e7eec] [bug] fix -F jnii/bnii output of mesh-based (non-dual-grid) simulations
-* 2026-10-21 [2ad91b2] [bug] fix off-by-one MAX_PROP check that rejected large meshes on cuda
-* 2026-10-21 [71eb4f1] [optix] no fluence in the ambient medium, terminate rays that exit the mesh
-* 2026-10-21 [654d6fe] [doc] refresh the v2026 ChangeLog, NEWS and README change lists
-* 2026-10-21 [7a3b3f3] [optix] terminate rays that miss all triangles in a non-scattering medium, fix NaN grid corners
-* 2026-10-21 [db4d829] [perf] build the OpenCL kernel with -cl-unsafe-math-optimizations, 1.14-1.16x
-* 2026-10-21 [e803195] [perf] dynamic photon dispatch in the OpenCL/CUDA kernel, 1.02-1.06x
-* 2026-10-21 [3dca2b6] [doc] refresh the v2026 ChangeLog and README change lists
-* 2026-10-21 [ddb5953] [perf] schedule the SSE/OpenMP photon loop dynamically, 1.1-1.3x on 16 threads
-* 2026-10-21 [fa723e2] [doc] refresh the v2026 ChangeLog, NEWS and README change lists
-* 2026-10-21 [3329d2c] [pmmc] opt-in CUDA backend (-DBUILD_CUDA=ON), fix its device query, test opencl/cuda
-* 2026-10-21 [5e5b797] [build] link cudart into the Octave mex built by 'make cudaoct'
-* 2026-10-21 [9b7c135] [test] test the opencl, cuda and optix backends compiled into mmc in testmmc.sh
-* 2026-10-21 [8b2dfaf] [test] split the trajectory test mesh asymmetrically, regenerate the MMC goldens
-* 2026-10-21 [207c6f9] [optix] make the full OptiX debug pipeline opt-in (MMC_OPTIX_DEBUG) instead of !NDEBUG
-* 2026-10-21 [1475737] [test] compare trajectories per photon: 5e-2 mm tolerance, tolerate up to 10% forked photons
-* 2026-10-21 [ef2c28f] [bug] fix swapped sin/cos in OpenCL MCX_SINCOS with --optlevel 0, rebuild mmc_utils.o when mmc_core.cl changes
-* 2026-10-21 [e542dad] [release] set the v2026 (3.0.0) codename to Egg Tart
-* 2026-10-21 [64ffdff] [doc] refresh the v2026 ChangeLog, NEWS and README change lists
-* 2026-10-21 [de3d1cf] [bug] read a JSON detector object by key regardless of its field count
-* 2026-10-21 [eba3e97] [bug] emit valid JSON in the -D S/X/R debug log ("key":[..] instead of "key"=[..])
-* 2026-10-21 [91bc95b] [release] bump the remaining v2025.10 keyword strings to v2026
-* 2026-10-21 [c1ef008] [doc] v2026 What's New and ChangeLog entry
-* 2026-10-21 [e3d94f0] [release] bump version to v2026 (3.0.0), pmmc to 0.4.0, update copyright years
-* 2026-10-21 [178598c] [ci] run testmmc.sh, and the trajectory tests on the POCL CPU OpenCL device
-* 2026-10-21 [5498290]*[test] add functional, step-by-step trajectory and pmmc tests runnable on the CPU
-* 2026-10-21 [2c47938]*[bug] label detected photon, trajectory and seed records in .jdt/.jdb as row-major
-* 2026-10-21 [a8f0af4] [bug] mmcsrcdomain: fix fourierx/fourierx2d source domain, treat them as wide-field in mmclab
-* 2026-10-21 [757de21]*[bug] mmclab: retessellate wide-field sources by srctype, refuse empty srcelem
-* 2026-07-07 [f0b8d82] Avoid volume buffer allocation when OpenCL volume output is disabled
-* 2026-07-02 [9f9f1ae] Fix detector lookup offset with extra source records
-* 2026-06-29 [d9bc2fe]*Fix low-mua fluence deposition in MMC raytracers
-* 2026-06-29 [fc34792] Expose integer isspecular and isextdet in pMMC
-* 2026-06-13 [8312b5b] [bug] opencl: harden host buffer handling and fix error-path GPU memory leaks
-* 2026-06-13 [ef5bb39]*[bug] fix long-standing memory leakage, due to unused event, fix #127
-* 2026-05-21 [5442e3e] [perf] replace NODAL_USE_MUA/MUSP templates with IS_RF/IS_MULTISRC/SAVE_DETPHOTON
-* 2026-05-21 [f8c8cb7] [perf] cuda: __launch_bounds__(64,16) on mmc_main_loop drops 122->64 regs
-* 2026-05-20 [9dc5ec0] [clean] mmc: revert per-slot energy accumulator to single-bin + broadcast
-* 2026-05-20 [12652da] [bug] mesh adjoint multi-source: per-slot initial tet + per-slot energy accounting, w/ Claude code
-* 2026-05-14 [35cfefe] [bug] pmmc: build detector-as-adjoint srcdata BEFORE mesh_validate, w/ Claude code
-* 2026-05-14 [47e5406] [feat] pmmc: accept Nsrc-row srcpos / srcdir for multi-source forward, w/ Claude code
-* 2026-05-13 [6a90384] [clean] suppress OpenCL build log on successful kernel build, w/ Claude code
-* 2026-05-13 [f769204] [fix] silence OpenCL JIT warnings on srcid multi-source guard, w/ Claude code
-* 2026-05-13 [30498af] [feat] mmclab honors USE_MCXCL=N device override, ported from mcxlabcl, w/ Claude code
-* 2026-05-13 [23cde0a] [feat] mmclab/pmmc adjoint detector append preserves multi-source srcdata, w/ Claude code
-* 2026-05-13 [4b26968] [format] apply astyle + mh_style fixes from make pretty / mh_style --fix .
-* 2026-05-13 [4e6550e] [fix] guard sgtitle() in mmclab demos for Octave < 8.0 compat, w/ Claude code
-* 2026-05-13 [8868080]*[feat] RF complex weight tracking in BLBadouel mesh kernel + complex flux.data in mmclab mesh mode, w/ Claude code
-* 2026-05-13 [461b1ed] [feat] mmclab: multi-source / mesh adjoint demos + 2D srcpos parser + RF imag for mesh basisorder=1, w/ Claude code
-* 2026-05-13 [abeb635] [feat] per-slot normalizer for extra-source slots scales by srcdata weight ratio, w/ Claude code
-* 2026-05-13 [a90ef05]*[feat] mcx-parity multi-source: JSON array Pos/Dir, srcid>0 single-slot, detphoton srcid column, w/ Claude code
-* 2026-05-13 [c39d979] [bug] fix per-node mua/musp parsers + missing OpenCL JIT macros, w/ Claude code
-* 2026-05-12 [5433129]*[feat] per-node mua/musp via CUDA templates + OpenCL macros for DOT recon, w/ Claude code
-* 2026-05-12 [0d8fb36] [bug] fix mesh-adjoint flux.data layout + nsrcslots gate, w/ Claude code
-* 2026-05-12 [ed4733e]*[feat] mesh-space adjoint Jacobian (full FEM + nodal approx) via GPU kernels, w/ Claude code
-* 2026-05-12 [959562b] [bug] fix maxgate>1 adjoint buffer collision: framelen should be datalen, w/ Claude code
-* 2026-05-12 [25b5982]*[feat] add cfg.srcid and mesh-mode multi-source slot infrastructure, w/ Claude code
-* 2026-05-10 [76f945d]*[feat] support -F bnii to save binary json files, use -Z base64 for raw, faster IO
-* 2026-05-10 [2a7c1f8] [bug] enable -F jnii flag for saving detphoton and traj data, fix #124
-* 2026-05-10 [31d6a06] [bug] add the missing --maxjumpdebug flag to cli, fix #123
-* 2026-05-08 [82994b1] [ci] add the missing detparam1/detparam2 input interface in JSON
-* 2026-04-04 [47b8472]*[feat] save and export both forward model and the Jacobian outputs
-* 2026-04-04 [2434e3a]*[feat] port RF forward and adjoint Jacobian from mcx to mmc
-* 2026-03-27 [a1465d4] [bug] fix additional seed buffer bugs to enable replay, fix #122, w/ Claude code
-* 2026-03-27 [90081a3] [bug] fix replay failure when setting optlevel>=3, fix #122, bump pmmc 0.3.9
-* 2026-03-27 [c2ea9e1] [bug] fix replay failure when setting optlevel>=3, fix #122, bump pmmc 0.3.9
-* 2026-03-22 [db6a0ed]*[feat] support pencilarray, pattern3d, hyperboloid and ring src, must retesselate
-* 2026-03-22 [fd74cbc] [feat] support cfg.compileropt and cfg.kernelfile in mmclab and pmmc
-* 2026-03-22 [f4052eb] [bug] fix mmc cone beam and zgaussian launch dir rotation, fix #121
-* 2026-03-06 [4cbf7b1] [bug] force input elem to mmcaddsrc and mmcadddet to have label
-* 2026-01-11 [1799480] [bug] stop testing faceroi in the 1st neighbor, close #119, close #120
-* 2025-12-31 [47617fd] [ci] remove octave image from mcxcl package
-* 2025-12-14 [85a7bfa] [bug] debug immc ray-tracing, fix incorrect partial path output, #116
-* 2025-12-14 [f03d523] [debug] change debug ouput to json, fix cfg.debugphoton bug
-* 2025-12-10 [95dc994] [ci] remove retired macos-13 runner, use macos-15-intel
-* 2025-12-10 [85613f9] [bug] fix missing trajectories in the immc mode, #116
-* 2025-12-10 [2a58c43] [bug] fix disabled unitinmm setting when cfg.method='grid', fix #117
-* 2025-12-01 [0eedf2b]*[optix] add source types: disk/gaussian/zgaussian/isotropic/cone/arcsine/line/slot
-* 2025-12-01 [3fe4024] [optix] fix some memory leakage
-* 2025-11-30 [639e810] [optix] add back normalization, at the moment, energytot is set to nphoton
-* 2025-11-30 [f048bd9] [optix] fix regression due to float3/FLOAT3 transition, patched by Shijie
-* 2025-11-30 [263d23f] [optix] fix example script path
-* 2025-11-30 [5b639c6] [format] automatically reformat all new matlab .m scripts
-* 2025-11-30 [72015ad] [optix] fix ifdef in mmclab
-* 2025-11-29 [3dd250a] [optix] reformat all optix units, rename all units start with mmc_
-* 2025-11-28 [5402644] [ci] fix g++-12 missing on macos-14
-* 2025-11-28 [deb927f] [ci] fix g++-9 missing on ubuntu 22.04
-* 2025-11-28 [7be94c0] [bug] fix immc unable to save ROI partial-path, fix #116, pmmc 0.3.8
-* 2025-11-17 [ad54567] remove redundant debugging code
-* 2025-11-17 [9ff1501] fix tissue labels for wide-field simulations
-* 2025-11-17 [5e52cb2] add planar source in RT-DMMCLAB
-* 2025-11-16 [fada4bc] search init. medium ID at runtime, add medium ID for terminating photons
-* 2025-11-13 [5e5cb81] [pmmc] bump pmmc version to 0.3.7 after fix #108
-* 2025-11-13 [e55aa08] [bug] allow passing srcdir(4) as NaN and -Inf, accept --json, fix #108
-* 2025-11-10 [f65b5a7] [doc] explain widefield detector settings in mmclab help info
-* 2025-10-25 [4ebbcbb] [mem] optimize struct align param to minimize padding
-* 2025-10-25 [563aaeb] [std] make unit compatible with some compilers
-* 2023-10-27 [d47862c] print kernel speed
-* 2023-10-27 [4cd86ca] improve variable definition
-* 2023-06-09 [acefed0] add slen to optix trace call
-* 2022-09-28 [2571307] disable anyhit program to improve speed
-* 2022-09-22 [1f4608f] free the host seed buffer after use
-* 2022-09-22 [47126c4] update example to output normalized fluence
-* 2022-09-21 [c998f72] add double buffer for OpenCL and CUDA MMC to reduce numerical loss
-* 2022-09-17 [9891182] add output normalization for OptiX
-* 2022-09-17 [6a40a5b] add fluence output in OptiX
-* 2022-09-15 [fc45dd9] add reflection/refraction for mismatched boundaries
-* 2022-09-14 [fb50bf6] add face normal vector to SBT
-* 2022-09-14 [1dd44e3] reduce miss cases by setting tmin to 0.0f
-* 2022-09-10 [5ba4606] add debug messages for context creation
-* 2022-09-08 [14fa090] no need to check volume mesh for triangle-based MC
-* 2022-09-07 [10dc9ed] fix lower 16-bit mask, thanks to Douglas!
-* 2022-09-07 [5c1ee41] fix an edge case for matched media bounaries
-* 2022-09-07 [834669b] remove redundant compilation files
-* 2022-09-07 [ec74b75] automate compilation for optix dependencies
-* 2022-09-07 [9f48be7] allow GNU make to track changes in header files
-* 2022-09-06 [2a6bfa8] resolve the mex compiler complaint
-* 2022-09-06 [b6717c6] save output only when moving to a new element
-* 2022-09-06 [6168b64] Reorganize code for better readability
-* 2022-09-06 [208027a] tweak tmin threshold to work with colin27 example
-* 2022-09-06 [4eb13c6] add function to get surface mesh from volume mesh, thanks to Qianqian!
-* 2022-09-05 [d477bc5] add command line options and fix bugs
-* 2022-09-05 [86d1686] add triangular surface-based MC
+**Inverse problems and frequency domain**
+* [ed4733e] mesh-space adjoint Jacobians (full FEM and nodal approximation) computed on the GPU;
+  [14bf357] mus/mus' Jacobians use the same chain rule as MCX
+* [5433129] per-node mua/mus' (`cfg.nodemua`, `cfg.nodemusp`) for diffuse optical tomography
+* [2434e3a] RF forward and RF/CW adjoint Jacobians ported from MCX; [8868080] complex photon
+  weights in the mesh kernel; [c87499f] RF forward on the CPU, and RF output fixed for element-
+  and node-based runs
+* [47b8472] the forward solution and the Jacobians are saved together
 
+**Sources, multi-source runs and outputs**
+* [25b5982, a90ef05] MCX-compatible multi-source simulations (`cfg.srcid`, JSON arrays of
+  `Pos`/`Dir`, a srcid column in detected photon data)
+* [db6a0ed] pencilarray, pattern3d, hyperboloid and ring sources
+* [76f945d] `-F bnii` binary JSON output; [621f207] parallel zlib/gzip compression of JData data
+* [fd74cbc] `cfg.compileropt` and `cfg.kernelfile` in mmclab and pmmc
+
+**OptiX (RT-MMC) and CUDA**
+* [0eedf2b, edaaa02] all source types in OptiX MMC (contributed by Shijie Yan); [2434293] multiple
+  sources; [7ee0a9d] detected photons; [6ac3389] trajectories; [6b92686] adjoint Jacobians;
+  [3671f6d] surface-only meshes; [0ec2400] unsupported settings are rejected with a message
+* [f8c8cb7] CUDA kernel down from 122 to 64 registers
+* [24aebad] mmc builds with MSVC, enabling CUDA/OptiX on Windows; [bfff982] mmc-optix packages
+  for Linux and Windows
+
+**Performance**
+* [ddb5953] dynamic OpenMP scheduling on the CPU, 1.1-1.3x on 16 threads
+* [db4d829] OpenCL kernel built with `-cl-unsafe-math-optimizations`, 1.14-1.16x
+* [e803195] dynamic photon dispatch in the OpenCL/CUDA kernels, 1.02-1.06x
+
+**Bug fixes**
+* [2c47938] detected photon, trajectory and seed records in `.jdt`/`.jdb` were scrambled
+  when loaded by JData readers
+* [757de21] wide-field sources on the mesh surface deposited the whole beam into one element on
+  the GPU; fourierx/fourierx2d source domains fixed
+* [a5e9c1f] the GPU lost up to 40% of the diffuse reflectance
+* [ef5bb39] long-standing OpenCL memory leaks (#127)
+* [f6091aa] host RNG seeds were not uniformly random; now uniform on all backends
+* [b64aa2a] no fluence in non-tissue (label<=0) elements; consistent nodal volumes
+* [882054e] implicit MMC uses the ROI's optical properties for scattering and albedo
+* [66f4c90] `cfg.face` is ignored when `cfg.elem` is given (fixing redbird's MMC Jacobians)
+* [816f671] `Session.OutputType` names read in full, not just their first letter
+
+**MMCLAB and PMMC**
+* [5ecd5ac] `pmmc.mmclab()`: the mmclab.m pre/post-processing around `pmmc.run()`; [d820fb5] all
+  mmclab examples ported to Python under `pmmc/example`
+* [a6d4f42] the mmclab help rewritten to document every cfg field; [0feb5bb] `cfg.issave2pt`,
+  and an error for backends the mex was not built with
+
+**Testing and robustness**
+* [5498290] functional, step-by-step trajectory and pmmc tests that run on the CPU in CI
+* [b07e548, 94de589] host unit tests, including the CUDA/OptiX backends; host coverage about 95%
+* [d5e3edb] four rounds of fuzzing of inputs and options: all crashes, hangs and memory errors
+  fixed [bcdfbb0, 7494228]; embedded meshes and input values validated
+
+**Packaging**
+* [73eb9f1] Linux releases built in manylinux2014 (glibc 2.17+); Octave 10 mex files for macOS/Windows
+* [4e581d7] bundled zmat updated to 1.2.0; [b65562c] cJSON updated to 1.7.19
 
 Introduction
----------------
-
-Mesh-based Monte Carlo (MMC) is a 3D Monte Carlo (MC) simulation software for 
-photon transport in complex turbid media. MMC combines the strengths of the 
-MC-based technique and the finite-element (FE) method: on the one hand, it can 
-handle general media, including low-scattering ones, as in the MC method; on 
-the other hand, it can use an FE-like tetrahedral mesh to represent curved 
-boundaries and complex structures, making it even more accurate, flexible, and 
-memory efficient. MMC uses the state-of-the-art ray-tracing techniques to 
-simulate photon propagation in a mesh space. It has been extensively optimized 
-for excellent computational efficiency and portability. MMC currently supports 
-multi-threaded parallel computing via OpenMP, Single Instruction Multiple Data 
-(SIMD) parallelism via SSE and, starting from v2019.10, OpenCL to support a wide 
-range of CPUs/GPUs from nearly all vendors.
-
-To run an MMC simulation, one has to prepare an FE mesh first to discretize the 
-problem domain. Image-based 3D mesh generation has been a very challenging task 
-only until recently. One can now use a powerful yet easy-to-use mesh generator, 
-iso2mesh [1], to make tetrahedral meshes directly from volumetric medical 
-images. You should download and install the latest iso2mesh toolbox in order to 
-run the built-in examples in MMC.
-
-MMC is also accelerated on GPUs: an OpenCL version (since v2019.10) runs on
-CPUs/GPUs from nearly all vendors, a CUDA version on NVIDIA GPUs, and an OptiX-based
-version (RT-MMC) uses the hardware ray-tracing cores of NVIDIA RTX GPUs. The GPU
-versions are typically a hundred to a thousand times faster than a single CPU
-thread, similar to what we have observed in our GPU-accelerated Monte Carlo
-software (Monte Carlo eXtreme, or MCX [2]). The backend is selected by `-c`
-(`sse`, `opencl`, `cuda` or `optix`) or `cfg.compute` in mmclab/pmmc.
-
-The most relevant publication describing this work is the GPU-accelerated MMC 
-paper:
-
-> Qianqian Fang and Shijie Yan, “GPU-accelerated mesh-based Monte Carlo photon 
-transport simulations,” J. of Biomedical Optics, 24(11), 115002 (2019)
-URL: <http://dx.doi.org/10.1117/1.JBO.24.11.115002>
-
-Please keep in mind that MMC is only a partial implementation of the general 
-Mesh-based Monte Carlo Method (MMCM). The limitations and issues you observed 
-in the current software will likely be removed in the future version of the 
-software. If you plan to perform comparison studies with other works, please 
-communicate with the software author to make sure you have correctly understood 
-the details of the implementation.
-
-The details of MMCM can be found in the following paper:
-
-> Qianqian Fang, “Mesh-based Monte Carlo method using fast ray-tracing in 
-Plücker coordinates,” Biomed. Opt. Express 1, 165-175 (2010) URL: 
-<https://opg.optica.org/boe/abstract.cfm?uri=boe-1-1-165>
-
-While the original MMC paper was based on the Plücker coordinates, a number of 
-more efficient SIMD-based ray-tracers, namely, Havel SSE4 ray-tracer, Badouel 
-SSE ray-tracer and branchless-Badouel SSE ray-tracer (fastest) have been added 
-since 2011. These methods can be selected by the `-M` flag. The details of these 
-methods can be found in the below paper
-
-> Qianqian Fang and David R. Kaeli, “Accelerating mesh-based Monte Carlo method 
-on modern CPU architectures,” Biomed. Opt. Express 3(12), 3223-3230 (2012) 
-URL: <https://opg.optica.org/boe/abstract.cfm?uri=boe-3-12-3223>
-
-and their key differences compared to another mesh-based MC simulator, TIM-OS, 
-are discussed in
-
-> Qianqian Fang, “Comment on 'A study on tetrahedron-based inhomogeneous 
-Monte-Carlo optical simulation',” Biomed. Opt. Express, vol. 2(5) 1258-1264, (2011)
-URL: <https://opg.optica.org/boe/abstract.cfm?uri=boe-2-5-1258>
-
-In addition, the generalized MMC algorithm for wide-field sources and detectors  
-are described in the following paper, and was made possible with the 
-collaboration with Ruoyang Yao and Prof. Xavier Intes from RPI
-
-> Yao R, Intes X, Fang Q, “Generalized mesh-based Monte Carlo for wide-field 
-illumination and detection via mesh retessellation,” Biomed. Optics Express, 
-7(1), 171-184 (2016) URL: 
-<https://opg.optica.org/boe/abstract.cfm?uri=boe-7-1-171>
-
-In addition, we have been developing a fast approach to build the Jacobian 
-matrix for solving inverse problems. The technique is called “photon 
-replay”, and is described in details in the below paper:
-
-> Yao R, Intes X, Fang Q, “A direct approach to compute Jacobians for diffuse 
-optical tomography using perturbation Monte Carlo-based photon 'replay',” 
-Biomed. Opt. Express 9(10), 4588-4603 (2018)
-
-In 2019, we published an improved MMC algorithm, named “dual-grid MMC”, or 
-DMMC, in the below JBO Letter. This method uses separate meshes for
-ray-tracing and fluence storage, and can be 2 to 3 fold faster than the 
-original MMC without loss of accuracy.
-
-> Shijie Yan, Anh Phong Tran, Qianqian Fang, “A dual-grid mesh-based Monte 
-Carlo algorithm for efficient photon transport simulations in complex 3-D  
-media,” J. of Biomedical Optics, 24(2), 020503 (2019).
-
-The authors of the papers are greatly appreciated if you can cite the above 
-papers as references if you use MMC and related software in your publication.
-
-
-Download and Compile MMC
----------------------------
-
-The latest release of MMC can be downloaded from the following URL:
-
-<https://mcx.space/#mmc>
-
-The same packages are also attached to the GitHub release page
-(https://github.com/fangq/mmc/releases), and the latest automatically built
-packages can be found at https://mcx.space/nightly/. In addition
-
-- the all-in-one MCX Studio packages bundle mmc with mcx, mcxcl, the MCX Studio
-  GUI and the MATLAB/Octave toolboxes; on Windows, they can be installed using an
-  installer or `winget install coti.mcxstudio`
-- the Python module can be installed using `python3 -m pip install pmmc`
-- a Docker image is available as `fangqq/mmc` on Docker Hub
-- the released Linux binaries and mex files are built in a manylinux2014 container
-  and run on Linux distributions with glibc 2.17 or newer; the Octave mex files for
-  Windows and macOS require Octave 10 or newer
-
-The development branch (not fully tested) of the code can be accessed using 
-Git. However this is not encouraged unless you are a developer. To check out 
-the Git source code, you should use the following command:
-
-      git clone https://github.com/fangq/mmc.git
-
-To compile the software, you need to install GNU gcc compiler toolchain on your 
-system. For Debian/Ubuntu based GNU/Linux systems, you can type
-
-      sudo apt-get install build-essential
-
-and for Fedora/Redhat based GNU/Linux systems, you can type
-
-      sudo dnf install make automake gcc gcc-c++
-
-To compile the binary with multi-threaded computing via OpenMP, 
-your `gcc` version should be at least 4.0. To compile the binary 
-supporting SSE4 instructions, gcc version should be at least 
-4.3.4. For windows users, you should install MSYS2 or Cygwin64 [3]. During the 
-installation, please select `mingw64-x86_64-gcc` and `make` packages.
-For MacOS users, you need to install the newer gcc from 
-Homebrew or MacPorts and use the instructions below to compile the 
-MMC source code.
-
-## Building MMC using CMake
-
-One can choose one of the two methods to build mmc binaries. The first
-approach is to use CMake. CMake is a portable system creating compilation
-and linking commands automatically adapted to your operating system and 
-installed compiler. It can run on Linux, MacOS and Windows.
-
-To use CMake, you will have to first run `sudo apt-get install cmake`
-or `sudo dnf install cmake` to install cmake first. To build MMC binaries,
-you should first navigate to the `mmc/src` folder, and run
-
-      mkdir -p build
-      cd build
-      cmake .. && make
-
-if cmake complains that any required library is missing, you will need
-to install those dependencies, removing all files inside the build folder,
-and run the cmake command above again.
-
-The above command builds the `mmc` executable inside `mmc/bin` folder. If
-your system has MATLAB installed, the above command also builds mmclab mex
-file as `mmc/mmclab/mmc.mex*` where the mex suffix depends on your OS.
-
-If you want to build the "Trinity" version of mmc to support CUDA on NVIDIA
-GPUs, you will have to first install CUDA toolkit, and replace the above cmake
-command by 
-
-      cmake .. -DBUILD_CUDA=on && make
-
-the executable will be build as `mmc/bin/mmciii` and the mex file is `mmc/mmclab/mmciii.mex*`.
-
-
-## Building MMC using GNU Make
-
-A more traditional, and fine-grained, approach to build MMC is to use the provided
-`Makefile` using GNU make. Similarly, you will need to open a terminal, navigate to
-the `mmc/src` folder, and type
-
-      make
-
-this should create a fully optimized OpenCL based mmc executable, located under 
-the `mmc/bin/` folder. The binary also supports SSE4 on the CPU.
-
-Other compilation options include
-
-      make ssemath  # this is the same as make, building mmc binary with SSE4+OpenMP+OpenCL
-      make cuda     # this compiles the "Trinity" version of mmc, supports SSE4+OpenMP+OpenCL+CUDA
-      make omp      # this compiles a multi-threaded binary using OpenMP
-      make release  # create a single-threaded optimized binary
-      make prof     # this makes a binary to produce profiling info for gprof
-      make sse      # this uses SSE4 for all vector operations (dot, cross), implies omp
-      make optix    # this compiles mmc with the OptiX-based ray-tracing MMC (RT-MMC), implies cuda
-      make unittest # this builds and runs the host (CPU) unit tests
-
-if you wish to build the mmc mex file to be used in matlab, you should run
-
-      make mex      # this produces mmc.mex* under mmc/mmclab/ folder
-      make cudamex  # this produces a "Trinity" version of mmc.mex* that supports SSE+OpenCL+CUDA
-
-similarly, if you wish to build the mex file for GNU Octave, you should run
-
-      make oct      # this produces mmc.mex* under mmc/mmclab/ folder
-      make cudaoct  # this produces a "Trinity" version of mmc.mex* that supports SSE+OpenCL+CUDA
-
-If you append `-f makefile_sfmt` at the end of any of the above make 
-commands, you will get an executable named `mmc_sfmt`, which uses a fast 
-MT19937 random-number-generator (RNG) instead of the default xorshift128+ RNG. 
-If your CPU supports SSE4, the fastest binary can be obtained by running the 
-following command:
-
-      make ssemath -f makefile_sfmt
-
-You should be able to compile the code with an Intel C++ compiler, an AMD C 
-compiler or LLVM compiler without any difficulty. To use other compilers, you 
-simply append `CC=compiler_exe` to the above make commands. If you see any 
-error messages, please google and fix your compiler settings or install the 
-missing libraries.
-
-A special note for Mac OS users: you can you use both gcc (installed by MacPorts
-or brew) or the default clang gcc provided by the default Xcode compiler to build
-mmc. MMC requires OpenMP for multi-threading based parallel computing. If one uses
-the clang compiler, one must first install `libomp` package in order to compile mmc.
-
-      brew install libomp
-      brew link --force libomp
-
-One can switch to other compilers by setting the `CC`, `CXX` and `AR` environment
-variables, for example
-
-      make CC=gcc-mp-10 CXX=g++-mp-10 AR=g++-mp-10
-
-After compilation, you may add the path to the `mmc` binary (typically, 
-`mmc/bin`) to your search path. To do so, you should modify your `$PATH` 
-environment variable. Detailed instructions can be found at [5].
-
-You can also compile MMC using Intel's C++ compiler - `icc`. To do this, you run
-
-      make CC=icc
-
-you must enable `icc` related environment variables by source the `compilervars.sh`
-file. The speed of icc-generated mmc binary is generally faster for CPU/SSE based
-MMC simulation than those compiled by `gcc`.
-
-
-Running Simulations
+------------
+
+Mesh-based Monte Carlo (MMC) traces photon packets through a tetrahedral mesh: at each
+step a packet is attenuated by absorption, redirected by scattering, and reflected or
+refracted when it crosses a face between elements of different refractive indices.
+Accumulating the packets' weights gives a statistically exact solution of the
+radiative transfer equation (RTE) [Fang2010]. Compared with voxel-based MC such as MCX:
+
+-   **curved and oblique boundaries are exact**: reflection and refraction use the true
+    surface normals, not voxel staircases, which matters at the skin, skull and other
+    interfaces with a refractive-index change;
+-   **thin and small structures** (layers, vessels) are represented without making the
+    whole grid finer, and the mesh can be coarse where the anatomy is simple;
+-   **meshes can be shared with finite-element (FEM) solvers** such as Redbird, so MC and
+    diffusion results are directly comparable node by node.
+
+The cost is that a mesh must be generated first (see [Preparing a mesh](#preparing-a-mesh))
+and that tracing through tetrahedra is more work per step than through voxels.
+
+MMC implements several variants of the method:
+
+| Variant | What it does | Select with |
+|---|---|---|
+| mesh-based MMC | traces and stores the fluence on the mesh (at nodes or elements) [Fang2010, Fang2012] | `-M S` (`cfg.method='elem'`), or `P`, `H`, `B` on the CPU |
+| dual-grid MMC (DMMC) | traces on the mesh, stores the fluence on a fine voxel grid; 2-3x faster, and the default [Yan2019] | `-M G` (`cfg.method='grid'`) |
+| implicit MMC (iMMC) | adds thin vessels, membranes and spheres given as radii/thicknesses on the mesh nodes, edges and faces, without meshing them [Yuan2021] | `Mesh.MeshROI` (`cfg.noderoi`, `edgeroi`, `faceroi`) |
+| RT-MMC | uses the ray-tracing cores of NVIDIA RTX GPUs through OptiX; also accepts surface-only meshes | `-c optix` (`cfg.compute='optix'`) |
+| wide-field MMC | wide-field sources and detectors, by tessellating their domains into the mesh [Yao2016] | done by MMCLAB/PMMC for wide-field sources |
+
+**The MCX family**
+
+| Software | Description |
+|---|---|
+| [MCX](https://github.com/fangq/mcx) | voxel-based MC in CUDA (NVIDIA) or HIP (AMD); MCXLAB, PMCX and MCX Studio |
+| [MCX-CL](https://github.com/fangq/mcxcl) | the OpenCL version of MCX |
+| [MMC](https://github.com/fangq/mmc) | this package: mesh-based MC; MMCLAB and PMMC |
+| [iso2mesh](https://github.com/fangq/iso2mesh) / [pyiso2mesh](https://pypi.org/project/iso2mesh/) | the mesh generators used to build MMC meshes from images and shapes |
+| [MCX Cloud](https://mcx.space/cloud) | run MCX and MMC in a web browser on cloud GPUs |
+| [Redbird](https://github.com/fangq/redbird) / [Redbirdpy](https://github.com/fangq/redbirdpy) | diffuse optical tomography solvers that can use MMC as the forward model |
+
+
+Choosing a backend
+------------------
+
+The same simulation runs on any of four backends, selected with `-c` on the command
+line or `cfg.compute` in MMCLAB/PMMC:
+
+| | `sse` (CPU) | `opencl` | `cuda` | `optix` |
+|---|---|---|---|---|
+| hardware | any x86_64 CPU (SSE4), and other CPUs | any GPU or CPU with an OpenCL driver | NVIDIA GPUs | NVIDIA GPUs; RTX GPUs use their ray-tracing cores |
+| parallelism | OpenMP threads + SIMD | GPU threads | GPU threads | GPU threads |
+| ray tracers (`-M`) | all: Plucker, Havel, Badouel, branchless Badouel, dual-grid | branchless Badouel (`S`) and dual-grid (`G`) | `S` and `G` | dual-grid (`G`) only |
+| in the release packages | yes | yes (default) | mmc-optix packages | mmc-optix packages |
+| in MMCLAB/PMMC releases | yes | yes (default) | build with `make cudamex/cudaoct`, or PMMC with `CMAKE_ARGS="-DBUILD_CUDA=ON"` | build with `make optixmex/optixoct` |
+
+Feature support differs where noted below; everything else - all output types,
+detectors, replay, adjoint Jacobians, RF, multiple sources, photon sharing - works on
+every backend.
+
+| Feature | `sse` | `opencl` | `cuda` | `optix` |
+|---|---|---|---|---|
+| implicit MMC (node/edge/face ROIs) | yes | - | - | - |
+| MCML-style weighting (`-m 1`) | yes | - | - | - |
+| mesh (node/element) output | yes | yes | yes | - (grid only) |
+| `pencilarray`, `hyperboloid`, `ring` sources | yes | - | - | yes |
+| photon replay (`-E file`, `-O J/L/P`) | yes | yes | yes | - |
+| photon sharing (`SrcNum` > 1) | yes | yes | yes | - |
+| detected photons | yes | yes | yes | yes, without seeds, momentum or wide-field detectors |
+| diffuse reflectance (`-X 1`) | yes | yes | yes | - |
+| per-node mua/mus' (`nodemua`, `nodemusp`) | yes | yes | yes | - |
+| surface-only meshes (`MeshSurf`) | - | - | - | yes |
+| identical photon paths for a seed | with one thread (`OMP_NUM_THREADS=1`) | with `-A 0 -T 1` | with `-A 0 -T 1` | - |
+
+A backend that cannot run the requested settings stops with a message naming the
+backend to use instead. Rules of thumb: use **`opencl`** by default, **`sse`** for
+implicit MMC or when no GPU is available, **`cuda`** on NVIDIA GPUs when you build
+MMC yourself, and **`optix`** on RTX GPUs for dual-grid forward simulations of large
+meshes.
+
+
+Installation and configuration
+------------------------------
+
+### Getting MMC
+
+| Package | Contents | How to get it |
+|---|---|---|
+| MMC (`mmc-<os>-<arch>-<version>.zip`) | the `mmc` binary with the `sse` and `opencl` backends | <https://mcx.space/wiki/?Get>, <https://github.com/fangq/mmc/releases> |
+| MMC-OptiX (`mmc-optix-<linux|windows>-x64-<version>.zip`) | `mmc` with all four backends | the same pages |
+| MMCLAB (`mmclab-<os>-<arch>-<version>.zip`) | MATLAB/Octave mex file (`sse`, `opencl`) and scripts | the same pages |
+| MCX Studio all-in-one package | mcx, mcxcl, mmc, the GUI and all MATLAB/Octave toolboxes | the same pages; on Windows also the installer or `winget install coti.mcxstudio` |
+| PMMC (Python) | `pip install pmmc` (`sse`, `opencl`) | <https://pypi.org/project/pmmc/> |
+| nightly builds | | <https://mcx.space/nightly/> |
+| source code | | `git clone https://github.com/fangq/mmc.git` |
+
+### The MCX Studio package
+
+The all-in-one package unzips into one folder:
+
+```
+MCXStudio/
+├── mcxstudio            the GUI (MCXStudio.app on macOS)
+├── mcxsuite_addpath.m   adds all the MATLAB/Octave toolboxes to the path
+├── MATLAB/              mcxlab, mcxlabcl, mmclab, iso2mesh and redbird
+└── MCXSuite/            mcx, mcxcl and mmc, each with its bin/ folder and helper scripts
+```
+
+Add `MCXSuite/mmc/bin` (and `mcx/bin`, `mcxcl/bin`) to your `PATH`. In MATLAB or
+Octave, `cd` into the `MCXStudio` folder, run `mcxsuite_addpath` (which also adds
+the bundled iso2mesh), and `savepath` to keep
+the paths for later sessions. On macOS, unzip the package under your home folder.
+
+### Requirements of each backend
+
+-   **`sse`**: nothing beyond the operating system; the binary uses all CPU cores.
+-   **`opencl`**: an OpenCL runtime, included in the NVIDIA, AMD and Intel graphics
+    drivers and in macOS; on Linux, POCL (`pocl-opencl-icd`) adds the CPU as an OpenCL
+    device. `mmc -L` lists the devices. See the MCX-CL README for details per vendor.
+-   **`cuda`** and **`optix`** (mmc-optix packages): an NVIDIA GPU with driver R515 or
+    newer (CUDA 11.7). OptiX runs on Maxwell and newer GPUs, and uses hardware ray
+    tracing on RTX GPUs. The CUDA toolkit and the OptiX SDK are only needed to build MMC.
+
+The released Linux binaries run on glibc 2.17 or newer; the Octave mex files for
+Windows and macOS need Octave 10 or newer.
+
+### Mesh tools
+
+Building meshes needs [iso2mesh](https://github.com/fangq/iso2mesh) in MATLAB/Octave
+(included in the MCX Studio package, or `addpath` its folder; also `octave-iso2mesh` on Debian/Ubuntu/Fedora), or
+[pyiso2mesh](https://pypi.org/project/iso2mesh/) in Python (`pip install iso2mesh`;
+the PMMC examples need version 0.6.7 or newer). MMCLAB and PMMC call iso2mesh to
+prepare the mesh for you.
+
+### Setting up MMCLAB and PMMC
+
+```matlab
+addpath('/path/to/mmclab');        % mmc.mex*, mmclab.m and the MMC helper functions
+addpath('/path/to/iso2mesh');
+info = mmclab('gpuinfo')           % list the OpenCL devices
+```
+
+```
+python3 -m pip install pmmc pmcx iso2mesh jdata bjdata matplotlib
+python3 -c "import pmmc; print(pmmc.gpuinfo())"
+```
+
+`pmcx` provides the utility functions PMMC re-exports (`detweight`, `meanpath`, ...).
+
+### Building from source
+
+```
+git clone https://github.com/fangq/mmc.git
+cd mmc/src
+make                        # mmc with sse + opencl, in ../bin
+make cuda                   # mmc with sse + opencl + cuda (needs the CUDA toolkit)
+make optix OPTIXHOME=/path/to/optix-sdk   # all four backends (needs CUDA 11+ and the OptiX 7.5 SDK)
+make mex / make oct         # MMCLAB for MATLAB / Octave (sse + opencl), in ../mmclab
+make cudamex / cudaoct      # MMCLAB with cuda
+make optixmex / optixoct    # MMCLAB with cuda and optix
+make unittest               # host unit tests
+```
+
+`make sse`, `make omp` and `make release` build CPU-only variants, and
+`make ... -f makefile_sfmt` uses the SFMT random number generator. CMake works too
+(`cmake -S src -B build [-DBUILD_CUDA=ON]`), and is what PMMC uses:
+`pip install .` in `pmmc/`, or `CMAKE_ARGS="-DBUILD_CUDA=ON" pip install .` for the
+`cuda` backend. On macOS with clang, install OpenMP first (`brew install libomp`).
+On Windows, MMC builds with MSYS2/MinGW, and the CUDA/OptiX backends with MSVC
+(`.github/windows_release_builder/build_mmc_optix.sh`).
+
+
+Quick start
+-----------
+
+**Command line.** Run a built-in benchmark, then a simulation from an input file:
+
+```
+mmc -L                                   # list the OpenCL devices
+mmc -Q dmmc-cube60 -n 1e6                # built-in benchmark (also dmmc-cube60b, edgeimmc, nodeimmc, faceimmc)
+cd examples/onecube
+mmc -f onecube.json -n 1e5               # mesh read from node_onecube.dat, elem_onecube.dat, ...
+mmc -f onecube.json -n 1e5 -c sse        # the same on the CPU
+mmc -f onecube.json --dumpjson onecube_all.json   # one self-contained JSON, mesh included
+```
+
+**MATLAB/Octave** (with iso2mesh):
+
+```matlab
+cfg.nphoton = 1e6;
+[cfg.node, face, cfg.elem] = meshabox([0 0 0], [60 60 30], 6);   % a 60x60x30 mm box mesh
+cfg.elemprop = ones(size(cfg.elem, 1), 1);    % every element is medium 1
+cfg.srcpos = [30 30 0];
+cfg.srcdir = [0 0 1];
+cfg.prop = [0 0 1 1; 0.005 1 0 1.37];          % [mua(1/mm), mus(1/mm), g, n] per label
+cfg.tstart = 0; cfg.tend = 5e-9; cfg.tstep = 5e-10;
+cfg.method = 'elem';                           % fluence at the mesh nodes
+flux = mmclab(cfg);                            % flux.data: #nodes x #time gates
+plotmesh([cfg.node log10(sum(flux.data, 2))], cfg.elem, 'y=30', 'edgecolor', 'none');
+```
+
+**Python** (with pyiso2mesh):
+
+```python
+import numpy as np, iso2mesh as i2m, pmmc
+cfg = {'nphoton': 1e6, 'srcpos': [30, 30, 0], 'srcdir': [0, 0, 1],
+       'prop': [[0, 0, 1, 1], [0.005, 1, 0, 1.37]],
+       'tstart': 0, 'tend': 5e-9, 'tstep': 5e-10, 'method': 'elem'}
+cfg['node'], face, cfg['elem'] = i2m.meshabox([0, 0, 0], [60, 60, 30], 6)
+cfg['elemprop'] = np.ones(cfg['elem'].shape[0])
+res = pmmc.mmclab(cfg)                         # res['flux']: #nodes x #time gates
+```
+
+**GUI:** start `mcxstudio`, open an MMC input file (a JSON file with a mesh), check the
+mesh, source and detectors in the 3-D view, and press **Run**.
+
+
+Preparing a mesh
+----------------
+
+An MMC mesh is a set of nodes (`node`, Nn x 3, in mm by default) and tetrahedra
+(`elem`, Ne x 4, 1-based node indices), with a medium label for each element
+(`elemprop`, Ne x 1, or a 5th column of `elem`). Labels start from 1; label 0 is the
+space outside the mesh.
+
+**Making meshes with iso2mesh** (MATLAB/Octave, or the same names in pyiso2mesh):
+
+| Starting from | Function |
+|---|---|
+| simple shapes | `meshabox`, `meshasphere`, `meshacylinder`, `meshunitsphere`, and `mergemesh`/`surfboolean` to combine them |
+| a segmented (label) volume, such as an MRI/CT segmentation | `v2m` / `vol2mesh` (labels become `elem(:,5)`) |
+| closed surface meshes, such as from CAD or FreeSurfer | `s2m` / `surf2mesh` |
+
+The element size sets the spatial resolution of mesh-based output; with dual-grid MMC
+(the default), the output resolution is set by the grid instead, so the mesh only
+needs to follow the boundaries. [BlenderPhotonics](https://github.com/COTILab/BlenderPhotonics)
+builds meshes interactively in Blender and runs MMC on them.
+
+**Requirements MMC checks for**
+
+-   **consistent orientation**: all tetrahedra must have the same node ordering.
+    MMCLAB/PMMC reorient them (`meshreorient`); for the command line, save meshes with
+    `savemmcmesh.m`, which does the same.
+-   **no degenerate elements**: elements of zero volume are rejected.
+-   **the source inside the mesh**: MMC needs the element that contains the source
+    (`cfg.e0`, `Mesh.InitElem`); MMCLAB/PMMC find it with `tsearchn`. For a source
+    outside the mesh, set `cfg.e0` to `'>'` to move the source along `srcdir` to the
+    first surface it meets (`'<'` backwards, `'-'` both).
+
+**Wide-field sources** (`planar`, `pattern`, `fourier`, ...) must start *outside* the
+mesh. MMCLAB/PMMC then add the source's footprint to the mesh as extra elements with
+negative labels (`mmcsrcdomain`, `mmcaddsrc`), from which photons are launched;
+`mmcadddet` does the same for wide-field detectors. If the source sits on the mesh
+surface, mmclab stops with an explanation, because the GPU would otherwise launch every
+photon from one element.
+
+**Using a mesh on the command line.** Either save it as files and give their name stub
+in `Mesh.MeshID`:
+
+```matlab
+savemmcmesh('mymesh', node, elem);   % node_mymesh.dat, elem_mymesh.dat, facenb_..., velem_...
+```
+
+or embed it in the JSON input (`Mesh.MeshNode`, `Mesh.MeshElem`, see
+[JSON input file format](#json-input-file-format)). The easiest way to get a complete
+input file is to set the simulation up in MATLAB and write it out with
+`mmc2json(cfg, 'input.json')`, or to run `mmc ... --dumpjson`.
+
+**Surface-only meshes (OptiX).** `cfg.face` (`Mesh.MeshSurf`): triangles given as
+`[n1 n2 n3 inner_label outer_label]`, with normals pointing from the inner to the outer
+medium, replace the tetrahedral mesh when `cfg.compute='optix'`; no volume mesh is
+needed. Example: `demo_optix_mmc.m`.
+
+
+Key concepts
+------------
+
+**Units and positions.** Node coordinates, source and detector positions and radii are
+in the length unit of the mesh, mm by default; set `Mesh.LengthUnit`/`-u`/
+`cfg.unitinmm` if the mesh is in another unit (e.g. 10 for cm). Absorption (mua) and
+scattering (mus) coefficients are always in 1/mm.
+
+**Media.** The optical properties of label i are the (i+1)-th row of `cfg.prop`
+(`Domain.Media`): `[mua, mus, g, n]`, with mus the scattering (not reduced scattering)
+coefficient. The first row is label 0, the space outside the mesh; its refractive index
+can also be set with `cfg.nout`. Per-node mua/mus' (`cfg.nodemua`, `cfg.nodemusp`) can
+replace the per-label values, as image reconstruction needs.
+
+**Where the fluence is stored.** With the default dual-grid method (`-M G`,
+`cfg.method='grid'`), the output is a voxel volume covering the bounding box of the
+mesh, with voxels of size `--gridsize`/`cfg.steps` (1 mm by default). With the
+mesh tracers (`-M S`, `cfg.method='elem'`, ...), the output is stored on the mesh: at the
+nodes (`-C 1`, `cfg.basisorder=1`, the default) or in the elements (`-C 0`). Either can
+be plotted with iso2mesh (`plotmesh`, `qmeshcut`) or any volume viewer.
+
+**Time gates, photons and normalization** work as in MCX: the time window [T0, T1] is
+divided into gates of width Dt, results are averages over the simulated photons (noise
+falls as 1/sqrt(photons)), and the output is normalized to a unit source by default
+(the Green's function; `-U 0` for raw weights).
+
+**Boundaries.** `-b`/`cfg.isreflect` sets the condition at the mesh surface: 1 Fresnel
+reflection (the default, using `nout` outside), 0 index-matched (photons leave), 2 total
+absorption, 3 mirror reflection. Interior interfaces between media of different
+refractive indices always reflect and refract.
+
+
+Running the mmc command line
+----------------------------
+
+```
+mmc -f input.json [options]
+mmc -Q dmmc-cube60 -n 1e7
+```
+
+`mmc` (or `mmc -h`) prints all options; the most useful ones are below.
+
+| Option | Meaning |
+|---|---|
+| `-f file`, `--input` | read a JSON input file (inline JSON if the string starts with `{`, stdin with `-f -`) |
+| `-Q name`, `--bench` | run a built-in benchmark: dmmc-cube60, dmmc-cube60b, edgeimmc, nodeimmc, faceimmc |
+| `-N name`, `--net` | download and run a simulation shared on [NeuroJSON.io](https://neurojson.io/db/mmc) |
+| `-j '{...}'`, `--json` | modify any setting of the input with a JSON fragment |
+| `-n num`, `--photon` | number of photons |
+| `-E seed`, `--seed` | RNG seed, or a `.mch` file to replay its detected photons |
+| `-P n`, `--replaydet` | replay only the photons of detector n |
+| `-c name`, `--compute` | backend: `sse`, `opencl` (default), `cuda`, `optix` |
+| `-G n` or `-G '0110'`, `--gpu` | device n (from 1, see `-L`), several devices as a 0/1 mask, or `-1` for the CPU (`sse`) |
+| `-W '50,50'`, `--workload` | relative share of photons for each device |
+| `-L`, `--listgpu` | list the OpenCL devices |
+| `-M G`, `--method` | ray tracer: `G` dual-grid (default), `S` branchless Badouel, and on the CPU `P` Plucker, `H` Havel, `B` Badouel |
+| `--gridsize mm` | voxel size of the dual-grid output |
+| `-C 1/0`, `--basisorder` | mesh output at the nodes (1) or in the elements (0) |
+| `-u mm`, `--unitinmm` | length unit of the mesh in mm |
+| `-b 1/0`, `--reflect` | Fresnel reflection at the mesh surface (1) or none (0) |
+| `-U 1/0`, `--normalize` | normalize the output (1) or save raw weights (0) |
+| `-m 0/1`, `--mc` | MCX-style (0) or MCML-style (1, CPU only) photon weighting |
+| `-e w`, `--minenergy` | Russian roulette threshold (default 1e-6) |
+| `-V 0/1`, `--specular` | include the specular reflection for a source outside the mesh |
+| `-k 1/0`, `--voidtime` | for a source outside the mesh, start the clock at launch (1) or at entry (0) |
+| `--srcid n` | with several sources: 0 all together, -1 each separately, -2 also run detectors as sources, n only source n |
+| `-s name`, `--session` | name of the output files |
+| `-O X`, `--outputtype` | output quantity, see [Output quantities](#output-quantities-files-and-formats) |
+| `-F fmt`, `--outputformat` | `ascii` (default, `.dat`), `bin`, `mc2`, `nii`, `hdr`, `jnii`, `bnii` |
+| `-Z zlib`, `--zip` | compression for jnii/bnii |
+| `-d 1`, `--savedet` | save detected photons (off by default in mmc) |
+| `-x 1`, `--saveexit` | also save exit positions and directions; 2: a wide-field detector image |
+| `--momentum 1` | also save momentum transfer (for DCS) |
+| `-X 1`, `--saveref` | save the diffuse reflectance on the mesh surface |
+| `-q 1`, `--saveseed` | save the RNG seeds of detected photons, for replay |
+| `-H num`, `--maxdetphoton` | the most detected photons kept |
+| `-S 1/0`, `--save2pt` | save the volume output (1) or skip it (0) |
+| `--dumpjson [file]` | print (or save) the complete input, mesh included, as one JSON file |
+| `-A 1/0`, `--autopilot` | let mmc choose the GPU thread count, with fast math on OpenCL (1), or use `-t`/`-T` (0) |
+| `--atomic 1/0`, `--kernel file.cl` | atomic accumulation; a custom OpenCL kernel |
+| `-D flags`, `--debug` | debug output: `P` progress bar, `T` timing, `M` trajectories, and ray-tracing details (`S`, `C`, `B`, `W`, `D`, `I`, `O`, `X`, `A`, `R`, `E`) |
+| `--debugphoton n` | print the debug output for photon n only |
+
+**Recipes**
+
+```
+mmc -f input.json -c opencl -G 1                     # first OpenCL device
+mmc -f input.json -c sse                             # all CPU cores
+mmc -f input.json -c cuda                            # NVIDIA GPU (mmc-optix build)
+mmc -f input.json -c optix -M G --gridsize 0.5       # RT-MMC, 0.5 mm output voxels
+mmc -f input.json -M S -C 1 -F jnii                  # fluence at the mesh nodes, as JNIfTI
+mmc -f input.json -d 1 -q 1 -s base                  # save detected photons and seeds (base.mch)
+mmc -f input.json -E base.mch -O J -P 1 -s jac       # replay them: mua Jacobian of detector 1
+```
+
+
+### Debug output
+
+With the ray-tracing debug flags (`-D S` photon moves, `A` accumulation, `E` exits, and
+`C`, `B`, `W`, `D`, `I`, `O`, `X`, `R`), mmc prints one JSON object per line:
+
+```
+{"id":0, "pre-add": {"p":[2.000000, 8.000000, 0.407062], "lmin":1.333540e+00, "eid":3, "l":8.814591e-01}}
+{"id":0, "terminate": {"p":[2.152560, 10.000000, 1.270147], "v":[-0.623828, 0.771854, -0.122802], "w":0.981131, "eid":-6}}
+```
+
+`id` is the photon index and the key names the event (`move`, `hit`, `enter`, `leave`,
+`exit-boundary`, `add`, `roulette-die`, `terminate-by-time`, the implicit-MMC
+`implicit-node`/`edge`/`face`, ...); the record holds the position `p`, direction `v`,
+weight `w`, element `eid` and step length `l` where they apply. Use it on the CPU
+(`-c sse`) with a few photons, or with `--debugphoton n` to follow one photon. To plot
+photon paths, save trajectories instead (`-D M`, or the `traj` output of MMCLAB).
+
+
+JSON input file format
 ----------------------
 
-### Preparation
+An MMC input file has the same structure as an MCX input, with a `Mesh` section in
+place of the voxel grid (`Shapes` is accepted as its name too):
 
-Before you create/run your own MMC simulations, we suggest you first 
-understanding all the examples under the mmc/example directory, checking out 
-the formats of the input files and the scripts for pre- and post-processing.
-
-Because MMC uses FE meshes in the simulation, you should create a mesh for your 
-problem domain before launching any simulation. This can be done fairly 
-straightforwardly using a Matlab/Octave mesh generator, iso2mesh [1], 
-developed by the MMC author. In the mmc/matlab folder, we also provide 
-additional functions to generate regular grid-shaped tetrahedral meshes.
-
-It is required to use the `savemmcmesh` function under the mmc/matlab 
-folder to save the mesh output from iso2mesh, because it performs additional 
-tests to ensure the consistency of element orientations. If you choose not to 
-use `savemmcmesh`, you MUST call the `meshreorient` function in iso2mesh to 
-test the `elem` array and make sure all elements are oriented in the same 
-direction. Otherwise, MMC will give incorrect results.
-
-### Command line options
-
-The full command line options of MMC include the following:
-
-```
-###############################################################################
-#                     Mesh-based Monte Carlo (MMC) - OpenCL                   #
-#          Copyright (c) 2010-2026 Qianqian Fang <q.fang at neu.edu>          #
-#              https://mcx.space/#mmc  &  https://neurojson.io/               #
-#                                                                             #
-#Computational Optics & Translational Imaging (COTI) Lab  [https://fanglab.org]#
-#   Department of Bioengineering, Northeastern University, Boston, MA, USA    #
-###############################################################################
-#    The MCX Project is funded by the NIH/NIGMS under grant R01-GM114365      #
-###############################################################################
-#  Open-source codes and reusable scientific data are essential for research, #
-# MCX proudly developed human-readable JSON-based data formats for easy reuse.#
-#                                                                             #
-#Please visit our free scientific data sharing portal at https://neurojson.io/#
-# and consider sharing your public datasets in standardized JSON/JData format #
-###############################################################################
-$Rev::      $v2026$Date::                       $ by $Author::             $
-###############################################################################
-
-usage: mmc <param1> <param2> ...
-where possible parameters include (the first item in [] is the default value)
-
-== Required option ==
- -f config     (--input)       read an input file in the .json format,if config
-                               string starts with '{',it is parsed as an inline
-                               JSON input file; if -f is followed by nothing or
-                               a single '-', it reads input from stdin via pipe
- -Q benchmark  (--bench)       run a built-in benchmark, -Q only to list
- -N benchmark  (--net)         get benchmark from NeuroJSON.io, -N only to list
-                               benchmark can be dataset URL,or dbname/benchname
-                               requires 'curl', install from https://curl.se/
-
-== MC options ==
- -n [0.|float] (--photon)      total photon number, max allowed value is 2^32-1
- -b [0|1]      (--reflect)     1 do reflection at int&ext boundaries, 0 no ref.
- -U [1|0]      (--normalize)   1 to normalize the fluence to unitary,0 save raw
- -m [0|1]      (--mc)          0 use MCX-styled MC method, 1 use MCML style MC
- -C [1|0]      (--basisorder)  1 piece-wise-linear basis for fluence,0 constant
- -u [1.|float] (--unitinmm)    define the mesh data length unit in mm
- -E [1648335518|int|mch](--seed) set random-number-generator seed;
-                               if an mch file is followed, MMC "replays"
-                               the detected photons; the replay mode can be used
-                               to calculate the mua/mus Jacobian matrices
- -P [0|int]    (--replaydet)   replay only the detected photons from a given
-                               detector (det ID starts from 1), use with -E
- -M [G|SG]    (--method)      choose ray-tracing algorithm (only use 1 letter)
-                               P - Plucker-coordinate ray-tracing algorithm
-                               H - Havel's SSE4 ray-tracing algorithm
-                               B - partial Badouel's method (used by TIM-OS)
-                               S - branch-less Badouel's method with SSE
-                               G - dual-grid MMC (DMMC) with voxel data output
- -e [1e-6|float](--minenergy)  minimum energy level to trigger Russian roulette
- -V [0|1]      (--specular)    1 source located in the background,0 inside mesh
- -k [1|0]      (--voidtime)    when src is outside, 1 enables timer inside void
-
-== GPU options ==
- -A [0|int]    (--autopilot)   auto thread config:1 enable;0 disable
- -c [opencl,sse,cuda](--compute) select compute backend (default to opencl)
-                               can also use 0: sse, 1: opencl, 2: cuda
- -G [0|int]    (--gpu)         specify which GPU to use, list GPU by -L; 0 auto
-      or                       if set to -1, CPU-based SSE mmc will be used
- -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)
- -W '50,30,20' (--workload)    workload for active devices; normalized by sum
- --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones
- --kernel my_simu.cl           user specified OpenCL kernel source file
-
-== Output options ==
- -s sessionid  (--session)     a string used to tag all output file names
- -O [X|XFEJLP...] (--outputtype) X - output flux, F - fluence, E - energy density
-                               J - Jacobian, L - weighted path length, P -
-                               weighted scattering count (J,L,P: replay mode)
-                               R - RF forward (complex fluence, set omega)
-                               A - adjoint mua Jacobian (grid mode, set detdir)
-                               D - adjoint D-coefficient Jacobian
-                               U - adjoint mus Jacobian, V - adjoint musp Jacobian
-                               W - dual adjoint [J_mua, J_D]
-                               Q - dual adjoint [J_mua, J_musp']
- -d [0|1]      (--savedet)     1 to save photon info at detectors,0 not to save
- -H [1000000] (--maxdetphoton) max number of detected photons
- -S [1|0]      (--save2pt)     1 to save the fluence field, 0 do not save
- -x [0|1]      (--saveexit)    1 to save photon exit positions and directions
-                               setting -x to 1 also implies setting '-d' to 1
- -X [0|1]      (--saveref)     save diffuse reflectance/transmittance on the
-                               exterior surface. The output is stored in a
-                               file named *_dref.dat, and the 2nd column of
-                               the data is resized to [#Nf, #time_gate] where
-                               #Nf is the number of triangles on the surface;
-                               #time_gate is the number of total time gates.
-                               To plot the surface diffuse reflectance, the
-                               output triangle surface mesh can be extracted
-                               by faces=faceneighbors(cfg.elem,'rowmajor');
-                               where 'faceneighbors' is part of Iso2Mesh.
- -q [0|1]      (--saveseed)    1 save RNG seeds of detected photons for replay
- -F [bin|...] (--outputformat) 'ascii', 'bin' (in 'double'), 'mc2' (double)
-                               'hdr' (Analyze) or 'nii' (nifti, double)
-                               mc2 - MCX mc2 format (binary 64bit float)
-                               jnii - JNIfTI format (https://neurojson.org)
-                               bnii - Binary JNIfTI (https://neurojson.org)
-                               nii - NIfTI format
-                               hdr - Analyze 7.5 hdr/img format
-    the bnii/jnii formats support compression (-Z) and generate small files
-    load jnii (JSON) and bnii (UBJSON) files using below lightweight libs:
-      MATLAB/Octave: JNIfTI toolbox   https://github.com/NeuroJSON/jnifti,
-      MATLAB/Octave: JSONLab toolbox  https://github.com/fangq/jsonlab,
-      Python:        PyJData:         https://pypi.org/project/jdata
-      JavaScript:    JSData:          https://github.com/NeuroJSON/jsdata
- -Z [zlib|...] (--zip)      set compression method if -F jnii or --dumpjson
-                            is used (when saving data to JSON/JNIfTI format)
-                            0 zlib: zip format (moderate compression,fast)
-                            1 gzip: gzip format (compatible with *.gz)
-                            2 base64: no compression; raw _ArrayData_ (base64 in
-                              text JSON, raw binary in BJData)
-                            3 lzip: lzip format (high compression,very slow)
-                            4 lzma: lzma format (high compression,very slow)
-                            5 lz4: LZ4 format (low compression,extrem. fast)
-                            6 lz4hc: LZ4HC format (moderate compression,fast)
- --dumpjson [-,2,'file.json'] export all settings, including volume data using
-                          JSON/JData (https://neurojson.org) format for
-                          easy sharing; can be reused using -f
-                          if followed by nothing or '-', mmc will print
-                          the JSON to the console; write to a file if file
-                          name is specified; by default, prints settings
-                          after pre-processing; '--dumpjson 2' prints
-                          raw inputs before pre-processing
-
-== User IO options ==
- -h            (--help)        print this message
- -v            (--version)     print MMC version information
- -l            (--log)         print messages to a log file instead
- -i            (--interactive) interactive mode
-
-== Debug options ==
- -D [0|int]    (--debug)       print debug information (you can use an integer
-  or                           or a string by combining the following flags)
- -D [''|SCBWDIOXATRPEM]        1 S  photon movement info
-                               2 C  print ray-polygon testing details
-                               4 B  print Bary-centric coordinates
-                               8 W  print photon weight changes
-                              16 D  print distances
-                              32 I  entering a triangle
-                              64 O  exiting a triangle
-                             128 X  hitting an edge
-                             256 A  accumulating weights to the mesh
-                             512 T  timing information
-                            1024 R  debugging reflection
-                            2048 P  show progress bar
-                            4096 E  exit photon info
-                            8192 M  return photon trajectories
-      combine multiple items by using a string, or add selected numbers together
- --debugphoton [-1|int]        to print the debug info specified by -D only for
-                               a single photon, followed by its index (1-based)
-
-== Additional options ==
- --momentum     [0|1]          1 to save photon momentum transfer,0 not to save
- --gridsize     [1|float]      if -M G is used, this sets the grid size in mm
- --srcid  [0|-1,0,1,2,..]      -1 simulate each source/detector slot separately
-                               0 all sources together (default)
-                               -2 append detectors as adjoint sources (forward
-                               fluence in all Ns+Nd slots, no Jacobian)
-                               N>0 run only the N-th source
- --maxjumpdebug [10000000|int] when trajectory is requested (i.e. -D S),
-                               use this parameter to set the maximum positions
-                               stored (default: 1e7)
-
-== Example ==
-example: (list built-in benchmarks: -Q/--bench)
-       mmc -Q
-or (use multiple devices - 1st,2nd and 4th GPUs - together with equal load)
-       mmc -Q dmmc-cube60 -n 1e7 -G 1101 -W 10,10,10
-or (use inline json setting modifier)
-       mmc -f input.json -j '{"Optode":{"Source":{"Type":"isotropic"}}}'
-or (dump simulation in a single json file)
-       mmc -Q dmmc-cube60 --dumpjson
-or (use -N/--net to browse community-contributed mmc simulations at https://neurojson.io)
-       mmc -N
-or (run user-shared mmc simulations, see full list at https://neurojson.org/db/mmc)
-       mmc -N dmmc-cube60
-or (use -f - to read piped input file modified by shell text processing utilities)
-       mmc -Q dmmc-cube60 --dumpjson | sed -e 's/pencil/isotropic/g' | mmc -f -
-or (download/modify simulations from NeuroJSON.io and run with mmc -f)
-       curl -s -X GET https://neurojson.io:7777/mmc/dmmc-cube60 | jq '.Forward.Dt = 1e-9' | mmc -f
+```json
+{
+    "Mesh": {
+        "MeshID": "onecube",
+        "InitElem": 3
+    },
+    "Session": {"Photons": 100000, "RNGSeed": 17182818, "ID": "onecube"},
+    "Forward": {"T0": 0.0, "T1": 5.0e-09, "Dt": 5.0e-10},
+    "Optode": {
+        "Source": {"Pos": [2.0, 8.0, 0.0], "Dir": [0.0, 0.0, 1.0]},
+        "Detector": [{"Pos": [2.0, 6.0, 0.0], "R": 1.0}]
+    }
+}
 ```
 
-### Input files
-
-It is highly recommended to use the JSON-formatted input file described in the following
-section. The legacy input file format `.inp` is depreciated and may be removed in
-future releases.
-
-The simplest example can be found under the `example/onecube` folder. 
-Please run `createmesh.m` first from Matlab/Octave to create all the mesh 
-files, which include
-
-    elem_onecube.dat    -- tetrahedral element file
-    facenb_onecube.dat  -- element neighbors of each face
-    node_onecube.dat    -- node coordinates
-    prop_onecube.dat    -- optical properties of each element type
-    velem_onecube.dat   -- volume of each element
-
-The input file of the example is named `onecube.inp`, where we specify most 
-of the simulation parameters. The input file follows a similar format as in 
-MCX, which looks like the following
-
-    100                  # total photon number (can be overwritten by -n)
-    17182818             # RNG seed, negative to regenerate
-    2. 8. 0.             # source position (mm)
-    0. 0. 1.             # initial incident vector
-    0.e+00 5.e-09 5e-10  # time-gates(s): start, end, step
-    onecube              # mesh id: name stub to all mesh files
-    3                    # index of element (starting from 1) which encloses the source
-    3       1.0          # detector number and radius (mm)
-    2.0     6.0    0.0   # detector 1 position (mm)
-    2.0     4.0    0.0   # ...
-    2.0     2.0    0.0
-    pencil               # optional: source type
-    0 0 0 0              # optional: source parameter set 1
-    0 0 0 0              # optional: source parameter set 2
-
-The mesh files are linked through the `mesh id` (a name stub) with a format 
-of `{node|elem|facenb|velem}_meshid.dat`. All mesh files must exist for an MMC 
-simulation. If the index to the tetrahedron that encloses the source is not 
-known, please use the `tsearchn` function in matlab/octave to find out and 
-supply it in the 7th line in the input file. Examples are provided in 
-`mmc/examples/meshtest/createmesh.m`.
-
-To run a simulation, you should execute the `run_test.sh` bash script in 
-this folder. If you want to run mmc directly from the command line, you can do 
-so by typing
-
-`../../bin/mmc -n 20 -f onecube.inp -s onecube`
-
-where `-n` specifies the total photon number to be simulated, `-f` specifies the 
-input file, and `-s` gives the output file name. To see all the supported 
-options, run `mmc` without any parameters.
-
-The above command only simulates 20 photons and will complete instantly. An 
-output file `onecube.dat` will be saved to record the normalized (unitary) 
-flux at each node. If one specifies multiple time-windows from the input file, 
-the output will contain multiple blocks with each block corresponding to the 
-time-domain solution at all nodes computed for each time window.
-
-More sophisticated examples can be found under the `example/validation` and 
-`example/meshtest` folders, where you can find `createmesh` scripts and 
-post-processing script to make plots from the simulation results.
-
-### JSON-formatted input files
-
-Starting from version 0.9, MMC accepts a JSON-formatted input file in addition 
-to the conventional tMCimg-like input format. JSON (JavaScript Object Notation) 
-is a portable, human-readable and “fat-free” text format to represent 
-complex and hierarchical data. Using the JSON format makes a input file 
-self-explanatory, extensible and easy-to-interface with other applications 
-(like MATLAB).
-
-A sample JSON input file can be found under the `examples/onecube` folder. The 
-same file, `onecube.json`, is also shown below:
-
-    {
-        "Domain": {
-            "MeshID": "onecube",
-            "InitElem": 3
-        },
-        "Session": {
-            "Photons":  100,
-            "Seed":     17182818,
-            "ID":       "onecube"
-        },
-        "Forward": {
-            "T0": 0.0e+00,
-            "T1": 5.0e-09,
-            "Dt": 5.0e-10
-        },
-        "Optode": {
-            "Source": {
-                "Type": "pencil",
-                "Pos": [2.0, 8.0, 0.0],
-                "Dir": [0.0, 0.0, 1.0],
-                "Param1": [0.0, 0.0, 0.0, 0.0],
-                "Param2": [0.0, 0.0, 0.0, 0.0]
-            },
-            "Detector": [
-                {
-                    "Pos": [2.0, 6.0, 0.0],
-                    "R": 1.0
-                },
-                {
-                    "Pos": [2.0, 4.0, 0.0],
-                    "R": 1.0
-                },
-                {
-                    "Pos": [2.0, 2.0, 0.0],
-                    "R": 1.0
-                }
-            ]
-        }
-    }
-
-A JSON input file requires 4 root objects, namely `Domain`, `Session`, 
-`Forward` and `Optode`. Each object is a data structure providing 
-information as indicated by its name. Each object can contain various 
-sub-fields. The orders of the fields in the same level are flexible. For each 
-field, you can always find the equivalent fields in the `*.inp` input files. For 
-example, The `MeshID` field under the `Mesh` object is the same as 
-Line\#6 in onecube.inp; the `InitElem` under `Mesh` is the same as 
-Line\#7; the `Forward.T0` is the same as the first number in Line\#5, etc.
-
-For the OptiX backend (`--compute optix`), the `Mesh` object can also give a
-surface-only mesh instead of a tetrahedral one: `MeshNode` (N x 3) and
-`MeshSurf` (F x 5), without `MeshElem` and `InitElem`. Each row of `MeshSurf`
-holds the 3 node indices (1-based) of a triangle, the label of its inner side
-and the label of its outer side, where label 0 (or a negative label) is the
-space outside the domain. The triangle normal, by the right-hand rule
-(n2-n1)x(n3-n1), must point from the inner to the outer side. This is the same
-labeled surface that MMC extracts from a tetrahedral mesh for OptiX. A surface
-that is not closed is reported as a warning. The initial medium of the photons
-is found by tracing a ray from the source, so no initial element is needed;
-the output is the dual-grid (`-M G`) fluence. For example
-
-        "Mesh": {
-            "MeshNode": [[0,0,0],[60,0,0],[60,60,0],[0,60,0],
-                         [0,0,60],[60,0,60],[60,60,60],[0,60,60]],
-            "MeshSurf": [[1,4,3,1,0],[1,3,2,1,0],[5,6,7,1,0],[5,7,8,1,0],
-                         [1,2,6,1,0],[1,6,5,1,0],[2,3,7,1,0],[2,7,6,1,0],
-                         [3,4,8,1,0],[3,8,7,1,0],[4,1,5,1,0],[4,5,8,1,0]]
-        }
-
-defines a 60 mm cube of medium 1. In mmclab, the same input is given by
-`cfg.node` and a 5-column `cfg.face` with `cfg.compute='optix'`.
-
-An MMC JSON input file must be a valid JSON text file. You can validate your 
-input file by running a JSON validator, for example <http://jsonlint.com/> You 
-should always use `...` to quote a `name` and separate parallel items 
-by `,`.
-
-MMC accepts an alternative form of JSON input, but using it is not recommended. 
-In the alternative format, you can use `"rootobj_name.field_name": value `
-
-to represent any parameter directly in the root level. For example
-
-    {
-        "Domain.MeshID": "onecube",
-        "Session.ID": "onecube",
-        ...
-    }
-
-You can even mix the alternative format with the standard format. If any input 
-parameter has values in both formats in a single input file, the 
-standard-formatted value has higher priority.
-
-To invoke the JSON-formatted input file in your simulations, you can use the 
-`-f` command line option with MMC, just like using an `.inp` file. For 
-example:
-
-      ../../bin/mmc -n 20 -f onecube.json -s onecubejson -D M
-
-The input file must have a `.json` suffix in order for MMC to recognize. If 
-the input information is set in both command line, and input file, the command 
-line value has higher priority (this is the same for `.inp` input files). For 
-example, when using `-n 20`, the value set in `Session`/`Photons` 
-is overwritten to 20; when using `-s onecubejson`, the 
-`Session`/`ID` value is modified. If your JSON input file is invalid, 
-MMC will quit and point out where it expects you to double check.
-
-### Photon debugging information using -D flag
-
-the output format for `-D M` (photon moving) is below:
-
-    ? px py pz eid id scat
-
-    ? is a single letter representing the state of the current position:
-       B a boundary point
-       P the photon is passing an interface point
-       T the photon terminates at this location due to
-          exceeding end of the time window
-       M a position other than any of the above
-
-    px,py,pz: the current photon position
-
-    eid: the index (starting from 1) of the current enclosing element
-
-    id: the index of the current photon, from 1 to nphoton
-
-    scat: the "normalized" length to read the next scattering site, \
-       it is unitless
-
-    for -D A (flux accumulation debugging), the output is
-
-    A ax ay az ww eid dlen
-
-    ax ay az: the location where the accumulation calculation was done \
-       (typically, the half-way point of the line segment between the last \
-       and current positions)
-
-    ww: the photon weight loss for the line segment
-
-    dlen=scat/mus of the current element: the distance left to arrive \
-       the next scattering site
-
-    for -D E
-
-    E  px py pz vx vy vz w eid
-
-    vx vy vz: the unitary propagation vector when the photon exits
-    w: the current photon weight
-
-
-### Plotting the Results
-
-As described above, MMC produces a fluence-rate output file as 
-`session-id.dat`. By default, this file contains the normalized, i.e. under 
-unitary source, fluence at each node of the mesh. The detailed interpretation 
-of the output data can be found in [6]. If multiple time-windows are defined, 
-the output file will contain multiple blocks of data, with each block being the 
-fluence distribution at each node at the center point of each time-window. The 
-total number of blocks equals to the total time-gate number.
-
-To read the mesh files (tetrahedral elements and nodes) into matlab, one can 
-use `readmmcnode` and `readmmcelem` function under the mmc/matlab directory. 
-Plotting non-structural meshes in matlab is possible with interpolation 
-functions such as griddata3. However, it is very time-consuming for large 
-meshes. In iso2mesh, a fast mesh slicing & plotting function, `qmeshcut`, is very 
-efficient in making 3D plots of mesh or cross-sections. More details can be 
-found at this webpage [7], or `help qmeshcut` in matlab. Another useful 
-function is plotmesh in iso2mesh toolbox. It has very flexible syntax to allow 
-users to plot surfaces, volumetric meshes and cross-section plots. One can use 
-something like
-
-      plotmesh([node fluence],elem,'x<30 & y>30');
-
-to plot a sliced mesh, or
-
-      plotmesh([node log10(fluence)],elem,'x=30'); view(3)
-
-to show a cross-sectional plot.
-
-Please edit or browse the `*.m` files under all example subfolder to find more 
-options to make plot from MMC output.
-
-When users specify `-d 1` to record partial path lengths for all detected 
-photons, an output file named `sessionid.mch` will be saved under the same 
-folder. This file can be loaded into Matlab/Octave using the `loadmch.m`
-script under the mmc/matlab folder. The output of loadmch script has the 
-following columns:
-
-      detector-id, scattering-events, partial-length_1, partial-length_2, ...., additional data ...`
-
-The simulation settings will be returned by a structure. Using the information 
-from the mch file will allow you to re-scale the detector readings without 
-rerunning the simulation (for absorption changes only).
-
-
-Known issues and TODOs
--------------------------
-
--   MMC only supports linear tetrahedral elements at this point.
- Quadratic elements will be added later
--   Optical properties are defined per element, except for the per-node mua/musp
- used to compute adjoint Jacobians for image reconstruction
--   Implicit MMC (edge/node/face regions of interest defined in the mesh input)
- is only supported by the SSE/OpenMP CPU backend (`-G -1`)
-
-
-Getting Involved
--------------------
-
-MMC is an open-source software. It is released under the terms of GNU General 
-Public License version 3 (GPLv3). That means not only everyone can download and 
-use MMC for any purposes, but also you can modify the code and share the 
-improved software with others (as long as the derived work is also licensed 
-under the GPLv3 license).
-
-If you already made a change to the source code to fix a bug you encountered in 
-your research, we are appreciated if you can share your changes (as `git diff` 
-outputs) with the developers. We will patch the code as soon as we 
-fully test the changes (we will acknowledge your contribution in the MMC 
-documentation).
-
-When making edits to the source code with an intent of sharing with the 
-upstream authors, please set your editor's tab width to 8 so that the 
-indentation of the source is correctly displayed. Please keep your patch as 
-small and local as possible, so that other parts of the code are not influenced.
-
-To streamline the process process, the best way to contribute your patch is to 
-click the **fork** button from <http://github.com/fangq/mmc>, and then change 
-the code in your forked repository. Once fully tested and documented, you can 
-then create a **pull request** so that the upstream author can review the 
-changes and accept your change.
-
-In you are a user, please use our mmc-users mailing list to post questions or 
-share experience regarding MMC. The mailing lists can be found from this link:
-
-<https://mcx.space/#about>
+**`Mesh`**
+
+| Field | Meaning |
+|---|---|
+| `MeshID` | name stub of the mesh files `node_<id>.dat`, `elem_<id>.dat`, `facenb_<id>.dat`, `velem_<id>.dat` (and `prop_<id>.dat` when `Domain.Media` is absent), written by `savemmcmesh.m` |
+| `MeshNode` | the nodes, Nn x 3, as a JSON array or a JData-encoded `single` array |
+| `MeshElem` | the elements, Ne x 5: 4 node indices and the label (`int32`) |
+| `MeshSurf` | OptiX surface-only mesh, Nf x 5: 3 node indices, inner and outer labels |
+| `MeshROI` | implicit MMC: node radii (Nn x 1), edge radii (Ne x 6) or face thicknesses (Ne x 4) |
+| `InitElem` | the element containing the source |
+| `LengthUnit` | length unit of the mesh in mm |
+
+**`Domain`**: `Media` (array of `{"mua", "mus", "g", "n"}`, the first for label 0),
+`LengthUnit`, and `Step` (the dual-grid voxel size).
+
+**`Session`**: `ID`, `Photons`, `RNGSeed`, `OutputType`, `OutputFormat`, `RayTracer`
+(`-M` letter), `BasisOrder`, `DoMismatch`, `DoNormalize`, `DoSaveVolume`,
+`DoPartialPath`, `DoSaveExit`, `DoSaveSeed`, `DoDCS`, `DoSpecular`, `DebugFlag`.
+
+**`Forward`**: `T0`, `T1`, `Dt` (seconds), `N0` (refractive index outside the mesh) and
+`Omega` (modulation angular frequency for RF outputs).
+
+**`Optode`**: `Source` (`Type`, `Pos`, `Dir`, `Param1`, `Param2`, `Pattern`, `SrcNum`;
+or an array of sources) and `Detector` (an array of `{"Pos", "R"}`, plus `"Dir"` for the
+adjoint outputs; `Param1`/`Param2` for a wide-field detector).
+
+`mmc2json(cfg, 'file.json')` in MATLAB converts an MMCLAB `cfg`, mesh included, into an
+input file, and `mmc --dumpjson` writes the complete input of any run.
+
+
+Sources
+-------
+
+MMC supports the same source types as MCX (see the MCX README for their parameters):
+`pencil`, `isotropic`, `cone`, `gaussian`, `planar`, `pattern`, `fourier`, `arcsine`,
+`disk`, `fourierx`, `fourierx2d`, `zgaussian`, `line`, `slit`, `pencilarray`, `pattern3d`,
+`hyperboloid` and `ring`. Positions and sizes are in mesh units. The OpenCL and CUDA
+backends do not implement `pencilarray`, `hyperboloid` and `ring`; use `sse` or `optix`
+for them.
+
+-   **Point and pencil sources** must lie inside the mesh (in element `InitElem`/`cfg.e0`),
+    or outside with `cfg.e0='>'` so MMCLAB moves them to the surface.
+-   **Wide-field sources** (`planar`, `pattern`, `fourier`, `fourierx`, `fourierx2d`,
+    `pattern3d`, ...) must start outside the mesh; MMCLAB/PMMC attach their footprint
+    to the mesh (see [Preparing a mesh](#preparing-a-mesh)). Example:
+    `demo_sfdi_2layer.m`.
+-   **Several sources**: one row per source in `cfg.srcpos`/`cfg.srcdir`, or an array of
+    `Optode.Source` objects; `cfg.srcid` chooses whether they are simulated together or
+    separately. Example: `demo_mmclab_multisrc.m`.
+-   **Photon sharing**: a `pattern` source with `cfg.srcnum` > 1 simulates many patterns
+    in one run. Example: `demo_photon_sharing.m`.
+
+
+Detectors and detected photon data
+----------------------------------
+
+Detectors are disks on the mesh surface, `cfg.detpos = [x y z radius]`
+(`Optode.Detector`). On the command line, detected photons are saved only with `-d 1`.
+For each detected photon, MMC saves the detector ID, the scattering count and partial
+path length in each medium, the momentum transfer (`--momentum 1`, `cfg.ismomentum=1`),
+the exit position and direction (`-x 1`, `cfg.issaveexit=1`) and the initial weight.
+The helper functions `mmcdetweight`, `mmcmeanpath`, `mmcmeanscat`, `mmcdettpsf` and
+`mmcdettime` (MATLAB), or `pmmc.detweight`, `pmmc.meanpath`, ... (Python), turn them
+into detector readings for any optical properties. In the raw array (`detp.data` in
+MMCLAB, or the `.mch` file read by `loadmch`), each photon is a row of: detector ID,
+the scattering counts and partial path lengths in each medium, the momentum transfers
+(with `--momentum 1`), the exit position and direction (with `-x 1`), and the initial
+weight.
+
+A **wide-field (camera) detector** is a quadrilateral given by `cfg.detpos` and two
+edge vectors with pixel counts, `cfg.detparam1 = [ux uy uz Nx]` and
+`cfg.detparam2 = [vx vy vz Ny]`; with `-x 2` (`cfg.issaveexit=2`) MMC returns the
+image of the exiting weight instead of per-photon records. Example: `demo_wide_det.m`.
+
+
+Output quantities, files and formats
+------------------------------------
+
+`-O` (`Session.OutputType`, `cfg.outputtype`) selects what the volume output holds:
+
+| `-O` | Name | Quantity |
+|---|---|---|
+| `X` | `flux` | fluence rate, 1/(mm^2 s) per unit source (default) |
+| `F` | `fluence` | fluence, integrated over each time gate |
+| `E` | `energy` | energy deposited |
+| `J` | `jacobian` | replay: mua Jacobian |
+| `L` | `wl` | replay: weighted path length (mua Jacobian) |
+| `P` | `wp` | replay: weighted scattering count (mus Jacobian) |
+| `R` | `rf` | with a modulation frequency, no replay: complex fluence rate |
+| `A`, `D`, `U`, `V` | `adjoint`, `adjoint_dcoeff`, `adjoint_mus`, `adjoint_musp` | adjoint Jacobians |
+| `W`, `Q` | `adjoint_mua_d`, `adjoint_mua_musp` | two adjoint Jacobians together |
+
+**Files of the command line**: the volume output `<session>.<ext>` in the format set by
+`-F` (`.dat` text by default, or `.bin`, `.mc2`, `.nii`, `.jnii`, `.bnii`; RF runs also
+write the imaginary part to `<session>_imag.<ext>`), the detected photons
+`<session>.mch` (or `<session>_detp.jdt`/`.jdb` with `-F jnii`/`bnii`), the surface
+reflectance `<session>_dref.<ext>` with `-X 1`, and trajectories with `-D M`. With
+mesh output, each time gate is a block of values at the nodes (or elements); with
+dual-grid output, it is a voxel volume.
+
+The diffuse reflectance (`-X 1`) is stored for each triangle of the mesh surface, in
+the order of `faceneighbors(elem, 'rowmajor')` (iso2mesh), as `#triangles x #gates`.
+
+### Units of the output
+
+With the default normalization (`-U 1`), the output is the response to a source that
+emits one unit of light (one joule, or one photon) in an impulse at t=0, so each
+quantity can be read in energy or in photon units:
+
+| Output | Energy units | Photon units |
+|---|---|---|
+| fluence rate (`flux`, default) | W/mm^2 per J emitted | 1/(mm^2 s) per photon emitted |
+| fluence (`fluence`) | J/mm^2 per J emitted | 1/mm^2 per photon emitted |
+| energy (`energy`) | J absorbed in the node, element or voxel per J emitted | the fraction of the photons absorbed there |
+
+To obtain absolute values, multiply by the energy (or number of photons) your source
+delivers; for a continuous source of power P, the CW fluence rate is P times the
+time-integrated (summed over gates and multiplied by Dt) fluence rate. Divide the
+`energy` output by the volume it represents (the nodal or element volume, or the voxel volume) for the absorbed energy density;
+`mcxfluence2energy.m` converts a fluence output into energy deposition. See [Fang2010] and Lihong Wang's *Biomedical Optics: Principles
+and Imaging*, chapter 5, for the definitions.
+
+**Fluence rate and current density.** The fluence rate is a scalar: the light passing
+through a small sphere around a point from all directions. The current density J is a
+vector: the net light flowing through a surface in a given direction; it has the same
+units. What a detector or the diffuse reflectance measures is the current density
+flowing out of the mesh: the total weight of the detected photons divided by the
+detector area gives J at the detector, as a function of time when the photons are
+binned by their time of flight, and `-X 1` records it on every surface triangle.
+
+
+Reading MMC data in MATLAB and Python
+-------------------------------------
+
+```matlab
+flux = load('onecube.dat');                 % -F ascii: one value per node (or element) per line
+nii  = loadjd('onecube.jnii');              % JSONLab: .jnii, .bnii, .jdt, .jdb
+[data, header] = loadmch('onecube.mch');    % detected photons (mmc/matlab)
+[node, elem] = readmmcmesh('onecube');      % read node_onecube.dat and elem_onecube.dat
+```
+
+Mesh output is plotted with iso2mesh: `plotmesh([node log10(fluence)], elem, 'y=30')`
+shows a cross section, `plotmesh([node fluence], elem, 'x<30 & y>30')` a cut-away
+view, and `qmeshcut` returns the values on any plane for your own plots. Dual-grid
+output is a regular volume, shown with `imagesc`, `islicer` or any volume viewer.
+
+```python
+import jdata as jd, pmmc
+nii  = jd.load('onecube.jnii')              # needs bjdata for .bnii/.jdb
+data, header = pmmc.loadmch('onecube.mch')[:2]
+```
+
+
+Using MMCLAB in MATLAB and Octave
+---------------------------------
+
+MMCLAB runs MMC inside MATLAB or GNU Octave, and does the mesh bookkeeping for you:
+it reorients the elements, computes face neighbors and element volumes, finds the
+source element, and attaches wide-field source domains, before calling the `mmc` mex
+file.
+
+```matlab
+[flux, detp, ncfg, seeds, traj] = mmclab(cfg);
+ncfg = mmclab(cfg, 'prep');            % only preprocess, to reuse the result
+flux = mmclab(cfg, 'sse');             % run on a given backend: 'sse', 'opencl', 'cuda', 'optix'
+info = mmclab('gpuinfo');
+```
+
+`help mmclab` documents every `cfg` field, its default and the outputs.
+
+| Output | Content |
+|---|---|
+| `flux.data` | dual-grid: Nx x Ny x Nz x Ng voxels; mesh output: #nodes (or #elements) x Ng |
+| `flux.dref` | surface diffuse reflectance, #triangles x Ng, with `cfg.issaveref=1` |
+| `flux.jmua`, `.jd`, `.jmus`, `.jmusp` | adjoint Jacobians |
+| `detp` | detected photons: `detid`, `nscat`, `ppath`, `mom`, `p`, `v`, `w0` |
+| `ncfg` | the preprocessed cfg, to pass to later runs |
+| `seeds`, `traj` | RNG seeds of detected photons; trajectories (`id`, `pos`, `eid`) |
+
+**Helper functions** (`mmc/matlab`): mesh I/O (`savemmcmesh`, `readmmcmesh`,
+`readmmcnode`, `readmmcelem`, `readmmcface`), sources and detectors (`mmcsrcdomain`,
+`mmcaddsrc`, `mmcadddet`, `mmcraytrace`), detected photons (`mmcdetweight`,
+`mmcmeanpath`, `mmcmeanscat`, `mmcdettpsf`, `mmcdettime`, `loadmch`), Jacobians
+(`mmcjacobian`, `mmcjmua`, `mmcjmus`), regular meshes (`genT5mesh`, `genT6mesh`), and the
+analytical diffusion solutions of spheres (`sphdiffusion*`); `mmc2json` is in
+`mmclab`.
+
+**Examples** in `mmclab/example`: `demo_mmclab_basic.m` (start here),
+`demo_example_onecube.m`, `demo_head_atlas.m` (a brain atlas mesh),
+`demo_dmmc_sphshells.m` (dual-grid MMC), `demo_immc_basic.m`, `demo_immc_vessel.m`
+(implicit MMC), `demo_sfdi_2layer.m`, `demo_wide_det.m` (wide-field sources and
+detectors), `demo_example_replay.m`, `demo_mmclab_mesh_adjoint.m`,
+`demo_mmclab_mesh_rf_adjoint.m` (Jacobians), `demo_photon_sharing.m`,
+`demo_mmclab_multisrc.m`, `demo_optix_mmc.m` (RT-MMC) and `demo_compare_mmc_mcx.m`.
+
+
+Using PMMC in Python
+--------------------
+
+PMMC runs MMC from Python:
+
+```python
+import pmmc
+res = pmmc.run(cfg)          # cfg: a dict with the MMCLAB field names, mesh already prepared
+res = pmmc.mmclab(cfg)       # with MMCLAB's preprocessing (needs pyiso2mesh)
+print(pmmc.gpuinfo())
+```
+
+`pmmc.mmclab` reorients the mesh, finds the source element and attaches wide-field
+source domains as `mmclab.m` does; `pmmc.mmcsrcdomain`, `mmcaddsrc`, `mmcadddet` and
+`mmcraytrace` are also available, together with the detected-photon and plotting
+utilities from `pmcx`. All MMCLAB examples have Python versions in `pmmc/example`.
+The wheels include the `sse` and `opencl` backends; `CMAKE_ARGS="-DBUILD_CUDA=ON"
+pip install .` in `pmmc/` adds `cuda`.
+
+
+Using MCX Studio
+----------------
+
+MCX Studio 2, included in the MCX Studio packages, is the graphical front end for MCX,
+MCX-CL and MMC (source code in MCX's `mcxstudio2/` folder). It opens MMC input files,
+shows the mesh surface, sources, detectors, the fluence and photon paths in its 3-D
+view, and runs mmc when the domain is a mesh; the `cpu` processor runs mmc's `sse`
+backend:
+
+```
+mcxstudio onecube.json
+xvfb-run -a mcxstudio --run --quit --processor cpu onecube.json   # headless
+```
+
+
+Advanced features
+-----------------
+
+### Photon replay and Jacobians
+
+Save the seeds of the detected photons, then replay them to build Jacobians
+[Yao2018]. In MMCLAB:
+
+```matlab
+[flux, detp, ncfg, seeds] = mmclab(cfg);
+ncfg.seed = seeds.data;
+ncfg.outputtype = 'jacobian';      % or 'wl', 'wp'
+ncfg.replaydet = 1;                % detector 1 (0: all detectors summed)
+jac = mmclab(ncfg);
+```
+
+On the command line: `mmc -f in.json -d 1 -q 1 -s base`, then
+`mmc -f in.json -E base.mch -O J -P 1`. Example: `demo_example_replay.m`.
+
+### Adjoint Jacobians
+
+Give each detector a direction (`cfg.detdir`, `Optode.Detector.Dir`) and use output
+type `adjoint`, `adjoint_dcoeff`, `adjoint_mus`, `adjoint_musp`, `adjoint_mua_d` or
+`adjoint_mua_musp`: every detector is also run as a source, and the Jacobians of all
+source-detector pairs are formed from the forward and adjoint fields, in CW or the
+frequency domain. On the mesh, `cfg.adjointmode` chooses the full finite-element form
+(0, the default) or the nodal approximation (1). Examples:
+`demo_mmclab_mesh_adjoint.m`, `demo_mmclab_mesh_rf_adjoint.m`. Redbird uses these
+outputs, with `cfg.nodemua`/`cfg.nodemusp`, for image reconstruction.
+
+### Frequency-domain (RF) simulations
+
+With a modulation frequency (`cfg.omega` in rad/s, `Forward.Omega`), MMC tracks complex
+photon weights and returns the complex fluence rate, on every backend.
+
+### Dual-grid MMC
+
+The default method traces photons on the mesh but stores the fluence on a voxel grid,
+which is faster and gives a uniform output resolution; set the grid with `cfg.steps` or
+`--gridsize`. `demo_dualmesh_output.m` shows how to map the result back to the mesh.
+
+### Implicit MMC
+
+Thin vessels, membranes and small spheres can be added without meshing them: give a
+radius per node (`cfg.noderoi`), per element edge (`cfg.edgeroi`, Ne x 6) or a thickness
+per element face (`cfg.faceroi`, Ne x 4) [Yuan2021]. Implicit MMC runs on the CPU
+(`sse`). Examples: `demo_immc_basic.m`, `demo_immc_vessel.m`; benchmarks `edgeimmc`,
+`nodeimmc`, `faceimmc`.
+
+### Comparing with MCX
+
+`demo_compare_mmc_mcx.m` runs the same problem with MMC and MCX; meshes and voxel
+volumes of the same domain give statistically matching results, which the test suite
+checks.
+
+
+Performance and best practices
+------------------------------
+
+-   **Use a GPU backend for large runs** (`opencl`, `cuda` or `optix`); keep `sse` for
+    implicit MMC, MCML-style weighting and runs without a GPU.
+-   **Prefer dual-grid output** (the default) when you need a fluence map: it is faster
+    than mesh output and its resolution does not depend on the mesh.
+-   **Mesh only as finely as the geometry needs.** Very small or badly shaped elements
+    slow down tracing without improving the result.
+-   **Preprocess once.** `mmclab(cfg, 'prep')` returns a cfg with the mesh data computed;
+    reuse it for repeated runs.
+-   **Reproducing a run**: on the CPU, use one thread (`OMP_NUM_THREADS=1`) and the same
+    seed; on the GPU, `-A 0 -T 1` gives the same photon paths.
+-   **More photons, less noise**: noise falls as 1/sqrt(photons).
+
+
+Testing
+-------
+
+| Test | What it checks | How to run |
+|---|---|---|
+| host unit tests | parsers, mesh code, ray tracers, and the CUDA/OptiX backends where built | `make unittest` in `src` |
+| functional tests | absorbed fraction, detected photons and outputs of the examples, on each backend that is built | `test/testmmc.sh` |
+| built-in examples | example cases exported from the MMCLAB demos, against golden values | `test/testbuiltin.sh` |
+| trajectory tests | step-by-step photon trajectories on the CPU and OpenCL, against golden data and MCX | `test/testtraj.sh` |
+| PMMC tests | the Python module | `python3 -m unittest discover -s test` in `pmmc/` |
+
+
+Known limitations
+-----------------
+
+-   MMC supports linear tetrahedral elements only.
+-   Optical properties are defined per element (per label), except the per-node
+    mua/mus' (`cfg.nodemua`, `cfg.nodemusp`) used for image reconstruction.
+-   Implicit MMC (node/edge/face ROIs) and MCML-style weighting run on the CPU (`sse`)
+    only, and the OptiX backend has the restrictions listed in
+    [Choosing a backend](#choosing-a-backend).
+-   MMC implements the mesh-based Monte Carlo method as described in the papers below,
+    not every possible variant of it. If you compare MMC with other software in a
+    publication, please contact the author to make sure the details of the
+    implementation are understood correctly.
+
+
+Getting help
+------------
+
+-   documentation, FAQ and tutorials: <https://mcx.space/wiki/>
+-   `help mmclab`, `pmmc/README.md`, and the examples
+-   questions and discussion: the [mmc-users mailing list](https://groups.google.com/g/mmc-users) for MMC,
+    and the [mcx-users mailing list](https://groups.google.com/g/mcx-users) for all MCX software
+-   bug reports and feature requests: <https://github.com/fangq/mmc/issues>
+-   release announcements: the [mcx-news mailing list](https://groups.google.com/g/mcx-news)
+
+Contributing
+------------
+
+MMC is open-source software under the GPLv3 license: you may use, modify and share
+it, as long as derived work is also released under the GPLv3. Bug fixes and new
+features are welcome:
+
+-   fork <https://github.com/fangq/mmc>, make your change in your fork, keep it small
+    and local, and open a pull request; describe what it fixes and how you tested it;
+-   or send the change as a `git diff` to the mailing list or a GitHub issue.
+
+Please format C/C++ code with `make pretty` (astyle) in `src`, MATLAB code with
+`mh_style --fix` (miss_hit) and Python code with `black` before submitting, and add a
+test when you can. Contributions are acknowledged in the What's New section and the
+ChangeLog.
+
+
+
+Publications and how to cite
+----------------------------
+
+If you use MMC in your research, please cite [Fang2010], which introduced MMC,
+[Fang2019], which describes the GPU-accelerated MMC, and the papers of the specific
+features you use. The complete list is maintained at <https://mcx.space/#publications>.
+
+- [Fang2010] Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing in
+  Plücker coordinates," Biomed. Opt. Express, 1(1), 165-175 (2010).
+  <https://opg.optica.org/boe/abstract.cfm?uri=boe-1-1-165>
+- [Fang2019] Qianqian Fang and Shijie Yan, "Graphics processing unit-accelerated mesh-based
+  Monte Carlo photon transport simulations," J. Biomed. Opt. 24(11), 115002 (2019).
+  <https://doi.org/10.1117/1.JBO.24.11.115002>
+- [Fang2012] Qianqian Fang and David R. Kaeli, "Accelerating mesh-based Monte Carlo method on
+  modern CPU architectures," Biomed. Opt. Express, 3(12), 3223-3230 (2012).
+  <https://opg.optica.org/boe/abstract.cfm?uri=boe-3-12-3223>
+- [Yan2019] Shijie Yan, Anh Phong Tran, Qianqian Fang, "A dual-grid mesh-based Monte Carlo
+  algorithm for efficient photon transport simulations in complex 3D media," J. Biomed. Opt.
+  24(2), 020503 (2019). <https://doi.org/10.1117/1.JBO.24.2.020503>
+- [Yuan2021] Yaoshen Yuan, Shijie Yan, Qianqian Fang, "Light transport modeling in highly
+  complex tissues using the implicit mesh-based Monte Carlo algorithm," Biomed. Opt.
+  Express, 12(1), 147-161 (2021). <https://opg.optica.org/boe/fulltext.cfm?uri=boe-12-1-147>
+- [Yao2016] Ruoyang Yao, Xavier Intes, Qianqian Fang, "Generalized mesh-based Monte Carlo for
+  wide-field illumination and detection via mesh retessellation," Biomed. Opt. Express,
+  7(1), 171-184 (2016). <https://opg.optica.org/boe/abstract.cfm?uri=boe-7-1-171>
+- [Yao2018] Ruoyang Yao, Xavier Intes, Qianqian Fang, "A direct approach to compute Jacobians
+  for diffuse optical tomography using perturbation Monte Carlo-based photon 'replay',"
+  Biomed. Opt. Express, 9(10), 4588-4603 (2018).
+  <https://opg.optica.org/boe/abstract.cfm?uri=boe-9-10-4588>
+- Qianqian Fang, "Comment on 'A study on tetrahedron-based inhomogeneous Monte-Carlo optical
+  simulation'," Biomed. Opt. Express, 2(5), 1258-1264 (2011).
+  <https://opg.optica.org/boe/abstract.cfm?uri=boe-2-5-1258>
+- Yuxuan Zhang and Qianqian Fang, "BlenderPhotonics - an integrated open-source software
+  environment for three-dimensional meshing and photon simulations in complex tissues,"
+  J. Biomed. Opt. 27(8), 083014 (2022). <https://doi.org/10.1117/1.JBO.27.8.083014>
+- Anh Phong Tran, Shijie Yan, Qianqian Fang, "Improving model-based fNIRS analysis using
+  mesh-based anatomical and light-transport models," Neurophotonics, 7(1), 015008 (2020).
+  <https://doi.org/10.1117/1.NPh.7.1.015008>
+- Qianqian Fang and David A. Boas, "Monte Carlo Simulation of Photon Migration in 3D Turbid
+  Media Accelerated by Graphics Processing Units," Opt. Express, 17(22), 20178-20190 (2009),
+  the MCX paper.
 
 
 Acknowledgement
-------------------
+---------------
+
+The MCX project, including MMC, is funded by the US National Institutes of Health (NIH) /
+National Institute of General Medical Sciences (NIGMS) under grant R01-GM114365. We thank
+the users and contributors who reported bugs and contributed code, credited in the What's
+New section and the ChangeLog.
+
+MMC uses the following open-source libraries:
 
 MMC uses the following open-source libraries:
 
@@ -1166,15 +1175,23 @@ according to this link:
 
 Both filter files were significantly modified by Qianqian Fang.
 
+### UBJ (UBJSON) library by Steven Braeger
 
-Reference
-------------
+- Files: src/ubj/*
+- Copyright (c) 2014 Steven Braeger
+- URL: https://github.com/Steve132/ubj
+- License: MIT License, src/ubj/LICENSE
+
+### Pybind11
+
+- Files: src/pybind11/*
+- Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>
+- URL: https://github.com/pybind/pybind11/
+- License: BSD-style license, https://github.com/pybind/pybind11/blob/master/LICENSE
 
 
-- [1] <http://iso2mesh.sf.net> -- an image-based surface/volumetric mesh generator 
-- [2] <https://mcx.space> -- Monte Carlo eXtreme: a GPU-accelerated MC code 
-- [3] <https://cygwin.com/setup-x86_64.exe> 
-- [4] <http://developer.apple.com/mac/library/releasenotes/DeveloperTools/RN-llvm-gcc/index.html> 
-- [5] <http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?Doc/AddPath> 
-- [6] <https://mcx.space/wiki/index.cgi?MMC/Doc/FAQ#How_do_I_interpret_MMC_s_output_data> 
-- [7] <http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?fun/qmeshcut>
+License
+-------
+
+MMC is free software, released under the GNU General Public License version 3 or later
+(GPLv3+); see `LICENSE.txt`. MMCLAB and PMMC are distributed under the same license.
