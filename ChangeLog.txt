@@ -1,6 +1,87 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-25 [0feb5bb] [feat] mmclab: issave2pt as in mcxlab, reject backends the mex was not built with
+ 2026-10-25 [a6d4f42] [doc] rewrite the mmclab help: document every cfg field the mex reads
+ 2026-10-25 [66f4c90] [bug] ignore cfg.face when cfg.elem is given: redbird's mmc Jacobians failed
+ 2026-10-25 [b5785df] [doc] update the author's title to Professor
+ 2026-10-25 [b65562c] [cjson] upgrade the bundled cJSON from 1.7.12+ (f790e17, 2020) to 1.7.19
+ 2026-10-25 [621f207] [feat] save and use the JData block index (_ArrayZipOffsets_) of zlib/gzip data
+ 2026-10-25 [4e581d7]*[zmat] sync the bundled zmat to upstream 1.2.0 (d1a1e94): parallel zlib/gzip
+ 2026-10-25 [fc6a84d] [ci] leave the linker's mmc.lib/mmc.exp out of the Windows mmc-optix package
+ 2026-10-25 [190d335] [doc] What's New: the mmc-optix packages
+ 2026-10-25 [bfff982]*[ci] mmc-optix packages for Linux and Windows: the CUDA and OptiX backends
+ 2026-10-25 [24aebad]*[feat] build mmc with MSVC: the CUDA and OptiX backends on Windows
+ 2026-10-25 [44a23c4] [ci] compact release packages: drop the Windows Octave download, strip before UPX
+ 2026-10-25 [239e82c] [doc] What's New: the fuzzing campaigns, unit-test coverage and input hardening
+ 2026-10-25 [816f671] [bug] read Session.OutputType names, not just their first letter
+ 2026-10-25 [3518e20] [ci] add the liboctmex SOVERSION symbol Octave 10+ requires to the Linux mex
+ 2026-10-25 [4eb51f2] [doc] bring the README and example notes up to date for v2026
+ 2026-10-25 [f4bccf6] [clean] use https for mcx.space and fanglab.org links
+ 2026-10-25 [b470bb2] [clean] OptiX backend: report like the other backends; OptiX logs with -D T
+ 2026-10-25 [c87499f]*[feat] frequency-domain (RF) forward on the CPU; fix RF output of element/nodal runs
+ 2026-10-25 [7494228] [bug] bound the pattern sizes before casting them to int (fuzzing round 4)
+ 2026-10-25 [11a0bad] [bug] fix rejected zlib JData arrays: miniz inflate returns Z_OK with room left
+ 2026-10-25 [6a4ad22] [ci] use Octave 10.3's own compiler and DLLs for the Windows Octave mex
+ 2026-10-25 [73eb9f1] [ci] build the Linux release in manylinux2014 so it runs on glibc 2.17+
+ 2026-10-25 [bcdfbb0] [bug] fix pattern-source overreads, time-limit hangs and lost-photon crashes from fuzzing
+ 2026-10-25 [d5e3edb]*[bug] fix crashes and hangs found by fuzzing JSON inputs and command-line options
+ 2026-10-24 [2070d5d] [test] raise mmc host coverage to 95%
+ 2026-10-24 [0459c89] [bug] fix the mmc input readers: SrcNum, flat MeshROI, InitElem with --json, .inp with --root
+ 2026-10-24 [6ac3389]*[feat] save photon trajectories (-D M) in OptiX mmc
+ 2026-10-24 [6b92686]*[feat] compute adjoint Jacobians in OptiX mmc
+ 2026-10-24 [2434293]*[feat] support multiple sources in OptiX mmc
+ 2026-10-24 [edaaa02]*[feat] add all source types to OptiX mmc, bind per-run settings as constants
+ 2026-10-24 [7ee0a9d]*[feat] save detected photons in OptiX mmc
+ 2026-10-24 [3671f6d]*[feat] accept surface-only meshes (MeshNode + MeshSurf) in OptiX mmc
+ 2026-10-24 [c2795ba] [bug] fix the mmclab/pmmc build after the J_mus chain rule, free the OptiX surface
+ 2026-10-24 [c91a6ab] [feat] tally the absorbed energy in OptiX mmc, fix negative mesh labels
+ 2026-10-24 [0ec2400] [feat] make OptiX mmc reject the features it does not implement
+ 2026-10-24 [9ca013d] [bug] fix the OptiX RF phase sign and grid step
+ 2026-10-24 [94de589] [test] add mmc unit tests for CUDA/OptiX backends, tracer and JSON variants
+ 2026-10-24 [14bf357] [feat] apply the mcx J_mus/J_musp chain rule to the mmc adjoint Jacobians
+ 2026-10-24 [9f0dcea] [bug] fix the CUDA mcconfig layout, CUDA RF crash and JSON detector parsing
+ 2026-10-24 [b07e548] [test] add host unit tests and a real replay test
+ 2026-10-24 [3a17de4] [bug] fix bugs found by the new mmc unit tests
+ 2026-10-23 [58bac0d] [bug] save Forward.Omega in --dumpjson and mmc2json for RF simulations
+ 2026-10-23 [83fbdc7] [doc] require iso2mesh 0.6.7 or newer for the pmmc examples
+ 2026-10-23 [d820fb5]*[feat] port all mmclab example scripts to python under pmmc/example
+ 2026-10-23 [5ecd5ac]*[feat] add pmmc.mmclab(), the mmclab.m pre/post-processing around pmmc.run()
+ 2026-10-23 [87e874c] [pmmc] accept compute='optix' as mmclab, run it with OpenCL when OptiX is not built in
+ 2026-10-23 [e66a21d] [pmmc] enable implicit MMC when noderoi, edgeroi or faceroi is given, as mmclab
+ 2026-10-23 [3bf2ad2] [bug] do not export the static libstdc++ symbols of _pmmc, fix a crash when pmcx runs after pmmc
+ 2026-10-23 [beaa069] [pmmc] find the source/detector elements before validating the input, as mmclab
+ 2026-10-23 [e6c1ec7] [pmmc] read issaveexit as an integer and return the issaveexit=2 detector image
+ 2026-10-23 [a23c77c] [pmmc] set srcnum from a 3-D srcpattern, fix photon sharing in pmmc
+ 2026-10-23 [4faae69] [pmmc] accept gpuid<=0 (e.g. -1 for the CPU) as mmclab does
+ 2026-10-23 [1c3129e] [pmmc] parse debuglevel with the mmc flags, as mmclab, so 'T'/'P' work and 'M' saves trajectories
+ 2026-10-23 [5bcc58d] [clean] silence constant-operand warnings of clang-based OpenCL compilers
+ 2026-10-23 [a5e9c1f]*[bug] accumulate diffuse reflectance atomically, the GPU lost up to 40% of it
+ 2026-10-23 [6c1684d] [bug] make mmc2json and --dumpjson exports read back as the same simulation
+ 2026-10-23 [ad9cfa3] [bug] post-process trajectories in mmclab only when the 4th output is requested
+ 2026-10-23 [5803db4] [bug] read 1-column JData MeshROI as an implicit-MMC ROI, run immc on the CPU by default
+ 2026-10-23 [148abf4] [bug] compute element volumes in double precision, do not flip sliver elements
+ 2026-10-23 [0356fe3] [bug] size the mesh weight buffer by all sources, fix a heap overflow in multi-source runs
+ 2026-10-22 [621225d] [doc] update and polish the mmc READMEs for v2026
+ 2026-10-22 [deeef5e] [ci] allow a few photons to fork in the POCL trajectory test
+ 2026-10-22 [314a936] [bug] link the static libomp into _pmmc on Intel macOS too
+ 2026-10-22 [13fb8fa] [release] bump pmmc to 0.3.12 for the new host seeds and macOS wheels
+ 2026-10-22 [c03b1dd] [ci] target macOS 10.15 (x86_64) and 11.0 (arm64), build every macOS wheel even if one fails
+ 2026-10-22 [ef74977] [test] regenerate the CPU and OpenCL trajectory goldens and the mcx statistics
+ 2026-10-22 [f6091aa]*[bug] draw uniform 32-bit host seeds for the RNGs of all backends
+ 2026-10-22 [7e2484d] [doc] match the version in the pmmc README to 0.3.11
+ 2026-10-22 [efa2a4e] [release] bump pmmc to 0.3.11
+ 2026-10-22 [53a6869] [ci] decide PyPI uploads per file, not per version
+ 2026-10-22 [a835557] [ci] tag macOS wheels with the runner architecture instead of universal2, check them
+ 2026-10-22 [882054e] [bug] use the implicit ROI medium for the scattering angle and albedo weight
+ 2026-10-21 [8629119] [ci] publish packages only when the run was started by the fangq account
+ 2026-10-21 [a80482f] [ci] decide PyPI uploads from the PyPI JSON API and never upload when the query fails
+ 2026-10-21 [5fe04ba] [ci] compare mmc trajectories with the Linux goldens only on Linux, do not run the OptiX build
+ 2026-10-21 [163cbd4] [optix] drop the OptiX SDK sutil/vec_math.h dependency, build OptiX in CI again
+ 2026-10-21 [d0c44cb] [ci] POCL CPU tests on Ubuntu 24.04 only, drop the OptiX build-only step, let each OS finish
+ 2026-10-21 [02c66f4] [ci] mmc --version exits with 0; testmmc.sh only tests backends really built in
+ 2026-10-21 [cc678e6] [release] keep the python module version at the published one until the release
+ 2026-10-21 [b64aa2a] [bug] no fluence in non-tissue (label<=0) elements, consistent tissue-only nodal volume
  2026-10-21 [99e7eec] [bug] fix -F jnii/bnii output of mesh-based (non-dual-grid) simulations
  2026-10-21 [2ad91b2] [bug] fix off-by-one MAX_PROP check that rejected large meshes on cuda
  2026-10-21 [71eb4f1] [optix] no fluence in the ambient medium, terminate rays that exit the mesh
