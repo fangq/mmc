@@ -1459,12 +1459,13 @@ void mcx_normalize(float field[], float scale, int fieldlen) {
  */
 
 void mcx_error(const int id, const char* msg, const char* file, const int linenum) {
+#ifdef MCX_CONTAINER
+    /* throw outside of any omp critical section: an exception leaving one keeps its
+       lock held, so the next error raised in the same mex/python session hangs */
+    mmc_throw_exception(id, msg, file, linenum);
+#else
     #pragma omp critical
     {
-#ifdef MCX_CONTAINER
-        mmc_throw_exception(id, msg, file, linenum);
-#else
-
         if (id == MMC_INFO) {
             MMC_FPRINTF(stdout, "%s\n", msg);
         } else {
@@ -1472,8 +1473,8 @@ void mcx_error(const int id, const char* msg, const char* file, const int linenu
         }
 
         exit(id);
-#endif
     }
+#endif
 }
 
 /**
