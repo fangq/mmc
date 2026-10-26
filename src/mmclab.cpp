@@ -246,7 +246,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
             mexEvalString("pause(.001);");
 
             /** Overwite the output flags using the number of output present */
-            cfg.issave2pt = (nlhs >= 1); /** save fluence rate to the 1st output if present */
+            if (nlhs < 1) {
+                cfg.issave2pt = 0;    /** issave2pt defaults to 1, users can disable it; auto disable only if there is no output */
+            }
+
             cfg.issavedet = (nlhs >= 2); /** save detected photon data to the 2nd output if present */
             cfg.issaveseed = (nlhs >= 3); /** save detected photon seeds to the 3rd output if present */
 
@@ -491,96 +494,98 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                  *       pidx-fastest                             ->  [srcnum, ..., maxgate] */
                 int ismultislot = (nsrcslots > cfg.srcnum);
 
-                if (cfg.method == rtBLBadouelGrid) {
-                    if (ismultislot) {
-                        fielddim[0] = cfg.dim.x;
-                        fielddim[1] = cfg.dim.y;
-                        fielddim[2] = cfg.dim.z;
-                        fielddim[3] = cfg.maxgate;
-                        fielddim[4] = nsrcslots;
-                    } else {
-                        fielddim[0] = cfg.srcnum;
-                        fielddim[1] = cfg.dim.x;
-                        fielddim[2] = cfg.dim.y;
-                        fielddim[3] = cfg.dim.z;
-                        fielddim[4] = cfg.maxgate;
-                    }
-
-                    mxComplexity cplx = (isrfforward && cfg.exportadjoint) ? mxCOMPLEX : mxREAL;
-
-                    if (ismultislot || cfg.srcnum > 1) {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(5, fielddim, mxDOUBLE_CLASS, cplx)));
-                    } else {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(4, &fielddim[1], mxDOUBLE_CLASS, cplx)));
-                    }
-                } else {
-                    /* mesh-mode layout. Kernel write order:
-                     *   detector-adjoint slots (nsrcslots > srcnum, srcnum==1):
-                     *       field[node + gate*nn + slot*nn*maxgate]  -> dims [datalen, maxgate, nsrcslots]
-                     *   pattern source (nsrcslots == srcnum > 1):
-                     *       field[(gate*ne + eid)*srcnum + pidx]     -> dims [nsrcslots, datalen, maxgate]
-                     *   single source:
-                     *       field[node + gate*nn]                    -> dims [datalen, maxgate] */
-                    mxComplexity mcplx = (isrfforward && cfg.exportadjoint) ? mxCOMPLEX : mxREAL;
-
-                    if (nsrcslots > 1) {
-                        dimtype meshfielddim[3];
-
+                if (cfg.issave2pt) {   /** cfg.issave2pt=0 leaves the 1st output's data empty, as mcxlab does */
+                    if (cfg.method == rtBLBadouelGrid) {
                         if (ismultislot) {
-                            meshfielddim[0] = datalen;
-                            meshfielddim[1] = cfg.maxgate;
-                            meshfielddim[2] = nsrcslots;
+                            fielddim[0] = cfg.dim.x;
+                            fielddim[1] = cfg.dim.y;
+                            fielddim[2] = cfg.dim.z;
+                            fielddim[3] = cfg.maxgate;
+                            fielddim[4] = nsrcslots;
                         } else {
-                            meshfielddim[0] = nsrcslots;
-                            meshfielddim[1] = datalen;
-                            meshfielddim[2] = cfg.maxgate;
+                            fielddim[0] = cfg.srcnum;
+                            fielddim[1] = cfg.dim.x;
+                            fielddim[2] = cfg.dim.y;
+                            fielddim[3] = cfg.dim.z;
+                            fielddim[4] = cfg.maxgate;
                         }
 
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(3, meshfielddim, mxDOUBLE_CLASS, mcplx)));
+                        mxComplexity cplx = (isrfforward && cfg.exportadjoint) ? mxCOMPLEX : mxREAL;
+
+                        if (ismultislot || cfg.srcnum > 1) {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(5, fielddim, mxDOUBLE_CLASS, cplx)));
+                        } else {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(4, &fielddim[1], mxDOUBLE_CLASS, cplx)));
+                        }
                     } else {
-                        mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mcplx)));
-                    }
-                }
+                        /* mesh-mode layout. Kernel write order:
+                         *   detector-adjoint slots (nsrcslots > srcnum, srcnum==1):
+                         *       field[node + gate*nn + slot*nn*maxgate]  -> dims [datalen, maxgate, nsrcslots]
+                         *   pattern source (nsrcslots == srcnum > 1):
+                         *       field[(gate*ne + eid)*srcnum + pidx]     -> dims [nsrcslots, datalen, maxgate]
+                         *   single source:
+                         *       field[node + gate*nn]                    -> dims [datalen, maxgate] */
+                        mxComplexity mcplx = (isrfforward && cfg.exportadjoint) ? mxCOMPLEX : mxREAL;
 
-                mxArray* outfield = mxGetFieldByNumber(plhs[0], jstruct, 0);
-                size_t nelem = (size_t)nsrcslots * datalen * cfg.maxgate;
+                        if (nsrcslots > 1) {
+                            dimtype meshfielddim[3];
 
-                if (isrfforward && cfg.exportadjoint) {
-#if MX_HAS_INTERLEAVED_COMPLEX
-                    mxComplexDouble* cptr = mxGetComplexDoubles(outfield);
+                            if (ismultislot) {
+                                meshfielddim[0] = datalen;
+                                meshfielddim[1] = cfg.maxgate;
+                                meshfielddim[2] = nsrcslots;
+                            } else {
+                                meshfielddim[0] = nsrcslots;
+                                meshfielddim[1] = datalen;
+                                meshfielddim[2] = cfg.maxgate;
+                            }
 
-                    if (cptr) {
-                        for (size_t ii = 0; ii < nelem; ii++) {
-                            cptr[ii].real = mesh.weight[ii];
-                            cptr[ii].imag = (double)cfg.exportadjoint[ii];
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(3, meshfielddim, mxDOUBLE_CLASS, mcplx)));
+                        } else {
+                            mxSetFieldByNumber(plhs[0], jstruct, 0, mmclab_assert(mxCreateNumericArray(2, &fielddim[1], mxDOUBLE_CLASS, mcplx)));
                         }
                     }
+
+                    mxArray* outfield = mxGetFieldByNumber(plhs[0], jstruct, 0);
+                    size_t nelem = (size_t)nsrcslots * datalen * cfg.maxgate;
+
+                    if (isrfforward && cfg.exportadjoint) {
+#if MX_HAS_INTERLEAVED_COMPLEX
+                        mxComplexDouble* cptr = mxGetComplexDoubles(outfield);
+
+                        if (cptr) {
+                            for (size_t ii = 0; ii < nelem; ii++) {
+                                cptr[ii].real = mesh.weight[ii];
+                                cptr[ii].imag = (double)cfg.exportadjoint[ii];
+                            }
+                        }
 
 #else
-                    double* output = (double*)mxGetPr(outfield);
-                    double* imoutput = (double*)mxGetPi(outfield);
+                        double* output = (double*)mxGetPr(outfield);
+                        double* imoutput = (double*)mxGetPi(outfield);
 
-                    if (output == NULL) {
-                        mexErrMsgTxt("MMCLAB failed to allocate memory!");
-                    }
-
-                    memcpy(output, mesh.weight, nelem * sizeof(double));
-
-                    if (imoutput) {
-                        for (size_t ii = 0; ii < nelem; ii++) {
-                            imoutput[ii] = (double)cfg.exportadjoint[ii];
+                        if (output == NULL) {
+                            mexErrMsgTxt("MMCLAB failed to allocate memory!");
                         }
-                    }
+
+                        memcpy(output, mesh.weight, nelem * sizeof(double));
+
+                        if (imoutput) {
+                            for (size_t ii = 0; ii < nelem; ii++) {
+                                imoutput[ii] = (double)cfg.exportadjoint[ii];
+                            }
+                        }
 
 #endif
-                } else {
-                    double* output = (double*)mxGetPr(outfield);
+                    } else {
+                        double* output = (double*)mxGetPr(outfield);
 
-                    if (output == NULL) {
-                        mexErrMsgTxt("MMCLAB failed to allocate memory!");
+                        if (output == NULL) {
+                            mexErrMsgTxt("MMCLAB failed to allocate memory!");
+                        }
+
+                        memcpy(output, mesh.weight, nelem * sizeof(double));
                     }
-
-                    memcpy(output, mesh.weight, nelem * sizeof(double));
                 }
 
                 if (cfg.issaveref) {      /** save diffuse reflectance */
@@ -771,6 +776,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
     GET_ONE_FIELD(cfg, nout)
     GET_ONE_FIELD(cfg, isref3)
     GET_ONE_FIELD(cfg, isnormalized)
+    GET_ONE_FIELD(cfg, issave2pt)
     GET_ONE_FIELD(cfg, issaveref)
     GET_ONE_FIELD(cfg, debugphoton)
     GET_ONE_FIELD(cfg, minenergy)
@@ -1472,6 +1478,28 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
         if (cfg->compute == -1) {
             mexErrMsgTxt("the specified compute is not supported");
         }
+
+#ifndef USE_OPENCL
+
+        if (cfg->compute == cbOpenCL) {
+            mexErrMsgTxt("this mmc mex file was built without OpenCL; rebuild it with 'make mex' or 'make oct'");
+        }
+
+#endif
+#ifndef USE_CUDA
+
+        if (cfg->compute == cbCUDA) {
+            mexErrMsgTxt("this mmc mex file was built without CUDA; rebuild it with 'make cudamex' or 'make cudaoct'");
+        }
+
+#endif
+#ifndef USE_OPTIX
+
+        if (cfg->compute == cbOptiX) {
+            mexErrMsgTxt("this mmc mex file was built without OptiX; rebuild it with 'make optixmex' or 'make optixoct'");
+        }
+
+#endif
 
         printf("mmc.compute='%s';\n", computestr);
     } else if (strcmp(name, "shapes") == 0) {

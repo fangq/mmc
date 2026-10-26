@@ -25,7 +25,8 @@ function varargout = mmclab(varargin)
 %    info = mmclab('gpuinfo');
 %
 %    Request only the outputs you need: detphoton, seeds and traj are only
-%    produced when they are requested.
+%    produced when they are requested, and [~, detphoton] = mmclab(cfg) skips
+%    the fluence in Octave (set cfg.issave2pt=0 to do the same in MATLAB).
 %
 % Input:
 %    cfg: a struct, or a struct array; each element is one simulation.
@@ -213,6 +214,8 @@ function varargout = mmclab(varargin)
 %                      <demo_mmclab_mesh_rf_adjoint.m>
 %      cfg.adjointmode: mesh-output adjoint mua Jacobian: [0] the full FEM form,
 %                      1 the nodal approximation -Vn*phi_src*phi_det
+%      cfg.issave2pt:  [1]: compute the 1st output's data; 0: skip it, which is
+%                      faster when only detphoton is needed
 %      cfg.issaveref:  1: save the diffuse reflectance on the mesh surface in
 %                      fluence.dref [0], [#surface triangles, #gates]; the
 %                      triangles are faceneighbors(cfg.elem,'rowmajor') (iso2mesh).
@@ -233,7 +236,8 @@ function varargout = mmclab(varargin)
 % == Compute backend ==
 %      cfg.compute:    'sse' (CPU, OpenMP), ['opencl'], 'cuda' or 'optix'; 'cuda'
 %                      and 'optix' need an mmc mex file built with them
-%                      (make cudamex/optixmex). Example: <demo_optix_mmc.m>
+%                      (make cudamex/cudaoct or optixmex/optixoct), and give an
+%                      error otherwise. Example: <demo_optix_mmc.m>
 %      cfg.gpuid:      which device to use, from 1 (mmclab('gpuinfo') lists the
 %                      OpenCL devices) [1]; -1 runs on the CPU (sse); a string of
 %                      0s and 1s selects several, e.g. '1101'
@@ -567,6 +571,13 @@ end
 for i = 1:length(cfg)
     if (isfield(cfg(i), 'gpuid') && ~ischar(cfg(i).gpuid) && cfg(i).gpuid < -1)
         cfg(i).gpuid = 1;
+    end
+end
+
+% detect [~,...]=mmclab() in Octave. unfortunately matlab does not have isargout()
+if (nargout >= 1 && exist('isargout', 'builtin') && isargout(1) == 0)
+    for i = 1:length(cfg)
+        cfg(i).issave2pt = 0;
     end
 end
 [varargout{1:mmcout}] = mmc(cfg);
