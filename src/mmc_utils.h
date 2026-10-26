@@ -121,7 +121,7 @@ enum TDeviceVendor {dvUnknown, dvNVIDIA, dvAMD, dvIntel, dvIntelGPU, dvAppleCPU,
 enum TMCXParent  {mpStandalone, mpMATLAB};
 enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
 enum TRayHitType {htNone, htInOut, htOutIn, htNoHitIn, htNoHitOut};
-enum TROIType {rtNone, rtEdge, rtNode, rtFace};
+enum TROIType {rtNone, rtEdge, rtNode, rtFace, rtInner};  /**< rtInner: a crossing inside the ROI union, no medium change */
 
 enum TBJData {JDB_mixed, JDB_nulltype, JDB_noop, JDB_true, JDB_false,
               JDB_char, JDB_string, JDB_hp,

@@ -121,6 +121,11 @@ void mesh_init(tetmesh* mesh) {
     mesh->edgeroi = NULL;
     mesh->faceroi = NULL;
     mesh->noderoi = NULL;
+    mesh->roioff = NULL;
+    mesh->roilist = NULL;
+    mesh->nroiprim = 0;
+    mesh->roieps = EPS;
+    mesh->nslab1 = 0;
     mesh->srcelemlen = 0;
     mesh->srcelem = NULL;
     mesh->detelemlen = 0;
@@ -243,6 +248,12 @@ void mesh_clear(tetmesh* mesh, mcconfig* cfg) {
         free(mesh->faceroi);
         mesh->faceroi = NULL;
     }
+
+    free(mesh->roioff);
+    free(mesh->roilist);
+    mesh->roioff = NULL;
+    mesh->roilist = NULL;
+    mesh->nroiprim = 0;
 
     /* the OptiX triangle surface */
     free(mesh->fnode);
@@ -474,9 +485,9 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
         mesh_10nodetet(mesh, cfg);
     }
 
+    mesh_loadroi(mesh, cfg);       /* before mesh_getvolume(), which reorients elements with their ROI columns */
     mesh_loadelemvol(mesh, cfg);
     mesh_loadfaceneighbor(mesh, cfg);
-    mesh_loadroi(mesh, cfg);
 
     if (cfg->seed == SEED_FROM_FILE && cfg->seedfile[0]) {
         mesh_loadseedfile(mesh, cfg);
@@ -1170,8 +1181,21 @@ void mesh_getvolume(tetmesh* mesh, mcconfig* cfg) {
            and flipping it breaks the face orientation that the ray-tracer relies on */
         if (vol < -1e-6 * len * len * len) {
             int e1 = ee[3];
+            float t;
             ee[3] = ee [2];
             ee[2] = e1;
+
+            /* the iMMC columns follow the nodes: edges {01,02,03,12,13,23}, faces of facenb */
+            if (mesh->edgeroi) {
+                float* er = mesh->edgeroi + i * 6;
+                t = er[1], er[1] = er[2], er[2] = t;
+                t = er[3], er[3] = er[4], er[4] = t;
+            }
+
+            if (mesh->faceroi) {
+                float* fr = mesh->faceroi + i * 4;
+                t = fr[0], fr[0] = fr[1], fr[1] = t;
+            }
         }
 
         mesh->evol[i] = (float)(fabs(vol) / 6.0);
@@ -1467,6 +1491,261 @@ void tracer_init(raytracer* tracer, tetmesh* pmesh, char methodid) {
 
 
 /**
+ * @brief Build the per-element lists of the edge (capsule) and node (sphere) iMMC primitives
+ *
+ * Every ROI edge becomes a capsule, a segment with spherical end caps (an edge listed by several
+ * elements keeps its largest radius), and every ROI node a sphere. Each element lists every
+ * primitive that may overlap it, so that the photon is traced against the union of all ROIs
+ * inside the element. The overlap test is conservative (the primitive's box against the
+ * element's box, and the primitive against the element's bounding sphere): an extra entry costs
+ * a ray test, a missing one would leak photons. The candidates come from a uniform grid holding
+ * the primitives' boxes.
+ *
+ * @param[in,out] mesh: the mesh; roioff, roilist and nroiprim are set (CSR, see tetmesh)
+ * @param[in] cfg: the simulation configuration
+ */
+
+typedef struct {
+    int a, b;
+    float r;
+} roiedge;
+
+static int roiedge_cmp(const void* p, const void* q) {
+    const roiedge* x = (const roiedge*)p, *y = (const roiedge*)q;
+    return (x->a != y->a) ? (x->a > y->a) - (x->a < y->a) : ((x->b != y->b) ? (x->b > y->b) - (x->b < y->b) : (x->r < y->r) - (x->r > y->r));
+}
+
+static int roiint_cmp(const void* p, const void* q) {
+    return *(const int*)p - *(const int*)q;
+}
+
+void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
+    const int e2n[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
+    int i, j, k, n, nedge = 0, np = 0, ne = mesh->ne, len, cap, dim[3], ncell;
+    int* cellbeg, *cellprim, *seen, *list;
+    roiedge* edge = NULL;
+    float* pl, *lo = &mesh->nmin.x, h;
+
+    free(mesh->roioff);
+    free(mesh->roilist);
+    mesh->roioff = NULL;
+    mesh->roilist = NULL;
+    mesh->nroiprim = 0;
+
+    if (cfg->implicit != 1 || (!mesh->edgeroi && !mesh->noderoi)) {
+        return;
+    }
+
+    /* the distinct ROI edges (node indices n0 < n1), the largest radius first, then the ROI nodes */
+    if (mesh->edgeroi) {
+        edge = (roiedge*)malloc(sizeof(roiedge) * ne * 6);
+
+        for (i = 0; i < ne * 6; i++) {
+            if (mesh->edgeroi[i] > 0.f) {
+                int* ee = mesh->elem + (i / 6) * mesh->elemlen, n0 = ee[e2n[i % 6][0]] - 1, n1 = ee[e2n[i % 6][1]] - 1;
+                roiedge e = {MIN(n0, n1), MAX(n0, n1), mesh->edgeroi[i]};
+                edge[np++] = e;
+            }
+        }
+
+        qsort(edge, np, sizeof(roiedge), roiedge_cmp);
+
+        for (i = 0; i < np; i++) {
+            if (nedge == 0 || edge[i].a != edge[nedge - 1].a || edge[i].b != edge[nedge - 1].b) {
+                edge[nedge++] = edge[i];
+            }
+        }
+    }
+
+    np = nedge;
+
+    for (i = 0; mesh->noderoi && i < mesh->nn; i++) {
+        np += (mesh->noderoi[i] > 0.f);
+    }
+
+    /* {Ax,Ay,Az,r, Bx,By,Bz,Rb^2}, r < 0 marks a sphere */
+    mesh->roilist = pl = (float*)calloc(8 * MAX(np, 1), sizeof(float));
+    mesh->nroiprim = np;
+
+    for (i = 0, k = 0; i < np; i++) {
+        FLOAT3* a, *b;
+        float* d = pl + i * 8, r;
+
+        if (i < nedge) {
+            a = mesh->node + edge[i].a;
+            b = mesh->node + edge[i].b;
+            r = edge[i].r;
+        } else {
+            while (mesh->noderoi[k] <= 0.f) {
+                k++;
+            }
+
+            a = b = mesh->node + k;
+            r = mesh->noderoi[k++];
+        }
+
+        d[0] = a->x, d[1] = a->y, d[2] = a->z, d[3] = (i < nedge) ? r : -r;
+        d[4] = b->x, d[5] = b->y, d[6] = b->z;
+        d[7] = 0.5f * dist_3(a, b) + r;
+        d[7] *= d[7];
+    }
+
+    free(edge);
+
+    /* a uniform grid of about one cell per element (at most 2^22 cells) holding the primitive boxes */
+    h = cbrtf((mesh->nmax.x - lo[0]) * (mesh->nmax.y - lo[1]) * (mesh->nmax.z - lo[2]) / MAX(MIN(ne, 1 << 22), 1));
+    h = MAX(h, 1e-6f * MAX(mesh->nmax.x - lo[0], MAX(mesh->nmax.y - lo[1], mesh->nmax.z - lo[2])));
+
+    do {
+        for (j = 0, ncell = 1; j < 3; j++) {
+            dim[j] = (int)(((&mesh->nmax.x)[j] - lo[j]) / h) + 1;
+            ncell *= dim[j];
+        }
+
+        h *= 1.25f;
+    } while (ncell > (1 << 22));
+
+    h /= 1.25f;
+
+#define ROI_CELL(v, j) MIN(MAX((int)(((v) - lo[j]) / h), 0), dim[j] - 1)
+#define ROI_PAD(d) ((d)[3] > 0.f ? (d)[3] : -(d)[3]) * 1.0001f + mesh->roieps
+
+    cellbeg = (int*)calloc(ncell + 1, sizeof(int));
+    cellprim = NULL;
+
+    for (n = 0; n < 2; n++) {    /* pass 0 counts the cell entries, pass 1 fills them */
+        for (i = 0; i < np; i++) {
+            float* d = pl + i * 8, pad = ROI_PAD(d);
+            int c0[3], c1[3], x, y, z;
+
+            for (j = 0; j < 3; j++) {
+                c0[j] = ROI_CELL(MIN(d[j], d[j + 4]) - pad, j);
+                c1[j] = ROI_CELL(MAX(d[j], d[j + 4]) + pad, j);
+            }
+
+            for (z = c0[2]; z <= c1[2]; z++)
+                for (y = c0[1]; y <= c1[1]; y++)
+                    for (x = c0[0]; x <= c1[0]; x++) {
+                        int c = (z * dim[1] + y) * dim[0] + x;
+
+                        if (n == 0) {
+                            cellbeg[c + 1]++;
+                        } else {
+                            cellprim[cellbeg[c]++] = i;
+                        }
+                    }
+        }
+
+        if (n == 0) {
+            for (i = 0; i < ncell; i++) {
+                cellbeg[i + 1] += cellbeg[i];
+            }
+
+            cellprim = (int*)malloc(sizeof(int) * MAX(cellbeg[ncell], 1));
+        } else {
+            for (i = ncell; i > 0; i--) {    /* the fill advanced each start to the next cell's */
+                cellbeg[i] = cellbeg[i - 1];
+            }
+
+            cellbeg[0] = 0;
+        }
+    }
+
+    /* the element lists, CSR: ne+1 offsets into this array, then the entries */
+    seen = (int*)malloc(sizeof(int) * MAX(np, 1));
+    memset(seen, -1, sizeof(int) * MAX(np, 1));
+    cap = ne + 1 + 4 * ne;
+    list = (int*)malloc(sizeof(int) * cap);
+    len = ne + 1;
+
+    for (i = 0; i < ne; i++) {
+        int* ee = mesh->elem + i * mesh->elemlen, c0[3], c1[3], x, y, z;
+        double bmin[3], bmax[3], cen[3] = {0.0, 0.0, 0.0}, R = 0.0;
+
+        list[i] = len;
+
+        for (j = 0; j < 3; j++) {
+            bmin[j] = 1e30, bmax[j] = -1e30;
+
+            for (k = 0; k < 4; k++) {
+                double v = (&mesh->node[ee[k] - 1].x)[j];
+                bmin[j] = MIN(bmin[j], v), bmax[j] = MAX(bmax[j], v), cen[j] += 0.25 * v;
+            }
+
+            c0[j] = ROI_CELL(bmin[j], j);
+            c1[j] = ROI_CELL(bmax[j], j);
+        }
+
+        for (k = 0; k < 4; k++) {
+            double d2 = 0.0;
+
+            for (j = 0; j < 3; j++) {
+                double dv = (&mesh->node[ee[k] - 1].x)[j] - cen[j];
+                d2 += dv * dv;
+            }
+
+            R = MAX(R, d2);
+        }
+
+        R = sqrt(R);
+
+        for (z = c0[2]; z <= c1[2]; z++)
+            for (y = c0[1]; y <= c1[1]; y++)
+                for (x = c0[0]; x <= c1[0]; x++) {
+                    int c = (z * dim[1] + y) * dim[0] + x, m;
+
+                    for (m = cellbeg[c]; m < cellbeg[c + 1]; m++) {
+                        int p = cellprim[m], hit = 1;
+                        float* d = pl + p * 8;
+                        double pad = ROI_PAD(d), ab[3], ac[3], s = 0.0, ab2 = 0.0, d2 = 0.0;
+
+                        if (seen[p] == i) {
+                            continue;
+                        }
+
+                        seen[p] = i;
+
+                        /* the boxes overlap, and the segment comes within r + R of the centroid */
+                        for (j = 0; j < 3; j++) {
+                            hit &= (MIN(d[j], d[j + 4]) - pad <= bmax[j]) && (MAX(d[j], d[j + 4]) + pad >= bmin[j]);
+                            ab[j] = (double)d[j + 4] - d[j];
+                            ac[j] = cen[j] - d[j];
+                            s += ab[j] * ac[j];
+                            ab2 += ab[j] * ab[j];
+                        }
+
+                        s = (ab2 > 0.0) ? MIN(MAX(s / ab2, 0.0), 1.0) : 0.0;
+
+                        for (j = 0; j < 3; j++) {
+                            d2 += (ac[j] - s * ab[j]) * (ac[j] - s * ab[j]);
+                        }
+
+                        if (hit && d2 <= (pad + R) * (pad + R)) {
+                            if (len == cap) {
+                                cap *= 2;
+                                list = (int*)realloc(list, sizeof(int) * cap);
+                            }
+
+                            list[len++] = p;
+                        }
+                    }
+                }
+
+        qsort(list + list[i], len - list[i], sizeof(int), roiint_cmp);    /* in primitive order */
+    }
+
+    list[ne] = len;
+    mesh->roioff = list;
+
+#undef ROI_CELL
+#undef ROI_PAD
+
+    free(seen);
+    free(cellprim);
+    free(cellbeg);
+}
+
+/**
  * @brief Preparing for the ray-tracing calculations
  *
  * This function build the ray-tracing precomputed data and test if the initial
@@ -1637,65 +1916,16 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
         }
     }
 
-    // build acceleration data structure to speed up first-neighbor immc edge-roi calculation
-    // loop over each edgeroi, count how many roi in each elem, and write to the first elem as negative integer
-    if (tracer->mesh->edgeroi) {
-        for (i = 0; i < ne; i++) {
-            int count = 0;
+    // iMMC: the post-hit offset, and the per-element lists of the edge/node ROI primitives
+    if (cfg->implicit) {
+        float X = 0.f;
 
-            for (j = 0; j < 6; j++)
-                if (tracer->mesh->edgeroi[(i * 6) + j] > 0.f) {
-                    count++;
-                }
-
-            if (count && fabs(tracer->mesh->edgeroi[i * 6]) < EPS) {
-                tracer->mesh->edgeroi[i * 6] = -count;    // number -1 to -6 indicates how many faces have ROIs
-            }
+        for (i = 0; i < tracer->mesh->nn; i++) {
+            X = MAX(X, MAX(fabsf(tracer->mesh->node[i].x), MAX(fabsf(tracer->mesh->node[i].y), fabsf(tracer->mesh->node[i].z))));
         }
 
-        for (i = 0; i < ne; i++) {
-            if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
-                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
-                    int id = tracer->mesh->facenb[i * tracer->mesh->elemlen + j]; // loop over neighboring elements
-                    float roilabel = tracer->mesh->edgeroi[(id - 1) * 6];
-
-                    if (id > 0 && fabs(roilabel) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
-                        if (roilabel < -6) {
-                            tracer->mesh->edgeroi[i * 6] = roilabel;
-                        } else {
-                            tracer->mesh->edgeroi[i * 6] = -id - 6;
-                        }
-
-                        break;
-                    }
-                }
-            }
-
-            if (fabs(tracer->mesh->edgeroi[i * 6]) < EPS) { // if I don't have roi
-                for (j = 0; j < tracer->mesh->elemlen; j++) { // loop over my neighbors
-                    int firstnbid = tracer->mesh->facenb[i * tracer->mesh->elemlen + j] - 1; // loop over neighboring elements
-
-                    if (firstnbid < 0) {
-                        continue;
-                    }
-
-                    for (k = 0; k < tracer->mesh->elemlen; k++) { // loop over my j-th neighbor's neighbors
-                        int id = tracer->mesh->facenb[firstnbid * tracer->mesh->elemlen + k]; // loop over 2nd order neighboring elements
-                        float roilabel = tracer->mesh->edgeroi[(id - 1) * 6];
-
-                        if (id > 0 && fabs(roilabel) > EPS) { // if I don't have roi, but neighbor has, set ref id as -elemid-6, only handle 1 roi neighbor case
-                            if (roilabel < -6) {
-                                tracer->mesh->edgeroi[i * 6] = roilabel;
-                            } else {
-                                tracer->mesh->edgeroi[i * 6] = -id - 6;
-                            }
-
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        tracer->mesh->roieps = (X > 0.f) ? ldexpf(16.f * X, -24) : EPS;
+        mesh_roilist(tracer->mesh, cfg);
     }
 
     // build acceleration data structure to speed up first-neighbor immc face-roi calculation
@@ -1711,6 +1941,26 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
 
             if (count && fabs(tracer->mesh->faceroi[i << 2]) < EPS) {
                 tracer->mesh->faceroi[i << 2] = -count;    // number -1 to -4 indicates how many faces have ROIs
+            }
+        }
+
+        // faces labeled from one side only: the outer surface of a single-sided slab, an interface
+        // between the background and the ROI medium (see slabfacecross() in mmc_raytrace.c)
+        tracer->mesh->nslab1 = 0;
+
+        for (i = 0; i < ne; i++) {
+            int* nb = tracer->mesh->facenb + i * tracer->mesh->elemlen;
+
+            for (j = 0; j < 4; j++) {
+                if (tracer->mesh->faceroi[(i << 2) + j] > 0.f && nb[j] > 0) {
+                    int* nb2 = tracer->mesh->facenb + (nb[j] - 1) * tracer->mesh->elemlen, both = 0;
+
+                    for (k = 0; k < 4; k++) {
+                        both |= (nb2[k] == i + 1) && (tracer->mesh->faceroi[((nb[j] - 1) << 2) + k] > 0.f);
+                    }
+
+                    tracer->mesh->nslab1 += !both;
+                }
             }
         }
     }

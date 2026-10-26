@@ -96,6 +96,13 @@ typedef struct MMC_mesh {
     float* edgeroi;        /**< immc: vessel edge radii */
     float* faceroi;        /**< immc: face thicknesses */
     float* noderoi;        /**< immc: node radius */
+    int*  roioff;          /**< immc edge/node: ne+1 offsets, then the list entries (CSR); element i tests the
+                                primitives roilist[roioff[k]], k = roioff[i] .. roioff[i+1]-1 */
+    float* roilist;        /**< immc edge/node: 8 floats per primitive {Ax,Ay,Az,r,Bx,By,Bz,Rb^2}: capsule A-B of
+                                radius r, or sphere at A of radius -r if r<0; Rb: bounding sphere about (A+B)/2 */
+    int nroiprim;          /**< immc edge/node: number of primitives in roilist */
+    float roieps;          /**< immc: post-hit offset, 16 ulp of the largest node coordinate */
+    int nslab1;            /**< immc face: number of faces labeled from one side only (single-sided slabs) */
     int*  srcelem;         /**< candidate list of elements containing the source*/
     int  srcelemlen;       /**< length of the elements that may contain the source*/
     int*  detelem;         /**< candidate list of elements containing a widefield detector*/
@@ -181,6 +188,7 @@ void mesh_deldotdel(tetmesh* mesh);
 void tracer_init(raytracer* tracer, tetmesh* mesh, char methodid);
 void tracer_build(raytracer* tracer);
 void tracer_prep(raytracer* tracer, mcconfig* cfg);
+void mesh_roilist(tetmesh* mesh, mcconfig* cfg);
 void tracer_clear(raytracer* tracer);
 
 float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom);

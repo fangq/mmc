@@ -90,12 +90,6 @@ static inline void mmc_rf_deposit(float w0, double phase0, float mua, float a, f
 }
 
 /**
- * \mapping from edge index to node index
- */
-
-const int e2n[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
-
-/**
  * \brief Tetrahedron face edge indices
  *
  * fc[4] points to the 4 facets of a tetrahedron, with each
@@ -240,6 +234,39 @@ void fixphoton(FLOAT3* p, FLOAT3* nodes, int* ee) {
 }
 
 /**
+ * \brief iMMC: trace the ROIs within the step, then take the step's medium from the state at p0
+ *
+ * Without an ROI crossing that is the new inroi. With one, the part before it is on the side of
+ * p0, which the element's own tests (pin) decide after an element change (the stored state may
+ * come from an ROI this element does not test); if the step then scatters first, the crossing
+ * is dropped.
+ *
+ * \return the medium of the step; *mus, *rc and *dlen are updated with it
+ */
+static medium* roi_step(ray* r, raytracer* tracer, mcconfig* cfg, medium* prop, float Lp0, float* mus, float* rc, float* dlen) {
+    int oldin = r->inroi, pin = traceroi(r, tracer, cfg->implicit, 0, cfg);
+
+    if ((r->roitype == rtNone) ? (r->inroi != oldin) : (pin >= 0 && pin != oldin)) {
+        prop = tracer->mesh->med + (((r->roitype == rtNone) ? r->inroi : pin) ? tracer->mesh->prop : tracer->mesh->type[r->eid - 1]);
+        *mus = (cfg->mcmethod == mmMCX) ? prop->mus : (prop->mua + prop->mus);
+        *rc = prop->n * R_C0;
+        *dlen = (*mus <= EPS) ? R_MIN_MUS : r->slen / *mus;
+
+        if (r->roitype == rtNone) {
+            r->isend = (Lp0 > *dlen);
+            r->Lmove = ((r->isend) ? *dlen : Lp0);
+        } else if (*dlen < r->Lmove) {
+            r->roitype = rtNone;
+            r->inroi = pin;
+            r->isend = 1;
+            r->Lmove = *dlen;
+        }
+    }
+
+    return prop;
+}
+
+/**
  * \brief Plucker-coordinate based ray-tracer to advance photon by one step
  *
  * this function uses Plucker-coordinate based ray-triangle intersection
@@ -267,6 +294,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
     }
 
     eid = r->eid - 1;
+    r->lasthit = (r->roitype != rtNone && r->roiidx >= 0) ? ((r->roiidx << 3) | r->roitype) : 0;
     r->faceid = -1;
     r->isend = 0;
     r->Lmove = 0.f;
@@ -371,7 +399,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
     // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
     if (cfg->implicit) {
-        traceroi(r, tracer, cfg->implicit, 0, cfg);
+        prop = roi_step(r, tracer, cfg, prop, Lp0, &mus, &rc, &dlen);
     }
 
     visit->raytet++;
@@ -1012,413 +1040,423 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 #endif
 
 
-/**
- * \brief Compute distances to edge (infinite cylindrical) ROIs in the element
+/*
+ * Implicit MMC (iMMC) ROI tests
  *
- * Commpute the distance between P0 (ray-start) and the labeled edge
- * and the distance between P1 (ray-end) and the labeled edge.
- * P0 is the entry point and P1 is the exit point
+ * Edge and node ROIs are capsules (segments with spherical caps) and spheres, listed per element
+ * by mesh_roilist(); the photon is traced against their union. Face ROIs are slabs below the
+ * labeled faces of an element. Each test classifies p0 as in or out by the sign of its implicit
+ * function, except inside a rounding band about the surface, where the stored r->inroi (set by
+ * the crossing that put the photon there) decides; the state then selects the one crossing to look
+ * for (the exit if in, the entry if out). The same tests are used by the GPU (mmc_core.cl).
  */
-void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], FLOAT3 p2d[2], int* hitstatus) {
-    FLOAT3 u, OP;
-    float r2, d1;
 
-    p2d[1] = tracer->mesh->node[ee[e2n[edgeid][0]] - 1]; // end id of the edge, E1
-    p2d[0] = tracer->mesh->node[ee[e2n[edgeid][1]] - 1]; // start id of the edge, E0
-
-    vec_diff3(p2d + 1, p2d, &u); // vector of the edge u = <E0 -> E1>
-    r2 = dist_3(p2d + 1, p2d); // get coordinates and compute edge length between E0-E1
-    r2 = 1.0f / r2;
-    vec_mult3(&u, r2, &u); // normalized vector of the edge, u is now unitary
-
-    vec_diff3(p2d + 1, (FLOAT3*)(&r->p0), &OP); // ray-start to edge-end, OP = <P0 -> E1>
-    d1 = vec_dot3(&OP, &u);      // projection of OP to u
-    vec_mult3(&u, d1, p2d);      // p2d now stores the vector starts with edge-start, ends with the orthogonal projection of vector OP=<P0->E1>
-    vec_diff3(p2d, &OP, p2d);    // PP0: P0 projection on plane, computed by OP - p2d
-    d2d[0] = vec_dot3(p2d, p2d); // ray-start (P0) distance to the edge squared
-
-    vec_mult3((FLOAT3*)&r->vec, r->Lmove, &OP);
-    vec_add3((FLOAT3*)&r->p0, &OP, &OP);      // P1, ray-end
-    vec_diff3(p2d + 1, &OP, &OP);    // OP = <P1 -> E1> vector from ray-end to edge-end
-    d1 = vec_dot3(&OP, &u);
-    vec_mult3(&u, d1, p2d + 1);
-    vec_diff3(p2d + 1, &OP, p2d + 1); // PP1: P1 projection on plane
-    d2d[1] = vec_dot3(p2d + 1, p2d + 1); // ray-end (P1) distance to the edge squared
-
-    r2 = r->roisize[edgeid] * r->roisize[edgeid]; // squared radius of the edge-roi
-
-    *hitstatus = htNone;
-
-    if (d2d[0] > r2 + EPS2 && d2d[1] < r2 - EPS2) {
-        *hitstatus = htOutIn;
-    } else if (d2d[0] < r2 - EPS2 && d2d[1] > r2 + EPS2) {
-        *hitstatus = htInOut;
-    } else if (d2d[1] > r2 + EPS2) {
-        *hitstatus = (r->inroi == 1) ? htInOut : htNoHitOut; // check for photons on edge of ROI
-    } else if (d2d[1] < r2 - EPS2) {
-        *hitstatus = (r->inroi == 0) ? htOutIn : htNoHitIn;
-    }
-}
+#define ROI_QUAD_KU   (64.f * 5.9604645e-8f)   /**< rounding band of the quadric tests, per unit of |w|^2+r^2 */
+#define ROI_QUAD_AMIN 1e-12f                   /**< below this, a ray is parallel to the capsule axis */
+#define ROI_SLAB_KB   4.f                      /**< rounding band of the slab test, in units of roieps */
+#define ROI_MAX_TINY  4                        /**< consecutive floored hits before the Fresnel event is dropped */
 
 /**
- * \brief Compute the next step length for edge-based iMMC
+ * \brief Solve a*t^2 + 2*b*t + c = 0 for the crossing selected by the in/out state of p0
+ *
+ * A positive selfeps marks the primitive crossed by the previous step, on whose surface the
+ * photon sits: a root closer than selfeps is that crossing again, so the side is taken from the
+ * direction of travel (b < 0: inward) and only the far root counts. An outside state (band)
+ * with p0 already past the entry root and moving in is an entry missed between two steps, made at
+ * t = 0.
+ *
+ * \return htOutIn/htInOut with *thit in [0, L], else htNoHitIn/htNoHitOut
  */
-float ray_cylinder_intersect(ray* r, int index, float d2d[2], FLOAT3 p2d[2], int hitstatus) {
-    float pt0[2], pt1[2], ph0[2], ph1[2], Lratio, theta;
+static inline int roi_quad(float a, float b, float c, float w2, float r2, float L, int inroi, float selfeps, float* thit) {
+    float dc = ROI_QUAD_KU * (w2 + r2), disc = b * b - a * c, q, tn, tf, ts;
+    int in = (c < -dc) ? 1 : ((c > dc) ? 0 : (inroi != 0));
 
-    // update Lmove and reflection
-    float dx, dy, dr2, delta, rt, sgn, Dp;
-    rt = r->roisize[index];
+    if (a < ROI_QUAD_AMIN || disc <= 0.f) {
+        return (in && a < ROI_QUAD_AMIN) ? htNoHitIn : htNoHitOut;
+    }
 
-    // accurate intersection computation
-    if (hitstatus == htOutIn || hitstatus == htInOut) { // hit edgeroi out->in or in->out
-        d2d[0] = sqrtf(d2d[0]);
-        d2d[1] = sqrtf(d2d[1]);
+    q = -(b + copysignf(sqrtf(disc), b));
+    tn = fminf(q / a, c / q);
+    tf = fmaxf(q / a, c / q);
+    ts = in ? tf : tn;
 
-        theta = vec_dot3(p2d, p2d + 1);
+    if (selfeps > 0.f && ts > 0.f && ts <= L && ts < selfeps) {
+        int inward = (b < 0.f);
 
-        theta = theta / (d2d[0] * d2d[1] + EPS);
-        pt0[0] = d2d[0];
-        pt0[1] = 0.f;
-        pt1[0] = d2d[1] * theta;
-        pt1[1] = d2d[1] * sqrtf(fabs(1 - theta * theta));
-
-        dx = pt1[0] - pt0[0];
-        dy = pt1[1] - pt0[1];
-        dr2 = dx * dx + dy * dy;
-        Dp = pt0[0] * pt1[1];
-        delta = sqrtf(rt * rt * dr2 - Dp * Dp); // must be >0
-        dr2 = 1.0f / dr2;
-        sgn = (dy >= 0) ? 1.0f : -1.0f;
-        ph0[0] = (Dp * dy  + sgn * dx * delta) * dr2;
-        ph0[1] = (-Dp * dx + fabs(dy) * delta) * dr2;
-        ph1[0] = (Dp * dy  - sgn * dx * delta) * dr2;
-        ph1[1] = (-Dp * dx - fabs(dy) * delta) * dr2;
-        Dp = dist2d2(pt0, pt1);
-
-        if (d2d[0] > rt && d2d[1] < rt) { // out->in
-            Lratio = dist2d2(pt0, ph1);
-
-            if (Dp > Lratio) {
-                Lratio = sqrtf(Lratio / Dp);
-            } else {
-                Lratio = dist2d2(pt0, ph0);
-                Lratio = sqrtf(Lratio / Dp);
-            }
-        } else { // d2d[0]<rt && d2d[1]>rt, in->out
-            Lratio = dist2d2(pt1, ph1);
-
-            if (Dp > Lratio) {
-                Lratio = 1.f - sqrtf(Lratio / Dp);
-            } else {
-                Lratio = dist2d2(pt1, ph0);
-                Lratio = 1.f - sqrtf(Lratio / Dp);
-            }
+        if (inward != (inroi != 0)) {
+            *thit = 0.f;        /* the stored side is wrong: cross here */
+            return inward ? htOutIn : htInOut;
         }
 
-        return Lratio;
+        if (!inward || tf < selfeps) {
+            return htNoHitOut;
+        }
+
+        if (tf > L) {
+            return htNoHitIn;
+        }
+
+        *thit = tf;
+        return htInOut;
     }
 
-    return 1.f;
+    if (!in) {
+        if (tn > 0.f && tn <= L) {
+            *thit = tn;
+            return htOutIn;
+        }
+
+        if (tn <= 0.f && tf > 0.f) {
+            *thit = 0.f;        /* past the entry and moving in: the missed entry */
+            return htOutIn;
+        }
+
+        return htNoHitOut;
+    }
+
+    if (tf <= 0.f) {
+        return htNoHitOut;
+    }
+
+    if (tf <= L) {
+        *thit = tf;
+        return htInOut;
+    }
+
+    return htNoHitIn;
 }
 
-/**
- * \brief Compute distances to node (spherical) ROIs if defined in the element
- *
- * Compute the distance between P0 and the labeled node
- * and the distance between P1 and the labeled node.
- * P0 is the entry point and P1 is the exit point
- */
+/** \brief The root of a*t^2 + 2*b*t + c = 0 selected by the state in, q = -(b + sign(b)*sqrt(disc)) */
+#define ROI_QUAD_ROOT(in, q, a, c) ((((in) != 0) == ((q) > 0.f)) ? (q) / (a) : (c) / (q))
 
-void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, FLOAT3** center, int* hitstatus) {
-    float npdist0, npdist1;
-    FLOAT3 PP;
+/** \brief The capsule root selected by the state in: the cylinder's if within the segment, else a cap's; 0 if missed */
+static inline int roi_capsule_root(ray* r, FLOAT3* B, FLOAT3* w, float s0, float sv, float a, float cc, float dsc, float qc,
+                                   float r2, int in, float* t) {
+    int capb = ((sv > 0.f) == (in != 0));
+    FLOAT3 wk;
+    float bs, cs, dss;
 
-    nr = nr * nr;
-    *center = tracer->mesh->node + ee[index] - 1;
+    if (a >= ROI_QUAD_AMIN) {
+        float s;
 
-    npdist0 = dist2_3((FLOAT3*)&r->p0, *center);   // P0
-    vec_mult3((FLOAT3*)&r->vec, r->Lmove, &PP);
-    vec_add3((FLOAT3*)&r->p0, &PP, &PP);
-    npdist1 = dist2_3(&PP, *center);      // P1
+        if (dsc <= 0.f) {
+            return 0;
+        }
 
-    if (npdist0 > nr + EPS2 && npdist1 < nr - EPS2) {
-        *hitstatus = htOutIn;
-    } else if (npdist0 < nr - EPS2 && npdist1 > nr + EPS2) {
-        *hitstatus = htInOut;
-    } else if (npdist1 > nr + EPS2) {
-        *hitstatus = (r->inroi == 1) ? htInOut : htNoHitOut; // check for borderline photons very close to edge
-    } else if (npdist1 < nr - EPS2) {
-        *hitstatus = (r->inroi == 0) ? htOutIn : htNoHitIn; // check for borderline photons very close to edge
+        *t = ROI_QUAD_ROOT(in, qc, a, cc);
+        s = s0 + *t * sv;
+
+        if (s >= 0.f && s <= 1.f) {
+            return 1;
+        }
+
+        capb = (s > 1.f);
+    }
+
+    if (capb) {
+        vec_diff3(B, (FLOAT3*)&r->p0, &wk);
     } else {
-        *hitstatus = htNone;
+        wk = *w;
+    }
+
+    bs = wk.x * r->vec.x + wk.y * r->vec.y + wk.z * r->vec.z;
+    cs = vec_dot3(&wk, &wk) - r2;
+    dss = bs * bs - cs;
+
+    if (dss <= 0.f) {
+        return 0;
+    }
+
+    bs = -(bs + copysignf(sqrtf(dss), bs));
+    *t = ROI_QUAD_ROOT(in, bs, 1.f, cs);
+    return 1;
+}
+
+/**
+ * \brief Capsule (edge ROI) test: the cylinder of segment A-B, then at most one end-cap sphere
+ *
+ * The cylinder root selected by the state is kept if its axial position s is in [0, 1];
+ * otherwise the cap on that side (A if s < 0, B if s > 1; by the sign of v.(B-A) if the ray is
+ * parallel to the axis) is solved. Self-intersections as in roi_quad().
+ */
+static int roi_capsule(ray* r, FLOAT3* A, FLOAT3* B, float rt, float selfeps, float* thit) {
+    FLOAT3 v = {r->vec.x, r->vec.y, r->vec.z}, e, w, wp, dp, wc;
+    float ie, s0, sv, sc, r2 = rt * rt, w2, dc, a, bc, cc, dsc, qc, t, L = r->Lmove;
+    int in, self = 0;
+
+    vec_diff3(A, B, &e);
+    vec_diff3(A, (FLOAT3*)&r->p0, &w);
+    ie = 1.f / vec_dot3(&e, &e);
+    s0 = vec_dot3(&w, &e) * ie;
+    sv = vec_dot3(&v, &e) * ie;
+    sc = fminf(1.f, fmaxf(0.f, s0));
+    vec_mult_add3(&e, &w, -s0, 1.f, &wp);       /* w and v perpendicular to the axis */
+    vec_mult_add3(&e, &v, -sv, 1.f, &dp);
+    vec_mult_add3(&e, &w, -sc, 1.f, &wc);       /* p0 from the closest point of the segment */
+    w2 = vec_dot3(&wc, &wc);
+    dc = ROI_QUAD_KU * (w2 + r2);
+    in = (w2 - r2 < -dc) ? 1 : ((w2 - r2 > dc) ? 0 : (r->inroi != 0));
+    a = vec_dot3(&dp, &dp);
+    bc = vec_dot3(&wp, &dp);
+    cc = vec_dot3(&wp, &wp) - r2;
+    dsc = bc * bc - a * cc;
+    qc = -(bc + copysignf(sqrtf(fmaxf(dsc, 0.f)), bc));
+
+    for (;;) {    /* a second pass only after a self-hit from outside, for the exit root */
+        int inward;
+
+        if (!roi_capsule_root(r, B, &w, s0, sv, a, cc, dsc, qc, r2, in, &t)) {
+            return htNoHitOut;
+        }
+
+        if (self || !(selfeps > 0.f && t > 0.f && t <= L && t < selfeps)) {
+            break;
+        }
+
+        inward = (vec_dot3(&wc, &v) < 0.f);    /* self-intersection, see roi_quad() */
+
+        if (inward != (r->inroi != 0)) {
+            *thit = 0.f;
+            return inward ? htOutIn : htInOut;
+        }
+
+        if (!inward) {
+            return htNoHitOut;
+        }
+
+        self = 1;
+
+        if (in) {
+            break;
+        }
+
+        in = 1;
+    }
+
+    if (self && t <= L && t < selfeps) {
+        return htNoHitOut;
+    }
+
+    if (t > 0.f && t <= L) {
+        *thit = t;
+        return in ? htInOut : htOutIn;
+    }
+
+    if (!in && t <= 0.f && vec_dot3(&wc, &v) < 0.f) {
+        *thit = 0.f;    /* the missed entry, see roi_quad() */
+        return htOutIn;
+    }
+
+    return (in && t > 0.f) ? htNoHitIn : htNoHitOut;
+}
+
+/**
+ * \brief Face (slab) ROI test: the plane at depth thick below the face (point fpt, outward normal fn)
+ *
+ * The depth below the face along the ray is d0 - t*s, d0 = (fpt-p0).fn, s = v.fn, and the slab is
+ * the depth range [0, thick]. The face plane itself is the element face, crossed by the ray-tet
+ * test; a photon rounded beyond it (d0 < -band) is outside for the whole step.
+ */
+static inline int roi_slab(ray* r, FLOAT3* fpt, FLOAT3* fn, float thick, float band, float* thit) {
+    FLOAT3 w;
+    float d0, e, s, ss, es;
+    int in;
+
+    vec_diff3((FLOAT3*)&r->p0, fpt, &w);
+    d0 = vec_dot3(&w, fn);
+
+    if (d0 < -band) {
+        return htNoHitOut;
+    }
+
+    e = d0 - thick;
+    s = vec_dot3((FLOAT3*)&r->vec, fn);
+    in = (e < -band) ? 1 : ((e > band) ? 0 : (r->inroi != 0));
+    ss = in ? -s : s;
+    es = in ? -e : e;
+
+    if (ss <= 0.f || es >= r->Lmove * ss) {
+        return in ? htNoHitIn : htNoHitOut;
+    }
+
+    *thit = fmaxf(e / s, 0.f);
+    return in ? htInOut : htOutIn;
+}
+
+/**
+ * \brief Floor an ROI hit closer than roieps so that the photon advances
+ *
+ * After ROI_MAX_TINY consecutive floored hits (a crease between two ROIs) the crossing is kept
+ * but roiidx is cleared, so that no Fresnel event can trap the photon there.
+ */
+static inline void roi_tinyhit(ray* r, int hit, float roieps) {
+    if (hit != htInOut && hit != htOutIn) {
+        return;
+    }
+
+    if (r->Lmove < roieps) {
+        r->Lmove = roieps;
+
+        if (++r->tinyhits > ROI_MAX_TINY) {
+            r->roiidx = -1;
+            r->tinyhits = 0;
+        }
+    } else {
+        r->tinyhits = 0;
     }
 }
 
 /**
- * \brief Compute the next step length for node-based iMMC
+ * \brief Edge/node iMMC: trace the ray against the union of the element's ROI primitives
+ *
+ * Each primitive is tested with its own in/out state. The photon is in the ROI at p0 if it is in
+ * any primitive. An outside photon enters the union at the first entry E; an inside one leaves it
+ * at the last exit X of the primitives it is in, unless it first enters another primitive
+ * (E < X): that is an inner crossing (rtInner), which ends the step without a medium change.
+ * r->lasthit names the primitive hit by the previous step, for the self-intersection test.
+ *
+ * \return the in/out state at p0 (1: in the union)
  */
-float ray_sphere_intersect(ray* r, int index, FLOAT3* center, float nr, int hitstatus) {
-    float temp1, temp2, d1, d2;
-    FLOAT3 oc;
+static int traceroi_list(ray* r, raytracer* tracer, int doinit, mcconfig* cfg) {
+    const tetmesh* mesh = tracer->mesh;
+    const int beg = mesh->roioff[r->eid - 1], n = mesh->roioff[r->eid] - beg;
+    const int* idx = mesh->roioff + beg;
+    const int self = (!doinit && r->lasthit) ? (r->lasthit >> 3) : -1;
+    float X = 0.f, E = 1e30f;
+    int nin = 0, jx = -1, je = -1, k, hs;
 
-    if (hitstatus == htOutIn || hitstatus == htInOut) {
-        vec_diff3(center, (FLOAT3*)&r->p0, &oc);
-        temp1 = vec_dot3((FLOAT3*)&r->vec, &oc);
-        temp2 = oc.x * oc.x + oc.y * oc.y + oc.z * oc.z - (nr * nr);
-        temp2 = sqrtf(fabs(temp1 * temp1 - temp2));
-        d1 = -temp1 + temp2;
-        d2 = -temp1 - temp2;
-        return ((hitstatus == htOutIn) ? MIN(d1, d2) : MAX(d1, d2));
+    for (k = 0; k < n; k++) {
+        float* d = mesh->roilist + (size_t)idx[k] * 8, t = 1e30f, se = (k == self) ? mesh->roieps : 0.f;
+        int isin;
+
+        if (d[3] > 0.f) {
+            /* skip the capsule if the step stays outside its bounding sphere (radius^2 in d[7]) */
+            FLOAT3 w = {r->p0.x - 0.5f * (d[0] + d[4]), r->p0.y - 0.5f * (d[1] + d[5]), r->p0.z - 0.5f * (d[2] + d[6])};
+            float wb = w.x * r->vec.x + w.y * r->vec.y + w.z * r->vec.z, wc = vec_dot3(&w, &w) - d[7], we = -wb - r->Lmove;
+
+            hs = (wc > 0.f && (wb >= 0.f || wb * wb <= wc || (we > 0.f && we * we > wb * wb - wc))) ? htNoHitOut :
+                 roi_capsule(r, (FLOAT3*)d, (FLOAT3*)(d + 4), d[3], se, &t);
+        } else {
+            FLOAT3 w;
+            vec_diff3((FLOAT3*)d, (FLOAT3*)&r->p0, &w);
+            hs = roi_quad(1.f, w.x * r->vec.x + w.y * r->vec.y + w.z * r->vec.z, vec_dot3(&w, &w) - d[3] * d[3],
+                          vec_dot3(&w, &w), d[3] * d[3], r->Lmove, r->inroi, se, &t);
+        }
+
+        /* in this primitive: its exit (none if the step ends inside) competes for the last exit X */
+        isin = (hs == htInOut || hs == htNoHitIn);
+        t = (hs == htNoHitIn) ? 1e30f : t;
+        nin += isin;
+
+        if (isin && (jx < 0 || t > X)) {
+            X = t, jx = k;
+        }
+
+        if (hs == htOutIn && t < E) {
+            E = t, je = k;
+        }
     }
 
-    return r->Lmove;
-}
+    r->roitype = rtNone;
 
-/**
- * \brief Compute the next step length for the face-based iMMC
- */
-float ray_face_intersect(ray* r, raytracer* tracer, int* ee, int faceid, int baseid, int eid, int* hitstatus) {
-    FLOAT3 pf1, pv, fnorm, ptemp;
-    float distf0, distf1, thick, ratio = 1.f;
-
-    thick = r->roisize[faceid];
-
-    vec_mult3((FLOAT3*)&r->vec, r->Lmove, &ptemp);
-    vec_add3((FLOAT3*)&r->p0, &ptemp, &ptemp);    // P1: ptemp
-
-    pf1 = tracer->mesh->node[ee[nc[ifaceorder[faceid]][0]] - 1]; // any point on face
-    fnorm.x = (&(tracer->n[baseid].x))[ifaceorder[faceid]];     // normal vector of the face
-    fnorm.y = (&(tracer->n[baseid].x))[ifaceorder[faceid] + 4];
-    fnorm.z = (&(tracer->n[baseid].x))[ifaceorder[faceid] + 8];
-
-    vec_diff3((FLOAT3*)&r->p0, &pf1, &pv);
-    distf0 = vec_dot3(&pv, &fnorm);
-
-    vec_diff3(&ptemp, &pf1, &pv);
-    distf1 = vec_dot3(&pv, &fnorm);
-
-    *hitstatus = htNone;
-
-    if (distf0 > thick + EPS2 && distf1 < thick - EPS2) { // hit: out->in
-        ratio = 1.f - (thick - distf1) / (distf0 - distf1);
-        *hitstatus = htOutIn;
-    } else if (distf0 < thick - EPS2 && distf1 > thick + EPS2) { // hit: in->out
-        ratio = (thick - distf0) / (distf1 - distf0);
-        *hitstatus = htInOut;
-    } else if ((distf0 <= thick && distf1 >= thick) || (distf0 > thick && distf1 > thick)) {
-        *hitstatus = htNoHitOut;
-    } else if ((distf0 >= thick && distf1 <= thick) || (distf0 < thick && distf1 < thick)) {
-        *hitstatus = htNoHitIn;
+    if (doinit) {
+        r->inroi |= (nin > 0);
+        return (nin > 0);
     }
 
-    return ratio;
+    hs = htNone;
+
+    if (je >= 0 && (nin == 0 || E < X)) {
+        hs = htOutIn, k = je, r->Lmove = E;
+    } else if (nin > 0 && X < 1e30f) {
+        hs = htInOut, k = jx, r->Lmove = X;
+    }
+
+    if (hs != htNone) {
+        r->inroi = (hs == htOutIn);
+        r->roiidx = k;
+        r->roitype = (nin > 0 && hs == htOutIn) ? rtInner : ((mesh->roilist[(size_t)idx[k] * 8 + 3] > 0.f) ? rtEdge : rtNode);
+    } else {
+        r->inroi = (nin > 0);
+    }
+
+    roi_tinyhit(r, hs, mesh->roieps);
+    return (nin > 0);
 }
 
 /**
  * \brief Implicit MMC ray-tracing core function
  *
- * if doinit is set to 1, this function only initialize r->inroi for 3 roi types
- * if doinit is set to 0, this function only updates r->{Lmove, roiidx, inroi}. r->roitype update is not necessary
- * in the latter case, if reference element is found, it also updates r->refeid and r->roisize pointers
+ * With doinit = 1, only initializes r->inroi at the launch position; otherwise shortens
+ * r->Lmove to the first ROI crossing, if any, and updates r->{inroi, roitype, roiidx}.
+ *
+ * \return edge/node mode: the in/out state at p0 from the element's own tests, which may differ
+ *         from the stored one after entering an element; -1 in face mode
  */
-void traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg) {
-    int eid = r->eid - 1;
-    int* ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
+int traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg) {
+    int eid = r->eid - 1, pin = -1;
 
-    if (roitype == 1) { /** edge and node immc - edge also depends on node, only test intersection with an infinite cylinder */
-        int neweid = -1;
-        int* newee;
-        int i;
-        float minratio = 1.f;
-        int hitstatus = htNone, firsthit = htNone, firstinout = htNone;
-
-        if (tracer->mesh->edgeroi) { /** if edge roi is defined */
-            // edge-based iMMC  - ray-cylinder intersection test
-            float distdata[2];
-            FLOAT3 projdata[2];
-
-            if (r->roisize[0] != 0.f) {
-                // test if this is a reference element, indicated by a negative radius
-                if (r->roisize[0] < -6.f) {
-                    neweid = (int)(-r->roisize[0]) - 6;
-                    r->refeid = neweid;
-                    newee = (int*)(tracer->mesh->elem + (neweid - 1) * tracer->mesh->elemlen);
-                    r->roisize = (float*)(tracer->mesh->edgeroi + (neweid - 1) * 6); // update r->roisize array to the referenced element
-                }
-
-                for (i = 0; i < 6; i++) { /** loop over each edge in current element, find the closest hit */
-                    if (r->roisize[i] > 0.f) {
-                        /** decide if photon is in the roi or not */
-                        if (neweid < 0) {
-                            compute_distances_to_edge(r, tracer, ee, i, distdata, projdata, &hitstatus);
-                        } else {
-                            compute_distances_to_edge(r, tracer, newee, i, distdata, projdata, &hitstatus);
-                        }
-
-
-                        /**
-                         *  hitstatus has 4 possible outputs:
-                         *  htInOut: photon path intersects with cylinder, moving from in to out
-                         *  htOutIn: photon path intersects with cylinder, moving from out to in
-                         *  htNoHitIn: both ends of photon path are inside cylinder, no intersection
-                         *  htNoHitOut: both ends of photon path are outside cylinder, no intersection
-                         *  htNone: unexpected, should never happen
-                         */
-                        if (doinit) {
-                            r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn); /** start position is in ROI - initialize state */
-                        } else {
-                            if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
-                                /** calculate the first intersection distance normalied by path seg length */
-                                float lratio = ray_cylinder_intersect(r, i, distdata, projdata, hitstatus);
-
-                                if (lratio < minratio) { /** find the closest hit */
-                                    minratio = lratio;
-                                    firsthit = hitstatus; /** closest hit status  */
-                                    r->roiidx = i;
-                                }
-                            } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
-                                firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
-                            }
-                        }
-                    }
-                }
-
-                if (minratio < 1.f) {
-                    r->Lmove *= minratio;
-                }
-
-                if (!doinit) {
-                    r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
-                    // update inroi to 0 only if no endcaps need to be tested
-                    r->inroi = (firsthit == htNone && firstinout == htNone && !tracer->mesh->noderoi) ? 0 : r->inroi;
-                }
-
-                r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtEdge : rtNone;
-
-                if (cfg->debuglevel & dlMove) {
-                    MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-edge\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
-                                r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, firsthit);
-                }
-            }
-        }
-
-        if (firsthit == htNone && firstinout != htNoHitIn && tracer->mesh->noderoi) {
-            // not hit any edgeroi in the current element, then go for node-based iMMC
-            float nr;
-            FLOAT3* center;
-
-            minratio = r->Lmove;
-            hitstatus = htNone;
-            firsthit = htNone;
-            firstinout = htNone;
-
-            for (i = 0; i < 4; i++) { // check if hits any node edgeroi
-                nr = tracer->mesh->noderoi[ee[i] - 1];
-
-                if (nr > 0.f) {
-                    compute_distances_to_node(r, tracer, ee, i, nr, &center, &hitstatus);
-
-                    if (doinit) {
-                        r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn);
-                    } else {
-                        if (hitstatus == htInOut || hitstatus == htOutIn) {
-                            float lmove = ray_sphere_intersect(r, i, center, nr, hitstatus);
-
-                            if (lmove < minratio) {
-                                minratio = lmove;
-                                firsthit = hitstatus;
-                                r->roiidx = i;
-                            }
-                        } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
-                            firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
-                        }
-                    }
-                }
-            }
-
-            if (minratio < r->Lmove) {
-                r->Lmove = minratio;
-            }
-
-            if (!doinit) {
-                r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
-                r->inroi = (firsthit == htNone && firstinout == htNone) ? 0 : r->inroi;
-            }
-
-            r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtNode : rtNone;
-
-            if (cfg->debuglevel & dlMove) {
-                MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-node\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
-                            r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, firsthit);
-            }
-        }
-
-        // prevent stuck photons when intersection is <EPS2 from current origin
-        if ((firsthit == htInOut || firsthit == htOutIn) && r->Lmove < EPS2) {
-            r->Lmove = EPS2;
-        }
+    if (roitype == 1) {
+        pin = traceroi_list(r, tracer, doinit, cfg);
     } else if (tracer->mesh->faceroi) {
-        int neweid = -1, newbaseid = 0;
-        int* newee;
-        float lratio = 1.f, minratio = 1.f;
-        int hitstatus = htNone, firsthit = htNone, firstinout = htNone, i;
+        int* ee = (int*)(tracer->mesh->elem + eid * tracer->mesh->elemlen);
+        int hs, firsthit = htNone, anyin = 0, nohitin = 0, tested = 0, i;
+        float minL = r->Lmove, band = ROI_SLAB_KB * tracer->mesh->roieps;
 
-        // test if this is a reference element, indicated by a negative radius
-        if (r->roisize[0] < -4.f) {
-            neweid = (int)(-r->roisize[0]) - 4;
-            r->refeid = neweid;
-            newbaseid = (neweid - 1) << 2;
-            newee = (int*)(tracer->mesh->elem + (neweid - 1) * tracer->mesh->elemlen);
-            r->roisize = (float*)(tracer->mesh->faceroi + (neweid - 1) * 4);
-        }
-
-        // test if the ray intersect with a face ROI (slab)
         for (i = 0; i < 4; i++) {
             if (r->roisize[i] > 0.f) {
-                if (neweid < 0) {
-                    lratio = ray_face_intersect(r, tracer, ee, i, eid << 2, eid, &hitstatus);
-                } else {
-                    lratio = ray_face_intersect(r, tracer, newee, i, newbaseid, neweid, &hitstatus);
-                }
+                float* nv = &(tracer->n[eid << 2].x), lr = r->Lmove;
+                FLOAT3 fn = {nv[ifaceorder[i]], nv[ifaceorder[i] + 4], nv[ifaceorder[i] + 8]};
 
-                if (doinit) {
-                    r->inroi |= (hitstatus == htInOut || hitstatus == htNoHitIn);
-                } else {
-                    if (hitstatus == htInOut || hitstatus == htOutIn) { /** if intersection is found */
-                        if (lratio < minratio) {
-                            minratio = lratio;
-                            firsthit = hitstatus;
-                            r->roiidx = i;
-                        }
-                    } else if (hitstatus == htNoHitIn || hitstatus == htNoHitOut) {
-                        firstinout = ((firstinout == htNone) ? hitstatus : (hitstatus == htNoHitIn ? hitstatus : firstinout));
-                    }
+                hs = roi_slab(r, tracer->mesh->node + ee[nc[ifaceorder[i]][0]] - 1, &fn, r->roisize[i], band, &lr);
+                tested = 1;
+                anyin |= (hs == htInOut || hs == htNoHitIn);
+                nohitin |= (hs == htNoHitIn);
+
+                /* the nearest crossing wins; without one the photon is in if it is in any slab */
+                if (!doinit && (hs == htInOut || hs == htOutIn) && lr < minL) {
+                    minL = lr, firsthit = hs, r->roiidx = i;
                 }
             }
         }
 
-        if (minratio < 1.f) {
-            r->Lmove *= minratio;
+        if (doinit) {
+            r->inroi |= anyin;
+        } else {
+            r->Lmove = minL;
+            r->inroi = (firsthit != htNone) ? (firsthit == htOutIn) : (tested ? nohitin : r->inroi);
         }
 
-        if (!doinit) {
-            r->inroi = (firsthit != htNone ? (firsthit == htOutIn) : (firstinout != htNone ? (firstinout == htNoHitIn) : r->inroi ));
-            r->inroi = (firsthit == htNone && firstinout == htNone) ? 0 : r->inroi;
-        }
-
-        r->roitype = (firsthit == htInOut || firsthit == htOutIn) ? rtFace : rtNone;
-
-        if (cfg->debuglevel & dlMove) {
-            MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit-face\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"firsthit\":%d}}\n",
-                        r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, firsthit);
-        }
-
-        // prevent stuck photons if intersections is <EPS2 from current origin
-        if ((firsthit == htInOut || firsthit == htOutIn) && r->Lmove < EPS2) {
-            r->Lmove = EPS2;
-        }
+        r->roitype = (firsthit != htNone) ? rtFace : rtNone;
+        roi_tinyhit(r, firsthit, tracer->mesh->roieps);
     }
+
+    if (cfg->debuglevel & dlMove) {
+        MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"implicit\": {\"p\":[%f, %f, %f], \"v\":[%f, %f, %f], \"l\":%f, \"inroi\":%d, \"roitype\":%d, \"roiidx\":%d}}\n",
+                    r->photonid, r->p0.x, r->p0.y, r->p0.z, r->vec.x, r->vec.y, r->vec.z, r->Lmove, r->inroi, r->roitype, r->roiidx);
+    }
+
+    return pin;
+}
+
+/**
+ * \brief Face iMMC: classify the crossing of the mesh face oldeid -> eid (faceid of oldeid)
+ *
+ * A face labeled from one side only is the outer surface of a single-sided slab, an interface
+ * between the background and the ROI medium; a face labeled from both sides is inside the slab.
+ *
+ * \return 1 if a photon outside the ROI enters the slab through its labeled face, 2 if a photon in
+ *         the ROI leaves it there, 0 otherwise
+ */
+static int slabfacecross(tetmesh* mesh, int oldeid, int eid, int faceid, int inroi) {
+    int* nb = mesh->facenb + (eid - 1) * mesh->elemlen;
+    int lold = (mesh->faceroi[((oldeid - 1) << 2) + faceid] > 0.f), lnew = 0, k;
+
+    for (k = 0; k < 4; k++) {
+        lnew |= (nb[k] == oldeid) && (mesh->faceroi[((eid - 1) << 2) + k] > 0.f);
+    }
+
+    return (!inroi && lnew && !lold) ? 1 : ((inroi && lold && !lnew) ? 2 : 0);
 }
 
 #ifdef MMC_USE_SSE
@@ -1458,8 +1496,8 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
     r->pout.x = MMC_UNDEFINED;
     r->faceid = -1;
     r->isend = 0;
+    r->lasthit = (r->roitype != rtNone && r->roiidx >= 0) ? ((r->roiidx << 3) | r->roitype) : 0;
     r->roitype = rtNone;
-    r->refeid = -1;
     r->roiidx = -1;
 
     const __m128 Nx = _mm_load_ps(&(tracer->n[baseid].x));
@@ -1474,6 +1512,23 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
     O = _mm_set1_ps(r->p0.z);
     T = _mm_add_ps(T, _mm_mul_ps(Nz, O));
     T = _mm_sub_ps(dd, T);
+
+    /* face iMMC: reset inroi from the depths below the faces (faceroi column k: T[ifaceorder[k]]):
+       in if decisively inside a slab, out if decisively outside all, else the stored state */
+    if (cfg->implicit == 2 && r->roisize) {
+        float MMC_ALIGN(16) Td[4], bd = ROI_SLAB_KB * tracer->mesh->roieps, *th = r->roisize;
+        int rin = 0, rout = 1, k;
+
+        _mm_store_ps(Td, T);
+
+        for (k = 0; k < 4; k++) {
+            float tk = Td[ifaceorder[k]];
+            rin |= (tk >= -bd) & (tk < th[k] - bd);
+            rout &= (th[k] <= 0.f) | (tk < -bd) | (tk > th[k] + bd);
+        }
+
+        r->inroi = rin | (r->inroi & !rout);
+    }
 
     O = _mm_set1_ps(r->vec.x);
     S = _mm_mul_ps(Nx, O);
@@ -1524,7 +1579,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
 
         // implicit MMC - test if ray intersects with edge/face/node ROI boundaries
         if (cfg->implicit) {
-            traceroi(r, tracer, cfg->implicit, 0, cfg);
+            prop = roi_step(r, tracer, cfg, prop, Lp0, &mus, &rc, &dlen);
         }
 
         O = _mm_load_ps(&(r->vec.x));
@@ -1958,7 +2013,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         }
 
         if (cfg->issavedet && r.Lmove > 0.f && r.faceid >= 0 && mesh->type[r.eid - 1] > 0) { /* faceid first: a photon the tracer gave up on has faceid -1 and eid ID_UNDEFINED */
-            r.partialpath[mesh->prop - 1 + ((cfg->implicit && (!(r.inroi) != !(r.roitype))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
+            r.partialpath[mesh->prop - 1 + ((cfg->implicit && ROI_STEP_IN(r.inroi, r.roitype)) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;    /*second medianum block is the partial path*/
 
             if (cfg->debuglevel & dlMove) {
                 MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"partialpath-1\": {\"l\":%f, \"inroi\":%d, \"roitype\":%d}}\n",
@@ -1970,13 +2025,13 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             break;    /*reaches the time limit*/
         }
 
-        if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && r.eid != ID_UNDEFINED && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
+        if (cfg->implicit && cfg->isreflect && r.roitype && r.roitype != rtInner && r.roiidx >= 0 && r.eid != ID_UNDEFINED && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
             if (cfg->debuglevel & dlTraj) {
                 savedebugdata(&r, (unsigned int)id, cfg);
             }
 
-            reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
-            vec_mult_add(&r.p0, &r.vec, 1.0f, 10 * EPS, &r.p0);
+            reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx);
+            vec_mult_add(&r.p0, &r.vec, 1.0f, mesh->roieps, &r.p0);
             continue;
         } else if (cfg->implicit && r.roitype) {
             continue;
@@ -1991,8 +2046,25 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.eid = enb[r.faceid];
 
             if (cfg->implicit) {
-                if (cfg->isreflect && (r.eid <= 0 || mesh->med[mesh->type[r.eid - 1]].n != mesh->med[mesh->type[oldeid - 1]].n )) {
-                    if (! (!r.inroi && r.eid <= 0 && ((mesh->med[mesh->type[oldeid - 1]].n == cfg->nout && cfg->isreflect != (int)bcMirror) || cfg->isreflect == (int)bcAbsorbExterior) ) ) {
+                /* face iMMC: the labeled face of a single-sided slab separates the background from the
+                   ROI medium (sf = 1: entering the slab, 2: leaving it) */
+                int sf = (cfg->implicit == 2 && mesh->nslab1 && r.eid > 0) ? slabfacecross(mesh, oldeid, r.eid, r.faceid, r.inroi) : 0;
+
+                if (sf) {
+                    float nbg = mesh->med[mesh->type[(sf == 1 ? oldeid : r.eid) - 1]].n, nroi = mesh->med[mesh->prop].n;
+
+                    if (cfg->isreflect && nbg != nroi) {
+                        reflectray_n(cfg, &r.vec, tracer, &oldeid, &r.eid, r.faceid, ran, r.inroi, (sf == 1) ? nbg : nroi, (sf == 1) ? nroi : nbg);
+                    }
+
+                    if (r.eid != oldeid) {    /* transmitted */
+                        r.inroi = (sf == 1);
+                    }
+                } else if (cfg->isreflect && (r.eid <= 0 || (!r.inroi && mesh->med[mesh->type[r.eid - 1]].n != mesh->med[mesh->type[oldeid - 1]].n))) {
+                    /* in the ROI, the photon is in the ROI medium on both sides of an interior face */
+                    float nold = r.inroi ? mesh->med[mesh->prop].n : mesh->med[mesh->type[oldeid - 1]].n;
+
+                    if (! (r.eid <= 0 && ((nold == cfg->nout && cfg->isreflect != (int)bcMirror) || cfg->isreflect == (int)bcAbsorbExterior) ) ) {
                         reflectray(cfg, &r.vec, tracer, &oldeid, &r.eid, r.faceid, ran, r.inroi);
                     }
                 }
@@ -2043,7 +2115,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
             if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                r.partialpath[mesh->prop - 1 + ((cfg->implicit && (!(r.inroi) != !(r.roitype))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
+                r.partialpath[mesh->prop - 1 + ((cfg->implicit && ROI_STEP_IN(r.inroi, r.roitype)) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
 
                 if (cfg->debuglevel & dlMove) {
                     MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"partialpath-2\": {\"l\":%f, \"inroi\":%d, \"roitype\":%d}}\n",
@@ -2058,7 +2130,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
                 r.slen = (*tracercore)(&r, tracer, cfg, visit);
 
                 if (cfg->issavedet && r.Lmove > 0.f && mesh->type[r.eid - 1] > 0) {
-                    r.partialpath[mesh->prop - 1 + ((cfg->implicit && ((!(r.inroi) != !(r.roitype)))) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
+                    r.partialpath[mesh->prop - 1 + ((cfg->implicit && ROI_STEP_IN(r.inroi, r.roitype)) ? mesh->prop : mesh->type[r.eid - 1])] += r.Lmove;
 
                     if (cfg->debuglevel & dlMove) {
                         MMC_FPRINTF(cfg->flog, "{\"id\":%u, \"partialpath-fixphoton\": {\"l\":%f, \"inroi\":%d, \"roitype\":%d}}\n",
@@ -2139,13 +2211,13 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
             }
         }
 
-        if (cfg->implicit && cfg->isreflect && r.roitype && r.roiidx >= 0 && r.eid != ID_UNDEFINED && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
+        if (cfg->implicit && cfg->isreflect && r.roitype && r.roitype != rtInner && r.roiidx >= 0 && r.eid != ID_UNDEFINED && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid - 1]].n)) {
             if (cfg->debuglevel & dlTraj) {
                 savedebugdata(&r, (unsigned int)id, cfg);
             }
 
-            reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx, r.refeid);
-            vec_mult_add(&r.p0, &r.vec, 1.0f, 10.f * EPS, &r.p0);
+            reflectrayroi(cfg, (FLOAT3*)&r.vec, (FLOAT3*)&r.p0, tracer, &r.eid, &r.inroi, ran, r.roitype, r.roiidx);
+            vec_mult_add(&r.p0, &r.vec, 1.0f, mesh->roieps, &r.p0);
             continue;
         } else if (cfg->implicit && r.roitype) {
             continue;
@@ -2154,6 +2226,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         mom = 0.f;
         r.slen0 = mc_next_scatter(mesh->med[(cfg->implicit && r.inroi) ? mesh->prop : mesh->type[r.eid - 1]].g, &r.vec, ran, ran0, cfg, &mom);
         r.slen = r.slen0;
+        r.tinyhits = 0;
 
         if (cfg->debuglevel & dlTraj) {
             savedebugdata(&r, (unsigned int)id, cfg);
@@ -2238,38 +2311,33 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid) {
+float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx) {
 
     /*to handle refractive index mismatch*/
-    FLOAT3 pnorm = {0.f}, *pn = &pnorm, EH, ut;
+    FLOAT3 pnorm = {0.f}, *pn = &pnorm;
     float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
 
-    if (roitype == rtEdge) { // hit edge roi
-        FLOAT3 u, E0;
-        E0 = tracer->mesh->node[tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][0]] - 1];
-        vec_diff3(&E0, tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + e2n[roiidx][1]] - 1), &u);
-        vec_diff3(&E0, ph, &EH);
-        tmp0 = vec_dot3(&EH, &u);
-        vec_mult3(&u, tmp0, &ut);
-        vec_diff3(&ut, &EH, pn);
-        tmp0 = 1.f / sqrtf(vec_dot3(pn, pn));
-        vec_mult3(pn, tmp0, pn);
-    } else if (roitype == rtNode) { // hit node roi
-        vec_diff3(tracer->mesh->node + (tracer->mesh->elem[((*eid - 1) << 2) + roiidx] - 1), ph, pn);
-        tmp0 = 1.f / sqrtf(vec_dot3(pn, pn));
-        vec_mult3(pn, tmp0, pn);
-    } else {         // hit face roi
-        int baseid;
+    if (roitype == rtEdge || roitype == rtNode) { // the outward normal of the capsule or sphere at ph
+        const int* ro = tracer->mesh->roioff;
+        float* d = tracer->mesh->roilist + (size_t)ro[ro[*eid - 1] + roiidx] * 8;
+        FLOAT3 u;
 
-        if (refeid < 0) {
-            baseid = (*eid - 1) << 2;
-        } else {
-            baseid = (refeid - 1) << 2;
+        vec_diff3((FLOAT3*)d, ph, pn);
+
+        if (roitype == rtEdge) {    // from the closest point of the segment (side or end cap)
+            vec_diff3((FLOAT3*)d, (FLOAT3*)(d + 4), &u);
+            tmp0 = fminf(1.f, fmaxf(0.f, vec_dot3(pn, &u) / vec_dot3(&u, &u)));
+            vec_mult_add3(&u, pn, -tmp0, 1.f, pn);
         }
 
-        pn->x = (&(tracer->n[baseid].x))[roiidx];
-        pn->y = (&(tracer->n[baseid].x))[roiidx + 4];
-        pn->z = (&(tracer->n[baseid].x))[roiidx + 8];
+        tmp0 = 1.f / sqrtf(vec_dot3(pn, pn));
+        vec_mult3(pn, tmp0, pn);
+    } else {         // hit face roi: faceroi column roiidx is the face ifaceorder[roiidx]
+        int baseid = (*eid - 1) << 2;
+
+        pn->x = (&(tracer->n[baseid].x))[ifaceorder[roiidx]];
+        pn->y = (&(tracer->n[baseid].x))[ifaceorder[roiidx] + 4];
+        pn->z = (&(tracer->n[baseid].x))[ifaceorder[roiidx] + 8];
     }
 
     /*pn pointing outward*/
@@ -2353,9 +2421,29 @@ float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, in
  */
 
 float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi) {
+    float n1, n2;
+
+    if (cfg->implicit && inroi != 0) {    /* in the ROI medium; an ROI touching the domain surface faces nout */
+        n1 = tracer->mesh->med[cfg->his.maxmedia].n;
+        n2 = (*eid > 0) ? n1 : cfg->nout;
+    } else {
+        n1 = (*oldeid != *eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid - 1]].n : cfg->nout;
+        n2 = (*eid > 0) ? tracer->mesh->med[tracer->mesh->type[*eid - 1]].n : cfg->nout;
+    }
+
+    return reflectray_n(cfg, c0, tracer, oldeid, eid, faceid, ran, inroi, n1, n2);
+}
+
+/**
+ * @brief Reflection/transmission at a mesh face between refractive indices n1 (oldeid side) and n2
+ *
+ * reflectray() with the indices given, e.g. for the labeled face of a face-iMMC slab
+ */
+
+float reflectray_n(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi, float n1, float n2) {
     /*to handle refractive index mismatch*/
     float3 pnorm = {0.f}, *pn = &pnorm;
-    float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
+    float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2;
     int offs = (*oldeid - 1) << 2;
 
     faceid = ifaceorder[faceid];
@@ -2373,14 +2461,6 @@ float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int*
 
     /*compute the cos of the incidence angle*/
     Icos = fabs(vec_dot(c0, pn));
-
-    if (cfg->implicit && inroi != 0) {
-        n1 = tracer->mesh->med[cfg->his.maxmedia].n;
-        n2 = n1;
-    } else {
-        n1 = (*oldeid != *eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid - 1]].n : cfg->nout;
-        n2 = (*eid > 0) ? tracer->mesh->med[tracer->mesh->type[*eid - 1]].n : cfg->nout;
-    }
 
     tmp0 = n1 * n1;
     tmp1 = n2 * n2;
@@ -2852,8 +2932,8 @@ void visitor_clear(visitor* visit) {
  */
 
 void updateroi(int immctype, ray* r, tetmesh* mesh) {
-    if (immctype == 1 && mesh->edgeroi) {
-        r->roisize = (float*)(mesh->edgeroi + (r->eid - 1) * 6);
+    if (immctype == 1) {    /* every primitive overlapping the element is in its list: an empty list is outside */
+        r->inroi &= (mesh->roioff && mesh->roioff[r->eid] > mesh->roioff[r->eid - 1]);
     } else if (mesh->faceroi) {
         r->roisize = (float*)(mesh->faceroi + (r->eid - 1) * 4);
         // set inroi to 0 if the photon leaves a implicitly marked tetrahedron

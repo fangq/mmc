@@ -79,9 +79,10 @@ typedef struct MMC_ray {
     double oldweight;
     float* roisize;               /**< roisize, node/edge radii or face thickness */
     int roitype;              /**< if 1, the photon hits the edgeroi; if 2, the photon hits the node edgeroi; if 0, does not hit edgeroi */
-    int inroi;            /**< if 1, inside edgeroi for the NEXT position; if 0, outside edgeroi */
-    int roiidx;           /**< edge(0-5), node (0-4) or face (0-4) index in a local element with ROIs */
-    int refeid;           /**< reference element id that is used for face-based implicit MMC*/
+    int inroi;            /**< 1: in the ROI (the union of the element's primitives, or a slab) for the NEXT position */
+    int roiidx;           /**< face (0-3) column, or edge/node mode: the entry in the element's ROI list (roioff) */
+    int lasthit;          /**< (roiidx<<3)|roitype of the ROI primitive crossed by the previous step, 0 if none */
+    int tinyhits;         /**< consecutive ROI hits floored to roieps */
     double oldweight_im;  /**< RF forward: imaginary part of the deposit accumulated for oldidx */
 } ray;
 
@@ -115,18 +116,16 @@ void fixphoton(FLOAT3* p, FLOAT3* nodes, int* ee);
 void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg, RandType* ran, RandType* ran0, visitor* visit);
 void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType* ran0);
 float reflectray(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi);
-float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx, int refeid);
+float reflectrayroi(mcconfig* cfg, FLOAT3* c0, FLOAT3* ph, raytracer* tracer, int* eid, int* inroi, RandType* ran, int roitype, int roiidx);
+float reflectray_n(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, int* eid, int faceid, RandType* ran, int inroi, float n1, float n2);
+/** iMMC: the step just taken was in the ROI medium; after a crossing, inroi is the state beyond it */
+#define ROI_STEP_IN(inroi, roitype) (((roitype) == rtNone || (roitype) == rtInner) ? ((inroi) != 0) : !(inroi))
 void save_scatter_events(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit);
 void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit);
 void visitor_init(mcconfig* cfg, visitor* visit);
 void visitor_clear(visitor* visit);
 void updateroi(int immctype, ray* r, tetmesh* mesh);
-void traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg);
-void compute_distances_to_edge(ray* r, raytracer* tracer, int* ee, int edgeid, float d2d[2], FLOAT3 p2d[2], int* hitstatus);
-void compute_distances_to_node(ray* r, raytracer* tracer, int* ee, int index, float nr, FLOAT3** center, int* hitstatus);
-float ray_cylinder_intersect(ray* r, int index, float d2d[2], FLOAT3 p2d[2], int hitstatus);
-float ray_sphere_intersect(ray* r, int index, FLOAT3* center, float nr, int hitstatus);
-float ray_face_intersect(ray* r, raytracer* tracer, int* ee, int index, int baseid, int eid, int* hitstatus);
+int traceroi(ray* r, raytracer* tracer, int roitype, int doinit, mcconfig* cfg);
 
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus
