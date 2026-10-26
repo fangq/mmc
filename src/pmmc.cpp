@@ -950,6 +950,10 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         return;  /* a surface-only mesh for OptiX: no element data to derive */
     }
 
+    if (mesh.type == NULL) {
+        throw py::value_error("the 'elemprop' field is missing");  /* mesh_getvolume reads it */
+    }
+
     if (mesh.evol == NULL) {
         mesh_getvolume(&mesh, &mcx_config);
     }
