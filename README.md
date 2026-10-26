@@ -643,8 +643,9 @@ place of the voxel grid (`Shapes` is accepted as its name too):
 `Omega` (modulation angular frequency for RF outputs).
 
 **`Optode`**: `Source` (`Type`, `Pos`, `Dir`, `Param1`, `Param2`, `Pattern`, `SrcNum`;
-or an array of sources) and `Detector` (an array of `{"Pos", "R"}`, plus `"Dir"` for the
-adjoint outputs; `Param1`/`Param2` for a wide-field detector).
+or an array of sources), `Detector` (an array of `{"Pos", "R"}`, plus `"Dir"` for the
+adjoint outputs; `Param1`/`Param2` for a wide-field detector) and `SDMap` (the adjoint
+Jacobian channels, an array of 1-based `[srcid, detid]` arrays).
 
 `mmc2json(cfg, 'file.json')` in MATLAB converts an MMCLAB `cfg`, mesh included, into an
 input file, and `mmc --dumpjson` writes the complete input of any run.
@@ -877,7 +878,10 @@ type `adjoint`, `adjoint_dcoeff`, `adjoint_mus`, `adjoint_musp`, `adjoint_mua_d`
 `adjoint_mua_musp`: every detector is also run as a source, and the Jacobians of all
 source-detector pairs are formed from the forward and adjoint fields, in CW or the
 frequency domain. On the mesh, `cfg.adjointmode` chooses the full finite-element form
-(0, the default) or the nodal approximation (1). Examples:
+(0, the default) or the nodal approximation (1). The Jacobians have one channel per
+source-detector pair (`Ns*Nd`, the detector index varying the fastest); to compute only
+some pairs, list them as 1-based `[srcid detid]` rows in `cfg.sdmap` (`Optode.SDMap`),
+and the Jacobians get one channel per row, in that order. Examples:
 `demo_mmclab_mesh_adjoint.m`, `demo_mmclab_mesh_rf_adjoint.m`. Redbird uses these
 outputs, with `cfg.nodemua`/`cfg.nodemusp`, for image reconstruction.
 

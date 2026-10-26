@@ -157,6 +157,14 @@ function varargout = mmclab(varargin)
 %      cfg.detdir:     an Nx4 array, one row per detector: [vx vy vz focal length],
 %                      the inward direction of each detector, required by the
 %                      adjoint outputs (the detectors are launched as sources)
+%      cfg.sdmap:      an Nch x 2 (or wider) array selecting the channels of the
+%                      adjoint Jacobians: each row is [srcid detid], both 1-based
+%                      (srcid counts the forward sources, detid the rows of
+%                      cfg.detpos); extra columns are ignored. The Jacobians then
+%                      have Nch channels, in the row order of cfg.sdmap, instead
+%                      of all Ns*Nd pairs. Default: all pairs, with the detector
+%                      index varying the fastest, i.e. [srcid detid] =
+%                      [1 1; 1 2; ... 1 Nd; 2 1; ...]
 %      cfg.detparam1, cfg.detparam2: [ux uy uz Nx] and [vx vy vz Ny], the edges and
 %                      pixel counts of a wide-field camera detector spanning
 %                      detpos, detpos+u, detpos+u+v and detpos+v; used with
@@ -202,7 +210,9 @@ function varargout = mmclab(varargin)
 %                      adjoint Jacobians (need cfg.detpos and cfg.detdir; every
 %                      detector is also run as a source, and the Jacobian of
 %                      each source-detector pair is returned in its own field of
-%                      the 1st output, complex if cfg.omega>0):
+%                      the 1st output, [Nx,Ny,Nz,Ngate,Nch] in grid mode or
+%                      [Nn,Nch] in mesh mode, where Nch is Ns*Nd or the rows of
+%                      cfg.sdmap; complex if cfg.omega>0):
 %                      'adjoint'          mua Jacobian, fluence.jmua
 %                      'adjoint_dcoeff'   diffusion coefficient D=1/(3mus')
 %                                         Jacobian, fluence.jd
@@ -352,7 +362,7 @@ if (isstruct(varargin{1}))
             varargin{1}(i).compute = strrep(type, 'omp', 'sse');
         end
 
-        castlist = {'srcpattern', 'srcpos', 'detpos', 'prop', 'workload', 'srcdir'};
+        castlist = {'srcpattern', 'srcpos', 'detpos', 'prop', 'workload', 'srcdir', 'detdir', 'sdmap'};
         for j = 1:length(castlist)
             if (isfield(varargin{1}(i), castlist{j}))
                 varargin{1}(i).(castlist{j}) = double(varargin{1}(i).(castlist{j}));

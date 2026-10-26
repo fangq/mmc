@@ -399,7 +399,10 @@ def mmclab(cfg, option=None):
              res['flux']: the fluence rate (or the output selected by cfg['outputtype']) at the
                     nodes or elements, a complex array for RF (omega>0) simulations
              res['dref']: diffuse reflectance on the surface faces, if cfg['issaveref'] is 1
-             res['jmua'], res['jd'], ...: adjoint Jacobians for the adjoint output types
+             res['jmua'], res['jd'], ...: adjoint Jacobians for the adjoint output types,
+                    [nn, Nch] on the mesh (basisorder 1) or [Nx, Ny, Nz, Ngate, Nch] in grid mode,
+                    where Nch = Ns*Nd (all source-detector pairs, detector index varying the
+                    fastest) or the rows of cfg['sdmap'] ([srcid, detid] pairs, 1-based)
              res['detp']: detected photons, a dict with detid, nscat, ppath, mom, p, v, w0,
                     prop, unitinmm and data (the raw records), as mmclab.m returns
              res['seeds']: the RNG seeds of the detected photons, one column per photon

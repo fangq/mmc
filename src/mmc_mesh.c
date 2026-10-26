@@ -2101,17 +2101,16 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
  *
  * @param[in] cfg: simulation configuration (uses outputtype, outputformat, session, rootpath)
  * @param[in] jac: float buffer holding the Jacobian (layout: [Re_J1,Re_J2,Im_J1,Im_J2]*adjlen)
- * @param[in] Ns: number of forward source slots
- * @param[in] Nd: number of detector slots
+ * @param[in] nch: number of Jacobian channels (Ns*Nd, or the rows of cfg.sdmap)
  * @param[in] isrfforward: 1 if RF mode (complex Jacobian), 0 for CW
  * @param[in] isdual: 1 for dual types (two Jacobians), 0 for single
  */
 
-void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int Ns, int Nd, int isrfforward, int isdual) {
+void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int nch, int isrfforward, int isdual) {
     char name[MAX_FULL_PATH];
     int ismesh = (cfg->method != rtBLBadouelGrid);
     size_t datalen = ismesh ? (size_t)mesh->nn : (size_t)cfg->crop0.z;
-    size_t adjlen = datalen * Ns * Nd;
+    size_t adjlen = datalen * nch;
 
     /* Jacobian component name suffixes per output type */
     const char* suffix1 = "jmua";   /* first (or only) Jacobian component */
@@ -2150,15 +2149,16 @@ void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int Ns, int Nd, in
     }
 
     /* Dimensions:
-     *   grid mode: [Nx, Ny, Nz, maxgate, Ns*Nd]      (jndim = 5)
-     *   mesh mode: [nn, Ns*Nd]                       (jndim = 2, CW only) */
+     *   grid mode: [Nx, Ny, Nz, maxgate, Nch]        (jndim = 5)
+     *   mesh mode: [nn, Nch]                         (jndim = 2, CW only)
+     * Nch: Ns*Nd, or the rows of cfg.sdmap */
     uint jdims[5];
     float jvoxsz[5];
     int jndim;
 
     if (ismesh) {
         jdims[0]  = (uint)mesh->nn;
-        jdims[1]  = (uint)(Ns * Nd);
+        jdims[1]  = (uint)nch;
         jvoxsz[0] = 1.f;
         jvoxsz[1] = 1.f;
         jndim = 2;
@@ -2167,7 +2167,7 @@ void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int Ns, int Nd, in
         jdims[1] = (uint)cfg->dim.y;
         jdims[2] = (uint)cfg->dim.z;
         jdims[3] = (uint)cfg->maxgate;
-        jdims[4] = (uint)(Ns * Nd);
+        jdims[4] = (uint)nch;
         jvoxsz[0] = cfg->steps.x;
         jvoxsz[1] = cfg->steps.y;
         jvoxsz[2] = cfg->steps.z;

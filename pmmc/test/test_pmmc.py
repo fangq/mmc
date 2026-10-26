@@ -107,6 +107,43 @@ class TestPMMCGPU(unittest.TestCase):
     def test_absorbed_fraction_cuda(self):
         self.check_absorbed("cuda")
 
+    def test_sdmap_opencl(self):
+        # cfg['sdmap'] rows [srcid, detid] (1-based) select the adjoint Jacobian channels
+        if not has_backend("opencl"):
+            self.skipTest("pmmc opencl backend is not available")
+
+        cfg = base_cfg()
+        cfg.update(
+            {
+                "compute": "opencl",
+                "gpuid": 1,
+                "nphoton": 200000,
+                "outputtype": "adjoint",
+                "basisorder": 1,
+                "detpos": np.array(
+                    [[5, 10, 0, 2], [15, 10, 0, 2], [10, 15, 0, 2]], dtype=np.float32
+                ),
+                "detdir": np.tile(np.array([0, 0, 1, 0], dtype=np.float32), (3, 1)),
+            }
+        )
+        full = pmmc.run(cfg)["jmua"]
+        cfg["sdmap"] = np.array([[1, 3], [1, 1]])
+        sub = pmmc.run(cfg)["jmua"]
+        self.assertEqual(full.shape[-1], 3)
+        self.assertEqual(sub.shape[-1], 2)
+
+        for c, k in enumerate([2, 0]):
+            # the two runs differ only by GPU run-to-run noise
+            err = np.linalg.norm(full[..., k] - sub[..., c]) / np.linalg.norm(
+                full[..., k]
+            )
+            self.assertLess(err, 0.05)
+
+        cfg["sdmap"] = np.array([[2, 1]])
+
+        with self.assertRaises(Exception):
+            pmmc.run(cfg)
+
 
 if __name__ == "__main__":
     unittest.main()

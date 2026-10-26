@@ -1648,6 +1648,11 @@ static void test_cmdedge(void) {
     EXPECT_EXIT(parse_mmc("-i -f utce.json", NULL), "both the interactive mode and an input file");
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json", NULL), "--json without a JSON fragment");
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -E utdet.mch -O A", NULL), "an adjoint output in the replay mode");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -O A --json {\"Optode\":{\"SDMap\":[[0,1]]}}", NULL), "an Optode.SDMap index below 1");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -O A --json {\"Optode\":{\"SDMap\":[[1]]}}", NULL), "an Optode.SDMap row shorter than 2");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -O A --json {\"Optode\":{\"SDMap\":[]}}", NULL), "an empty Optode.SDMap");
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 10 -M G -O A --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}],"
+                        "\"SDMap\":[[1,2]]}}", NULL), "an Optode.SDMap detector index beyond the detectors");
 
     /* the checks of mcx_validatecfg */
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Forward\":{\"T0\":1e-9,\"T1\":0,\"Dt\":1e-10}}", NULL), "a reversed time window");
@@ -2072,6 +2077,10 @@ static void test_gpubackends(void) {
         {"grid, adjoint J_mus (-O U)",       "-M G -O U", 1, 2},
         {"grid, adjoint J_musp (-O V)",      "-M G -O V", 1, 2},
         {"grid, dual adjoint (-O Q)",        "-M G -O Q", 1, 2},
+        {
+            "grid, adjoint of Optode.SDMap",    "-M G -O A --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]},"
+            "{\"Pos\":[30,20,0],\"R\":2,\"Dir\":[0,0,1]}],\"SDMap\":[[1,2],[1,1]]}}", 0, 2
+        },
         {"grid, isotropic source",           "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"isotropic\",\"Pos\":[30,45,15]}}}", 0, 1},
         {"grid, cone source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"cone\",\"Param1\":[0.4,0,0,0]}}}", 0, 1},
         {"grid, planar source",              "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"planar\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,0],\"Param2\":[0,4,0,0]}}}", 0, 1},

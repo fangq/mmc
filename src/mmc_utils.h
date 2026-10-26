@@ -244,6 +244,8 @@ typedef struct MMC_config {
     medium* prop;                  /**<optical property mapping table*/
     float4* detpos;                /**<detector positions and radius, overwrite detradius*/
     float4* detdir;               /**<detector normal directions and focal lengths for adjoint mode (Nd x 4)*/
+    unsigned int* sdmap;          /**<adjoint Jacobian channels: 0-based (source, detector) index pairs, 2*sdmaplen values; NULL for all Ns x Nd pairs*/
+    unsigned int sdmaplen;        /**<number of channels (rows) in sdmap*/
     float4 detparam1;              /**<parameters set 1 for wide-field detector*/
     float4 detparam2;              /**<parameters set 2 for wide-feild detector*/
     float* detpattern;             /**<detector pattern*/
@@ -381,6 +383,8 @@ int  mcx_loadjson(cJSON* root, mcconfig* cfg);
 void mcx_version(mcconfig* cfg);
 int  mcx_loadfromjson(char* jbuf, mcconfig* cfg);
 void mcx_prep(mcconfig* cfg);
+unsigned int mcx_jacchannels(mcconfig* cfg);
+unsigned int* mcx_getsdmap(mcconfig* cfg);
 void mcx_printheader(mcconfig* cfg);
 void mcx_cleargpuinfo(GPUInfo** gpuinfo);
 void mcx_convertcol2row(unsigned int** vol, uint3* dim);

@@ -596,12 +596,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
                 }
 
                 /* Output adjoint Jacobian in separate struct fields (flux.jmua, flux.jd, etc.).
-                 * Grid mode: shape [Nx, Ny, Nz, maxgate, Ns*Nd].
-                 * Mesh mode (basisorder=1): shape [nn, Ns*Nd] (CW, no maxgate dim). */
+                 * Grid mode: shape [Nx, Ny, Nz, maxgate, Nch].
+                 * Mesh mode (basisorder=1): shape [nn, Nch] (CW, no maxgate dim).
+                 * Nch: Ns*Nd, or the rows of cfg.sdmap */
                 if (isadjoint && cfg.exportjacob) {
-                    int Ns = (cfg.extrasrclen > cfg.detnum) ? (cfg.extrasrclen - cfg.detnum) : 1;
-                    int Nd = (cfg.detnum > 0)               ?  cfg.detnum                   : 1;
-                    int nsrcpairs = Ns * Nd;
+                    int nsrcpairs = (int)mcx_jacchannels(&cfg);
                     int isdual = MCX_IS_DUAL_ADJOINT_TYPE(cfg.outputtype);
                     mxComplexity jcplx = isrfforward ? mxCOMPLEX : mxREAL;
                     int jndim;
@@ -1401,6 +1400,38 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
             }
 
         printf("mmc.detdir=[%d,4];\n", nd);
+    } else if (strcmp(name, "sdmap") == 0) {
+        arraydim = mxGetDimensions(item);
+
+        if (cfg->sdmap) {
+            free(cfg->sdmap);
+            cfg->sdmap = NULL;
+        }
+
+        cfg->sdmaplen = 0;
+
+        if (mxGetNumberOfElements(item) == 0) {
+            return;
+        }
+
+        if (!mxIsDouble(item) || mxIsComplex(item) || arraydim[1] < 2) {
+            MEXERROR("the 'sdmap' field must be a real matrix with 2 or more columns (srcid,detid,...)");
+        }
+
+        double* val = mxGetPr(item);
+        cfg->sdmaplen = arraydim[0];
+        cfg->sdmap = (unsigned int*)malloc(sizeof(unsigned int) * 2 * cfg->sdmaplen);
+
+        for (i = 0; i < (int)cfg->sdmaplen; i++) {
+            if (val[i] < 1 || val[arraydim[0] + i] < 1) {
+                MEXERROR("the source and detector indices in 'sdmap' start from 1");
+            }
+
+            cfg->sdmap[i << 1] = (unsigned int)val[i] - 1;
+            cfg->sdmap[(i << 1) + 1] = (unsigned int)val[arraydim[0] + i] - 1;
+        }
+
+        printf("mmc.sdmap=[%d channels];\n", cfg->sdmaplen);
     } else if (strcmp(name, "nodemua") == 0) {
         /* per-node absorption coefficient array, length mesh.nn; auto-sets isnodalmua.
          * Accepts double or single precision input (matlab default vs. explicit single()). */

@@ -158,7 +158,7 @@ void mesh_build(tetmesh* mesh);
 void mesh_error(const char* msg, const char* file, const int linenum);
 void mesh_filenames(const char* format, char* foutput, mcconfig* cfg);
 void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref);
-void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int Ns, int Nd, int isrfforward, int isdual);
+void mesh_savejacob(mcconfig* cfg, tetmesh* mesh, float* jac, int nch, int isrfforward, int isdual);
 float* mesh_getmusscale(tetmesh* mesh, int ismusp);
 void mesh_loadsurf(tetmesh* mesh, mcconfig* cfg);
 int mesh_compareu64(const void* a, const void* b);

@@ -1150,11 +1150,11 @@ is more than what your have specified (%d), please use the -H option to specify 
         if (cfg->issave2pt && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method != rtBLBadouelGrid &&
                 cfg->basisorder && cfg->extrasrclen > 0 && cfg->detdir != NULL && cfg->exportfield) {
             unsigned int Ns          = (unsigned int)(cfg->extrasrclen - cfg->detnum);
-            unsigned int Nd          = (unsigned int)cfg->detnum;
+            cl_uint nch              = (cl_uint)mcx_jacchannels(cfg); /* Ns*Nd, or the rows of cfg.sdmap */
             int isdual               = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
             int isnodal_approx       = (cfg->adjointmode == 1);
             unsigned int datalen     = (unsigned int)mesh->nn;
-            size_t adjointlen        = (size_t)datalen * Ns * Nd;
+            size_t adjointlen        = (size_t)datalen * nch;
             size_t single_exportlen  = adjointlen * (isrfforward ? 2 : 1);
             size_t exportlen_adj     = single_exportlen * (isdual ? 2 : 1);
             int compute_jmua = (cfg->outputtype == otAdjoint || isdual);
@@ -1185,6 +1185,12 @@ is more than what your have specified (%d), please use the -H option to specify 
                 gcl_field_im = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * nodefield_len, cfg->exportadjoint, &status);
                 OCL_ASSERT(status);
             }
+
+            /* the 0-based (source, detector) pair of each Jacobian channel */
+            unsigned int* hsdmap = mcx_getsdmap(cfg);
+            cl_mem gcl_sdmap = clCreateBuffer(mcxcontext, RO_MEM, sizeof(cl_uint) * 2 * (nch > 0 ? nch : 1), hsdmap, &status);
+            OCL_ASSERT(status);
+            free(hsdmap);
 
             /* Upload mesh helpers */
             cl_mem gcl_elem = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int) * mesh->ne * mesh->elemlen, mesh->elem, &status);
@@ -1255,7 +1261,8 @@ is more than what your have specified (%d), please use the -H option to specify 
                 OCL_ASSERT(clSetKernelArg(kern, 4, sizeof(cl_uint), &nn_arg));
                 OCL_ASSERT(clSetKernelArg(kern, 5, sizeof(cl_uint), &maxgate_arg));
                 OCL_ASSERT(clSetKernelArg(kern, 6, sizeof(cl_uint), &Ns));
-                OCL_ASSERT(clSetKernelArg(kern, 7, sizeof(cl_uint), &Nd));
+                OCL_ASSERT(clSetKernelArg(kern, 7, sizeof(cl_mem), &gcl_sdmap));
+                OCL_ASSERT(clSetKernelArg(kern, 8, sizeof(cl_uint), &nch));
                 size_t adj_global = ((mesh->nn + adj_local - 1) / adj_local) * adj_local;
                 OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
                 OCL_ASSERT(clFinish(mcxqueue[0]));
@@ -1283,11 +1290,12 @@ is more than what your have specified (%d), please use the -H option to specify 
                 OCL_ASSERT(clSetKernelArg(kern,  8, sizeof(cl_uint), &nn_arg));
                 OCL_ASSERT(clSetKernelArg(kern,  9, sizeof(cl_uint), &maxgate_arg));
                 OCL_ASSERT(clSetKernelArg(kern, 10, sizeof(cl_uint), &Ns));
-                OCL_ASSERT(clSetKernelArg(kern, 11, sizeof(cl_uint), &Nd));
-                OCL_ASSERT(clSetKernelArg(kern, 12, sizeof(cl_uint), &elemlen_arg));
-                OCL_ASSERT(clSetKernelArg(kern, 13, sizeof(cl_int),  &isnodal_arg));
-                OCL_ASSERT(clSetKernelArg(kern, 14, sizeof(cl_mem),  gcl_medscale ? (void*)(gtype + 0) : NULL));
-                OCL_ASSERT(clSetKernelArg(kern, 15, sizeof(cl_mem),  gcl_medscale ? &gcl_medscale : NULL));
+                OCL_ASSERT(clSetKernelArg(kern, 11, sizeof(cl_mem),  &gcl_sdmap));
+                OCL_ASSERT(clSetKernelArg(kern, 12, sizeof(cl_uint), &nch));
+                OCL_ASSERT(clSetKernelArg(kern, 13, sizeof(cl_uint), &elemlen_arg));
+                OCL_ASSERT(clSetKernelArg(kern, 14, sizeof(cl_int),  &isnodal_arg));
+                OCL_ASSERT(clSetKernelArg(kern, 15, sizeof(cl_mem),  gcl_medscale ? (void*)(gtype + 0) : NULL));
+                OCL_ASSERT(clSetKernelArg(kern, 16, sizeof(cl_mem),  gcl_medscale ? &gcl_medscale : NULL));
                 size_t adj_global = ((mesh->ne + adj_local - 1) / adj_local) * adj_local;
                 OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
                 OCL_ASSERT(clFinish(mcxqueue[0]));
@@ -1302,6 +1310,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 
             clReleaseMemObject(gcl_elem);
             clReleaseMemObject(gcl_evol);
+            clReleaseMemObject(gcl_sdmap);
 
             if (gcl_deldotdel) {
                 clReleaseMemObject(gcl_deldotdel);
@@ -1367,7 +1376,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 
             if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
                 MMC_FPRINTF(cfg->flog, "saving mesh adjoint Jacobian to file ...\t");
-                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
+                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)nch, isrfforward, isdual);
                 MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
                 mcx_fflush(cfg->flog);
             }
@@ -1382,11 +1391,11 @@ is more than what your have specified (%d), please use the -H option to specify 
         if (cfg->issave2pt && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method == rtBLBadouelGrid &&
                 cfg->extrasrclen > 0 && cfg->detdir != NULL && cfg->exportfield) {
             unsigned int Ns         = (unsigned int)(cfg->extrasrclen - cfg->detnum);
-            unsigned int Nd         = (unsigned int)cfg->detnum;
+            cl_uint nch             = (cl_uint)mcx_jacchannels(cfg); /* Ns*Nd, or the rows of cfg.sdmap */
             unsigned int pure_voxels = (unsigned int)cfg->crop0.z;
             int isdual              = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
 
-            size_t adjointlen       = (size_t)pure_voxels * Ns * Nd;
+            size_t adjointlen       = (size_t)pure_voxels * nch;
             size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
             size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
 
@@ -1409,6 +1418,12 @@ is more than what your have specified (%d), please use the -H option to specify 
                 gcl_field_im = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * fieldlen, cfg->exportadjoint, &status);
                 OCL_ASSERT(status);
             }
+
+            /* the 0-based (source, detector) pair of each Jacobian channel */
+            unsigned int* hsdmap = mcx_getsdmap(cfg);
+            cl_mem gcl_sdmap = clCreateBuffer(mcxcontext, RO_MEM, sizeof(cl_uint) * 2 * (nch > 0 ? nch : 1), hsdmap, &status);
+            OCL_ASSERT(status);
+            free(hsdmap);
 
             /* Allocate zeroed output buffers for Jacobian */
             float* hzero = (float*)calloc(single_exportlen, sizeof(float));
@@ -1438,7 +1453,8 @@ is more than what your have specified (%d), please use the -H option to specify 
                 OCL_ASSERT(clSetKernelArg(adj_kern, 3, sizeof(cl_uint), &pure_voxels));
                 OCL_ASSERT(clSetKernelArg(adj_kern, 4, sizeof(cl_uint), (cl_uint*)&cfg->maxgate));
                 OCL_ASSERT(clSetKernelArg(adj_kern, 5, sizeof(cl_uint), &Ns));
-                OCL_ASSERT(clSetKernelArg(adj_kern, 6, sizeof(cl_uint), &Nd));
+                OCL_ASSERT(clSetKernelArg(adj_kern, 6, sizeof(cl_mem), &gcl_sdmap));
+                OCL_ASSERT(clSetKernelArg(adj_kern, 7, sizeof(cl_uint), &nch));
                 OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], adj_kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
                 OCL_ASSERT(clFinish(mcxqueue[0]));
                 clReleaseKernel(adj_kern);
@@ -1455,9 +1471,10 @@ is more than what your have specified (%d), please use the -H option to specify 
                 OCL_ASSERT(clSetKernelArg(dcoeff_kern, 3, sizeof(cl_uint), &pure_voxels));
                 OCL_ASSERT(clSetKernelArg(dcoeff_kern, 4, sizeof(cl_uint), (cl_uint*)&cfg->maxgate));
                 OCL_ASSERT(clSetKernelArg(dcoeff_kern, 5, sizeof(cl_uint), &Ns));
-                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 6, sizeof(cl_uint), &Nd));
-                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 7, sizeof(cl_uint), &Nx));
-                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 8, sizeof(cl_uint), &Ny));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 6, sizeof(cl_mem), &gcl_sdmap));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 7, sizeof(cl_uint), &nch));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 8, sizeof(cl_uint), &Nx));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 9, sizeof(cl_uint), &Ny));
 
                 /* J_mus/J_musp: the kernel multiplies each voxel's J_D by the factor of the medium
                    label recorded there during the simulation (merged over the devices if several) */
@@ -1488,8 +1505,8 @@ is more than what your have specified (%d), please use the -H option to specify 
                     }
                 }
 
-                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 9, sizeof(cl_mem), gcl_medscale ? (gcl_voxtype ? &gcl_voxtype : (void*)(gvoxtype + 0)) : NULL));
-                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 10, sizeof(cl_mem), gcl_medscale ? &gcl_medscale : NULL));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 10, sizeof(cl_mem), gcl_medscale ? (gcl_voxtype ? &gcl_voxtype : (void*)(gvoxtype + 0)) : NULL));
+                OCL_ASSERT(clSetKernelArg(dcoeff_kern, 11, sizeof(cl_mem), gcl_medscale ? &gcl_medscale : NULL));
                 OCL_ASSERT(clEnqueueNDRangeKernel(mcxqueue[0], dcoeff_kern, 1, NULL, &adj_global, &adj_local, 0, NULL, NULL));
                 OCL_ASSERT(clFinish(mcxqueue[0]));
                 clReleaseKernel(dcoeff_kern);
@@ -1504,6 +1521,7 @@ is more than what your have specified (%d), please use the -H option to specify 
             }
 
             OCL_ASSERT(clReleaseMemObject(gcl_field_re));
+            OCL_ASSERT(clReleaseMemObject(gcl_sdmap));
 
             if (gcl_field_im) {
                 OCL_ASSERT(clReleaseMemObject(gcl_field_im));
@@ -1559,7 +1577,7 @@ is more than what your have specified (%d), please use the -H option to specify 
 
             if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
                 MMC_FPRINTF(cfg->flog, "saving adjoint Jacobian to file ...\t");
-                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
+                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)nch, isrfforward, isdual);
                 MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
                 mcx_fflush(cfg->flog);
             }

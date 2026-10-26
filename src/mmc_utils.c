@@ -282,6 +282,8 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->isnodalmua = 0;
     cfg->isnodalmusp = 0;
     cfg->detdir = NULL;
+    cfg->sdmap = NULL;
+    cfg->sdmaplen = 0;
     cfg->exportadjoint = NULL;
     cfg->exportjacob = NULL;
     cfg->ismomentum = 0;
@@ -439,6 +441,12 @@ void mcx_clearcfg(mcconfig* cfg) {
     if (cfg->detdir) {
         free(cfg->detdir);
         cfg->detdir = NULL;
+    }
+
+    if (cfg->sdmap) {
+        free(cfg->sdmap);
+        cfg->sdmap = NULL;
+        cfg->sdmaplen = 0;
     }
 
     if (cfg->nodemua) {
@@ -2593,6 +2601,39 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         }
     }
 
+    /* adjoint Jacobian channels: [[srcid,detid,...],...], 1-based; extra columns are ignored */
+    if (Optode) {
+        cJSON* sdmap = FIND_JSON_OBJ("SDMap", "Optode.SDMap", Optode);
+
+        if (sdmap) {
+            cJSON* row = sdmap->child;
+
+            if (!cJSON_IsArray(sdmap) || row == NULL) {
+                MMC_ERROR(-1, "Optode.SDMap must be a non-empty array of [srcid, detid] arrays");
+            }
+
+            if (cfg->sdmap) {
+                free(cfg->sdmap);
+            }
+
+            cfg->sdmaplen = cJSON_GetArraySize(sdmap);
+            cfg->sdmap = (unsigned int*)malloc(sizeof(unsigned int) * 2 * cfg->sdmaplen);
+
+            for (unsigned int ir = 0; ir < cfg->sdmaplen && row; ir++, row = row->next) {
+                if (!cJSON_IsArray(row) || cJSON_GetArraySize(row) < 2) {
+                    MMC_ERROR(-1, "each row of Optode.SDMap must be an array of at least 2 numbers");
+                }
+
+                if (row->child->valuedouble < 1 || row->child->next->valuedouble < 1) {
+                    MMC_ERROR(-1, "Optode.SDMap source and detector indices start from 1");
+                }
+
+                cfg->sdmap[ir << 1] = (unsigned int)row->child->valuedouble - 1;
+                cfg->sdmap[(ir << 1) + 1] = (unsigned int)row->child->next->valuedouble - 1;
+            }
+        }
+    }
+
     if (cfg->meshtag[0] == '\0' && cfg->nodenum == 0) {
         MMC_ERROR(-1, "You must specify mesh files");
     }
@@ -3087,6 +3128,19 @@ void mcx_savejdata(char* filename, mcconfig* cfg) {
         cJSON_AddItemToArray(sub, tmp = cJSON_CreateObject());
         cJSON_AddItemToObject(tmp, "Pos", cJSON_CreateFloatArray(&(cfg->detpos[i].x), 3));
         cJSON_AddNumberToObject(tmp, "R", cfg->detpos[i].w);
+
+        if (cfg->detdir) {
+            cJSON_AddItemToObject(tmp, "Dir", cJSON_CreateFloatArray(&(cfg->detdir[i].x), 4));
+        }
+    }
+
+    if (cfg->sdmap && cfg->sdmaplen) {
+        cJSON_AddItemToObject(obj, "SDMap", sub = cJSON_CreateArray());
+
+        for (i = 0; i < (int)cfg->sdmaplen; i++) {
+            int pair[2] = {(int)cfg->sdmap[i << 1] + 1, (int)cfg->sdmap[(i << 1) + 1] + 1};
+            cJSON_AddItemToArray(sub, cJSON_CreateIntArray(pair, 2));
+        }
     }
 
     /* save "Shapes" constructs, containing InitElem, MeshNode, MeshElem, and MeshROI */
@@ -4337,6 +4391,48 @@ void mcx_prep(mcconfig* cfg) {
         }
     }
 
+    /* the Jacobian channels (Optode.SDMap/cfg.sdmap) index the forward sources and the detectors */
+    if (cfg->sdmap && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->extrasrclen > cfg->detnum) {
+        unsigned int Ns = (unsigned int)(cfg->extrasrclen - cfg->detnum);
+
+        for (unsigned int i = 0; i < cfg->sdmaplen; i++) {
+            if (cfg->sdmap[i << 1] >= Ns || cfg->sdmap[(i << 1) + 1] >= (unsigned int)cfg->detnum) {
+                MMC_ERROR(-6, "cfg.sdmap/Optode.SDMap contains a source or detector index out of range (both start from 1)");
+            }
+        }
+    }
+}
+
+/**
+ * @brief Return the number of adjoint Jacobian channels
+ *
+ * the rows of cfg.sdmap/Optode.SDMap if given, otherwise every source/detector pair (Ns*Nd);
+ * only valid after the detectors are appended as adjoint sources
+ * @param[in] cfg: simulation configuration
+ */
+
+unsigned int mcx_jacchannels(mcconfig* cfg) {
+    return (cfg->sdmap) ? cfg->sdmaplen : (unsigned int)((cfg->extrasrclen - cfg->detnum) * cfg->detnum);
+}
+
+/**
+ * @brief Return the 0-based (source, detector) pair of each adjoint Jacobian channel
+ *
+ * a copy of cfg.sdmap if given, otherwise all pairs with the detector index varying the fastest;
+ * the caller frees the returned buffer of 2*mcx_jacchannels(cfg) values
+ * @param[in] cfg: simulation configuration
+ */
+
+unsigned int* mcx_getsdmap(mcconfig* cfg) {
+    unsigned int nch = mcx_jacchannels(cfg), Nd = (unsigned int)cfg->detnum;
+    unsigned int* sdmap = (unsigned int*)malloc(sizeof(unsigned int) * 2 * (nch > 0 ? nch : 1));
+
+    for (unsigned int i = 0; i < nch; i++) {
+        sdmap[i << 1]       = (cfg->sdmap) ? cfg->sdmap[i << 1] : i / Nd;
+        sdmap[(i << 1) + 1] = (cfg->sdmap) ? cfg->sdmap[(i << 1) + 1] : i % Nd;
+    }
+
+    return sdmap;
 }
 
 #ifndef MCX_CONTAINER

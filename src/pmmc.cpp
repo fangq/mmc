@@ -667,6 +667,44 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         std::cout << "detdir: [" << nd << ",4]" << std::endl;
     }
 
+    if (user_cfg.contains("sdmap")) {
+        auto f_style_volume = py::array_t < double, py::array::f_style | py::array::forcecast >::ensure(user_cfg["sdmap"]);
+
+        if (!f_style_volume) {
+            throw py::value_error("Invalid sdmap field value");
+        }
+
+        auto buffer_info = f_style_volume.request();
+
+        if (mcx_config.sdmap) {
+            free(mcx_config.sdmap);
+            mcx_config.sdmap = nullptr;
+        }
+
+        mcx_config.sdmaplen = 0;
+
+        if (buffer_info.size > 0) {
+            if ((buffer_info.shape.size() > 1 && buffer_info.shape.at(1) < 2) || (buffer_info.shape.size() == 1 && buffer_info.shape.at(0) < 2) || buffer_info.shape.size() > 2) {
+                throw py::value_error("the 'sdmap' field must have 2 or more columns (srcid,detid,...)");
+            }
+
+            unsigned int nch = (buffer_info.shape.size() == 1) ? 1 : buffer_info.shape.at(0);
+            auto val = static_cast<double*>(buffer_info.ptr);
+
+            mcx_config.sdmap = (unsigned int*) malloc(sizeof(unsigned int) * 2 * nch);
+            mcx_config.sdmaplen = nch;
+
+            for (unsigned int i = 0; i < nch; i++) {
+                if (val[i] < 1 || val[nch + i] < 1) {
+                    throw py::value_error("the source and detector indices in 'sdmap' start from 1");
+                }
+
+                mcx_config.sdmap[i << 1] = (unsigned int)val[i] - 1;
+                mcx_config.sdmap[(i << 1) + 1] = (unsigned int)val[nch + i] - 1;
+            }
+        }
+    }
+
     /* per-node optical properties: cfg.nodemua / cfg.nodemusp are length-nn float arrays.
      * Either array's presence auto-sets the corresponding isnodal* flag. */
     if (user_cfg.contains("nodemua")) {
@@ -1289,12 +1327,11 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             }
 
             /* Output adjoint Jacobian in separate dict fields (output["jmua"], output["jd"], etc.).
-             * Grid mode: shape [Nx, Ny, Nz, maxgate, Ns*Nd].
-             * Mesh mode (basisorder=1): shape [nn, Ns*Nd] (CW, no maxgate dim). */
+             * Grid mode: shape [Nx, Ny, Nz, maxgate, Nch].
+             * Mesh mode (basisorder=1): shape [nn, Nch] (CW, no maxgate dim).
+             * Nch: Ns*Nd, or the rows of cfg['sdmap'] */
             if (isadjoint && mcx_config.exportjacob) {
-                int Ns = (mcx_config.extrasrclen > mcx_config.detnum) ? (mcx_config.extrasrclen - mcx_config.detnum) : 1;
-                int Nd = (mcx_config.detnum > 0)                      ?  mcx_config.detnum                          : 1;
-                int nsrcpairs = Ns * Nd;
+                int nsrcpairs = (int)mcx_jacchannels(&mcx_config);
                 int isdual = MCX_IS_DUAL_ADJOINT_TYPE(mcx_config.outputtype);
                 size_t adjlen;
                 std::vector<size_t> jdims;

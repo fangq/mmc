@@ -1085,13 +1085,13 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
         if (cfg->issave2pt && MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->method != rtBLBadouelGrid &&
                 cfg->basisorder && cfg->extrasrclen > 0 && cfg->detdir != NULL && cfg->exportfield) {
             unsigned int Ns = (unsigned int)(cfg->extrasrclen - cfg->detnum);
-            unsigned int Nd = (unsigned int)cfg->detnum;
+            unsigned int nch = mcx_jacchannels(cfg);   /* Ns*Nd, or the rows of cfg.sdmap */
             int isdual  = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
             int isnodal_approx = (cfg->adjointmode == 1);    /* nodal-adjoint approximation */
             /* output domain: node-based for both basisorder=1 full FEM (after elem→node scatter)
              * and the nodal approximation; element-based not currently exposed in mesh mode */
             unsigned int datalen = (unsigned int)mesh->nn;
-            size_t adjointlen = (size_t)datalen * Ns * Nd;
+            size_t adjointlen = (size_t)datalen * nch;
             size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
             size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
 
@@ -1179,12 +1179,18 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
             size_t adjblocksize = 256;
 
+            /* the 0-based (source, detector) pair of each Jacobian channel */
+            unsigned int* hsdmap = mcx_getsdmap(cfg), *gsdmap_cu = NULL;
+            CUDA_ASSERT(cudaMalloc((void**)&gsdmap_cu, sizeof(unsigned int) * 2 * (nch > 0 ? nch : 1)));
+            CUDA_ASSERT(cudaMemcpy(gsdmap_cu, hsdmap, sizeof(unsigned int) * 2 * nch, cudaMemcpyHostToDevice));
+            free(hsdmap);
+
             if (isnodal_approx && compute_jmua) {
                 /* nodal approximation J_mua kernel: one thread per node */
                 size_t adjgridsize = ((size_t)mesh->nn + adjblocksize - 1) / adjblocksize;
                 mmc_adjoint_mesh_nodal_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
                     gfield_re_cu, gfield_im_cu, gnvol_jac, gjmua_cu,
-                    (unsigned int)mesh->nn, (unsigned int)cfg->maxgate, Ns, Nd);
+                    (unsigned int)mesh->nn, (unsigned int)cfg->maxgate, Ns, gsdmap_cu, nch);
                 CUDA_ASSERT(cudaDeviceSynchronize());
             }
 
@@ -1207,7 +1213,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                     (isnodal_approx ? NULL : gjmua_cu),  /* skip J_mua here if nodal-approx already ran */
                     gjd_cu,
                     (unsigned int)mesh->ne, (unsigned int)mesh->nn, (unsigned int)cfg->maxgate,
-                    Ns, Nd, (unsigned int)mesh->elemlen,
+                    Ns, gsdmap_cu, nch, (unsigned int)mesh->elemlen,
                     /*isnodal*/ 1, gtype, gmedscale_cu);
                 CUDA_ASSERT(cudaDeviceSynchronize());
 
@@ -1224,6 +1230,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
             CUDA_ASSERT(cudaFree(gelem_jac));
             CUDA_ASSERT(cudaFree(gevol_jac));
+            CUDA_ASSERT(cudaFree(gsdmap_cu));
 
             if (gdeldotdel_jac) {
                 CUDA_ASSERT(cudaFree(gdeldotdel_jac));
@@ -1290,7 +1297,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
             if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
                 MMC_FPRINTF(cfg->flog, "saving mesh adjoint Jacobian to file ...\t");
-                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
+                mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)nch, isrfforward, isdual);
                 MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
                 mcx_fflush(cfg->flog);
             }
@@ -1485,11 +1492,11 @@ void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fie
     }
 
     unsigned int Ns = (unsigned int)(cfg->extrasrclen - cfg->detnum);
-    unsigned int Nd = (unsigned int)cfg->detnum;
+    unsigned int nch = mcx_jacchannels(cfg);   /* Ns*Nd, or the rows of cfg.sdmap */
     unsigned int pure_voxels = (unsigned int)cfg->crop0.z;
     int isdual  = MCX_IS_DUAL_ADJOINT_TYPE(cfg->outputtype);
 
-    size_t adjointlen = (size_t)pure_voxels * Ns * Nd;
+    size_t adjointlen = (size_t)pure_voxels * nch;
     size_t single_exportlen = adjointlen * (isrfforward ? 2 : 1);
     size_t exportlen_adj    = single_exportlen * (isdual ? 2 : 1);
 
@@ -1530,11 +1537,17 @@ void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fie
     size_t adjblocksize = 256;
     size_t adjgridsize  = (pure_voxels + (unsigned int)adjblocksize - 1) / adjblocksize;
 
+    /* the 0-based (source, detector) pair of each Jacobian channel */
+    unsigned int* hsdmap = mcx_getsdmap(cfg), *gsdmap_cu = NULL;
+    CUDA_ASSERT(cudaMalloc((void**)&gsdmap_cu, sizeof(unsigned int) * 2 * (nch > 0 ? nch : 1)));
+    CUDA_ASSERT(cudaMemcpy(gsdmap_cu, hsdmap, sizeof(unsigned int) * 2 * nch, cudaMemcpyHostToDevice));
+    free(hsdmap);
+
     if (isdual || cfg->outputtype == otAdjoint) {
         mmc_adjoint_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
             gfield_re_cu, gfield_im_cu,
             isdual ? gadjoint_mua_cu : gadjoint_tmp_cu,
-            pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd);
+            pure_voxels, (unsigned int)cfg->maxgate, Ns, gsdmap_cu, nch);
         CUDA_ASSERT(cudaDeviceSynchronize());
     }
 
@@ -1552,7 +1565,7 @@ void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fie
 
         mmc_adjoint_dcoeff_kernel <<< (unsigned int)adjgridsize, (unsigned int)adjblocksize>>>(
             gfield_re_cu, gfield_im_cu, gadjoint_tmp_cu,
-            pure_voxels, (unsigned int)cfg->maxgate, Ns, Nd,
+            pure_voxels, (unsigned int)cfg->maxgate, Ns, gsdmap_cu, nch,
             (unsigned int)cfg->dim.x, (unsigned int)cfg->dim.y,
             gvoxtype, gmedscale_cu);
         CUDA_ASSERT(cudaDeviceSynchronize());
@@ -1563,6 +1576,7 @@ void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fie
     }
 
     CUDA_ASSERT(cudaFree(gfield_re_cu));
+    CUDA_ASSERT(cudaFree(gsdmap_cu));
 
     if (gfield_im_cu) {
         CUDA_ASSERT(cudaFree(gfield_im_cu));
@@ -1619,7 +1633,7 @@ void mmc_cu_adjoint_grid(mcconfig* cfg, tetmesh* mesh, double* field, size_t fie
 
     if (cfg->issave2pt && cfg->parentid == mpStandalone && cfg->exportjacob) {
         MMC_FPRINTF(cfg->flog, "saving adjoint Jacobian to file ...\t");
-        mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)Ns, (int)Nd, isrfforward, isdual);
+        mesh_savejacob(cfg, mesh, cfg->exportjacob, (int)nch, isrfforward, isdual);
         MMC_FPRINTF(cfg->flog, "saving Jacobian complete : %d ms\n\n", GetTimeMillis() - tic);
         mcx_fflush(cfg->flog);
     }
