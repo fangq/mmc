@@ -36,6 +36,12 @@ ap.add_argument(
 )
 ap.add_argument("-n", "--cases", type=int, default=200, help="number of cases [200]")
 ap.add_argument("--seed", type=int, default=1, help="fuzzer RNG seed [1]")
+ap.add_argument(
+    "--skip",
+    type=int,
+    default=0,
+    help="generate but do not run the first SKIP cases, to resume a round [0]",
+)
 ap.add_argument("--out", default="fuzzout", help="output folder [fuzzout]")
 ap.add_argument("--timeout", type=float, default=60, help="seconds per run [60]")
 opt = ap.parse_args()
@@ -259,7 +265,7 @@ def mutate_json(d):
     if isinstance(d.get("Forward"), dict) and rng.random() < 0.15:
         d["Forward"].update(
             rng.choice(
-                [{"T1": 1e-6}, {"Dt": 1e-11}, {"T1": 5e-11, "Dt": 1e-11}, {"T0": 1e-9}]
+                [{"T1": 1e-7}, {"Dt": 1e-11}, {"T1": 5e-11, "Dt": 1e-11}, {"T0": 1e-9}]
             )
         )
 
@@ -317,6 +323,10 @@ for c in range(opt.cases):
         + opt.extra.split()
         + mutate_cli()
     )
+
+    if c < opt.skip:
+        continue
+
     wd = os.path.join(opt.out, "w")
     shutil.rmtree(wd, ignore_errors=True)
     os.makedirs(wd)
