@@ -4115,12 +4115,13 @@ void mcx_validatecfg(mcconfig* cfg) {
 
     /* the optical properties the kernel divides by and takes logarithms of: a
        refractive index of nought (a "1.37" written as a string reads as 0) or
-       an infinite scattering coefficient has every photon step forever */
+       an infinite scattering coefficient has every photon step forever; so does an index ratio whose square
+       overflows a float in the Fresnel and Snell terms (n=1e30 outside a tissue of n=1.37) */
     for (uint i = 0; i < cfg->medianum; i++) {
         if (!isfinite(cfg->prop[i].mua) || !isfinite(cfg->prop[i].mus) || !isfinite(cfg->prop[i].g) || !isfinite(cfg->prop[i].n) ||
-                cfg->prop[i].mua < 0.f || cfg->prop[i].mus < 0.f || cfg->prop[i].n <= 0.f || fabsf(cfg->prop[i].g) > 1.f) {
+                cfg->prop[i].mua < 0.f || cfg->prop[i].mus < 0.f || cfg->prop[i].n < 1e-6f || cfg->prop[i].n > 1e6f || fabsf(cfg->prop[i].g) > 1.f) {
             char msg[MAX_PATH_LENGTH];
-            snprintf(msg, MAX_PATH_LENGTH, "medium %u: mua and mus must be finite and non-negative, g within [-1,1], and n positive (got %g %g %g %g)",
+            snprintf(msg, MAX_PATH_LENGTH, "medium %u: mua and mus must be finite and non-negative, g within [-1,1], and n within [1e-6,1e6] (got %g %g %g %g)",
                      i, cfg->prop[i].mua, cfg->prop[i].mus, cfg->prop[i].g, cfg->prop[i].n);
             MMC_ERROR(-1, msg);
         }

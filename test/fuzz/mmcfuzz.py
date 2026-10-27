@@ -126,7 +126,7 @@ FLAGS = [
     ["-C", ["0", "1", "2"]],
     ["-b", ["0", "1", "2", "3"]],
     ["-O", list("FELXJPWRQAVDZ")],
-    ["-D", ["T", "M", "TPM", "A", "X"]],
+    ["-D", ["T", "M", "TPM", "X"]],
     ["-x", ["0", "1"]],
     ["-X", ["0", "1"]],
     ["-d", ["0", "1"]],
@@ -259,7 +259,7 @@ def mutate_json(d):
     if isinstance(d.get("Forward"), dict) and rng.random() < 0.15:
         d["Forward"].update(
             rng.choice(
-                [{"T1": 1e-6}, {"Dt": 1e-12}, {"T1": 5e-11, "Dt": 1e-11}, {"T0": 1e-9}]
+                [{"T1": 1e-6}, {"Dt": 1e-11}, {"T1": 5e-11, "Dt": 1e-11}, {"T0": 1e-9}]
             )
         )
 

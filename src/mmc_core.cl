@@ -1197,7 +1197,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #endif
         r->pout = r->p0 + FL3(Lmin) * r->vec;
 
-        if ((int)((r->photontimer + r->Lmove * (prop.n * R_C0) - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep)) > GPU_PARAM(gcfg, maxgate) - 1) { /*exit time window*/
+        if ((int)((r->photontimer + r->Lmove * (prop.n * R_C0) - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep)) > (int)GPU_PARAM(gcfg, maxgate) - 1) { /*exit time window; signed: before T0 the gate is negative*/
             r->faceid = -2;
             r->pout.x = MMC_UNDEFINED;
             r->Lmove = fmax((gcfg->tend - r->photontimer) / (prop.n * R_C0) - 1e-4f, 0.f); /* never backwards in time */
@@ -1230,9 +1230,9 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         r->photontimer += r->Lmove * (prop.n * R_C0);
 
         if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP)) {
-            tshift = MIN( ((int)(replaytime[r->photonid] * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
+            tshift = MIN( ((int)(replaytime[r->photonid] * GPU_PARAM(gcfg, Rtstep))), (int)GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
         } else {
-            tshift = MIN(max((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, framelen);
+            tshift = MIN(max((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), (int)GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, framelen);
         }
 
         {
@@ -1461,6 +1461,10 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                          (S.y > 0.f) ? __float2int_rd(S.y * GPU_PARAM(gcfg, dstep)) : 0,
                                          (S.z > 0.f) ? __float2int_rd(S.z * GPU_PARAM(gcfg, dstep)) : 0);
 #endif
+                    /* and below the grid's upper corner, as on the CPU: a midpoint can round out of it */
+                    idx.x = min(idx.x, (int)gcfg->crop0.x - 1);
+                    idx.y = min(idx.y, (int)(gcfg->crop0.y / gcfg->crop0.x) - 1);
+                    idx.z = min(idx.z, (int)(gcfg->crop0.z / gcfg->crop0.y) - 1);
                     uint newidx = (idx.z * gcfg->crop0.y + idx.y * gcfg->crop0.x + idx.x) + tshift + src_slot_offset;
                     r->oldidx = (r->oldidx == ID_UNDEFINED) ? newidx : r->oldidx;
 
@@ -2520,7 +2524,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #ifdef MCX_SAVE_DREF
 
                 if (GPU_PARAM(gcfg, issaveref) && r.eid < 0 && dref) {
-                    int tshift = MIN(max((int)((r.photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, nf);
+                    int tshift = MIN(max((int)((r.photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), (int)GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, nf);
                     /* many threads exit through the same faces near the source; a plain += loses updates */
 #ifdef USE_ATOMIC
                     atomicadd(dref + ((-r.eid) - 1) + tshift, r.weight);

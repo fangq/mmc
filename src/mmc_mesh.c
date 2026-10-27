@@ -1961,7 +1961,7 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
             int* elems = tracer->mesh->elem + i * tracer->mesh->elemlen;   // element node indices
             int* enb = tracer->mesh->facenb + i * tracer->mesh->elemlen;   // check facenb, find surface faces
 
-            if (tracer->mesh->type[i] <= 0) { // only the surface of the tissue matters, see mesh_validate
+            if (tracer->mesh->type[i] <= 0 || tracer->mesh->type[i] > tracer->mesh->prop) { // only the surface of the tissue matters (not a wide-field detector's prop+1), see mesh_validate
                 continue;
             }
 
@@ -1986,6 +1986,12 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg) {
                 tracer->mesh->nvol[i] = -tracer->mesh->nvol[i];
             }
         }
+    }
+
+    /* the face (slab) iMMC tests and their Fresnel normals use the face normals tracer->n, which the
+       Havel and Badouel tracers do not compute */
+    if (cfg->implicit == 2 && tracer->n == NULL) {
+        MESH_ERROR("face iMMC needs the Plucker (-M P), branch-less Badouel (-M S) or dual-grid (-M G) ray-tracer");
     }
 
     // iMMC: the post-hit offset, and the per-element lists of the edge/node ROI primitives

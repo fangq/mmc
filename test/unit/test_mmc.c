@@ -1753,6 +1753,9 @@ static void test_cmdedge(void) {
                                 "\"Dir\":[[0,0,1],[0,0,1]]}}}", NULL), "mmc_validate_config: a source ID beyond the sources");
     parse_mmc("--bench dmmc-cube60 -E -1", NULL);
     EXPECT_TRUE(1, "a negative seed is replaced by the time");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Domain\":{\"Media\":[{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1e30},"
+                          "{\"mua\":0.005,\"mus\":1,\"g\":0.01,\"n\":1.37}]}}", NULL), "a refractive index whose square overflows a float");
+    EXPECT_EXIT(run_mmc("--bench faceimmc -G -1 -n 10 -M H", NULL), "face iMMC with the Havel ray-tracer (no face normals)");
 
 #ifdef USE_OPENCL
 
