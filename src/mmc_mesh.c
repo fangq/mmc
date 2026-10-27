@@ -709,6 +709,10 @@ void mesh_checkelem(tetmesh* mesh, mcconfig* cfg) {
         }
     }
 
+    if (mesh->ne == 0 && cfg->compute != cbOptiX) {    /* only OptiX traces a surface-only mesh */
+        MESH_ERROR("the mesh has no elements (MeshElem)");
+    }
+
     if (mesh->ne > 0 && cfg->e0 > mesh->ne) {
         snprintf(msg, MAX_PATH_LENGTH, "InitElem is %d, but the mesh has %d elements", cfg->e0, mesh->ne);
         MESH_ERROR(msg);
@@ -817,6 +821,10 @@ void mesh_loadroi(tetmesh* mesh, mcconfig* cfg) {
             mesh->faceroi = (float*)malloc(sizeof(float) * row * col);
             pe = mesh->faceroi;
             cfg->implicit = 2;
+        }
+
+        if (cfg->roidatalen != (size_t)row * col) {    /* one row per element (edge, face) or node */
+            MESH_ERROR("Mesh.MeshROI must have one row per element (edge or face ROI) or one value per node (node ROI)");
         }
 
         memcpy(pe, cfg->roidata, sizeof(float) * row * col);
@@ -1524,7 +1532,8 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
     int i, j, k, n, nedge = 0, nnode, np = 0, ne = mesh->ne, len, cap, dim[3], ncell;
     int* cellbeg, *cellprim, *seen, *list;
     roiedge* edge = NULL;
-    float* pl, *lo = &mesh->nmin.x, h;
+    float* pl;
+    double h, lo[3] = {1e300, 1e300, 1e300}, ext[3] = {-1e300, -1e300, -1e300};
 
     free(mesh->roioff);
     free(mesh->roilist);
@@ -1605,21 +1614,42 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
     free(edge);
 
     /* a uniform grid of about one cell per element (at most 2^22 cells) holding the primitive boxes */
-    h = cbrtf((mesh->nmax.x - lo[0]) * (mesh->nmax.y - lo[1]) * (mesh->nmax.z - lo[2]) / MAX(MIN(ne, 1 << 22), 1));
-    h = MAX(h, 1e-6f * MAX(mesh->nmax.x - lo[0], MAX(mesh->nmax.y - lo[1], mesh->nmax.z - lo[2])));
+    for (i = 0; i < mesh->nn; i++) {    /* the bounding box of the nodes, in double: a float extent can overflow */
+        for (j = 0; j < 3; j++) {
+            lo[j] = MIN(lo[j], (double)(&mesh->node[i].x)[j]);
+            ext[j] = MAX(ext[j], (double)(&mesh->node[i].x)[j]);
+        }
+    }
 
-    do {
-        for (j = 0, ncell = 1; j < 3; j++) {
-            dim[j] = (int)(((&mesh->nmax.x)[j] - lo[j]) / h) + 1;
-            ncell *= dim[j];
+    for (j = 0; j < 3; j++) {
+        lo[j] = (mesh->nn > 0) ? lo[j] : 0.0;
+        ext[j] = (mesh->nn > 0) ? ext[j] - lo[j] : 0.0;
+    }
+
+    h = cbrt(ext[0] * ext[1] * ext[2] / MAX(MIN(ne, 1 << 22), 1));
+    h = MAX(h, 1e-6 * MAX(ext[0], MAX(ext[1], ext[2])));
+    h = (h > 0.0) ? h : 1.0;    /* a mesh of zero extent: one cell */
+
+    for (;;) {    /* the cell count in double: a flat or huge box overflows an int */
+        double nc = 1.0;
+
+        for (j = 0; j < 3; j++) {
+            nc *= floor(ext[j] / h) + 1.0;
         }
 
-        h *= 1.25f;
-    } while (ncell > (1 << 22));
+        if (nc <= (double)(1 << 22)) {
+            break;
+        }
 
-    h /= 1.25f;
+        h *= 1.25;
+    }
 
-#define ROI_CELL(v, j) MIN(MAX((int)(((v) - lo[j]) / h), 0), dim[j] - 1)
+    for (j = 0, ncell = 1; j < 3; j++) {
+        dim[j] = (int)floor(ext[j] / h) + 1;
+        ncell *= dim[j];
+    }
+
+#define ROI_CELL(v, j) ((int)MIN(MAX(((double)(v) - lo[j]) / h, 0.0), (double)(dim[j] - 1)))    /* clamped before the cast: far-away primitives */
 #define ROI_PAD(d) ((d)[3] > 0.f ? (d)[3] : -(d)[3]) * 1.0001f + mesh->roieps
 
     cellbeg = (int*)calloc(ncell + 1, sizeof(int));

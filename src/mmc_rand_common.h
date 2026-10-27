@@ -97,8 +97,9 @@ inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN], float* si, floa
         pos = 0;
     }
 
-    *si = sine[0].f[pos];
-    *co = cosine[0].f[pos++];
+    *si = sine[pos >> 2].f[pos & 3];    /* element pos of the buffer, not past sine[0] */
+    *co = cosine[pos >> 2].f[pos & 3];
+    pos++;
 }
 
 //! generate [0,1] random number for the next scattering length
@@ -123,7 +124,8 @@ inlinefun float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]) {
         pos = 0;
     }
 
-    res = ((logval[0].f[pos] != logval[0].f[pos]) ? LOG_RNG_MAX : (-logval[0].f[pos]));
+    res = logval[pos >> 2].f[pos & 3];
+    res = ((res != res) ? LOG_RNG_MAX : (-res));
     pos++;
     return res;
 }

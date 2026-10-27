@@ -31,6 +31,7 @@
 
 #include <set>
 #include <list>
+#include <map>
 #include <vector>
 #include <unordered_map>
 #include <array>
@@ -53,45 +54,28 @@ const int facelist[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
     extern "C"
 #endif
 void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
-    int pos, n1, n2, oldnn = mesh->nn;
-    unsigned int setlen;
-    int* ee;
-
-    std::set< std::pair<int, int> > edgeset;
-    std::set< std::pair<int, int> >::iterator iset;
-    std::list <std::pair<int, int> > edgelist;
-    std::list <std::pair<int, int> >::iterator it;
-
-    std::pair<int, int> edge;
-    it = edgelist.begin();
-    iset = edgeset.begin();
+    int oldnn = mesh->nn;
+    std::map< std::pair<int, int>, int > edgeidx;     /* edge (1-based node ids, low first) -> index of its mid-node */
+    std::vector< std::pair<int, int> > edgelist;
 
     if (mesh->elem2 == NULL) {
         mesh->elem2 = (int*)calloc(sizeof(int) * TETEDGE, mesh->ne);
     }
 
-    for (int eid = 0; eid < mesh->ne; eid++)
-        for (int ed = 0; ed < TETEDGE; ed++) {
-            ee = (int*)(&mesh->elem[eid]);
-            n1 = MIN(ee[edgepair[ed][0]], ee[edgepair[ed][1]]);
-            n2 = MAX(ee[edgepair[ed][0]], ee[edgepair[ed][1]]);
-            edge = std::make_pair(n1, n2);
-            setlen = edgeset.size();
-            edgeset.insert(iset, edge);
+    for (int eid = 0; eid < mesh->ne; eid++) {
+        int* ee = mesh->elem + eid * mesh->elemlen;
 
-            if (setlen < edgeset.size()) { // if no previous edge
-                edgelist.insert(it, edge);
-                pos = edgelist.size() - 1;
-            } else {
-                std::list< std::pair<int, int> >::iterator edidx =
-                    std::find(edgelist.begin(), edgelist.end(), edge);
-                pos = std::distance( edgelist.begin(), edidx) ;
+        for (int ed = 0; ed < TETEDGE; ed++) {
+            std::pair<int, int> edge = std::make_pair(MIN(ee[edgepair[ed][0]], ee[edgepair[ed][1]]), MAX(ee[edgepair[ed][0]], ee[edgepair[ed][1]]));
+            std::pair<std::map< std::pair<int, int>, int >::iterator, bool> res = edgeidx.insert(std::make_pair(edge, (int)edgelist.size()));
+
+            if (res.second) {
+                edgelist.push_back(edge);
             }
 
-            mesh->elem2[eid * TETEDGE + ed] = pos;
+            mesh->elem2[eid * TETEDGE + ed] = res.first->second;
         }
-
-    pos = 0;
+    }
 
     mesh->nn += edgelist.size();
 
@@ -102,16 +86,17 @@ void mesh_10nodetet(tetmesh* mesh, mcconfig* cfg) {
         cfg->node = mesh->node;
         cfg->nodenum = mesh->nn;
     }
-    mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * mesh->nn * cfg->maxgate);
-    memset(mesh->weight, 0, sizeof(double)*mesh->nn * cfg->maxgate); // if mesh->weight is filled, need to allocate a new buffer, and copy the old buffer gate by gate
 
-    for (it = edgelist.begin(); it != edgelist.end(); it++) {
-        for (int i = 0; i < 3; i++) {
-            ((float*)(&mesh->node[oldnn + pos]))[i] =
-                (((float*)(&mesh->node[it->first]))[i] + ((float*)(&mesh->node[it->second]))[i]) * 0.5f;
-        }
+    /* one slot per source or pattern, as mesh_loadelem allocates it */
+    size_t wlen = (size_t)mesh->nn * cfg->maxgate * ((cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum);
+    mesh->weight = (double*)realloc((void*)mesh->weight, sizeof(double) * wlen);
+    memset(mesh->weight, 0, sizeof(double) * wlen);
 
-        pos++;
+    for (size_t k = 0; k < edgelist.size(); k++) {    /* the mid-node of each edge; node ids are 1-based */
+        FLOAT3* a = mesh->node + edgelist[k].first - 1, *b = mesh->node + edgelist[k].second - 1, *m = mesh->node + oldnn + k;
+        m->x = (a->x + b->x) * 0.5f;
+        m->y = (a->y + b->y) * 0.5f;
+        m->z = (a->z + b->z) * 0.5f;
     }
 }
 

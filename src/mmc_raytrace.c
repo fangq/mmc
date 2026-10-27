@@ -460,10 +460,10 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->ne;
             } else {
-                tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->ne;
+                tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->ne;
             }
 
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0) { /* no fluence in non-tissue (label<=0) elements, as mcx never deposits in label-0 voxels */
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) { /* no fluence in non-tissue (label<=0) elements, as mcx never deposits in label-0 voxels, nor before the time window */
                 if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                     #pragma omp atomic
                     tracer->mesh->weight[eid + tshift] += ww;
@@ -500,7 +500,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                     if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
                         tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->nn;
                     } else {
-                        tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->nn;
+                        tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->nn;
                     }
 
                     if (cfg->debuglevel & dlAccum) {
@@ -516,7 +516,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                         }
                     }
 
-                    if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0) {
+                    if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
                         if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                             for (i = 0; i < 4; i++) {
                                 #pragma omp atomic
@@ -736,7 +736,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             } else {
-                tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
+                tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             }
 
             if (cfg->debuglevel & dlAccum) {
@@ -801,7 +801,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             //if(cfg->debuglevel&dlBary)
             //    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0) {
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
                 if (!cfg->basisorder) {
                     if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                         #pragma omp atomic
@@ -975,7 +975,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             } else {
-                tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
+                tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             }
 
             if (cfg->debuglevel & dlAccum) {
@@ -987,7 +987,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->p0.y += r->Lmove * r->vec.y;
             r->p0.z += r->Lmove * r->vec.z;
 
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0) {
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
                 if (!cfg->basisorder) {
                     if (cfg->isatomic)
                         #pragma omp atomic
@@ -1635,7 +1635,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
             if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * framelen;
             } else {
-                tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * framelen;
+                tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * framelen;
             }
 
             if (cfg->debuglevel & dlAccum) {
@@ -1664,7 +1664,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
             T = _mm_add_ps(S, _mm_mul_ps(O, T));
             _mm_store_ps(&(r->p0.x), T);
 
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0) {
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
                 if (!cfg->basisorder) {
                     if (cfg->method == rtBLBadouel) {
                         unsigned int newidx = eid + tshift;
@@ -1730,24 +1730,14 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         totalloss = (totalloss == 0.f) ? 0.f : (1.f - segloss) / totalloss;
                         w0 = ww;
 
-                        /* a midpoint rounded just outside the grid, as an extreme refractive index can
-                           make it, must not index past it; the midpoints lie on a line, so they are all
-                           inside if the first and the last are, and only then the clamp is skipped */
-                        int clampidx;
-                        {
-                            __m128 lo = _mm_mul_ps(S, _mm_set1_ps(dstep)), hi = _mm_mul_ps(_mm_add_ps(S, _mm_mul_ps(T, _mm_set1_ps((float)(seg - 1)))), _mm_set1_ps(dstep));
-                            __m128 dimf = _mm_set_ps(1.f, (float)cfg->dim.z, (float)cfg->dim.y, (float)cfg->dim.x);
-                            /* the negated tests are also true for a NaN */
-                            __m128 out = _mm_or_ps(_mm_or_ps(_mm_cmpnge_ps(lo, _mm_setzero_ps()), _mm_cmpnlt_ps(lo, dimf)),
-                                                   _mm_or_ps(_mm_cmpnge_ps(hi, _mm_setzero_ps()), _mm_cmpnlt_ps(hi, dimf)));
-                            clampidx = (_mm_movemask_ps(out) & 7);
-                        }
-
                         for (i = 0; i < seg; i++) {
                             P = _mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
                             _mm_store_si128((__m128i*) & (idx.x), P);
 
-                            if (clampidx) {
+                            /* a midpoint rounded just outside the grid, as an extreme refractive
+                               index or the rounding of the steps can make it, must not index past
+                               it; one unsigned test per axis, the clamp itself is rare */
+                            if ((unsigned)idx.x >= cfg->dim.x || (unsigned)idx.y >= cfg->dim.y || (unsigned)idx.z >= cfg->dim.z) {
                                 idx.x = MIN(MAX(idx.x, 0), (int)cfg->dim.x - 1);
                                 idx.y = MIN(MAX(idx.y, 0), (int)cfg->dim.y - 1);
                                 idx.z = MIN(MAX(idx.z, 0), (int)cfg->dim.z - 1);
@@ -2174,7 +2164,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
                 }
 
                 if (cfg->issaveref && r.eid < 0 && mesh->dref) {
-                    int tshift = MIN( ((int)((r.photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * mesh->nf;
+                    int tshift = MIN(MAX((int)((r.photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * mesh->nf;
                     #pragma omp atomic
                     mesh->dref[((-r.eid) - 1) + tshift] += r.weight;
                 }
@@ -2654,10 +2644,9 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         sphi = sinf(ang);
         cphi = cosf(ang);
 
-        if (cfg->srctype == stCone) { // a solid-angle section of a uniform sphere
-            do {
-                ang = (cfg->srcparam1.y > 0) ? TWO_PI * rand_uniform01(ran) : acosf(2.f * rand_uniform01(ran) - 1.f); //sine distribution
-            } while (ang > cfg->srcparam1.x);
+        if (cfg->srctype == stCone) { // a solid-angle section of a uniform sphere, sampled directly (a rejection loop never ended for a zero angle)
+            ang = (cfg->srcparam1.y > 0) ? fminf(fmaxf(cfg->srcparam1.x, 0.f), TWO_PI) * rand_uniform01(ran) :   // uniform in angle
+                  acosf(1.f - rand_uniform01(ran) * (1.f - cosf(fminf(fmaxf(cfg->srcparam1.x, 0.f), M_PI))));   // uniform in solid angle
         } else {
             if (cfg->srctype == stIsotropic) { // uniform sphere
                 ang = acosf(2.f * rand_uniform01(ran) - 1.f);    //sine distribution
@@ -2890,7 +2879,7 @@ void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit) {
         return;
     }
 
-    tshift = MIN( ((int)((r->photontimer - cfg->tstart) * visit->rtstep)), cfg->maxgate - 1 ) * datalen;
+    tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * datalen;
 
     if (cfg->method == rtBLBadouelGrid) {
 

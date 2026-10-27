@@ -1232,7 +1232,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP)) {
             tshift = MIN( ((int)(replaytime[r->photonid] * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
         } else {
-            tshift = MIN( ((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
+            tshift = MIN(max((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, framelen);
         }
 
         {
@@ -1246,6 +1246,8 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                      (ww / prop.mua);
 #endif
             }
+
+            ww = (r->photontimer < gcfg->tstart) ? 0.f : ww;    /* nothing is recorded before the time window */
 
 #ifdef USE_BLBADOUEL
 #ifdef __NVCC__
@@ -2075,9 +2077,9 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
         if (GPU_PARAM(gcfg, srctype) == MCX_SRC_CONE) {
 #endif
 
-            do {
-                ang = (gcfg->srcparam1.y > 0) ? TWO_PI * rand_uniform01(ran) : acos(2.f * rand_uniform01(ran) - 1.f); //sine distribution
-            } while (ang > gcfg->srcparam1.x);
+            /* sampled directly, as on the CPU (a rejection loop never ended for a zero angle) */
+            ang = (gcfg->srcparam1.y > 0) ? fmin(fmax(gcfg->srcparam1.x, 0.f), (float)TWO_PI) * rand_uniform01(ran) :
+                  acos(1.f - rand_uniform01(ran) * (1.f - cos(fmin(fmax(gcfg->srcparam1.x, 0.f), (float)ONE_PI))));
 
 #endif
 #if defined(__NVCC__) || defined(MCX_SRC_ISOTROPIC) || defined(MCX_SRC_ARCSINE)
@@ -2518,7 +2520,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #ifdef MCX_SAVE_DREF
 
                 if (GPU_PARAM(gcfg, issaveref) && r.eid < 0 && dref) {
-                    int tshift = MIN( ((int)((r.photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep))), GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, nf);
+                    int tshift = MIN(max((int)((r.photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, nf);
                     /* many threads exit through the same faces near the source; a plain += loses updates */
 #ifdef USE_ATOMIC
                     atomicadd(dref + ((-r.eid) - 1) + tshift, r.weight);

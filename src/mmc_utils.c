@@ -74,6 +74,22 @@ static size_t srcpatternlen = 0;
      : tmp->val)
 
 /**
+ * Macro to load a JSON string: a value of another type is an error (cJSON leaves its valuestring NULL)
+ */
+
+#define FIND_JSON_STR(id,idfull,parent,fallback) mcx_jsonstr(FIND_JSON_KEY(id,idfull,parent,fallback,valuestring), idfull)
+
+static const char* mcx_jsonstr(const char* str, const char* name) {
+    if (str == NULL) {
+        char msg[MAX_PATH_LENGTH];
+        snprintf(msg, MAX_PATH_LENGTH, "%s must be a string", name);
+        MMC_ERROR(-1, msg);
+    }
+
+    return str;
+}
+
+/**
  * Macro to load JSON object
  */
 
@@ -359,6 +375,7 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->surfnum = 0;
     cfg->roitype = rtNone;
     cfg->roidata = NULL;
+    cfg->roidatalen = 0;
     cfg->roiprim = NULL;
     cfg->nroiprim = 0;
 
@@ -1637,7 +1654,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         subitem = FIND_JSON_OBJ("MeshID", "Mesh.MeshID", Mesh);
 
         if (subitem) {
-            strncpy(cfg->meshtag, FIND_JSON_KEY("MeshID", "Mesh.MeshID", Mesh, (MMC_ERROR(-1, "You must specify mesh files"), ""), valuestring), MAX_SESSION_LENGTH - 1);
+            strncpy(cfg->meshtag, FIND_JSON_STR("MeshID", "Mesh.MeshID", Mesh, (MMC_ERROR(-1, "You must specify mesh files"), "")), MAX_SESSION_LENGTH - 1);
         }
 
         //< reading mesh node and elem mesh data from JSON file
@@ -1797,6 +1814,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
 
                     cfg->roitype = (collen == 6) ? rtEdge : ((collen == 1 || rowlen == 1) ? rtNode : (collen == 4 ? rtFace : rtNone));
                     cfg->roidata = (float*)malloc(sizeof(float) * rowlen * collen);
+                    cfg->roidatalen = (size_t)rowlen * collen;
                     cfg->implicit = (cfg->roitype != rtNone) + (cfg->roitype == rtFace);
 
                     for (int i = 0; i < rowlen; i++) {
@@ -1820,6 +1838,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                         free(cfg->roidata);
                         MMC_ERROR(-1, "Mesh.MeshROI JData-annotated array must be in the 'single' format");
                     } else {
+                        cfg->roidatalen = (size_t)dims[0] * MAX(dims[1], 1);
                         cfg->roitype = (dims[1] == 6) ? rtEdge : ((ndim == 1 || dims[0] == 1 || dims[1] == 1) ? rtNode : (dims[1] == 4 ? rtFace : rtNone));
                         cfg->implicit = (cfg->roitype != rtNone) + (cfg->roitype == rtFace);
                     }
@@ -2089,7 +2108,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
             subitem = FIND_JSON_OBJ("Type", "Optode.Source.Type", src);
 
             if (subitem) {
-                cfg->srctype = mcx_keylookup(subitem->valuestring, srctypeid);
+                cfg->srctype = mcx_keylookup((char*)mcx_jsonstr(subitem->valuestring, "Optode.Source.Type"), srctypeid);
 
                 if (cfg->srctype == -1) {
                     MMC_ERROR(-6, "the specified source type is not supported");
@@ -2296,7 +2315,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                                 cfg->srcpattern[i] = pat->valuedouble;
                                 pat = pat->next;
                             }
-                        } else if (pat) {
+                        } else if (pat && cJSON_IsString(pat)) {    /* a file name; any other type leaves the pattern empty */
                             FILE* fid = fopen(pat->valuestring, "rb");
 
                             if (fid != NULL) {
@@ -2441,7 +2460,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         }
 
         if (cfg->session[0] == '\0') {
-            strncpy(cfg->session, FIND_JSON_KEY("ID", "Session.ID", Session, "default", valuestring), MAX_SESSION_LENGTH);
+            strncpy(cfg->session, FIND_JSON_STR("ID", "Session.ID", Session, "default"), MAX_SESSION_LENGTH);
         }
 
         if (!flagset['b']) {
@@ -2481,7 +2500,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         }
 
         if (!flagset['F']) {
-            cfg->outputformat = mcx_keylookup((char*)FIND_JSON_KEY("OutputFormat", "Session.OutputFormat", Session, "ascii", valuestring), outputformat);
+            cfg->outputformat = mcx_keylookup((char*)FIND_JSON_STR("OutputFormat", "Session.OutputFormat", Session, "ascii"), outputformat);
         }
 
         if (cfg->outputformat < 0) {
@@ -2497,7 +2516,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
         }
 
         if (!flagset['M']) {
-            strncpy(val, FIND_JSON_KEY("RayTracer", "Session.RayTracer", Session, raytracing + cfg->method, valuestring), 1);
+            strncpy(val, FIND_JSON_STR("RayTracer", "Session.RayTracer", Session, raytracing + cfg->method), 1);
 
             if (mcx_lookupindex(val, raytracing)) {
                 MMC_ERROR(-2, "the specified ray-tracing method is not recognized");
@@ -3998,6 +4017,11 @@ int mcx_lookupindex(char* key, const char* index) {
 
 int mcx_keylookup(char* origkey, const char* table[]) {
     int i = 0;
+
+    if (origkey == NULL) {    /* not a string */
+        return -1;
+    }
+
     char* key = malloc(strlen(origkey) + 1);
     memcpy(key, origkey, strlen(origkey) + 1);
 
@@ -4076,6 +4100,18 @@ void  mcx_convertrow2col(float* vol, uint3* dim) {
 
 void mcx_validatecfg(mcconfig* cfg) {
     int i;
+
+    /* the detected-photon record holds the exit position and direction only for 1 or 2; any other
+       value wrote them past the end of the record */
+    if (cfg->issaveexit < 0 || cfg->issaveexit > 2) {
+        MMC_ERROR(-1, "DoSaveExit (-x) must be 0, 1 or 2");
+    }
+
+    /* the replay outputs read the replayed photons' weights and times: an OutputType from the JSON
+       input is only known here, after the command-line check in mcx_parsecmd */
+    if ((cfg->outputtype == otJacobian || cfg->outputtype == otWL || cfg->outputtype == otWP) && cfg->seed != SEED_FROM_FILE) {
+        MMC_ERROR(-1, "Jacobian output is only valid in the replay mode. Please give an mch file after '-E'.");
+    }
 
     /* the optical properties the kernel divides by and takes logarithms of: a
        refractive index of nought (a "1.37" written as a string reads as 0) or
