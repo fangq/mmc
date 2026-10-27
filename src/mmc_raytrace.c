@@ -1327,20 +1327,17 @@ static int traceroi_list(ray* r, raytracer* tracer, int doinit, mcconfig* cfg) {
 
     for (k = 0; k < n; k++) {
         float* d = mesh->roilist + (size_t)idx[k] * 8, t = 1e30f, se = (k == self) ? mesh->roieps : 0.f;
+        /* p0 from the center of the bounding sphere (radius^2 in d[7]) */
+        FLOAT3 w = {r->p0.x - 0.5f * (d[0] + d[4]), r->p0.y - 0.5f * (d[1] + d[5]), r->p0.z - 0.5f * (d[2] + d[6])};
+        float wb = w.x * r->vec.x + w.y * r->vec.y + w.z * r->vec.z, wc = vec_dot3(&w, &w) - d[7], we = -wb - r->Lmove;
         int isin;
 
-        if (d[3] > 0.f) {
-            /* skip the capsule if the step stays outside its bounding sphere (radius^2 in d[7]) */
-            FLOAT3 w = {r->p0.x - 0.5f * (d[0] + d[4]), r->p0.y - 0.5f * (d[1] + d[5]), r->p0.z - 0.5f * (d[2] + d[6])};
-            float wb = w.x * r->vec.x + w.y * r->vec.y + w.z * r->vec.z, wc = vec_dot3(&w, &w) - d[7], we = -wb - r->Lmove;
-
-            hs = (wc > 0.f && (wb >= 0.f || wb * wb <= wc || (we > 0.f && we * we > wb * wb - wc))) ? htNoHitOut :
-                 roi_capsule(r, (FLOAT3*)d, (FLOAT3*)(d + 4), d[3], se, &t);
-        } else {
-            FLOAT3 w;
-            vec_diff3((FLOAT3*)d, (FLOAT3*)&r->p0, &w);
-            hs = roi_quad(1.f, w.x * r->vec.x + w.y * r->vec.y + w.z * r->vec.z, vec_dot3(&w, &w) - d[3] * d[3],
-                          vec_dot3(&w, &w), d[3] * d[3], r->Lmove, r->inroi, se, &t);
+        if (wc > 0.f && (wb >= 0.f || wb * wb <= wc || (we > 0.f && we * we > wb * wb - wc))) {
+            hs = htNoHitOut;    /* the step stays outside the bounding sphere */
+        } else if (d[3] > 0.f) {
+            hs = roi_capsule(r, (FLOAT3*)d, (FLOAT3*)(d + 4), d[3], se, &t);
+        } else {                /* a sphere: the bounding sphere's center is its center */
+            hs = roi_quad(1.f, wb, vec_dot3(&w, &w) - d[3] * d[3], vec_dot3(&w, &w), d[3] * d[3], r->Lmove, r->inroi, se, &t);
         }
 
         /* in this primitive: its exit (none if the step ends inside) competes for the last exit X */

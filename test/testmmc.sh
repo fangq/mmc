@@ -9,7 +9,7 @@
 # step-by-step trajectory tests in testtraj.sh. The GPU backends compiled
 # into the binary (opencl; cuda with "make cuda"; optix with "make optix")
 # and usable on device -G 1 are then tested as well: absorbed fraction of the
-# dual-grid benchmarks for opencl/cuda, step-by-step trajectories of cuda
+# dual-grid and implicit-MMC benchmarks for opencl/cuda, step-by-step trajectories of cuda
 # against the opencl golden data, and for optix (which does not report the
 # absorbed fraction or save trajectories) a smoke run plus a comparison of the
 # planar-source fluence with opencl.
@@ -129,7 +129,7 @@ for b in $BACKENDS; do
         continue
     fi
 
-    for bench in "dmmc-cube60:1[78]" "dmmc-cube60b:2[67]"; do
+    for bench in "dmmc-cube60:1[78]" "dmmc-cube60b:2[67]" "edgeimmc:30" "nodeimmc:1[45]" "faceimmc:94"; do
         name=${bench%%:*}
         expect=${bench#*:}
         echo "test absorbed fraction of benchmark $name with $b ... "

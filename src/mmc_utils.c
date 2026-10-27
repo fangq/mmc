@@ -1820,6 +1820,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                     }
                 }
             }
+
         }
 
         /* a surface-only mesh has no elements; OptiX then finds the initial medium by tracing a ray from the source */
@@ -2478,7 +2479,8 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                    "adjoint_mus", ...): only the first character used to be read, so "flux" gave
                    'f' (fluence), "dcs" 'd' and "wl" 'w' */
                 const char* typenames[] = {"flux", "fluence", "energy", "jacobian", "wl", "wp", "rf", "rfmus",
-                                       "adjoint", "adjoint_dcoeff", "adjoint_mus", "adjoint_musp", "adjoint_mua_d", "adjoint_mua_musp", ""};
+                                           "adjoint", "adjoint_dcoeff", "adjoint_mus", "adjoint_musp", "adjoint_mua_d", "adjoint_mua_musp", ""
+                                          };
                 const char typeletters[] = "xfejlprsaduvwq";
                 /* absent: the current type; the macro's fallback would be the tail of the
                    letter table ("xfej..."), read as a name */
@@ -4146,12 +4148,8 @@ void mcx_validatecfg(mcconfig* cfg) {
         cfg->basisorder = 0;
     }
 
-    if (cfg->implicit && (int)(cfg->gpuid) >= 0) {
-        if (!flagset['G']) { /* no device was requested, run implicit MMC on the CPU */
-            cfg->gpuid = -1;
-        } else {
-            MMC_ERROR(-2, "Implicit MMC is currently only supported in the CPU, please set -G -1 or cfg.gpuid=-1");
-        }
+    if (cfg->implicit && cfg->compute == cbOptiX) {
+        MMC_ERROR(-2, "Implicit MMC is not supported by the OptiX backend, please use the CPU, OpenCL or CUDA");
     }
 
     for (i = 0; i < MAX_DEVICE; i++)

@@ -232,6 +232,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
        in grid mode the kernel records the medium label of each voxel it deposits into */
     int ismusjacob = (cfg->outputtype == otAdjointMus || cfg->outputtype == otAdjointMusp || cfg->outputtype == otAdjointMuaMusp);
     int* gvoxtype = NULL;
+    int* groioff = NULL;          /* iMMC: ROI lists (edge/node) or slabs (face), see mesh_roilist() */
+    float4* groilist = NULL;
+    float* gfaceroi = NULL;
     /* For adjoint/multi-source mode, expand meshlen to cover all source slots.
      * cfg->srcid > 0 selects a single slot from srcdata, so the field buffer collapses to one slot. */
     uint nsrcslots = (cfg->extrasrclen > 0 && cfg->srcid <= 0) ? (uint)cfg->extrasrclen : 1u;
@@ -494,6 +497,11 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     // gparam
     CUDA_ASSERT(cudaMemcpyToSymbol(gcfg, &param, sizeof(MCXParam), 0, cudaMemcpyHostToDevice));
 
+    if (cfg->implicit) {
+        float2 immcparam = make_float2(mesh->roieps, (float)(mesh->nslab1 > 0));
+        CUDA_ASSERT(cudaMemcpyToSymbol(gimmc, &immcparam, sizeof(float2), 0, cudaMemcpyHostToDevice));
+    }
+
     /* Upload media, extra sources, and detectors to gmed[] constant memory.
      * Layout: [media 0..prop] | [extra sources, each 4 Medium slots] | [detector positions] | [normals] */
     uint srcpropoffset = (uint)(mesh->prop + 1 + cfg->isextdet);
@@ -598,6 +606,16 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         CUDA_ASSERT(cudaMalloc((void**) &gdebugdata, sizeof(float) * (debuglen * cfg->maxjumpdebug)));
     }
 
+    if (cfg->implicit == 1 && mesh->roioff) {
+        CUDA_ASSERT(cudaMalloc((void**) &groioff, sizeof(int) * mesh->roioff[mesh->ne]));
+        CUDA_ASSERT(cudaMemcpy(groioff, mesh->roioff, sizeof(int) * mesh->roioff[mesh->ne], cudaMemcpyHostToDevice));
+        CUDA_ASSERT(cudaMalloc((void**) &groilist, sizeof(float) * 8 * MAX(mesh->nroiprim, 1)));
+        CUDA_ASSERT(cudaMemcpy(groilist, mesh->roilist, sizeof(float) * 8 * mesh->nroiprim, cudaMemcpyHostToDevice));
+    } else if (cfg->implicit == 2 && mesh->faceroi) {
+        CUDA_ASSERT(cudaMalloc((void**) &gfaceroi, sizeof(float) * 4 * mesh->ne));
+        CUDA_ASSERT(cudaMemcpy(gfaceroi, mesh->faceroi, sizeof(float) * 4 * mesh->ne, cudaMemcpyHostToDevice));
+    }
+
     if (ismusjacob && cfg->issave2pt && cfg->method == rtBLBadouelGrid) {
         CUDA_ASSERT(cudaMalloc((void**) &gvoxtype, sizeof(int) * cfg->crop0.z));
         CUDA_ASSERT(cudaMemset(gvoxtype, 0, sizeof(int) * cfg->crop0.z));
@@ -679,7 +697,8 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
              *
              *   IS_RF          - cfg.omega>0 and not replay
              *   IS_MULTISRC    - cfg.srcnum>1 or (extrasrclen>0 && srcid<=0)
-             *   SAVE_DETPHOTON - cfg.issavedet */
+             *   SAVE_DETPHOTON - cfg.issavedet
+             *   IMMC_MODE      - cfg.implicit (0, 1 edge/node, 2 face), 3 x 8 instantiations */
             const int is_rf = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE) ? 1 : 0;
             /* IS_MULTISRC includes pattern source (uses r->posidx for srcpattern[] lookup)
              * alongside pattern-multi-source (srcnum>1) and adjoint multi-source. */
@@ -689,13 +708,20 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             const int save_dp = cfg->issavedet ? 1 : 0;
             const int variant = (is_rf << 2) | (is_ms << 1) | save_dp;
 
-#define MMC_DISPATCH(RF, MS, SD) \
-    mmc_main_loop<RF, MS, SD> <<< mcgrid, mcblock, sharedmemsize>>>( \
+#define MMC_DISPATCH_IM(RF, MS, SD, IM) \
+    mmc_main_loop<RF, MS, SD, IM> <<< mcgrid, mcblock, sharedmemsize>>>( \
             threadphoton, oddphotons, gnode, (int*)gelem, gweight, gdref, \
             gtype, (int*)gfacenb, gsrcelem, gnormal, \
             gnodemua_cu, gnodemusp_cu, \
             gdetphoton, gdetected, gseed, (int*)gprogress, genergy, greporter, \
-            gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata, gvoxtype)
+            gsrcpattern, greplayweight, greplaytime, greplayseed, gphotonseed, gdebugdata, gvoxtype, \
+            groioff, groilist, gfaceroi)
+#define MMC_DISPATCH(RF, MS, SD) \
+    switch (cfg->implicit) { \
+        case 1: MMC_DISPATCH_IM(RF, MS, SD, 1); break; \
+        case 2: MMC_DISPATCH_IM(RF, MS, SD, 2); break; \
+        default: MMC_DISPATCH_IM(RF, MS, SD, 0); \
+    }
 
             switch (variant) {
                 case 0:
@@ -732,6 +758,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             }
 
 #undef MMC_DISPATCH
+#undef MMC_DISPATCH_IM
 
             #pragma omp master
             {
@@ -1416,6 +1443,15 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
     if (gvoxtype) {
         CUDA_ASSERT(cudaFree(gvoxtype));
+    }
+
+    if (groioff) {
+        CUDA_ASSERT(cudaFree(groioff));
+        CUDA_ASSERT(cudaFree(groilist));
+    }
+
+    if (gfaceroi) {
+        CUDA_ASSERT(cudaFree(gfaceroi));
     }
 
     CUDA_ASSERT(cudaFree(greporter));

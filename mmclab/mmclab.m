@@ -72,7 +72,7 @@ function varargout = mmclab(varargin)
 %                      its nodes
 %      cfg.nodemusp:   per-node mus', Nnx1, used together with cfg.nodemua; g and n
 %                      still come from cfg.prop
-%      implicit MMC (iMMC), CPU only (cfg.gpuid=-1), see <demo_immc_basic.m> and
+%      implicit MMC (iMMC), on the CPU, OpenCL and CUDA (not OptiX), see <demo_immc_basic.m> and
 %      <demo_immc_vessel.m>:
 %      cfg.noderoi:    a vector of sphere radii, one per node
 %      cfg.edgeroi:    an Nex6 array of cylinder radii, one per element edge, in

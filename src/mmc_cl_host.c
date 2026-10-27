@@ -112,6 +112,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     cl_mem* gweight = NULL, *gdref = NULL, *gdetphoton = NULL, *gseed = NULL, *genergy = NULL, *greporter = NULL, *gdebugdata = NULL;     /*read-write buffers*/
     cl_mem* gprogress = NULL, *gdetected = NULL, *gphotonseed = NULL; /*write-only buffers*/
     cl_mem* gvoxtype = NULL;  /* grid-mode J_mus/J_musp: medium label of each voxel, recorded by the kernel */
+    cl_mem* groioff = NULL, *groilist = NULL, *gfaceroi = NULL;   /* iMMC ROI lists or face slabs, see mesh_roilist() */
 
     int isrfforward = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE);
     int savevolume = (cfg->issave2pt != 0);
@@ -229,6 +230,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         greporter = (cl_mem*)calloc(workdev, sizeof(cl_mem));
         gdebugdata = (cl_mem*)calloc(workdev, sizeof(cl_mem));
         gvoxtype = (cl_mem*)calloc(workdev, sizeof(cl_mem));
+        groioff = (cl_mem*)calloc(workdev, sizeof(cl_mem));
+        groilist = (cl_mem*)calloc(workdev, sizeof(cl_mem));
+        gfaceroi = (cl_mem*)calloc(workdev, sizeof(cl_mem));
 
         gnode = (cl_mem*)calloc(workdev, sizeof(cl_mem));
         gelem = (cl_mem*)calloc(workdev, sizeof(cl_mem));
@@ -250,7 +254,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         if (!mcxqueue || !gseed || !gweight || !gdref || !gdetphoton || !genergy || !gdetected ||
                 !gphotonseed || !greporter || !gdebugdata || !gnode || !gelem || !gtype || !gfacenb ||
                 !gsrcelem || !gnormal || !gnodemua_cl || !gnodemusp_cl || !gproperty || !gparam ||
-                !gprogress || !gsrcpattern || !greplayweight || !greplaytime || !greplayseed) {
+                !gprogress || !gsrcpattern || !greplayweight || !greplaytime || !greplayseed || !groioff || !groilist || !gfaceroi) {
             status = CL_OUT_OF_HOST_MEMORY;
             break;
         }
@@ -458,6 +462,13 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                 greplayseed[i] = NULL;
             }
 
+            if (cfg->implicit == 1 && mesh->roioff) {
+                OCL_TRY(((groioff[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(int) * (mesh->roioff[mesh->ne]), mesh->roioff, &status), status)));
+                OCL_TRY(((groilist[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * 8 * MAX(mesh->nroiprim, 1), mesh->roilist, &status), status)));
+            } else if (cfg->implicit == 2 && mesh->faceroi) {
+                OCL_TRY(((gfaceroi[i] = clCreateBuffer(mcxcontext, RO_MEM, sizeof(float) * 4 * mesh->ne, mesh->faceroi, &status), status)));
+            }
+
             if (savevoxtype) {
                 int* zerotype = (int*)calloc(cfg->crop0.z, sizeof(int));
                 OCL_TRY(((gvoxtype[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(int) * cfg->crop0.z, zerotype, &status), status)));
@@ -586,6 +597,11 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         if (cfg->issavedet) {
             snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DSAVE_DETPHOTON=1");
+        }
+
+        if (cfg->implicit) {
+            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DIMMC_MODE=%d -DIMMC_ROIEPS=%.10ef -DIMMC_SLAB1=%d",
+                     cfg->implicit, mesh->roieps, (mesh->nslab1 > 0));
         }
 
         if (strstr(opt, "USE_MACRO_CONST")) {
@@ -720,6 +736,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             OCL_ASSERT((clSetKernelArg(mcxkernel[i], 25, sizeof(cl_mem), (void*)(gphotonseed + i))));
             OCL_ASSERT((clSetKernelArg(mcxkernel[i], 26, sizeof(cl_mem), ((cfg->debuglevel & dlTraj) ? (void*)(gdebugdata + i) : NULL) )));
             OCL_ASSERT((clSetKernelArg(mcxkernel[i], 27, sizeof(cl_mem), (savevoxtype ? (void*)(gvoxtype + i) : NULL) )));
+            OCL_ASSERT((clSetKernelArg(mcxkernel[i], 28, sizeof(cl_mem), (groioff[i] ? (void*)(groioff + i) : NULL))));
+            OCL_ASSERT((clSetKernelArg(mcxkernel[i], 29, sizeof(cl_mem), (groilist[i] ? (void*)(groilist + i) : NULL))));
+            OCL_ASSERT((clSetKernelArg(mcxkernel[i], 30, sizeof(cl_mem), (gfaceroi[i] ? (void*)(gfaceroi + i) : NULL))));
         }
 
         if (status != CL_SUCCESS) {
@@ -1729,6 +1748,18 @@ is more than what your have specified (%d), please use the -H option to specify 
             clReleaseMemObject(gdebugdata[i]);
         }
 
+        if (groioff && groioff[i]) {
+            clReleaseMemObject(groioff[i]);
+        }
+
+        if (groilist && groilist[i]) {
+            clReleaseMemObject(groilist[i]);
+        }
+
+        if (gfaceroi && gfaceroi[i]) {
+            clReleaseMemObject(gfaceroi[i]);
+        }
+
         if (gvoxtype && gvoxtype[i])         {
             clReleaseMemObject(gvoxtype[i]);
         }
@@ -1760,6 +1791,9 @@ is more than what your have specified (%d), please use the -H option to specify 
     free(gphotonseed);
     free(gdebugdata);
     free(gvoxtype);
+    free(groioff);
+    free(groilist);
+    free(gfaceroi);
     free(greporter);
 
     free(gnode);

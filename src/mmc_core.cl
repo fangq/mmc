@@ -65,12 +65,15 @@
  *                    save exit position/dir for detected photons (saves ~6
  *                    regs when off).
  *
+ *   IMMC_MODE      - cfg.implicit: 1 edge/node, 2 face iMMC, 0 none (no ROI
+ *                    tests or state).
+ *
  * NODAL_USE_MUA/MUSP moved out of templates: on CUDA they're now runtime reads
  * from gcfg (their lifetime is too short to affect peak register pressure, so
  * templating gave no benefit); on OpenCL they remain build-time #defines
  * since the kernel is JIT-built per simulation anyway. */
-#define MMC_TEMPLATE template <const int IS_RF, const int IS_MULTISRC, const int SAVE_DETPHOTON>
-#define MMC_TARGS    <IS_RF, IS_MULTISRC, SAVE_DETPHOTON>
+#define MMC_TEMPLATE template <const int IS_RF, const int IS_MULTISRC, const int SAVE_DETPHOTON, const int IMMC_MODE>
+#define MMC_TARGS    <IS_RF, IS_MULTISRC, SAVE_DETPHOTON, IMMC_MODE>
 #define NODAL_USE_MUA   (GPU_PARAM(gcfg, isnodalmua))
 #define NODAL_USE_MUSP  (GPU_PARAM(gcfg, isnodalmusp))
 
@@ -96,7 +99,10 @@
 #ifdef MMC_NO_LAUNCH_BOUNDS
     #define MMC_LAUNCH_BOUNDS
 #else
-    #define MMC_LAUNCH_BOUNDS __launch_bounds__(MMC_BLOCKSIZE, MMC_MIN_BLOCKS)
+    #ifndef MMC_IMMC_MIN_BLOCKS
+        #define MMC_IMMC_MIN_BLOCKS MMC_MIN_BLOCKS
+    #endif
+    #define MMC_LAUNCH_BOUNDS __launch_bounds__(MMC_BLOCKSIZE, (IMMC_MODE ? MMC_IMMC_MIN_BLOCKS : MMC_MIN_BLOCKS))
 #endif
 
 inline __device__ float3 cross(float3 a, float3 b) {
@@ -192,6 +198,9 @@ typedef struct MMC_FLOAT3 {
 #endif
 #ifndef SAVE_DETPHOTON
     #define SAVE_DETPHOTON  0
+#endif
+#ifndef IMMC_MODE
+    #define IMMC_MODE       0
 #endif
 
 /* OpenCL has no function templates; the dispatch lives entirely in the
@@ -291,6 +300,11 @@ typedef struct MMC_ALIGN(4) MMC_Ray {
     //float4 bary0;               /**< the Barycentric coordinate of the intersection with the tet */
     float slen0;                  /**< initial unitless scattering length = length*mus */
     unsigned int photonid;        /**< index of the current photon */
+    int inroi;                    /**< iMMC: 1 if in the ROI for the next position */
+    int roitype;                  /**< iMMC: the ROI crossing ending the step (TROIType), rtNone if none */
+    int roiidx;                   /**< iMMC: faceroi column, or the entry in the element's ROI list */
+    int lasthit;                  /**< iMMC: (roiidx<<3)|roitype of the primitive crossed by the previous step */
+    int tinyhits;                 /**< iMMC: consecutive ROI hits floored to roieps */
 } ray;
 
 
@@ -369,11 +383,20 @@ typedef struct MMC_ALIGN(16) MCX_medium {
 #ifdef __NVCC__
 __constant__ MCXParam gcfg[1];
 __constant__ Medium   gmed[MAX_PROP];
+__constant__ float2   gimmc[1];             /**< iMMC: {roieps, 1 if a face is labeled from one side only}; not
+                                                 in MCXParam, whose growth slows the kernels down */
 #define GPU_PARAM(a,b) (a->b)
+#define ROI_EPS        (gimmc[0].x)
+#define ROI_SLAB1      (gimmc[0].y != 0.f)
 
 #else
 
 enum TBoundary {bcNoReflect, bcReflect, bcAbsorbExterior, bcMirror /*, bcCylic*/};
+enum TRayHitType {htNone, htInOut, htOutIn, htNoHitIn, htNoHitOut};
+enum TROIType {rtNone, rtEdge, rtNode, rtFace, rtInner};
+
+#define ROI_EPS        IMMC_ROIEPS          /**< iMMC JIT constants from the host, see mmc_cl_host.c */
+#define ROI_SLAB1      IMMC_SLAB1
 
 #ifndef USE_MACRO_CONST
     #define GPU_PARAM(a,b) (a->b)
@@ -633,11 +656,414 @@ __device__ void savedebugdata(ray* r, uint id, __global MCXReporter* reporter, _
     #define SAVE_VOXTYPE  0
 #endif
 
+/** iMMC: the medium index of a step in the ROI (in != 0) or in an element of medium t */
+#define ROI_MEDIUM(t, in) ((IMMC_MODE && (in)) ? (int)GPU_PARAM(gcfg, maxmedia) : (t))
+/** iMMC: the step just taken was in the ROI medium; after a crossing, inroi is the state beyond it */
+#define ROI_STEP_IN(inroi, roitype) (((roitype) == rtNone || (roitype) == rtInner) ? ((inroi) != 0) : !(inroi))
+
+#if defined(__NVCC__) || IMMC_MODE
+/*
+ * Implicit MMC (iMMC) ROI tests, the same as traceroi() and its helpers in mmc_raytrace.c (see
+ * there for the details). Compiled in only when IMMC_MODE is set: the CUDA template constant
+ * or, on OpenCL, -DIMMC_MODE=1 (edge/node) or 2 (face) from the host.
+ */
+
+#define ROI_QUAD_KU   (64.f * 5.9604645e-8f)   /**< rounding band of the quadric tests, per unit of |w|^2+r^2 */
+#define ROI_QUAD_AMIN 1e-12f                   /**< below this, a ray is parallel to the capsule axis */
+#define ROI_SLAB_KB   4.f                      /**< rounding band of the slab test, in units of roieps */
+#define ROI_MAX_TINY  4                        /**< consecutive floored hits before the Fresnel event is dropped */
+#define ROI_QUAD_ROOT(in, q, a, c) ((((in) != 0) == ((q) > 0.f)) ? (q) / (a) : (c) / (q))
+#ifdef __NVCC__
+    #define ROI_F3(x, y, z) make_float3(x, y, z)
+#else
+    #define ROI_F3(x, y, z) ((float3)(x, y, z))
+#endif
+#define ROI_XYZ(a) ROI_F3((a).x, (a).y, (a).z)
+/** the component of a ray-tet float4 (faces in the nc[] order) for faceroi column k, i.e. ifaceorder[k] */
+#define ROI_FACE(v, k) ((k) == 0 ? (v).w : ((k) == 1 ? (v).x : ((k) == 2 ? (v).z : (v).y)))
+
+/** @brief a*t^2 + 2*b*t + c = 0: the crossing selected by the in/out state, see roi_quad() in mmc_raytrace.c */
+__device__ int roi_quad(float a, float b, float c, float w2, float r2, float L, int inroi, float selfeps, float* thit) {
+    float dc = ROI_QUAD_KU * (w2 + r2), disc = b * b - a * c, q, tn, tf, ts;
+    int in = (c < -dc) ? 1 : ((c > dc) ? 0 : (inroi != 0));
+
+    if (a < ROI_QUAD_AMIN || disc <= 0.f) {
+        return (in && a < ROI_QUAD_AMIN) ? htNoHitIn : htNoHitOut;
+    }
+
+    q = -(b + copysign(sqrt(disc), b));
+    tn = fmin(q / a, c / q);
+    tf = fmax(q / a, c / q);
+    ts = in ? tf : tn;
+
+    if (selfeps > 0.f && ts > 0.f && ts <= L && ts < selfeps) {
+        int inward = (b < 0.f);
+
+        if (inward != (inroi != 0)) {
+            *thit = 0.f;
+            return inward ? htOutIn : htInOut;
+        }
+
+        if (!inward || tf < selfeps) {
+            return htNoHitOut;
+        }
+
+        if (tf > L) {
+            return htNoHitIn;
+        }
+
+        *thit = tf;
+        return htInOut;
+    }
+
+    if (!in) {
+        if (tn > 0.f && tn <= L) {
+            *thit = tn;
+            return htOutIn;
+        }
+
+        if (tn <= 0.f && tf > 0.f) {
+            *thit = 0.f;
+            return htOutIn;
+        }
+
+        return htNoHitOut;
+    }
+
+    if (tf <= 0.f) {
+        return htNoHitOut;
+    }
+
+    if (tf <= L) {
+        *thit = tf;
+        return htInOut;
+    }
+
+    return htNoHitIn;
+}
+
+/** @brief the capsule root selected by the state in, see roi_capsule_root() in mmc_raytrace.c */
+__device__ int roi_capsule_root(float3 p0, float3 v, float3 B, float3 w, float s0, float sv, float a, float cc, float dsc,
+                                float qc, float r2, int in, float* t) {
+    int capb = ((sv > 0.f) == (in != 0));
+    float3 wk;
+    float bs, cs, dss;
+
+    if (a >= ROI_QUAD_AMIN) {
+        float s;
+
+        if (dsc <= 0.f) {
+            return 0;
+        }
+
+        *t = ROI_QUAD_ROOT(in, qc, a, cc);
+        s = s0 + *t * sv;
+
+        if (s >= 0.f && s <= 1.f) {
+            return 1;
+        }
+
+        capb = (s > 1.f);
+    }
+
+    wk = capb ? p0 - B : w;
+    bs = dot(wk, v);
+    cs = dot(wk, wk) - r2;
+    dss = bs * bs - cs;
+
+    if (dss <= 0.f) {
+        return 0;
+    }
+
+    bs = -(bs + copysign(sqrt(dss), bs));
+    *t = ROI_QUAD_ROOT(in, bs, 1.f, cs);
+    return 1;
+}
+
+/** @brief capsule (edge ROI) test, see roi_capsule() in mmc_raytrace.c */
+__device__ int roi_capsule(float3 p0, float3 v, float3 A, float3 B, float rt, float L, int inroi, float selfeps, float* thit) {
+    float3 e = B - A, w = p0 - A;
+    float ie = 1.f / dot(e, e), s0 = dot(w, e) * ie, sv = dot(v, e) * ie, sc = fmin(1.f, fmax(0.f, s0));
+    float3 wp = w - e * FL3(s0), dp = v - e * FL3(sv), wc = w - e * FL3(sc);
+    float r2 = rt * rt, w2 = dot(wc, wc), dc = ROI_QUAD_KU * (w2 + r2), t = 0.f;
+    float a = dot(dp, dp), bc = dot(wp, dp), cc = dot(wp, wp) - r2, dsc = bc * bc - a * cc;
+    float qc = -(bc + copysign(sqrt(fmax(dsc, 0.f)), bc));
+    int in = (w2 - r2 < -dc) ? 1 : ((w2 - r2 > dc) ? 0 : (inroi != 0)), self = 0;
+
+    for (;;) {
+        int inward;
+
+        if (!roi_capsule_root(p0, v, B, w, s0, sv, a, cc, dsc, qc, r2, in, &t)) {
+            return htNoHitOut;
+        }
+
+        if (self || !(selfeps > 0.f && t > 0.f && t <= L && t < selfeps)) {
+            break;
+        }
+
+        inward = (dot(wc, v) < 0.f);
+
+        if (inward != (inroi != 0)) {
+            *thit = 0.f;
+            return inward ? htOutIn : htInOut;
+        }
+
+        if (!inward) {
+            return htNoHitOut;
+        }
+
+        self = 1;
+
+        if (in) {
+            break;
+        }
+
+        in = 1;
+    }
+
+    if (self && t <= L && t < selfeps) {
+        return htNoHitOut;
+    }
+
+    if (t > 0.f && t <= L) {
+        *thit = t;
+        return in ? htInOut : htOutIn;
+    }
+
+    if (!in && t <= 0.f && dot(wc, v) < 0.f) {
+        *thit = 0.f;
+        return htOutIn;
+    }
+
+    return (in && t > 0.f) ? htNoHitIn : htNoHitOut;
+}
+
+/** @brief floor an ROI hit closer than roieps, see roi_tinyhit() in mmc_raytrace.c */
+__device__ void roi_tinyhit(ray* r, int hit, float roieps) {
+    if (hit != htInOut && hit != htOutIn) {
+        return;
+    }
+
+    if (r->Lmove < roieps) {
+        r->Lmove = roieps;
+
+        if (++r->tinyhits > ROI_MAX_TINY) {
+            r->roiidx = -1;
+            r->tinyhits = 0;
+        }
+    } else {
+        r->tinyhits = 0;
+    }
+}
+
+/**
+ * @brief iMMC: trace the ROIs within the step, see traceroi() in mmc_raytrace.c
+ *
+ * Edge/node mode tests the union of the element's ROI list; face mode the slabs of the element,
+ * from the depths D below its faces and the projections S of the direction on their normals
+ * (both in the ray-tet order; faceroi column k is component ifaceorder[k]).
+ *
+ * @return edge/node mode: the in/out state at p0; -1 in face mode
+ */
+__device__ int traceroi(int imm, ray* r, __constant MCXParam* gcfg, __global int* roioff, __global float4* roilist,
+                        __global float* faceroi, float4 D, float4 S, int doinit) {
+    const float roieps = ROI_EPS;
+    int hs = htNone, k, pin = -1;
+
+    r->roitype = rtNone;
+
+    if (imm == 1) {
+        const int beg = roioff[r->eid - 1], n = roioff[r->eid] - beg;
+        const int self = (!doinit && r->lasthit) ? (r->lasthit >> 3) : -1;
+        float X = 0.f, E = 1e30f;
+        int nin = 0, jx = -1, je = -1;
+
+        for (k = 0; k < n; k++) {
+            float4 a = roilist[roioff[beg + k] << 1], b = roilist[(roioff[beg + k] << 1) + 1];
+            float t = 1e30f, se = (k == self) ? roieps : 0.f;
+            float3 w = r->p0 - (ROI_XYZ(a) + ROI_XYZ(b)) * FL3(0.5f);    /* from the center of the bounding sphere */
+            float wb = dot(w, r->vec), wc = dot(w, w) - b.w, we = -wb - r->Lmove;
+            int isin;
+
+            if (wc > 0.f && (wb >= 0.f || wb * wb <= wc || (we > 0.f && we * we > wb * wb - wc))) {
+                hs = htNoHitOut;    /* the step stays outside the bounding sphere */
+            } else if (a.w > 0.f) {
+                hs = roi_capsule(r->p0, r->vec, ROI_XYZ(a), ROI_XYZ(b), a.w, r->Lmove, r->inroi, se, &t);
+            } else {                /* a sphere: the bounding sphere's center is its center */
+                hs = roi_quad(1.f, wb, dot(w, w) - a.w * a.w, dot(w, w), a.w * a.w, r->Lmove, r->inroi, se, &t);
+            }
+
+            isin = (hs == htInOut || hs == htNoHitIn);
+            t = (hs == htNoHitIn) ? 1e30f : t;
+            nin += isin;
+
+            if (isin && (jx < 0 || t > X)) {
+                X = t;
+                jx = k;
+            }
+
+            if (hs == htOutIn && t < E) {
+                E = t;
+                je = k;
+            }
+        }
+
+        pin = (nin > 0);
+
+        if (doinit) {
+            r->inroi |= pin;
+            return pin;
+        }
+
+        hs = htNone;
+
+        if (je >= 0 && (nin == 0 || E < X)) {
+            hs = htOutIn;
+            k = je;
+            r->Lmove = E;
+        } else if (nin > 0 && X < 1e30f) {
+            hs = htInOut;
+            k = jx;
+            r->Lmove = X;
+        }
+
+        if (hs != htNone) {
+            r->inroi = (hs == htOutIn);
+            r->roiidx = k;
+            r->roitype = (nin > 0 && hs == htOutIn) ? rtInner : ((roilist[roioff[beg + k] << 1].w > 0.f) ? rtEdge : rtNode);
+        } else {
+            r->inroi = pin;
+        }
+    } else {
+        float minL = r->Lmove, band = ROI_SLAB_KB * roieps;
+        int anyin = 0, nohitin = 0, tested = 0;
+
+#ifdef __NVCC__
+#pragma unroll
+#endif
+
+        for (k = 0; k < 4; k++) {
+            float thick = faceroi[((r->eid - 1) << 2) + k];
+
+            if (thick > 0.f) {    /* the slab below the face at depth [0, thick], see roi_slab() */
+                float d0 = ROI_FACE(D, k), s = ROI_FACE(S, k), e = d0 - thick, t;
+                int in = (e < -band) ? 1 : ((e > band) ? 0 : (r->inroi != 0)), h;
+
+                if (d0 < -band) {
+                    h = htNoHitOut;
+                } else if ((in ? -s : s) <= 0.f || (in ? -e : e) >= r->Lmove * (in ? -s : s)) {
+                    h = in ? htNoHitIn : htNoHitOut;
+                } else {
+                    h = in ? htInOut : htOutIn;
+                }
+
+                t = fmax(e / s, 0.f);
+                tested = 1;
+                anyin |= (h == htInOut || h == htNoHitIn);
+                nohitin |= (h == htNoHitIn);
+
+                if ((h == htInOut || h == htOutIn) && t < minL) {
+                    minL = t;
+                    hs = h;
+                    r->roiidx = k;
+                }
+            }
+        }
+
+        r->Lmove = minL;
+        r->inroi = (hs != htNone) ? (hs == htOutIn) : (tested ? nohitin : r->inroi);
+        r->roitype = (hs != htNone) ? rtFace : rtNone;
+    }
+
+    roi_tinyhit(r, hs, roieps);
+    return pin;
+}
+
+/** @brief Fresnel reflection/transmission at the ROI surface, see reflectrayroi() in mmc_raytrace.c */
+__device__ void reflectrayroi(__constant MCXParam* gcfg, ray* r, __global int* roioff, __global float4* roilist,
+                              __global float4* normal, __constant Medium* gmed, __global int* type, __private RandType* ran) {
+    float3 pn;
+    float Icos, tmp0, tmp1, tmp2, n1, n2;
+
+    if (r->roitype == rtFace) {    /* faceroi column roiidx is the face ifaceorder[roiidx] */
+        __global float* nv = (__global float*)(normal + ((r->eid - 1) << 2));
+        pn = ROI_F3(nv[ifaceorder[r->roiidx]], nv[ifaceorder[r->roiidx] + 4], nv[ifaceorder[r->roiidx] + 8]);
+    } else {                       /* from the closest point of the segment (side or end cap) or the center */
+        int p = roioff[roioff[r->eid - 1] + r->roiidx] << 1;
+        float3 A = ROI_XYZ(roilist[p]), u = ROI_XYZ(roilist[p + 1]) - A;
+
+        pn = r->p0 - A;
+
+        if (r->roitype == rtEdge) {
+            pn -= u * FL3(fmin(1.f, fmax(0.f, dot(pn, u) / dot(u, u))));
+        }
+
+        pn *= FL3(MCX_MATHFUN(rsqrt)(dot(pn, pn)));
+    }
+
+    Icos = fabs(dot(r->vec, pn));
+
+    if (r->inroi) {    /* out->in; inroi is the state beyond the surface */
+        n1 = gmed[type[r->eid - 1]].n;
+        n2 = gmed[GPU_PARAM(gcfg, maxmedia)].n;
+        pn *= FL3((r->roitype == rtFace) ? 1.f : -1.f);
+    } else {
+        n1 = gmed[GPU_PARAM(gcfg, maxmedia)].n;
+        n2 = gmed[type[r->eid - 1]].n;
+        pn *= FL3((r->roitype == rtFace) ? -1.f : 1.f);
+    }
+
+    tmp0 = n1 * n1;
+    tmp1 = n2 * n2;
+    tmp2 = 1.f - tmp0 / tmp1 * (1.f - Icos * Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
+
+    if (tmp2 > 0.f) {
+        float Re = tmp0 * Icos * Icos + tmp1 * tmp2, Im, Rtotal;
+        tmp2 = MCX_MATHFUN(sqrt)(tmp2);
+        Im = 2.f * n1 * n2 * Icos * tmp2;
+        Rtotal = (Re - Im) / (Re + Im); /*Rp*/
+        Re = tmp1 * Icos * Icos + tmp0 * tmp2 * tmp2;
+        Rtotal = (Rtotal + (Re - Im) / (Re + Im)) * 0.5f; /*(Rp+Rs)/2*/
+
+        if (rand_next_reflect(ran) <= Rtotal) {
+            r->vec += FL3(-2.f * Icos) * pn;
+            r->inroi = !r->inroi;
+        } else {
+            r->vec += FL3(-Icos) * pn;
+            r->vec = FL3(tmp2) * pn + FL3(n1 / n2) * r->vec;
+        }
+    } else {    /*total internal reflection*/
+        r->vec += FL3(-2.f * Icos) * pn;
+        r->inroi = !r->inroi;
+    }
+
+    r->vec *= FL3(MCX_MATHFUN(rsqrt)(dot(r->vec, r->vec)));
+}
+
+/**
+ * @brief Face iMMC: classify the crossing of the mesh face oldeid -> eid, see slabfacecross() in mmc_raytrace.c
+ *
+ * @return 1: entering a single-sided slab through its labeled face, 2: leaving it there, 0: neither
+ */
+__device__ int slabfacecross(__global float* faceroi, __global int* facenb, int elemlen, int oldeid, int eid, int faceid, int inroi) {
+    __global int* nb = facenb + (eid - 1) * elemlen;
+    int lold = (faceroi[((oldeid - 1) << 2) + faceid] > 0.f), lnew = 0, k;
+
+    for (k = 0; k < 4; k++) {
+        lnew |= (nb[k] == oldeid) && (faceroi[((eid - 1) << 2) + k] > 0.f);
+    }
+
+    return (!inroi && lnew && !lold) ? 1 : ((inroi && lold && !lnew) ? 2 : 0);
+}
+
+#endif
+
 MMC_TEMPLATE
 __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __local float* ppath, __global int* elem, __global float* weight,
         int type, __global int* facenb, __global float4* normal, __constant Medium* gmed,
         __global float* gnodemua, __global float* gnodemusp,
-        __global float* replayweight, __global float* replaytime, __global int* gvoxtype) {
+        __global float* replayweight, __global float* replaytime, __global int* gvoxtype,
+        __global int* roioff, __global float4* roilist, __global float* faceroi) {
 
     float Lmin;
     float ww, totalloss = 0.f;
@@ -659,6 +1085,13 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
     r->faceid = -1;
     r->isend = 0;
 
+    if (IMMC_MODE) {    /* an element without ROIs is outside; the primitive just crossed, for the self-hit test */
+        r->inroi &= (IMMC_MODE == 1) ? (roioff[r->eid] > roioff[r->eid - 1]) : (faceroi[(r->eid - 1) << 2] != 0.f);
+        r->lasthit = (r->roitype != rtNone && r->roiidx >= 0) ? ((r->roiidx << 3) | r->roitype) : 0;
+        r->roitype = rtNone;
+        r->roiidx = -1;
+    }
+
     if (r->eid <= GPU_PARAM(gcfg, normbuf)) {
         eid += GPU_PARAM(gcfg, maxpropdet);
         S = ((r->vec.x) * ((__constant float4*)gmed)[eid]) + ((r->vec.y) * ((__constant float4*)gmed)[eid + 1]) + ((r->vec.z) * ((__constant float4*)gmed)[eid + 2]);
@@ -668,6 +1101,27 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         T = normal[eid + 3] - (((r->p0.x) * normal[eid]) + ((r->p0.y) * normal[eid + 1]) + ((r->p0.z) * normal[eid + 2]));
     }
 
+#if defined(__NVCC__) || IMMC_MODE
+    float4 D = T, Sv = S;    /* iMMC: the depths below the faces and the direction projections */
+
+    if (IMMC_MODE == 2) {    /* reset inroi from the depths, see branchless_badouel_raytet() in mmc_raytrace.c */
+        float bd = ROI_SLAB_KB * ROI_EPS;
+        int rin = 0, rout = 1, k;
+
+#ifdef __NVCC__
+#pragma unroll
+#endif
+
+        for (k = 0; k < 4; k++) {
+            float tk = ROI_FACE(D, k), th = faceroi[((r->eid - 1) << 2) + k];
+            rin |= (tk >= -bd) & (tk < th - bd);
+            rout &= (th <= 0.f) | (tk < -bd) | (tk > th + bd);
+        }
+
+        r->inroi = rin | (r->inroi & !rout);
+    }
+
+#endif
 #ifndef __NVCC__
     T = -convert_float4_rte(isgreater(T, FL4(0.f)) * 2) * FL4(0.5f) * T;
 #endif
@@ -688,7 +1142,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
     if (r->faceid >= 0 && Lmin >= 0.f) {
         Medium prop;
 
-        prop = gmed[type];
+        prop = gmed[(IMMC_MODE && r->inroi) ? GPU_PARAM(gcfg, maxmedia) : type];
 
         /* Per-node mua/musp override (set by redbird-style DOT reconstruction).
          * Uses the element-centroid average of the four nodal values, which is
@@ -713,6 +1167,31 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         r->Lmove = (prop.mus <= EPS) ? R_MIN_MUS : r->slen / prop.mus;
         r->isend = (Lmin > r->Lmove);
         r->Lmove = ((r->isend) ? r->Lmove : Lmin);
+
+#if defined(__NVCC__) || IMMC_MODE
+
+        if (IMMC_MODE) {    /* trace the ROIs; the step's medium follows the state at p0, see roi_step() in mmc_raytrace.c */
+            int oldin = r->inroi, pin = traceroi(IMMC_MODE, r, gcfg, roioff, roilist, faceroi, D, Sv, 0);
+
+            if ((r->roitype == rtNone) ? (r->inroi != oldin) : (pin >= 0 && pin != oldin)) {
+                float dl;
+
+                prop = gmed[((r->roitype == rtNone) ? r->inroi : pin) ? GPU_PARAM(gcfg, maxmedia) : type];
+                dl = (prop.mus <= EPS) ? R_MIN_MUS : r->slen / prop.mus;
+
+                if (r->roitype == rtNone) {
+                    r->isend = (Lmin > dl);
+                    r->Lmove = ((r->isend) ? dl : Lmin);
+                } else if (dl < r->Lmove) {
+                    r->roitype = rtNone;
+                    r->inroi = pin;
+                    r->isend = 1;
+                    r->Lmove = dl;
+                }
+            }
+        }
+
+#endif
         r->pout = r->p0 + FL3(Lmin) * r->vec;
 
         if ((int)((r->photontimer + r->Lmove * (prop.n * R_C0) - gcfg->tstart)*GPU_PARAM(gcfg, Rtstep)) > GPU_PARAM(gcfg, maxgate) - 1) { /*exit time window*/
@@ -1176,10 +1655,11 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
 #ifdef MCX_DO_REFLECTION
 
-__device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, int* eid, int faceid, __private RandType* ran, __global int* type, __global float4* normal, __constant Medium* gmed) {
+/** @brief reflectray() between the refractive indices n1 (oldeid side) and n2, e.g. at a face-iMMC slab surface */
+__device__ float reflectray_n(__constant MCXParam* gcfg, float3* c0, int* oldeid, int* eid, int faceid, __private RandType* ran, __global float4* normal, float n1, float n2) {
     /*to handle refractive index mismatch*/
     float3 pnorm = {0.f, 0.f, 0.f};
-    float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2, n1, n2;
+    float Icos, Re, Im, Rtotal, tmp0, tmp1, tmp2;
     int offs = (*oldeid - 1) << 2;
 
     faceid = ifaceorder[faceid];
@@ -1192,9 +1672,6 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
 
     /*compute the cos of the incidence angle*/
     Icos = fabs(dot(*c0, pnorm));
-
-    n1 = ((*oldeid != *eid) ? gmed[type[*oldeid - 1]].n : GPU_PARAM(gcfg, nout));
-    n2 = ((*eid > 0) ? gmed[type[*eid - 1]].n : GPU_PARAM(gcfg, nout));
 
     tmp0 = n1 * n1;
     tmp1 = n2 * n2;
@@ -1232,6 +1709,19 @@ __device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, 
     tmp0 = MCX_MATHFUN(rsqrt)(dot(*c0, *c0));
     (*c0) *= FL3(tmp0);
     return 1.f;
+}
+
+/** @brief reflection/transmission at a mesh face; inroi: the photon is in the iMMC ROI medium */
+__device__ float reflectray(__constant MCXParam* gcfg, float3* c0, int* oldeid, int* eid, int faceid, __private RandType* ran, __global int* type, __global float4* normal, __constant Medium* gmed, int inroi) {
+    float n1 = ((*oldeid != *eid) ? gmed[type[*oldeid - 1]].n : GPU_PARAM(gcfg, nout));
+    float n2 = ((*eid > 0) ? gmed[type[*eid - 1]].n : GPU_PARAM(gcfg, nout));
+
+    if (inroi) {    /* in the ROI medium on both sides of an interior face; the domain surface faces nout */
+        n1 = gmed[GPU_PARAM(gcfg, maxmedia)].n;
+        n2 = (*eid > 0) ? n1 : GPU_PARAM(gcfg, nout);
+    }
+
+    return reflectray_n(gcfg, c0, oldeid, eid, faceid, ran, normal, n1, n2);
 }
 
 #endif
@@ -1786,7 +2276,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                           __global float* gnodemua, __global float* gnodemusp,
                           __global float* n_det, __global uint* detectedphoton, __local float* energytot, __local float* energyesc, __private RandType* ran, int* raytet, __global float* srcpattern,
                           __global float* replayweight, __global float* replaytime, __global RandType* photonseed, __global MCXReporter* reporter, __global float* gdebugdata,
-                          __global int* gvoxtype) {
+                          __global int* gvoxtype, __global int* roioff, __global float4* roilist, __global float* faceroi) {
 
     int oldeid, fixcount = 0;
     ray r = {gcfg->srcpos, gcfg->srcdir, {MMC_UNDEFINED, 0.f, 0.f}, GPU_PARAM(gcfg, e0), 0, 0, 1.f, 0.f, 0.f, 0.f, 0.f, ID_UNDEFINED, 0.f, 0.f};
@@ -1817,6 +2307,14 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
     /*initialize the photon parameters*/
     launchnewphoton MMC_TARGS (gcfg, &r, node, elem, srcelem, ran, srcpattern, gmed);
+
+#if defined(__NVCC__) || IMMC_MODE
+
+    if (IMMC_MODE == 1 && r.eid > 0) {    /* in the ROI at launch; face slabs are reset by the first ray-tet step */
+        traceroi(IMMC_MODE, &r, gcfg, roioff, roilist, faceroi, FL4(0.f), FL4(0.f), 1);
+    }
+
+#endif
 
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 #ifdef __NVCC__
@@ -1854,7 +2352,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
     /*http://stackoverflow.com/questions/2148149/how-to-sum-a-large-number-of-float-number*/
 
     while (1) { /*propagate a photon until exit*/
-        r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
+        r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype, roioff, roilist, faceroi);
         (*raytet)++;
 
         if (r.pout.x == MMC_UNDEFINED) {
@@ -1874,22 +2372,59 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
         if (SAVE_DETPHOTON && r.Lmove > 0.f && type[r.eid - 1] > 0) {
-            ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;    /*second medianum block is the partial path*/
+            ppath[GPU_PARAM(gcfg, maxmedia) + ROI_MEDIUM(type[r.eid - 1], ROI_STEP_IN(r.inroi, r.roitype)) - 1] += r.Lmove;    /*second medianum block is the partial path*/
+        }
+
+#endif
+
+#if defined(__NVCC__) || IMMC_MODE
+
+        if (IMMC_MODE && r.roitype && r.eid != ID_UNDEFINED) {    /* the step ended on an ROI surface */
+            if (GPU_PARAM(gcfg, isreflect) && r.roitype != rtInner && r.roiidx >= 0 && gmed[GPU_PARAM(gcfg, maxmedia)].n != gmed[type[r.eid - 1]].n) {
+                reflectrayroi(gcfg, &r, roioff, roilist, normal, gmed, type, ran);
+                r.p0 += r.vec * FL3(ROI_EPS);
+            }
+
+            continue;
         }
 
 #endif
 
         /*move a photon until the end of the current scattering path*/
-        while (r.faceid >= 0 && !r.isend) {
+        while (r.faceid >= 0 && !r.isend && !(IMMC_MODE && r.roitype)) {
             r.p0 = r.pout;
 
             oldeid = r.eid;
             r.eid = ((__global int*)(facenb + (r.eid - 1) * GPU_PARAM(gcfg, elemlen)))[r.faceid];
 #ifdef MCX_DO_REFLECTION
 
-            if (GPU_PARAM(gcfg, isreflect) && (r.eid <= 0 || (r.eid > 0 && gmed[type[r.eid - 1]].n != gmed[type[oldeid - 1]].n ))) {
-                if (! (r.eid <= 0 && (((gmed[type[oldeid - 1]].n == GPU_PARAM(gcfg, nout)) * (GPU_PARAM(gcfg, isreflect) != (int)bcMirror)) + (GPU_PARAM(gcfg, isreflect) == (int)bcAbsorbExterior)) )) {
-                    reflectray(gcfg, &r.vec, &oldeid, &r.eid, r.faceid, ran, type, normal, gmed);
+            int roiin = (IMMC_MODE && r.inroi), sf = 0;   /* in the ROI, only the domain surface is an interface */
+#if defined(__NVCC__) || IMMC_MODE
+
+            /* face iMMC: the labeled face of a single-sided slab separates the background from the ROI medium */
+            if (IMMC_MODE == 2 && ROI_SLAB1 && r.eid > 0) {
+                sf = slabfacecross(faceroi, facenb, GPU_PARAM(gcfg, elemlen), oldeid, r.eid, r.faceid, r.inroi);
+
+                if (sf) {
+                    float nbg = gmed[type[((sf == 1) ? oldeid : r.eid) - 1]].n, nroi = gmed[GPU_PARAM(gcfg, maxmedia)].n;
+
+                    if (GPU_PARAM(gcfg, isreflect) && nbg != nroi) {
+                        reflectray_n(gcfg, &r.vec, &oldeid, &r.eid, r.faceid, ran, normal, (sf == 1) ? nbg : nroi, (sf == 1) ? nroi : nbg);
+                    }
+
+                    if (r.eid != oldeid) {    /* transmitted */
+                        r.inroi = (sf == 1);
+                    }
+                }
+            }
+
+#endif
+
+            if (!sf && GPU_PARAM(gcfg, isreflect) && (r.eid <= 0 || (!roiin && gmed[type[r.eid - 1]].n != gmed[type[oldeid - 1]].n ))) {
+                float nold = roiin ? gmed[GPU_PARAM(gcfg, maxmedia)].n : gmed[type[oldeid - 1]].n;
+
+                if (! (r.eid <= 0 && (((nold == GPU_PARAM(gcfg, nout)) * (GPU_PARAM(gcfg, isreflect) != (int)bcMirror)) + (GPU_PARAM(gcfg, isreflect) == (int)bcAbsorbExterior)) )) {
+                    reflectray(gcfg, &r.vec, &oldeid, &r.eid, r.faceid, ran, type, normal, gmed, roiin);
                 }
             }
 
@@ -1927,12 +2462,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 GPUDEBUG(("P %f %f %f %d %u %e\n", r.pout.x, r.pout.y, r.pout.z, r.eid, id, r.slen));
             }
 
-            r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
+            r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype, roioff, roilist, faceroi);
             (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
             if (SAVE_DETPHOTON && r.Lmove > 0.f && type[r.eid - 1] > 0) {
-                ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
+                ppath[GPU_PARAM(gcfg, maxmedia) + ROI_MEDIUM(type[r.eid - 1], ROI_STEP_IN(r.inroi, r.roitype)) - 1] += r.Lmove;
             }
 
 #endif
@@ -1945,12 +2480,12 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
             while (r.pout.x == MMC_UNDEFINED && r.eid > 0 && fixcount++ < MAX_TRIAL) {
                 fixphoton(&r.p0, node, (__global int*)(elem + (r.eid - 1)*GPU_PARAM(gcfg, elemlen)));
-                r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype);
+                r.slen = branchless_badouel_raytet MMC_TARGS (&r, gcfg, ppath, elem, weight, type[r.eid - 1], facenb, normal, gmed, gnodemua, gnodemusp, replayweight, replaytime, gvoxtype, roioff, roilist, faceroi);
                 (*raytet)++;
 #if defined(MCX_SAVE_DETECTORS) || defined(__NVCC__)
 
                 if (SAVE_DETPHOTON && r.Lmove > 0.f && type[r.eid - 1] > 0) {
-                    ppath[GPU_PARAM(gcfg, maxmedia) + type[r.eid - 1] - 1] += r.Lmove;
+                    ppath[GPU_PARAM(gcfg, maxmedia) + ROI_MEDIUM(type[r.eid - 1], ROI_STEP_IN(r.inroi, r.roitype)) - 1] += r.Lmove;
                 }
 
 #endif
@@ -2052,9 +2587,25 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
             }
         }
 
+
+#if defined(__NVCC__) || IMMC_MODE
+
+        if (IMMC_MODE && r.roitype && r.eid != ID_UNDEFINED) {    /* the step ended on an ROI surface */
+            if (GPU_PARAM(gcfg, isreflect) && r.roitype != rtInner && r.roiidx >= 0 && gmed[GPU_PARAM(gcfg, maxmedia)].n != gmed[type[r.eid - 1]].n) {
+                reflectrayroi(gcfg, &r, roioff, roilist, normal, gmed, type, ran);
+                r.p0 += r.vec * FL3(ROI_EPS);
+            }
+
+            continue;
+        }
+
+#endif
+
+
         float mom = 0.f;
-        r.slen0 = mc_next_scatter(gmed[type[r.eid - 1]].g, &r.vec, ran, gcfg, &mom);
+        r.slen0 = mc_next_scatter(gmed[ROI_MEDIUM(type[r.eid - 1], r.inroi)].g, &r.vec, ran, gcfg, &mom);
         r.slen = r.slen0;
+        r.tinyhits = 0;
 
         if (GPU_PARAM(gcfg, debuglevel) & dlTraj) {
             savedebugdata(&r, id, reporter, gdebugdata, gcfg);
@@ -2064,11 +2615,11 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 
         if (SAVE_DETPHOTON) {
             if (GPU_PARAM(gcfg, ismomentum) && type[r.eid - 1] > 0) {             /*when ismomentum is set to 1*/
-                ppath[(GPU_PARAM(gcfg, maxmedia) << 1) + type[r.eid - 1] - 1] += mom;    /*the third medianum block stores the momentum transfer*/
+                ppath[(GPU_PARAM(gcfg, maxmedia) << 1) + ROI_MEDIUM(type[r.eid - 1], r.inroi) - 1] += mom;    /*the third medianum block stores the momentum transfer*/
             }
 
-            if (SAVE_DETPHOTON) {
-                ppath[type[r.eid - 1] - 1] += 1.f;    /*the first medianum block stores the scattering event counts*/
+            if (SAVE_DETPHOTON && ROI_MEDIUM(type[r.eid - 1], r.inroi) > 0) {
+                ppath[ROI_MEDIUM(type[r.eid - 1], r.inroi) - 1] += 1.f;    /*the first medianum block stores the scattering event counts*/
             }
         }
 
@@ -2108,7 +2659,7 @@ __kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophot
         __global float* n_det, __global uint* detectedphoton,
         __global uint* n_seed, __global int* progress, __global float* energy, __global MCXReporter* reporter, __global float* srcpattern,
         __global float* replayweight, __global float* replaytime, __global RandType* replayseed, __global RandType* photonseed, __global float* gdebugdata,
-        __global int* gvoxtype) {
+        __global int* gvoxtype, __global int* roioff, __global float4* roilist, __global float* faceroi) {
 
     RandType t[RAND_BUF_LEN];
     int idx = get_global_id(0);
@@ -2179,7 +2730,7 @@ __kernel MMC_LAUNCH_BOUNDS void mmc_main_loop(const int nphoton, const int ophot
                              gnodemua, gnodemusp,
                              n_det, detectedphoton, sharedmem + get_local_id(0) * GPU_PARAM(gcfg, srcnum),
                              sharedmem + (get_local_size(0) + get_local_id(0)) * GPU_PARAM(gcfg, srcnum), t, &raytet,
-                             srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata, gvoxtype);
+                             srcpattern, replayweight, replaytime, photonseed, reporter, gdebugdata, gvoxtype, roioff, roilist, faceroi);
     }
 
     for (int i = 0; i < GPU_PARAM(gcfg, srcnum); i++) {

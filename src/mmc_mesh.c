@@ -1563,6 +1563,7 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
         np += (mesh->noderoi[i] > 0.f);
     }
 
+
     /* {Ax,Ay,Az,r, Bx,By,Bz,Rb^2}, r < 0 marks a sphere */
     mesh->roilist = pl = (float*)calloc(8 * MAX(np, 1), sizeof(float));
     mesh->nroiprim = np;
@@ -1586,8 +1587,8 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
 
         d[0] = a->x, d[1] = a->y, d[2] = a->z, d[3] = (i < nedge) ? r : -r;
         d[4] = b->x, d[5] = b->y, d[6] = b->z;
-        d[7] = 0.5f * dist_3(a, b) + r;
-        d[7] *= d[7];
+        d[7] = 0.5f * dist_3(a, b) + r;    /* the bounding sphere, outside the in/out rounding band */
+        d[7] = (d[7] * 1.0001f + mesh->roieps) * (d[7] * 1.0001f + mesh->roieps);
     }
 
     free(edge);
@@ -1660,7 +1661,7 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
 
     for (i = 0; i < ne; i++) {
         int* ee = mesh->elem + i * mesh->elemlen, c0[3], c1[3], x, y, z;
-        double bmin[3], bmax[3], cen[3] = {0.0, 0.0, 0.0}, R = 0.0;
+        double bmin[3], bmax[3], cen[3] = {0.0, 0.0, 0.0}, R = 0.0, fn[4][4];
 
         list[i] = len;
 
@@ -1688,6 +1689,31 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
         }
 
         R = sqrt(R);
+
+        /* the outward unit normals and offsets {n, n.p} of the faces: a primitive entirely beyond one
+           of them misses the element */
+        for (k = 0; k < 4; k++) {
+            float* q0 = &mesh->node[ee[(k + 1) & 3] - 1].x, *q1 = &mesh->node[ee[(k + 2) & 3] - 1].x;
+            float* q2 = &mesh->node[ee[(k + 3) & 3] - 1].x, *opp = &mesh->node[ee[k] - 1].x;
+            double e1[3], e2[3], len2;
+
+            for (j = 0; j < 3; j++) {
+                e1[j] = (double)q1[j] - q0[j];
+                e2[j] = (double)q2[j] - q0[j];
+            }
+
+            fn[k][0] = e1[1] * e2[2] - e1[2] * e2[1];
+            fn[k][1] = e1[2] * e2[0] - e1[0] * e2[2];
+            fn[k][2] = e1[0] * e2[1] - e1[1] * e2[0];
+            len2 = sqrt(fn[k][0] * fn[k][0] + fn[k][1] * fn[k][1] + fn[k][2] * fn[k][2]);
+            len2 = (fn[k][0] * (opp[0] - q0[0]) + fn[k][1] * (opp[1] - q0[1]) + fn[k][2] * (opp[2] - q0[2]) > 0.0) ? -len2 : len2;
+            fn[k][3] = 0.0;
+
+            for (j = 0; j < 3; j++) {
+                fn[k][j] = (len2 != 0.0) ? fn[k][j] / len2 : 0.0;
+                fn[k][3] += fn[k][j] * q0[j];
+            }
+        }
 
         for (z = c0[2]; z <= c1[2]; z++)
             for (y = c0[1]; y <= c1[1]; y++)
@@ -1718,6 +1744,11 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
 
                         for (j = 0; j < 3; j++) {
                             d2 += (ac[j] - s * ab[j]) * (ac[j] - s * ab[j]);
+                        }
+
+                        for (j = 0; hit && j < 4; j++) {    /* both ends of the segment beyond a face plane */
+                            hit = (fn[j][0] * d[0] + fn[j][1] * d[1] + fn[j][2] * d[2] - fn[j][3] <= pad) ||
+                                  (fn[j][0] * d[4] + fn[j][1] * d[5] + fn[j][2] * d[6] - fn[j][3] <= pad);
                         }
 
                         if (hit && d2 <= (pad + R) * (pad + R)) {
