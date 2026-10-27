@@ -102,12 +102,12 @@ MMC v2026 adds the below key features
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
   all mmclab example scripts are ported to Python under `pmmc/example`
 * unit tests and coverage: host-side unit tests of the parsers, mesh code, ray tracers
-  and the CUDA/OptiX backends (`make unittest`, 510 checks) raise the line coverage of
+  and the CUDA/OptiX backends (`make unittest`, 513 checks) raise the line coverage of
   the host code to about 95%; 68 built-in example tests check every run against golden
   values; the bugs these tests found were fixed
 * fuzzing: rounds of JSON-aware mutation fuzzing of the input files and of the
   command-line options, run on AddressSanitizer builds of mcx, mcxcl and mmc (for mmc,
-  `test/fuzz/mmcfuzz.py`, about 5,500 cases on the CPU, OpenCL and CUDA backends); every
+  `test/fuzz/mmcfuzz.py`, about 8,000 cases on the CPU, OpenCL, CUDA and OptiX backends); every
   crash, hang and memory error they found was fixed
 * hardening: JSON arrays are length-checked before use; JData arrays must carry valid
   annotations and decode to their declared size; an embedded mesh is checked (node
@@ -218,8 +218,8 @@ lists all of them, with their commit hashes.
 * [b07e548, 94de589] host unit tests, including the CUDA/OptiX backends; host coverage about 95%
 * [d5e3edb] four rounds of fuzzing of inputs and options: all crashes, hangs and memory errors
   fixed [bcdfbb0, 7494228]; embedded meshes and input values validated
-* [6cc7990] `test/fuzz/mmcfuzz.py`, an mmc fuzzer including the iMMC inputs; the bugs it found
-  were fixed [07c6fa5, 85f7ed9]
+* [6cc7990, 1c9093a] `test/fuzz/mmcfuzz.py`, an mmc fuzzer including the iMMC inputs, run on all four
+  backends; the bugs it found were fixed [07c6fa5, 85f7ed9, 797cccf]
 
 **Packaging**
 * [73eb9f1] Linux releases built in manylinux2014 (glibc 2.17+); Octave 10 mex files for macOS/Windows

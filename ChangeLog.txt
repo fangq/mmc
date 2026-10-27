@@ -1,6 +1,9 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-27 [1c9093a] [test] mmcfuzz.py: fuzz OptiX, report GPU faults and rejection reasons; testmmc.sh found OptiX again
+ 2026-10-27 [797cccf] [bug] fix OptiX T0>0 deposits and zero-angle cones; reject a non-positive length unit
+ 2026-10-27 [5369342] [doc] ChangeLog and README: the iMMC port, GPU speedups and the mmc fuzzer
  2026-10-27 [46655df] [doc] README: implicit MMC runs on the OpenCL and CUDA backends; unit-test and fuzzing counts
  2026-10-27 [17dbf06] [test] mmcfuzz.py: --skip to resume a round; mutate T1 to 0.1 us instead of 1 us
  2026-10-27 [85f7ed9] [bug] fix GPU T0>0 gates, face iMMC tracers, Reff labels and huge n found by more fuzzing
