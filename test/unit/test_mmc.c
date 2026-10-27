@@ -916,6 +916,10 @@ static void mut_srcdir(mcconfig* cfg, tetmesh* mesh) {
     (void)mesh;
     cfg->srcdir.z = 2.f;
 }
+static void mut_unitinmm(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    cfg->unitinmm = -1.f;
+}
 static void mut_tend(mcconfig* cfg, tetmesh* mesh) {
     (void)mesh;
     cfg->tend = cfg->tstart;
@@ -975,6 +979,7 @@ static void test_mmclab_path(void) {
     EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_nphoton), "mmc_validate_config: no photons");
     EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_tstep), "mmc_validate_config: zero time step");
     EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_srcdir), "mmc_validate_config: non-unit srcdir");
+    EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_unitinmm), "mmc_validate_config: a negative unitinmm");
     EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_tend), "mmc_validate_config: tend <= tstart");
     EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_pattern), "mmc_validate_config: pattern without data");
     EXPECT_EXIT(run_mmclab_path("--bench dmmc-cube60 -G -1 -s utmle", mut_srcnumreplay), "mmc_validate_config: several patterns in replay");
@@ -1756,6 +1761,8 @@ static void test_cmdedge(void) {
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Domain\":{\"Media\":[{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1e30},"
                           "{\"mua\":0.005,\"mus\":1,\"g\":0.01,\"n\":1.37}]}}", NULL), "a refractive index whose square overflows a float");
     EXPECT_EXIT(run_mmc("--bench faceimmc -G -1 -n 10 -M H", NULL), "face iMMC with the Havel ray-tracer (no face normals)");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -u -1", NULL), "a negative length unit");
+    EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -u 0", NULL), "a zero length unit");
 
 #ifdef USE_OPENCL
 

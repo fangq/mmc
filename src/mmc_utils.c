@@ -4113,6 +4113,12 @@ void mcx_validatecfg(mcconfig* cfg) {
         MMC_ERROR(-1, "Jacobian output is only valid in the replay mode. Please give an mch file after '-E'.");
     }
 
+    /* the length unit scales the optical properties and the path lengths: a negative one gave
+       negative coefficients and normalizers, and OptiX read out of bounds */
+    if (!isfinite(cfg->unitinmm) || cfg->unitinmm <= 0.f) {
+        MMC_ERROR(-1, "the length unit (-u/--unitinmm, Mesh.LengthUnit) must be positive");
+    }
+
     /* the optical properties the kernel divides by and takes logarithms of: a
        refractive index of nought (a "1.37" written as a string reads as 0) or
        an infinite scattering coefficient has every photon step forever; so does an index ratio whose square
@@ -4312,6 +4318,10 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
 void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
     if (cfg->nphoton <= 0) {
         MMC_ERROR(999, "cfg.nphoton must be a positive number");
+    }
+
+    if (!isfinite(cfg->unitinmm) || cfg->unitinmm <= 0.f) {
+        MMC_ERROR(999, "cfg.unitinmm must be positive");
     }
 
     if (cfg->tstart > cfg->tend || !(cfg->tstep > 0.f)) {
@@ -4991,7 +5001,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
     }
 
     if ((cfg->outputtype == otJacobian || cfg->outputtype == otWL || cfg->outputtype == otWP) && cfg->seed != SEED_FROM_FILE) {
-        MMC_ERROR(-1, "Jacobian output is only valid in the reply mode. Please give an mch file after '-E'.");
+        MMC_ERROR(-1, "Jacobian output is only valid in the replay mode. Please give an mch file after '-E'.");
     }
 
     if (MCX_IS_ADJOINT_TYPE(cfg->outputtype) && cfg->seed == SEED_FROM_FILE) {

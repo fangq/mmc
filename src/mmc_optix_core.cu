@@ -240,9 +240,9 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
         sincosf(ang, &sphi, &cphi);
 
         if (gcfg.srctype == MCX_SRC_CONE) {
-            do {
-                ang = (gcfg.srcparam1.y > 0) ? TWO_PI * rng.uniform(0.0f, 1.0f) : acos(2.f * rng.uniform(0.0f, 1.0f) - 1.f); //sine distribution
-            } while (ang > gcfg.srcparam1.x);
+            /* sampled directly, as on the other backends (a rejection loop never ended for a zero angle) */
+            ang = (gcfg.srcparam1.y > 0) ? fminf(fmaxf(gcfg.srcparam1.x, 0.f), TWO_PI) * rng.uniform(0.0f, 1.0f) :
+                  acosf(1.f - rng.uniform(0.0f, 1.0f) * (1.f - cosf(fminf(fmaxf(gcfg.srcparam1.x, 0.f), M_PIf))));
         } else {
             if (gcfg.srctype == MCX_SRC_ISOTROPIC) { // uniform sphere
                 ang = acosf(2.f * rng.uniform(0.0f, 1.0f) - 1.f);    //sine distribution
@@ -435,10 +435,11 @@ __device__ __forceinline__ uint getVoxelIdx(const float3& p) {
 }
 
 /**
- * @brief Get the offset of the current time frame
+ * @brief Get the offset of the current time frame; before T0 the gate is negative and the
+ * deposit is dropped (see the segment loop), so clamp it to the first frame
  */
 __device__ __forceinline__ uint getTimeFrame(const float& tof) {
-    return min(((int)((tof - gcfg.tstart) * gcfg.Rtstep)),
+    return min(max((int)((tof - gcfg.tstart) * gcfg.Rtstep), 0),
                gcfg.maxgate - 1) * gcfg.crop0.z;
 }
 
@@ -654,8 +655,9 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
         ((int*)gcfg.voxtypebuffer)[getVoxelIdx(segmid)] = r.mediumid;
     }
 
-    float oldweight = segloss;
-    float oldweight_im = segloss_im;
+    /* nothing is deposited before T0, as on the other backends */
+    float oldweight = (currtof >= gcfg.tstart) ? segloss : 0.f;
+    float oldweight_im = (currtof >= gcfg.tstart) ? segloss_im : 0.f;
 
     // iterate over the rest of the segments
     for (int i = 1; i < segcount; ++i) {
@@ -692,8 +694,10 @@ __device__ __forceinline__ void accumulateOutput(optixray& r, const Medium& prop
             oldweight_im = 0.0f;
         }
 
-        oldweight += segloss;
-        oldweight_im += segloss_im;
+        if (currtof >= gcfg.tstart) {
+            oldweight += segloss;
+            oldweight_im += segloss_im;
+        }
     }
 
     // save the weight loss of the last segment
