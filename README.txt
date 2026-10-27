@@ -227,7 +227,8 @@ dual-grid MMC (DMMC)
 implicit MMC (iMMC)
     What it does: adds thin vessels, membranes and spheres given as radii/thicknesses on the
         mesh nodes, edges and faces, without meshing them [Yuan2021]
-    Select with: `Mesh.MeshROI` (`cfg.noderoi`, `edgeroi`, `faceroi`)
+    Select with: `Mesh.MeshROI` (`cfg.noderoi`, `edgeroi`, `faceroi`) or
+        `Mesh.MeshROIPrim`; CPU, OpenCL and CUDA
 RT-MMC
     What it does: uses the ray-tracing cores of NVIDIA RTX GPUs through OptiX; also accepts
         surface-only meshes
@@ -752,6 +753,9 @@ place of the voxel grid (`Shapes` is accepted as its name too):
 `MeshROI`
     Meaning: implicit MMC: node radii (Nn x 1), edge radii (Ne x 6) or face thicknesses (Ne
         x 4)
+`MeshROIPrim`
+    Meaning: implicit MMC: capsules and spheres given by coordinates, N x 7
+        [Ax,Ay,Az,Bx,By,Bz,r] (a sphere if B equals A), not tied to the mesh
 `InitElem`
     Meaning: the element containing the source
 `LengthUnit`

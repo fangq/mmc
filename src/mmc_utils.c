@@ -359,6 +359,8 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->surfnum = 0;
     cfg->roitype = rtNone;
     cfg->roidata = NULL;
+    cfg->roiprim = NULL;
+    cfg->nroiprim = 0;
 
 #ifdef MCX_EMBED_CL
     cfg->clsource = (char*)mmc_core_cl;
@@ -482,6 +484,9 @@ void mcx_clearcfg(mcconfig* cfg) {
     if (cfg->surf) {
         free(cfg->surf);
     }
+
+    free(cfg->roiprim);
+    cfg->roiprim = NULL;
 
     if (cfg->roidata) {
         free(cfg->roidata);
@@ -1821,6 +1826,34 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                 }
             }
 
+            /* edge/node iMMC primitives not tied to the mesh, rows {Ax,Ay,Az, Bx,By,Bz, r} (B == A: a sphere) */
+            subitem = FIND_JSON_OBJ("MeshROIPrim", "Mesh.MeshROIPrim", Mesh);
+
+            if (subitem) {
+                int rowlen = cJSON_GetArraySize(subitem);
+
+                if (!cJSON_IsArray(subitem) || rowlen == 0 || !cJSON_IsArray(subitem->child) || cfg->implicit == 2) {
+                    MMC_ERROR(-1, "Mesh.MeshROIPrim must be an Nx7 array {Ax,Ay,Az, Bx,By,Bz, r} and can not be combined with a face MeshROI");
+                }
+
+                free(cfg->roiprim);
+                cfg->roiprim = (float*)malloc(sizeof(float) * 7 * rowlen);
+                cfg->nroiprim = rowlen;
+                cfg->implicit = 1;
+                subitem = subitem->child;
+
+                for (int i = 0; i < rowlen; i++, subitem = subitem->next) {
+                    if (cJSON_GetArraySize(subitem) != 7) {
+                        MMC_ERROR(-1, "Each row of Mesh.MeshROIPrim must have 7 numbers {Ax,Ay,Az, Bx,By,Bz, r}");
+                    }
+
+                    tmp = subitem->child;
+
+                    for (int j = 0; j < 7; j++, tmp = tmp->next) {
+                        cfg->roiprim[i * 7 + j] = tmp->valuedouble;
+                    }
+                }
+            }
         }
 
         /* a surface-only mesh has no elements; OptiX then finds the initial medium by tracing a ray from the source */

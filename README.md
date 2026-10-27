@@ -237,7 +237,7 @@ MMC implements several variants of the method:
 |---|---|---|
 | mesh-based MMC | traces and stores the fluence on the mesh (at nodes or elements) [Fang2010, Fang2012] | `-M S` (`cfg.method='elem'`), or `P`, `H`, `B` on the CPU |
 | dual-grid MMC (DMMC) | traces on the mesh, stores the fluence on a fine voxel grid; 2-3x faster, and the default [Yan2019] | `-M G` (`cfg.method='grid'`) |
-| implicit MMC (iMMC) | adds thin vessels, membranes and spheres given as radii/thicknesses on the mesh nodes, edges and faces, without meshing them [Yuan2021] | `Mesh.MeshROI` (`cfg.noderoi`, `edgeroi`, `faceroi`) |
+| implicit MMC (iMMC) | adds thin vessels, membranes and spheres given as radii/thicknesses on the mesh nodes, edges and faces, without meshing them [Yuan2021] | `Mesh.MeshROI` (`cfg.noderoi`, `edgeroi`, `faceroi`) or `Mesh.MeshROIPrim`; CPU, OpenCL and CUDA |
 | RT-MMC | uses the ray-tracing cores of NVIDIA RTX GPUs through OptiX; also accepts surface-only meshes | `-c optix` (`cfg.compute='optix'`) |
 | wide-field MMC | wide-field sources and detectors, by tessellating their domains into the mesh [Yao2016] | done by MMCLAB/PMMC for wide-field sources |
 
@@ -629,6 +629,7 @@ place of the voxel grid (`Shapes` is accepted as its name too):
 | `MeshElem` | the elements, Ne x 5: 4 node indices and the label (`int32`) |
 | `MeshSurf` | OptiX surface-only mesh, Nf x 5: 3 node indices, inner and outer labels |
 | `MeshROI` | implicit MMC: node radii (Nn x 1), edge radii (Ne x 6) or face thicknesses (Ne x 4) |
+| `MeshROIPrim` | implicit MMC: capsules and spheres given by coordinates, N x 7 `[Ax,Ay,Az,Bx,By,Bz,r]` (a sphere if B equals A), not tied to the mesh |
 | `InitElem` | the element containing the source |
 | `LengthUnit` | length unit of the mesh in mm |
 

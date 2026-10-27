@@ -352,6 +352,8 @@ typedef struct MMC_config {
     unsigned int surfnum;          /**<total number of surface triangles*/
     enum TROIType roitype;         /**<mesh roi type: rtNone: unknown, rtEdge: edge-roi, rtNode: node-roi, rtFace: face-roi */
     float* roidata;                /**<mesh roi (edge/node/face) data*/
+    float* roiprim;                /**<edge/node iMMC primitives given by coordinates, rows {Ax,Ay,Az,Bx,By,Bz,r}: capsule A-B, sphere if B==A*/
+    int nroiprim;                  /**<number of rows in roiprim*/
     char jsonfile[MAX_PATH_LENGTH];/**<if the seed is specified as a file (mch), mcx will replay the photons*/
 } mcconfig;
 

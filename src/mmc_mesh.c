@@ -1521,7 +1521,7 @@ static int roiint_cmp(const void* p, const void* q) {
 
 void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
     const int e2n[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
-    int i, j, k, n, nedge = 0, np = 0, ne = mesh->ne, len, cap, dim[3], ncell;
+    int i, j, k, n, nedge = 0, nnode, np = 0, ne = mesh->ne, len, cap, dim[3], ncell;
     int* cellbeg, *cellprim, *seen, *list;
     roiedge* edge = NULL;
     float* pl, *lo = &mesh->nmin.x, h;
@@ -1532,7 +1532,7 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
     mesh->roilist = NULL;
     mesh->nroiprim = 0;
 
-    if (cfg->implicit != 1 || (!mesh->edgeroi && !mesh->noderoi)) {
+    if (cfg->implicit != 1 || (!mesh->edgeroi && !mesh->noderoi && !cfg->roiprim)) {
         return;
     }
 
@@ -1563,6 +1563,8 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
         np += (mesh->noderoi[i] > 0.f);
     }
 
+    nnode = np - nedge;
+    np += cfg->nroiprim;
 
     /* {Ax,Ay,Az,r, Bx,By,Bz,Rb^2}, r < 0 marks a sphere */
     mesh->roilist = pl = (float*)calloc(8 * MAX(np, 1), sizeof(float));
@@ -1572,7 +1574,16 @@ void mesh_roilist(tetmesh* mesh, mcconfig* cfg) {
         FLOAT3* a, *b;
         float* d = pl + i * 8, r;
 
-        if (i < nedge) {
+        if (i >= nedge + nnode) {    /* Mesh.MeshROIPrim: a capsule, or a sphere if B == A */
+            float* q = cfg->roiprim + (i - nedge - nnode) * 7;
+            int issph = (q[0] == q[3] && q[1] == q[4] && q[2] == q[5]);
+
+            d[0] = q[0], d[1] = q[1], d[2] = q[2], d[3] = issph ? -q[6] : q[6];
+            d[4] = q[3], d[5] = q[4], d[6] = q[5];
+            d[7] = 0.5f * sqrtf((q[3] - q[0]) * (q[3] - q[0]) + (q[4] - q[1]) * (q[4] - q[1]) + (q[5] - q[2]) * (q[5] - q[2])) + q[6];
+            d[7] = (d[7] * 1.0001f + mesh->roieps) * (d[7] * 1.0001f + mesh->roieps);
+            continue;
+        } else if (i < nedge) {
             a = mesh->node + edge[i].a;
             b = mesh->node + edge[i].b;
             r = edge[i].r;
