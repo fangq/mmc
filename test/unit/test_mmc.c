@@ -457,9 +457,21 @@ static void test_outputs(void) {
  *  implicit MMC with edge, node and face ROIs, and refractive index mismatch
  *---------------------------------------------------------------------------*/
 
+static void check_roiprim(mcconfig* cfg, tetmesh* mesh) {
+    EXPECT_TRUE(cfg->implicit == 1 && mesh->nroiprim == 3 && mesh->roioff && mesh->roioff[mesh->ne] > mesh->ne + 1,
+                "Mesh.MeshROIPrim rows join the node ROI in the element lists");
+}
+
+static void check_slab1(mcconfig* cfg, tetmesh* mesh) {
+    EXPECT_TRUE(cfg->implicit == 2 && mesh->nslab1 > 0, "a face labeled from one side only is a single-sided slab");
+}
+
 static void test_immc(void) {
     const char* bench[] = {"edgeimmc", "nodeimmc", "faceimmc"};
-    char args[512], msg[128];
+    /* an ROI medium of a lower index: Fresnel events, total internal reflection and self-hits on the ROI surfaces */
+    const char* media = "{\"Domain\":{\"Media\":[{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1},{\"mua\":0.0458,\"mus\":35.65,\"g\":0.9,\"n\":1.37},"
+                        "{\"mua\":0.5,\"mus\":2,\"g\":0.9,\"n\":1}]}}";
+    char args[1024], msg[128];
 
     for (int i = 0; i < 3; i++) {
         snprintf(args, sizeof(args), "--bench %s -G -1 -n 500 -E 1 -b 1 -s utimmc%d", bench[i], i);
@@ -470,6 +482,71 @@ static void test_immc(void) {
         r = run_mmc(args, NULL);
         sprintf(msg, "iMMC %s without reflection, MCML-style", bench[i]);
         EXPECT_TRUE(r.ran, msg);
+        snprintf(args, sizeof(args), "--bench %s -G -1 -n 2000 -E 1 -b 1 --json %s -s utimmcn%d", bench[i], media, i);
+        r = run_mmc(args, NULL);
+        sprintf(msg, "iMMC %s with an index step at the ROI surface", bench[i]);
+        EXPECT_TRUE(r.ran && r.wsum > 0., msg);
+    }
+
+    /* a capsule and a sphere given by coordinates, together with the node ROI of nodeimmc */
+    RunResult r = run_mmc("--bench nodeimmc -G -1 -n 2000 -E 1 -b 1 --json {\"Shapes\":{\"MeshROIPrim\":[[0.5,0.5,0.5,0.5,0.5,0.5,0.3],"
+                          "[0.1,0.2,0.3,0.9,0.8,0.7,0.1]]}} -s utprim", check_roiprim);
+    EXPECT_TRUE(r.ran && r.wsum > 0., "iMMC with Mesh.MeshROIPrim runs");
+    EXPECT_EXIT(run_mmc("--bench nodeimmc --json {\"Shapes\":{\"MeshROIPrim\":[[1,2,3]]}}", NULL), "a MeshROIPrim row of 3 numbers");
+    EXPECT_EXIT(run_mmc("--bench nodeimmc --json {\"Shapes\":{\"MeshROIPrim\":1}}", NULL), "a MeshROIPrim that is not an array");
+    EXPECT_EXIT(run_mmc("--bench faceimmc --json {\"Shapes\":{\"MeshROIPrim\":[[0,0,0,1,1,1,0.1]]}}", NULL),
+                "MeshROIPrim combined with a face ROI");
+
+    /* a slab on one side of an interior face only: a Fresnel interface between the background and the ROI medium */
+    snprintf(args, sizeof(args), "--bench faceimmc -G -1 -n 3000 -E 1 -b 1 --json {\"Shapes\":{\"MeshROI\":[[0,0,0,0],[0,0,0,0],[0,0,0,0],"
+             "[0.1,0,0,0],[0,0,0,0],[0,0,0,0]]},%s -s utslab1", media + 1);
+    r = run_mmc(args, check_slab1);
+    EXPECT_TRUE(r.ran && r.wsum > 0., "face iMMC with a single-sided slab runs");
+
+    /* inputs found by mmcfuzz.py: each runs or stops with an error instead of crashing or hanging */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 200 -E 1 --json {\"Optode\":{\"Source\":{\"Type\":\"cone\",\"Param1\":[0,0,0,0]}}} -s utcone0", NULL);
+    EXPECT_TRUE(r.ran, "a cone of zero angle (a rejection loop never ended)");
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 200 -E 1 --json {\"Forward\":{\"T0\":1e-9,\"T1\":5e-9,\"Dt\":1e-9}} -s utt0", NULL);
+    EXPECT_TRUE(r.ran, "a time window after the launch (a negative gate indexed before the output)");
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 200 -E 1 -C 2 -s utc2", NULL);
+    EXPECT_TRUE(r.ran, "the 10-node mesh of -C 2 (an O(edges^2) search and wrong node indices)");
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 10 --json {\"Session\":{\"DoSaveExit\":-5}}", NULL), "DoSaveExit of -5");
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 10 --json {\"Session\":{\"RayTracer\":1}}", NULL), "a RayTracer that is not a string");
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 10 --json {\"Session\":{\"OutputType\":\"wp\"}}", NULL),
+                "a replay output type without a replay file");
+    EXPECT_EXIT(run_mmc("--bench faceimmc -G -1 -n 10 --json {\"Shapes\":{\"MeshROI\":[[0,0,0,0.1]]}}", NULL), "a MeshROI shorter than the mesh");
+
+    /* reorienting an inverted element swaps its edge and face ROI columns with its nodes 3 and 4 */
+    {
+        mcconfig cfg;
+        tetmesh mesh;
+        FLOAT3 nd[4] = {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {0.f, 0.f, 1.f}};    /* negative volume in mmc's sign */
+        int i, ok = 1;
+
+        mcx_initcfg(&cfg);
+        mesh_init(&mesh);
+        mesh.nn = 4, mesh.ne = 1, mesh.prop = 1;
+        mesh.node = (FLOAT3*)malloc(sizeof(nd));
+        memcpy(mesh.node, nd, sizeof(nd));
+        mesh.elem = (int*)malloc(sizeof(int) * 4);
+        mesh.type = (int*)calloc(1, sizeof(int));
+        mesh.edgeroi = (float*)malloc(sizeof(float) * 6);
+        mesh.faceroi = (float*)malloc(sizeof(float) * 4);
+
+        for (i = 0; i < 6; i++) {
+            mesh.edgeroi[i] = (float)(i + 1);
+            mesh.elem[i & 3] = (i & 3) + 1;
+            mesh.faceroi[i & 3] = (float)((i & 3) + 1);
+        }
+
+        mesh_getvolume(&mesh, &cfg);
+        ok = (mesh.elem[2] == 4 && mesh.elem[3] == 3);
+        ok &= (mesh.edgeroi[0] == 1.f && mesh.edgeroi[1] == 3.f && mesh.edgeroi[2] == 2.f && mesh.edgeroi[3] == 5.f && mesh.edgeroi[4] == 4.f
+               && mesh.edgeroi[5] == 6.f);
+        ok &= (mesh.faceroi[0] == 2.f && mesh.faceroi[1] == 1.f && mesh.faceroi[2] == 3.f && mesh.faceroi[3] == 4.f);
+        EXPECT_TRUE(ok, "a reoriented element keeps its ROI columns with its edges and faces");
+        mesh_clear(&mesh, &cfg);
+        mcx_clearcfg(&cfg);
     }
 }
 
@@ -1435,26 +1512,38 @@ static void test_jsonedge(void) {
         const char* session, *domain, *mesh, *source, *detector, *msg;
     } bad[] = {
         {"", "", "\"MeshNode\":[[0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1", NULL, "", "a MeshNode row without 3 numbers"},
-        {"", "", "\"MeshNode\":{\"_ArrayType_\":\"int32\",\"_ArraySize_\":[4,3],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":12,\"_ArrayZipData_\":\"eJxjYEAARgZUgI0PAABsAAQ=\"},"
-         "\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1", NULL, "", "a JData MeshNode that is not single precision"},
+        {
+            "", "", "\"MeshNode\":{\"_ArrayType_\":\"int32\",\"_ArraySize_\":[4,3],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":12,\"_ArrayZipData_\":\"eJxjYEAARgZUgI0PAABsAAQ=\"},"
+            "\"MeshElem\":[[1,2,3,4,1]],\"InitElem\":1", NULL, "", "a JData MeshNode that is not single precision"
+        },
         {"", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":[[1,2,3,4]],\"InitElem\":1", NULL, "", "a MeshElem row without 5 integers"},
-        {"", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":{\"_ArrayType_\":\"single\",\"_ArraySize_\":[1,5],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":5,\"_ArrayZipData_\":\"eJxjYGiwZ2BgcAAiIG4AYXsAGsIC/w==\"}"
-         ",\"InitElem\":1", NULL, "", "a JData MeshElem that is not int32"},
-        {"", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshSurf\":{\"_ArrayType_\":\"single\",\"_ArraySize_\":[1,5],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":5,\"_ArrayZipData_\":\"eJxjYGiwZ2BgcAAiIAazGQAZfgI/\"}"
-         "", NULL, "", "a JData MeshSurf that is not int32"},
+        {
+            "", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshElem\":{\"_ArrayType_\":\"single\",\"_ArraySize_\":[1,5],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":5,\"_ArrayZipData_\":\"eJxjYGiwZ2BgcAAiIG4AYXsAGsIC/w==\"}"
+            ",\"InitElem\":1", NULL, "", "a JData MeshElem that is not int32"
+        },
+        {
+            "", "", "\"MeshNode\":[[0,0,0],[1,0,0],[0,1,0],[0,0,1]],\"MeshSurf\":{\"_ArrayType_\":\"single\",\"_ArraySize_\":[1,5],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":5,\"_ArrayZipData_\":\"eJxjYGiwZ2BgcAAiIAazGQAZfgI/\"}"
+            "", NULL, "", "a JData MeshSurf that is not int32"
+        },
         {"", "", NULL, NULL, "", NULL},  /* placeholder for the MeshROI cases below */
         {"", "\"Media\":[[0,0,1,1],5]", NULL, NULL, "", "a medium that is neither an object nor an array"},
         {"", "\"Media\":[[0,0,1,1],[0.01,1,0.9,1.37]],\"Step\":[]", NULL, NULL, "", "an empty Domain.Step"},
         {"", "", NULL, "\"Pos\":[[0.2,0.2,0,1],[0.3,0.2,0,1]],\"Dir\":[[0,0,1],[0,0,1],[0,0,1]]", "", "Dir rows that do not match Pos"},
         {"", "", NULL, "\"Pos\":[[0.2,0.2,0,1],[0.3,0.2,0,1]],\"Dir\":[0,0,1],\"Param1\":[[0,0,0,0],[0,0,0,0],[0,0,0,0]]", "", "Param1 rows that do not match Pos"},
         {"", "", NULL, "\"Pos\":[[0.2,0.2,0,1],[0.3,0.2,0,1]],\"Dir\":[0,0,1],\"Param2\":[[0,0,0,0],[0,0,0,0],[0,0,0,0]]", "", "Param2 rows that do not match Pos"},
-        {"", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
-         "\"Pattern\":{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[2,2],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":4,\"_ArrayZipData_\":\"eJxjZGBgBAAACQAD\"}",
-         "", "a compressed pattern that is not single precision"},
-        {"", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
-         "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,2]}", "", "an incomplete pattern"},
-        {"", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
-         "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":\"utnosuchpattern.bin\"}", "", "a missing pattern file"},
+        {
+            "", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
+            "\"Pattern\":{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[2,2],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipSize_\":4,\"_ArrayZipData_\":\"eJxjZGBgBAAACQAD\"}",
+            "", "a compressed pattern that is not single precision"
+        },
+        {
+            "", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
+            "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,2]}", "", "an incomplete pattern"
+        },
+        {
+            "", "", NULL, "\"Type\":\"pattern\",\"Pos\":[0.1,0.1,0],\"Dir\":[0,0,1],\"Param1\":[0.5,0,0,2],\"Param2\":[0,0.5,0,2],"
+            "\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":\"utnosuchpattern.bin\"}", "", "a missing pattern file"
+        },
         {"", "", NULL, NULL, ",\"Detector\":{\"Pos\":[[0.2,0.2],[0.3,0.3,0]],\"R\":1}", "detector rows without 3 numbers"},
         {"", "", NULL, NULL, ",\"Detector\":[{\"Pos\":[0.2,0.2],\"R\":1}]", "a detector object without 3 numbers"},
         {",\"OutputFormat\":\"nosuchformat\"", "", NULL, NULL, "", "an unknown output format"},
@@ -1571,10 +1660,10 @@ static void check_jdatadecode(mcconfig* cfg, tetmesh* mesh) {
     }
 
     EXPECT_EQ(cfg->mediabyte, 1, "mcx_jdatadecode sets the media format from the array type");
-    EXPECT_EXIT({cJSON * o = cJSON_Parse("{\"_ArrayType_\":\"double\",\"_ArraySize_\":[1],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipData_\":\"AA==\"}"); vol = NULL;
+    EXPECT_EXIT({cJSON* o = cJSON_Parse("{\"_ArrayType_\":\"double\",\"_ArraySize_\":[1],\"_ArrayZipType_\":\"zlib\",\"_ArrayZipData_\":\"AA==\"}"); vol = NULL;
                  mcx_jdatadecode(&vol, &ndim, dims, 3, &type, o, cfg);
                 }, "mcx_jdatadecode of an 8-byte array");
-    EXPECT_EXIT({cJSON * o = cJSON_Parse("{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[1]}"); vol = NULL;
+    EXPECT_EXIT({cJSON* o = cJSON_Parse("{\"_ArrayType_\":\"uint8\",\"_ArraySize_\":[1]}"); vol = NULL;
                  mcx_jdatadecode(&vol, &ndim, dims, 3, &type, o, cfg);
                 }, "mcx_jdatadecode without array data");
 }
@@ -1666,6 +1755,7 @@ static void test_cmdedge(void) {
     EXPECT_TRUE(1, "a negative seed is replaced by the time");
 
 #ifdef USE_OPENCL
+
     /* mesh-mode Jacobians saved as JNIfTI and BNIfTI, dual and RF, under a root folder */
     if (hasocl) {
         RunResult r;
@@ -1679,6 +1769,7 @@ static void test_cmdedge(void) {
         r = run_mmc(args, NULL);
         EXPECT_TRUE(r.ran && file_size("utjq_jmua.bnii") > 0 && file_size("utjq_jmusp.bnii") > 0, "RF dual mesh Jacobians saved as BNIfTI");
     }
+
 #endif
 }
 
@@ -1867,6 +1958,7 @@ static void test_morecover3(void) {
     EXPECT_TRUE(1, "-G with a device number");
 
 #ifdef USE_OPENCL
+
     if (hasocl) {
         /* the remaining combinations of the mesh Jacobian outputs */
         const char* det = "{\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}";
@@ -1880,6 +1972,7 @@ static void test_morecover3(void) {
         run_mmc(args, NULL);
         EXPECT_TRUE(r.ran && file_size("utja_jmua.bnii") > 0 && file_size("utjar_jmua.jnii") > 0, "single, dual and RF mesh Jacobian files");
     }
+
 #endif
 }
 
@@ -1912,12 +2005,14 @@ static void test_morecover4(void) {
     }
 
 #ifdef USE_OPENCL
+
     if (hasocl) {
         snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 2000 -E 1 -M H -C 1 -O W -F jnii -s utjwr --json "
                  "{\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}");
         RunResult r = run_mmc(args, NULL);
         EXPECT_TRUE(r.ran && file_size("utjwr_jd.jnii") > 0, "RF dual mesh Jacobians saved as JNIfTI");
     }
+
 #endif
     (void)args;
 }
@@ -2086,10 +2181,14 @@ static void test_gpubackends(void) {
         {"grid, planar source",              "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"planar\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,0],\"Param2\":[0,4,0,0]}}}", 0, 1},
         {"grid, gaussian source",            "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"gaussian\",\"Pos\":[30,45,15],\"Param1\":[1,0,0,0]}}}", 0, 1},
         {"grid, disk source",                "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"disk\",\"Pos\":[30,45,15],\"Param1\":[3,0,0,0]}}}", 0, 1},
-        {"grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
-                                             "\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1},
-        {"grid, 2 sources, a field each",   "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"ID\":-1,\"Pos\":[[30,45,0,0.5],[20,30,0,0.5]],"
-                                             "\"Dir\":[[0,0,1,0],[0,0,1,0]]}}}", 0, 1},
+        {
+            "grid, two patterns",               "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],"
+            "\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1,0,1,1,0]}}}}", 0, 1
+        },
+        {
+            "grid, 2 sources, a field each",   "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pencil\",\"ID\":-1,\"Pos\":[[30,45,0,0.5],[20,30,0,0.5]],"
+            "\"Dir\":[[0,0,1,0],[0,0,1,0]]}}}", 0, 1
+        },
         {"grid, trajectories (-D M)",        "-M G -D M", 0, 1},
         {"mesh nodal (-M H -C 1)",           "-M H -C 1", 0, 0},
         {"mesh elem (-M H -C 0)",            "-M H -C 0", 0, 0},
