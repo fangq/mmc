@@ -73,6 +73,11 @@ MMC v2026 adds the below key features
   (`OMP_NUM_THREADS=1`) on the CPU to reproduce a run exactly
 * the OptiX-based RT-MMC now supports all source types, multiple sources, detected
   photons, trajectories (`-D M`), adjoint Jacobians and surface-only meshes
+* implicit MMC (node/edge/face ROIs and `Mesh.MeshROIPrim`) now also runs on the
+  OpenCL and CUDA backends, ported from the GPU iMMC of Aiden Lewis: each element
+  holds a host-built list of all overlapping capsules and spheres, traced as a union,
+  and face slabs apply Fresnel reflection on single-sided slabs; the GPU results agree
+  with the CPU within 0.1% and pass the analytic iMMC tests
 * mmc-optix packages for Linux and Windows: mmc with the CUDA (`-c cuda`) and OptiX
   (`-c optix`) backends next to the CPU and OpenCL ones, for NVIDIA GPUs with driver
   R515 or newer; mmc now also builds with MSVC
@@ -80,11 +85,12 @@ MMC v2026 adds the below key features
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
   all mmclab example scripts are ported to Python under `pmmc/example`
 * unit tests and coverage: host-side unit tests of the parsers, mesh code, ray tracers
-  and the CUDA/OptiX backends (`make unittest`, 485 checks) raise the line coverage of
+  and the CUDA/OptiX backends (`make unittest`, 510 checks) raise the line coverage of
   the host code to about 95%; 68 built-in example tests check every run against golden
   values; the bugs these tests found were fixed
-* fuzzing: four rounds of JSON-aware mutation fuzzing of the input files and of the
-  command-line options, run on AddressSanitizer builds of mcx, mcxcl and mmc; every
+* fuzzing: rounds of JSON-aware mutation fuzzing of the input files and of the
+  command-line options, run on AddressSanitizer builds of mcx, mcxcl and mmc (for mmc,
+  `test/fuzz/mmcfuzz.py`, about 5,500 cases on the CPU, OpenCL and CUDA backends); every
   crash, hang and memory error they found was fixed
 * hardening: JSON arrays are length-checked before use; JData arrays must carry valid
   annotations and decode to their declared size; an embedded mesh is checked (node
@@ -296,8 +302,8 @@ every backend.
 <pre>
 implicit MMC (node/edge/face ROIs)
     `sse`: yes
-    `opencl`: -
-    `cuda`: -
+    `opencl`: yes
+    `cuda`: yes
     `optix`: -
 MCML-style weighting (`-m 1`)
     `sse`: yes
@@ -352,8 +358,8 @@ identical photon paths for a seed
 </pre>
 
 A backend that cannot run the requested settings stops with a message naming the
-backend to use instead. Rules of thumb: use '''`opencl`''' by default, '''`sse`''' for
-implicit MMC or when no GPU is available, '''`cuda`''' on NVIDIA GPUs when you build
+backend to use instead. Rules of thumb: use '''`opencl`''' by default, '''`sse`''' when no GPU
+is available, '''`cuda`''' on NVIDIA GPUs when you build
 MMC yourself, and '''`optix`''' on RTX GPUs for dual-grid forward simulations of large
 meshes.
 
@@ -1041,7 +1047,7 @@ which is faster and gives a uniform output resolution; set the grid with `cfg.st
 Thin vessels, membranes and small spheres can be added without meshing them: give a
 radius per node (`cfg.noderoi`), per element edge (`cfg.edgeroi`, Ne x 6) or a thickness
 per element face (`cfg.faceroi`, Ne x 4) [Yuan2021]. Implicit MMC runs on the CPU
-(`sse`). Examples: `demo_immc_basic.m`, `demo_immc_vessel.m`; benchmarks `edgeimmc`,
+(`sse`), OpenCL and CUDA backends, not on OptiX. Examples: `demo_immc_basic.m`, `demo_immc_vessel.m`; benchmarks `edgeimmc`,
 `nodeimmc`, `faceimmc`.
 
 === Comparing with MCX ===
@@ -1053,7 +1059,7 @@ checks.
 == # Performance and best practices ==
 
 * '''Use a GPU backend for large runs''' (`opencl`, `cuda` or `optix`); keep `sse` for
-    implicit MMC, MCML-style weighting and runs without a GPU.
+    MCML-style weighting and runs without a GPU.
 * '''Prefer dual-grid output''' (the default) when you need a fluence map: it is faster
     than mesh output and its resolution does not depend on the mesh.
 * '''Mesh only as finely as the geometry needs.''' Very small or badly shaped elements
@@ -1091,8 +1097,8 @@ PMMC tests
 * MMC supports linear tetrahedral elements only.
 * Optical properties are defined per element (per label), except the per-node
     mua/mus' (`cfg.nodemua`, `cfg.nodemusp`) used for image reconstruction.
-* Implicit MMC (node/edge/face ROIs) and MCML-style weighting run on the CPU (`sse`)
-    only, and the OptiX backend has the restrictions listed in
+* Implicit MMC (node/edge/face ROIs) does not run on OptiX, MCML-style weighting runs
+    on the CPU (`sse`) only, and the OptiX backend has the restrictions listed in
     Choosing a backend.
 * MMC implements the mesh-based Monte Carlo method as described in the papers below,
     not every possible variant of it. If you compare MMC with other software in a
