@@ -175,6 +175,12 @@ lists all of them, with their commit hashes.
 * [76f945d] `-F bnii` binary JSON output; [621f207] parallel zlib/gzip compression of JData data
 * [fd74cbc] `cfg.compileropt` and `cfg.kernelfile` in mmclab and pmmc
 
+**Implicit MMC**
+* [376ea5d] iMMC traces the union of all capped capsules and spheres overlapping an element;
+  robust slab tests; [a2b303c] iMMC on the OpenCL and CUDA backends (ported from Aiden Lewis'
+  GPU iMMC); [a4a3f6c] `Mesh.MeshROIPrim` capsules and spheres given by coordinates
+* [5969413, f6cf915] faster GPU kernels: element normals in global memory, one loop of ray-tet steps
+
 **OptiX (RT-MMC) and CUDA**
 * [0eedf2b, edaaa02] all source types in OptiX MMC (contributed by Shijie Yan); [2434293] multiple
   sources; [7ee0a9d] detected photons; [6ac3389] trajectories; [6b92686] adjoint Jacobians;
@@ -212,6 +218,8 @@ lists all of them, with their commit hashes.
 * [b07e548, 94de589] host unit tests, including the CUDA/OptiX backends; host coverage about 95%
 * [d5e3edb] four rounds of fuzzing of inputs and options: all crashes, hangs and memory errors
   fixed [bcdfbb0, 7494228]; embedded meshes and input values validated
+* [6cc7990] `test/fuzz/mmcfuzz.py`, an mmc fuzzer including the iMMC inputs; the bugs it found
+  were fixed [07c6fa5, 85f7ed9]
 
 **Packaging**
 * [73eb9f1] Linux releases built in manylinux2014 (glibc 2.17+); Octave 10 mex files for macOS/Windows

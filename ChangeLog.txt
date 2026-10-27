@@ -1,6 +1,18 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-27 [46655df] [doc] README: implicit MMC runs on the OpenCL and CUDA backends; unit-test and fuzzing counts
+ 2026-10-27 [17dbf06] [test] mmcfuzz.py: --skip to resume a round; mutate T1 to 0.1 us instead of 1 us
+ 2026-10-27 [85f7ed9] [bug] fix GPU T0>0 gates, face iMMC tracers, Reff labels and huge n found by more fuzzing
+ 2026-10-27 [6cc7990] [test] mmcfuzz.py: a mutation fuzzer for mmc; unit tests for iMMC paths and the fuzzer findings
+ 2026-10-27 [07c6fa5] [bug] fix crashes, hangs and memory errors found by a new mmc fuzzer
+ 2026-10-26 [00cfbfe] [perf] dual-grid CPU deposit: clamp the voxel index only when a step's midpoints leave the grid
+ 2026-10-26 [f6cf915] [perf] GPU: trace each photon in one loop of ray-tet steps; iMMC launch bounds
+ 2026-10-26 [5969413] [perf] GPU: read the element normals from global memory, not __constant
+ 2026-10-26 [71d85ea] [perf] face iMMC: reset the slab state only in elements with slabs
+ 2026-10-26 [a4a3f6c] [feat] Mesh.MeshROIPrim: iMMC capsules and spheres given by coordinates
+ 2026-10-26 [a2b303c]*[feat] iMMC on the OpenCL and CUDA backends
+ 2026-10-26 [376ea5d]*[feat] iMMC: trace the union of capped capsule/sphere ROIs listed per element, robust slab tests
  2026-10-25 [0feb5bb] [feat] mmclab: issave2pt as in mcxlab, reject backends the mex was not built with
  2026-10-25 [a6d4f42] [doc] rewrite the mmclab help: document every cfg field the mex reads
  2026-10-25 [66f4c90] [bug] ignore cfg.face when cfg.elem is given: redbird's mmc Jacobians failed
