@@ -1512,7 +1512,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
 
     /* face iMMC: reset inroi from the depths below the faces (faceroi column k: T[ifaceorder[k]]):
        in if decisively inside a slab, out if decisively outside all, else the stored state */
-    if (cfg->implicit == 2 && r->roisize) {
+    if (cfg->implicit == 2 && r->roisize && r->roisize[0] != 0.f) {    /* column 0 is nonzero in an element with slabs */
         float MMC_ALIGN(16) Td[4], bd = ROI_SLAB_KB * tracer->mesh->roieps, *th = r->roisize;
         int rin = 0, rout = 1, k;
 

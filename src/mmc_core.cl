@@ -1104,7 +1104,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #if defined(__NVCC__) || IMMC_MODE
     float4 D = T, Sv = S;    /* iMMC: the depths below the faces and the direction projections */
 
-    if (IMMC_MODE == 2) {    /* reset inroi from the depths, see branchless_badouel_raytet() in mmc_raytrace.c */
+    if (IMMC_MODE == 2 && faceroi[(r->eid - 1) << 2] != 0.f) {    /* reset inroi from the depths, see branchless_badouel_raytet() in mmc_raytrace.c */
         float bd = ROI_SLAB_KB * ROI_EPS;
         int rin = 0, rout = 1, k;
 
