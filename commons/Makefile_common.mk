@@ -315,7 +315,8 @@ $(BINDIR)/$(BINARY): makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	$(AR)  $(ARFLAGS) $(AROUTPUT) $@ $(OBJS) $(USERARFLAGS) $(EXTRALIB)
 
 
-$(ZMATLIB):
+# rebuild the bundled zmat when its sources change, or a stale libzmat.a lingers
+$(ZMATLIB): zmat/zmatlib.c zmat/zmatlib.h
 	-$(MAKE) -C zmat lib AR=ar CPPOPT="$(DLLFLAG)" CCOPT="$(DLLFLAG)" USERLINKOPT=
 
 ##  Documentation  ##
@@ -325,7 +326,7 @@ doc: makedocdir
 ## Clean
 clean:
 	-$(MAKE) -C zmat clean
-	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(PTXFILE)
+	rm -rf $(OBJS) $(OBJDIR) $(BINDIR) $(DOCDIR) $(PTXFILE) $(ZMATLIB)
 ifdef SUBDIRS
 	for i in $(SUBDIRS); do $(MAKE) --no-print-directory -C $$i clean; done
 endif
