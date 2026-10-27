@@ -298,7 +298,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         cfg->isextdet,
         (uint)(meshlen / (cfg->srcnum * nsrcslots)),  /* framelen = datalen (per-gate stride); slot stride is datalen*maxgate */
         (uint)(mesh->prop + 1 + cfg->isextdet) + (uint)(cfg->extrasrclen * 4) + cfg->detnum,
-        (uint)(MIN((MAX_PROP - (mesh->prop + 1 + cfg->isextdet) - (cfg->extrasrclen * 4) - cfg->detnum), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
+        0u, /*no element normals in __constant memory: the lanes of a warp read those of different elements, which serializes*/
         cfg->issaveseed,
         cfg->seed,
         cfg->maxjumpdebug,

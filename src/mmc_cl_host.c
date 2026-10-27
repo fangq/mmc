@@ -170,7 +170,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mesh->nn, mesh->ne, mesh->nf, cfg->nout, cfg->roulettesize, cfg->srcnum, mesh->srcelemlen,
         cfg->e0, cfg->isextdet, (meshlen / (cfg->srcnum * nsrcslots)),  /* framelen = datalen (per-gate stride); slot stride is datalen*maxgate */
         (mesh->prop + 1 + cfg->isextdet) + (cfg->extrasrclen * 4) + cfg->detnum,
-        (MIN((MAX_PROP - param.maxpropdet), ((mesh->ne) << 2)) >> 2), /*max count of elem normal data in const mem*/
+        0, /*no element normals in __constant memory: the lanes of a warp read those of different elements, which serializes*/
         cfg->issaveseed, cfg->seed, cfg->maxjumpdebug,
         cfg->omega,
         (float)(3.335640951981520e-12),   /* oneoverc0 */
