@@ -1730,14 +1730,29 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
                         totalloss = (totalloss == 0.f) ? 0.f : (1.f - segloss) / totalloss;
                         w0 = ww;
 
+                        /* a midpoint rounded just outside the grid, as an extreme refractive index can
+                           make it, must not index past it; the midpoints lie on a line, so they are all
+                           inside if the first and the last are, and only then the clamp is skipped */
+                        int clampidx;
+                        {
+                            __m128 lo = _mm_mul_ps(S, _mm_set1_ps(dstep)), hi = _mm_mul_ps(_mm_add_ps(S, _mm_mul_ps(T, _mm_set1_ps((float)(seg - 1)))), _mm_set1_ps(dstep));
+                            __m128 dimf = _mm_set_ps(1.f, (float)cfg->dim.z, (float)cfg->dim.y, (float)cfg->dim.x);
+                            /* the negated tests are also true for a NaN */
+                            __m128 out = _mm_or_ps(_mm_or_ps(_mm_cmpnge_ps(lo, _mm_setzero_ps()), _mm_cmpnlt_ps(lo, dimf)),
+                                                   _mm_or_ps(_mm_cmpnge_ps(hi, _mm_setzero_ps()), _mm_cmpnlt_ps(hi, dimf)));
+                            clampidx = (_mm_movemask_ps(out) & 7);
+                        }
+
                         for (i = 0; i < seg; i++) {
                             P = _mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
                             _mm_store_si128((__m128i*) & (idx.x), P);
-                            /* a midpoint rounded just outside the grid, as an extreme
-                               refractive index can make it, must not index past it */
-                            idx.x = MIN(MAX(idx.x, 0), (int)cfg->dim.x - 1);
-                            idx.y = MIN(MAX(idx.y, 0), (int)cfg->dim.y - 1);
-                            idx.z = MIN(MAX(idx.z, 0), (int)cfg->dim.z - 1);
+
+                            if (clampidx) {
+                                idx.x = MIN(MAX(idx.x, 0), (int)cfg->dim.x - 1);
+                                idx.y = MIN(MAX(idx.y, 0), (int)cfg->dim.y - 1);
+                                idx.z = MIN(MAX(idx.z, 0), (int)cfg->dim.z - 1);
+                            }
+
                             unsigned int newidx = idx.z * cfg->crop0.y + idx.y * cfg->crop0.x + idx.x + tshift;
                             r->oldidx = (r->oldidx == 0xFFFFFFFF) ? newidx : r->oldidx;
 
