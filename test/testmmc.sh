@@ -95,7 +95,7 @@ if [ -z "${BACKENDS+x}" ]; then
         case $b in
             opencl) mark='OpenCL' ;;
             cuda)   mark='compiled by nvcc' ;;
-            optix)  mark='optix init complete' ;;
+            optix)  mark='MMC-OptiX' ;;
         esac
         log=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -c $b -G 1 -n 1000 -S 0 -D T 2>&1)
         if echo "$log" | grep -q 'simulated 1000 photons' && echo "$log" | grep -q "$mark"; then

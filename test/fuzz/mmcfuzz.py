@@ -16,6 +16,8 @@ arguments and the log.
 Build mmc with the sanitizers to catch memory errors, e.g. in src/
     make CC='gcc -fsanitize=address,undefined -fno-omit-frame-pointer'
 and fuzz the CPU path (the default -G -1), or a GPU backend with --extra '-c opencl -G 1'.
+With --extra '-c optix ...', the implicit-MMC seeds and mutations and the options OptiX
+does not run (-M other than G, -m 1, -X 1) are left out, and every case runs with -M G.
 """
 import argparse, os, json, random, subprocess, glob, shutil, re, math
 
@@ -47,6 +49,7 @@ ap.add_argument("--timeout", type=float, default=60, help="seconds per run [60]"
 opt = ap.parse_args()
 
 rng = random.Random(opt.seed)
+OPTIX = "optix" in opt.extra.split()
 os.makedirs(opt.out, exist_ok=True)
 EXE = os.path.abspath(opt.bin)
 env = dict(
@@ -61,6 +64,9 @@ seeds = [
     for f in sorted(glob.glob(os.path.join(opt.builtin, "*.json")))
     if os.path.getsize(f) < 2e6 and "atlas" not in f and "colin27" not in f
 ]
+
+if OPTIX:
+    opt.bench = ",".join(b for b in opt.bench.split(",") if "immc" not in b)
 
 for b in filter(None, opt.bench.split(",")):
     p = subprocess.run(
@@ -171,6 +177,17 @@ def meshobj(d):
     return None
 
 
+if OPTIX:
+    seeds = [
+        d
+        for d in seeds
+        if not any(
+            k in (meshobj(d) or {})
+            for k in ("MeshROI", "MeshROIPrim", "noderoi", "edgeroi", "faceroi")
+        )
+    ]
+
+
 def mutate_roi(d):
     """implicit MMC: MeshROI shapes and values, MeshROIPrim rows and the ROI medium"""
     m = meshobj(d)
@@ -249,7 +266,7 @@ def mutate_json(d):
         except Exception:
             pass
 
-    if rng.random() < 0.4:
+    if rng.random() < 0.4 and not OPTIX:
         mutate_roi(d)
 
     sess = d.get("Session") if isinstance(d.get("Session"), dict) else None
@@ -277,9 +294,11 @@ def mutate_cli():
 
     for _ in range(rng.randint(0, 4)):
         f, vals = rng.choice(FLAGS)
-        a += [f, rng.choice(vals)]
 
-    return a
+        if not (OPTIX and f in ("-M", "-m", "-X")):
+            a += [f, rng.choice(vals)]
+
+    return a + (["-M", "G"] if OPTIX else [])
 
 
 def run(args, wd):
@@ -297,7 +316,16 @@ def run(args, wd):
         "san": [
             l for l in txt.splitlines() if "Sanitizer" in l or "runtime error" in l
         ],
+        # a GPU fault is reported through the normal error path: count it as a finding
+        "gpu": re.findall(
+            r"[^\n]*(?:illegal memory access|unspecified launch failure|misaligned address"
+            r"|illegal instruction|CL_OUT_OF_RESOURCES|OPTIX_ERROR)[^\n]*",
+            txt,
+        )[:1],
         "err": re.findall(r"MMC ERROR\(?(-?\d+)\)?", txt),
+        "msg": re.findall(
+            r"(?:MMC ERROR\(?-?\d+\)?|Mesh error):?\s*([^\n]{0,70})", txt
+        )[:1],
         "log": txt,
     }
 
@@ -345,6 +373,9 @@ for c in range(opt.cases):
     if r["san"]:
         found.append("sanitizer: " + r["san"][0][:120])
 
+    if r["gpu"]:
+        found.append("gpu fault: " + r["gpu"][0][:120])
+
     key = found[0].split(":")[0] if found else ("rejected" if r["err"] else "ok")
     stats[key] = stats.get(key, 0) + 1
 
@@ -357,6 +388,10 @@ for c in range(opt.cases):
         )
         open(os.path.join(cd, "mmc.log"), "w").write(r["log"][-6000:])
 
-    print("%4d seed%-3d %-8s %s" % (c, si, key, "; ".join(found)), flush=True)
+    print(
+        "%4d seed%-3d %-8s %s"
+        % (c, si, key, "; ".join(found) or (r["msg"][0] if r["msg"] else "")),
+        flush=True,
+    )
 
 print("SUMMARY", json.dumps(stats))
