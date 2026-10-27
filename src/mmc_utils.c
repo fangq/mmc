@@ -79,6 +79,7 @@ static size_t srcpatternlen = 0;
 
 #define FIND_JSON_STR(id,idfull,parent,fallback) mcx_jsonstr(FIND_JSON_KEY(id,idfull,parent,fallback,valuestring), idfull)
 
+#ifndef MCX_CONTAINER
 static const char* mcx_jsonstr(const char* str, const char* name) {
     if (str == NULL) {
         char msg[MAX_PATH_LENGTH];
@@ -88,6 +89,7 @@ static const char* mcx_jsonstr(const char* str, const char* name) {
 
     return str;
 }
+#endif
 
 /**
  * Macro to load JSON object

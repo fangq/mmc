@@ -2413,7 +2413,7 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
         }
 
         memcpy(session, cfg->session, MAX_SESSION_LENGTH);
-        snprintf(cfg->session, MAX_SESSION_LENGTH, "%s_imag", session);
+        snprintf(cfg->session, MAX_SESSION_LENGTH, "%.*s_imag", MAX_SESSION_LENGTH - 6, session);
         mesh_saveweightdata(mesh, cfg, 0, imag);
         memcpy(cfg->session, session, MAX_SESSION_LENGTH);
         free(imag);
