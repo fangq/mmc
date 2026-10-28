@@ -259,6 +259,11 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+      - name: Update RCS keywords
+        run: |
+          printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
+          rm -rf src/*.c
+          git checkout src/*.c
       - name: Fetch the OptiX headers
         run: |
           git clone --depth 1 --branch v7.5.0 https://github.com/NVIDIA/optix-dev.git ../optix
