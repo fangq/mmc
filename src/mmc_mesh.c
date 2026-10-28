@@ -2864,13 +2864,17 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
             normalizor = Eabsorb / (Etotal * energydeposit * 0.25f); /*scaling factor*/
         } else {
+            /* the tracers deposit the fluence-like (w0-w)/mua: the absorbed energy
+               of an element is its deposit times its mua, and its fluence is the
+               deposit divided by its volume (dividing by mua again made the output
+               of every medium off by the ratio of its mua to the others') */
             for (i = 0; i < datalen; i++)
                 for (j = 0; j < cfg->maxgate; j++) {
-                    energydeposit += mesh->weight[(j * datalen + i) * cfg->srcnum + pair];
+                    energydeposit += mesh->weight[(j * datalen + i) * cfg->srcnum + pair] * mesh->med[mesh->type[i]].mua;
                 }
 
             for (i = 0; i < datalen; i++) {
-                energyelem = mesh->evol[i] * mesh->med[mesh->type[i]].mua;
+                energyelem = mesh->evol[i];
 
                 for (j = 0; j < cfg->maxgate; j++) {
                     mesh->weight[(j * datalen + i) * cfg->srcnum + pair] /= energyelem;
