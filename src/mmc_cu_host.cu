@@ -811,7 +811,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             {
 
                 for (i = 0; i < gpu[gpuid].autothread; i++) {
-                    for (j = 0; j < cfg->srcnum; j++) {
+                    for (j = 0; j < (uint)cfg->srcnum; j++) {
                         cfg->energyesc[j] += energy[(i << 1) * cfg->srcnum + j];
                         cfg->energytot[j] += energy[((i << 1) + 1) * cfg->srcnum + j];
                         energyesc += energy[(i << 1) * cfg->srcnum + j];
@@ -1517,6 +1517,8 @@ void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         mcx_error(-1, "No GPU device found\n", __FILE__, __LINE__);
     }
 
+    mmc_error_reset();
+
 #ifdef _OPENMP
     /**
         Now we are ready to launch one thread for each involked GPU to run the simulation
@@ -1524,15 +1526,21 @@ void mmc_run_cu(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     omp_set_num_threads(activedev);
     #pragma omp parallel
     {
-#endif
-
-        /**
-            This line runs the main MCX simulation for each GPU inside each thread
-         */
-        mmc_run_simulation(cfg, mesh, tracer, gpuinfo);
-
-#ifdef _OPENMP
+        /* an exception can not leave the parallel region: the error of a GPU thread is recorded
+           (see mmc_utils.h) and raised again once all threads have finished */
+        try {
+            mmc_run_simulation(cfg, mesh, tracer, gpuinfo);
+        } catch (...) {
+            mmc_defer_error(-1, "unknown exception in a GPU thread", __FILE__, __LINE__);
+        }
     }
+
+    mmc_raise_deferred();
+#else
+    /**
+        This line runs the main MCX simulation for each GPU inside each thread
+     */
+    mmc_run_simulation(cfg, mesh, tracer, gpuinfo);
 #endif
 }
 

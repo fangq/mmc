@@ -439,6 +439,19 @@ void mcx_matlab_flush(void);
 void mcx_python_flush(void);
 #endif
 
+/**
+ * An exception can not leave an OpenMP parallel region (std::terminate aborts MATLAB, Octave or
+ * Python), so an error raised in one, by a photon or a GPU thread, is recorded and the exception
+ * caught in that thread; the first one recorded is raised again once the region has ended.
+ * The MATLAB/Python modules catch the exceptions of the photons of mmc_run_mp through
+ * mmc_task_guard, which runs task(arg) in a try block and returns non-zero if it threw.
+ */
+extern int (*mmc_task_guard)(void (*task)(void*), void* arg);
+void mmc_defer_error(const int id, const char* msg, const char* file, const int linenum);
+int  mmc_error_pending(void);
+void mmc_error_reset(void);
+void mmc_raise_deferred(void);
+
 
 #ifdef  __cplusplus
 }

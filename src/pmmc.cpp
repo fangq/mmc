@@ -988,6 +988,8 @@ inline void cleanup_mesh(mcconfig& mcx_config, tetmesh& mesh) {
 }
 
 
+static int pmmc_task_guard(void (*task)(void*), void* arg);
+
 py::dict pmmc_interface(const py::dict& user_cfg) {
     unsigned int hostdetreclen;
     mcconfig mcx_config;  /* mcx_config: structure to store all simulation parameters */
@@ -1149,6 +1151,8 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         }
 
         /** Enclose all simulation calls inside a try/catch construct for exception handling */
+        mmc_task_guard = pmmc_task_guard;  /* catches the errors of the photons of mmc_run_mp */
+
         try {
 
             if (mcx_config.compute == cbSSE || mcx_config.gpuid > MAX_DEVICE) {
@@ -1445,6 +1449,25 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
     return output;
 }
 
+
+/**
+ * @brief Run one photon of mmc_run_mp in a try block, see mmc_task_guard in mmc_utils.h
+ *
+ * An exception can not leave the OpenMP parallel region of mmc_run_mp: the error of a photon
+ * is recorded by mcx_error/mesh_error and raised again after the region; the exception is
+ * caught here, in the thread that threw it.
+ */
+
+static int pmmc_task_guard(void (*task)(void*), void* arg) {
+    try {
+        task(arg);
+    } catch (...) {
+        mmc_defer_error(-1, "unknown exception in a simulation thread", __FILE__, __LINE__);
+        return 1;
+    }
+
+    return 0;
+}
 
 /**
  * @brief Error reporting function in PMMC, equivalent to mcx_error in binary mode

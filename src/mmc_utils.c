@@ -1473,6 +1473,76 @@ void mcx_normalize(float field[], float scale, int fieldlen) {
     }
 }
 
+/** set by the MATLAB/Python modules: runs a photon of mmc_run_mp in a try block, see mmc_utils.h */
+int (*mmc_task_guard)(void (*task)(void*), void* arg) = NULL;
+
+static volatile int mmc_deferred_id = 0;  /**< the id of the first error raised in a parallel region, 0: none */
+static char mmc_deferred_msg[MAX_FULL_PATH], mmc_deferred_file[MAX_FULL_PATH];
+static int mmc_deferred_line = 0;
+
+/**
+ * @brief Record an error raised in an OpenMP parallel region, to raise it again after the region
+ *
+ * Only the first error is kept; outside of a parallel region this does nothing.
+ *
+ * @param[in] id: a single integer for the types of the error
+ * @param[in] msg: the error message string
+ * @param[in] file: the unit file name where this error is raised
+ * @param[in] linenum: the line number in the file where this error is raised
+ */
+
+void mmc_defer_error(const int id, const char* msg, const char* file, const int linenum) {
+#ifdef _OPENMP
+
+    if (!omp_in_parallel()) {
+        return;
+    }
+
+    #pragma omp critical(mmc_deferred_error)
+    {
+        if (mmc_deferred_id == 0) {
+            snprintf(mmc_deferred_msg, sizeof(mmc_deferred_msg), "%s", msg ? msg : "unknown error");
+            snprintf(mmc_deferred_file, sizeof(mmc_deferred_file), "%s", file ? file : "");
+            mmc_deferred_line = linenum;
+            mmc_deferred_id = (id != 0) ? id : -1;
+        }
+    }
+#else
+    (void)id;
+    (void)msg;
+    (void)file;
+    (void)linenum;
+#endif
+}
+
+/** @brief Return 1 if an error was raised in a parallel region and not raised again yet */
+
+int mmc_error_pending(void) {
+    return mmc_deferred_id != 0;
+}
+
+/** @brief Forget an error recorded in a parallel region, at the start of a simulation */
+
+void mmc_error_reset(void) {
+    mmc_deferred_id = 0;
+}
+
+/** @brief Raise again the error recorded in a parallel region, once the region has ended */
+
+void mmc_raise_deferred(void) {
+    /* copies of their own, not on the stack: pmmc throws the message pointer */
+    static char msg[MAX_FULL_PATH], file[MAX_FULL_PATH];
+
+    if (mmc_deferred_id != 0) {
+        int id = mmc_deferred_id;
+
+        memcpy(msg, mmc_deferred_msg, sizeof(msg));
+        memcpy(file, mmc_deferred_file, sizeof(file));
+        mmc_deferred_id = 0;
+        mcx_error(id, msg, file, mmc_deferred_line);
+    }
+}
+
 /**
  * @brief Error reporting function
  *
@@ -1484,6 +1554,8 @@ void mcx_normalize(float field[], float scale, int fieldlen) {
 
 void mcx_error(const int id, const char* msg, const char* file, const int linenum) {
 #ifdef MCX_CONTAINER
+    /* an error in a parallel region is raised again once the region has ended */
+    mmc_defer_error(id, msg, file, linenum);
     /* throw outside of any omp critical section: an exception leaving one keeps its
        lock held, so the next error raised in the same mex/python session hangs */
     mmc_throw_exception(id, msg, file, linenum);

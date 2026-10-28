@@ -506,6 +506,7 @@ void mesh_init_from_cfg(tetmesh* mesh, mcconfig* cfg) {
 
 void mesh_error(const char* msg, const char* file, const int linenum) {
 #ifdef MCX_CONTAINER
+    mmc_defer_error(1, msg, file, linenum);  /* raised again after a parallel region, see mmc_utils.h */
     mmc_throw_exception(1, msg, file, linenum);
 #else
     fprintf(stderr, "Mesh error: %s in unit %s line#%d\n", msg, file, linenum);

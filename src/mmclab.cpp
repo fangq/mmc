@@ -101,6 +101,7 @@ typedef mwSize dimtype;                                   //! MATLAB type alias 
 
 void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruct, mcconfig* cfg, tetmesh* mesh);
 void mmclab_usage();
+static int mmclab_task_guard(void (*task)(void*), void* arg);
 mxArray* mmclab_assert(mxArray* arr);
 
 extern const char debugflag[];
@@ -376,6 +377,8 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
 
 
             /** \subsection ssimu Parallel photon transport simulation */
+
+            mmc_task_guard = mmclab_task_guard;  /* catches the errors of the photons of mmc_run_mp */
 
             try {
                 if (cfg.compute == cbSSE || cfg.gpuid > MAX_DEVICE) {
@@ -1362,7 +1365,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
             cfg->srcpattern[k] = val[k];
         }
 
-        printf("mmc.srcpattern=[%ld %ld %ld];\n", arraydim[0], arraydim[1], dimz);
+        printf("mmc.srcpattern=[%lld %lld %lld];\n", (long long)arraydim[0], (long long)arraydim[1], (long long)dimz);
     } else if (strcmp(name, "method") == 0) {
         int len = mxGetNumberOfElements(item);
         const char* methods[] = {"plucker", "havel", "badouel", "elem", "grid", ""};
@@ -1592,7 +1595,7 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
         dimdetps[1] = arraydim[1];
         detps = (float*)malloc(arraydim[0] * arraydim[1] * sizeof(float));
         memcpy(detps, mxGetData(item), arraydim[0]*arraydim[1]*sizeof(float));
-        printf("mmc.detphotons=[%ld %ld];\n", arraydim[0], arraydim[1]);
+        printf("mmc.detphotons=[%lld %lld];\n", (long long)arraydim[0], (long long)arraydim[1]);
     } else if (strcmp(name, "seed") == 0) {
         arraydim = mxGetDimensions(item);
 
@@ -1712,6 +1715,25 @@ mxArray* mmclab_assert(mxArray* arr) {
     return arr;
 }
 
+
+/**
+ * @brief Run one photon of mmc_run_mp in a try block, see mmc_task_guard in mmc_utils.h
+ *
+ * An exception can not leave the OpenMP parallel region of mmc_run_mp: the error of a photon
+ * is recorded by mcx_error/mesh_error and raised again after the region; the exception is
+ * caught here, in the thread that threw it.
+ */
+
+static int mmclab_task_guard(void (*task)(void*), void* arg) {
+    try {
+        task(arg);
+    } catch (...) {
+        mmc_defer_error(-1, "unknown exception in a simulation thread", __FILE__, __LINE__);
+        return 1;
+    }
+
+    return 0;
+}
 
 /**
  * @brief Error reporting function in the mex function, equivallent to mcx_error in binary mode

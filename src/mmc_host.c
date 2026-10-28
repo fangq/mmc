@@ -186,6 +186,22 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     return 0;
 }
 
+/** the arguments of one photon of mmc_run_mp, run through mmc_task_guard by the MATLAB/Python modules */
+typedef struct {
+    size_t id;
+    raytracer* tracer;
+    tetmesh* mesh;
+    mcconfig* cfg;
+    RandType* ran;
+    RandType* ran0;
+    visitor* visit;
+} photontask;
+
+static void mmc_run_photon(void* arg) {
+    photontask* t = (photontask*)arg;
+    onephoton(t->id, t->tracer, t->mesh, t->cfg, t->ran, t->ran0, t->visit);
+}
+
 /**
  * \brief Main function to launch CPU based MMC photon simulation
  *
@@ -205,6 +221,7 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     unsigned int threadid = 0, ncomplete = 0, t0, dt, debuglevel = 0;
     visitor master = {0.f, 0.f, 0.f, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL};
     visitor_init(cfg, &master);
+    mmc_error_reset();
 
     t0 = StartTimer();
 
@@ -321,6 +338,13 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         #pragma omp for reduction(+:raytri,raytri0) schedule(dynamic, 64)
 
         for (id = 0; id < cfg->nphoton; id++) {
+            photontask task = {(size_t)id, tracer, mesh, cfg, ran0, ran1, &visit};
+
+            /* after an error in any photon, skip the rest; it is raised after the parallel region */
+            if (mmc_error_pending()) {
+                continue;
+            }
+
             visit.raytet = 0.f;
             visit.raytet0 = 0.f;
 
@@ -329,9 +353,15 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             }
 
             if (cfg->seed == SEED_FROM_FILE) {
-                onephoton(id, tracer, mesh, cfg, ((RandType*)cfg->photonseed) + id * RAND_BUF_LEN, ran1, &visit);
+                task.ran = ((RandType*)cfg->photonseed) + id * RAND_BUF_LEN;
+            }
+
+            /* the MATLAB/Python modules catch here the exception of an error in this photon,
+               which can not leave the parallel region; the binary exits on an error instead */
+            if (mmc_task_guard) {
+                mmc_task_guard(mmc_run_photon, &task);
             } else {
-                onephoton(id, tracer, mesh, cfg, ran0, ran1, &visit);
+                mmc_run_photon(&task);
             }
 
             raytri += visit.raytet;
@@ -399,6 +429,14 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     if (seeds) {
         free(seeds);
+    }
+
+    /* an error raised by a photon is raised again now that the parallel region has ended */
+    if (mmc_error_pending()) {
+        free(master.partialpath);
+        free(master.photonseed);
+        visitor_clear(&master);
+        mmc_raise_deferred();
     }
 
     /** \subsection sreport Post simulation */
