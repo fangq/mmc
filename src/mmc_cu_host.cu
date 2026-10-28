@@ -325,10 +325,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         sharedmemsize += sizeof(float) * cfg->srcnum;
     }
 
-    gpuid = cfg->deviceid[threadid] - 1;
-
-    sharedmemsize *= ((int)gpu[gpuid].autoblock);
-
 #ifdef _OPENMP
     threadid = omp_get_thread_num();
 #endif
@@ -336,6 +332,11 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     if (threadid < MAX_DEVICE && cfg->deviceid[threadid] == '\0') {
         return;
     }
+
+    /* each OpenMP thread drives the GPU at its own slot in deviceid */
+    gpuid = cfg->deviceid[threadid] - 1;
+
+    sharedmemsize *= ((int)gpu[gpuid].autoblock);
 
     if (gpuid < 0) {
         mcx_error(-1, "GPU ID must be non-zero", __FILE__, __LINE__);
@@ -430,10 +431,10 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         }
     }
 
-    threadphoton = (int)(cfg->nphoton * cfg->workload[gpuid] /
+    threadphoton = (int)(cfg->nphoton * cfg->workload[threadid] /
                          (fullload * gpu[gpuid].autothread * cfg->respin));
     oddphotons =
-        (int)(cfg->nphoton * cfg->workload[gpuid] / (fullload * cfg->respin) -
+        (int)(cfg->nphoton * cfg->workload[threadid] / (fullload * cfg->respin) -
               threadphoton * gpu[gpuid].autothread);
     field = (float*)calloc(sizeof(float) * meshlen * (isrfforward ? 4 : 2), cfg->maxgate);
     dref = (float*)calloc(sizeof(float) * mesh->nf, cfg->maxgate);
@@ -659,7 +660,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                 "- [device %d(%d): %s] threadph=%d oddphotons=%d np=%.1f "
                 "nthread=%d nblock=%d repetition=%d\n",
                 gpuid + 1, gpu[gpuid].id, gpu[gpuid].name, threadphoton,
-                oddphotons, cfg->nphoton * cfg->workload[gpuid] / fullload,
+                oddphotons, cfg->nphoton * cfg->workload[threadid] / fullload,
                 (int)gpu[gpuid].autothread, (int)gpu[gpuid].autoblock,
                 cfg->respin);
 
@@ -946,7 +947,8 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
         } // iteration
     }   // time gates
 
-    #pragma omp master
+    /* with multiple GPUs, every thread adds the field of its own device to the output */
+    #pragma omp critical
     {
         int i, j, srcid;
 
@@ -1025,7 +1027,13 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                 mesh->dref[i] += dref[i];
             }
         }
+    }
 
+    /* normalize only after all devices have added their fields and energies */
+    #pragma omp barrier
+
+    #pragma omp master
+    {
         if (cfg->isnormalized) {
             double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
@@ -1387,6 +1395,13 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
         // total energy here equals total simulated photons+unfinished photons for
         // all threads
+        energytot = energyesc = 0.0;
+
+        for (j = 0; j < (uint)cfg->srcnum; j++) {
+            energytot += cfg->energytot[j];
+            energyesc += cfg->energyesc[j];
+        }
+
         MMC_FPRINTF(cfg->flog,
                     "simulated %ld photons (%ld) with devices (ray-tet "
                     "%.0f)\nMCX simulation speed: %.2f photon/ms\n",
