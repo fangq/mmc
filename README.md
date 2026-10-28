@@ -66,11 +66,13 @@ It is highly recommended to upgrade for all users.
 
 MMC v2026 adds the below key features
 
-* mesh-space adjoint Jacobians (full FEM and nodal approximation) computed on the GPU,
-  per-node mua/musp for diffuse optical tomography, and saving both the forward
-  solution and the Jacobian in one run
-* RF forward and RF/CW adjoint Jacobians ported from MCX, with complex photon weights
-  in the mesh-based (BLBadouel) kernel
+* directly building adjoint Jacobians via `cfg.outputtype='adjoint'`: mesh-space
+  Jacobians (full FEM and nodal approximation) computed on the GPU, per-node mua/musp
+  for diffuse optical tomography, and saving both the forward solution and the
+  Jacobian in one run
+* frequency-domain (FD/RF) forward simulations and adjoint-based FD-Jacobians
+  (complex-valued), ported from MCX, with complex photon weights in the mesh-based
+  (BLBadouel) kernel
 * MCX-compatible multi-source simulations (`cfg.srcid`, JSON array `Pos`/`Dir`,
   per-slot normalization, `srcid` column in detected photon data)
 * new source types: pencilarray, pattern3d, hyperboloid and ring; new OptiX source
