@@ -1,0 +1,87 @@
+{
+	"Session":	{
+		"ID":	"onecube",
+		"Photons":	20,
+		"RNGSeed":	17182818,
+		"DoMismatch":	true,
+		"DoSaveVolume":	true,
+		"DoNormalize":	true,
+		"DoPartialPath":	false,
+		"DoSaveRef":	false,
+		"DoSaveExit":	false,
+		"DoSaveSeed":	false,
+		"DoAutoThread":	true,
+		"DoDCS":	false,
+		"DoSpecular":	false,
+		"DebugFlag":	8448,
+		"BasisOrder":	0,
+		"RayTracer":	"g",
+		"OutputFormat":	"ascii",
+		"OutputType":	"x"
+	},
+	"Forward":	{
+		"T0":	0,
+		"T1":	4.99999996961265e-09,
+		"Dt":	4.99999985859034e-10
+	},
+	"Domain":	{
+		"LengthUnit":	1,
+		"Media":	[{
+				"mua":	0,
+				"mus":	0,
+				"g":	1,
+				"n":	1
+			}, {
+				"mua":	0.00499999988824129,
+				"mus":	1.0101009607315063,
+				"g":	0.00999999977648258,
+				"n":	1
+			}, {
+				"mua":	0.00499999988824129,
+				"mus":	1.0101009607315063,
+				"g":	0.00999999977648258,
+				"n":	1.3700000047683716
+			}],
+		"Dim":	[11, 11, 11]
+	},
+	"Optode":	{
+		"Source":	{
+			"Type":	"pencil",
+			"Pos":	[2, 8, 0],
+			"Dir":	[0, 0, 1, 0],
+			"Param1":	[0, 0, 0, 0],
+			"Param2":	[0, 0, 0, 0],
+			"SrcNum":	1
+		},
+		"Detector":	[{
+				"Pos":	[30, 20, 1],
+				"R":	1
+			}, {
+				"Pos":	[30, 40, 1],
+				"R":	1
+			}, {
+				"Pos":	[20, 30, 1],
+				"R":	1
+			}, {
+				"Pos":	[40, 30, 1],
+				"R":	1
+			}]
+	},
+	"Shapes":	{
+		"MeshNode":	{
+			"_ArrayType_":	"single",
+			"_ArraySize_":	[8, 3],
+			"_ArrayZipType_":	"zlib",
+			"_ArrayZipSize_":	24,
+			"_ArrayZipData_":	"eAFticEJAAAIAh2lVdp/qehTJyiInCcx1YbHu8nR8/sOl+wEjQ=="
+		},
+		"MeshElem":	{
+			"_ArrayType_":	"int32",
+			"_ArraySize_":	[6, 5],
+			"_ArrayZipType_":	"zlib",
+			"_ArrayZipSize_":	30,
+			"_ArrayZipData_":	"eAFNjEkOAEAIwnD2/794IIHEQw/WagEY5JFFysgd+7jpRk77OM23ddtO992pyb8PGlwAdA=="
+		},
+		"InitElem":	3
+	}
+}

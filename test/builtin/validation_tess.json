@@ -1,0 +1,82 @@
+{
+	"Session":	{
+		"ID":	"cube2",
+		"Photons":	100000000,
+		"RNGSeed":	1648335518,
+		"DoMismatch":	false,
+		"DoSaveVolume":	true,
+		"DoNormalize":	true,
+		"DoPartialPath":	false,
+		"DoSaveRef":	false,
+		"DoSaveExit":	false,
+		"DoSaveSeed":	false,
+		"DoAutoThread":	true,
+		"DoDCS":	false,
+		"DoSpecular":	false,
+		"DebugFlag":	2560,
+		"BasisOrder":	0,
+		"RayTracer":	"g",
+		"OutputFormat":	"bin",
+		"OutputType":	"x"
+	},
+	"Forward":	{
+		"T0":	0,
+		"T1":	4.99999996961265e-09,
+		"Dt":	1.00000001335143e-10
+	},
+	"Domain":	{
+		"LengthUnit":	1,
+		"Media":	[{
+				"mua":	0,
+				"mus":	0,
+				"g":	1,
+				"n":	1
+			}, {
+				"mua":	0.00499999988824129,
+				"mus":	1,
+				"g":	0.00999999977648258,
+				"n":	1
+			}],
+		"Dim":	[61, 61, 61]
+	},
+	"Optode":	{
+		"Source":	{
+			"Type":	"pencil",
+			"Pos":	[30.100000381469727, 30.200000762939453, 0],
+			"Dir":	[0, 0, 1, 0],
+			"Param1":	[0, 0, 0, 0],
+			"Param2":	[0, 0, 0, 0],
+			"SrcNum":	1
+		},
+		"Detector":	[{
+				"Pos":	[30, 20, 0],
+				"R":	1
+			}, {
+				"Pos":	[30, 40, 0],
+				"R":	1
+			}, {
+				"Pos":	[20, 30, 0],
+				"R":	1
+			}, {
+				"Pos":	[40, 30, 0],
+				"R":	1
+			}]
+	},
+	"Shapes":	{
+		"MeshNode":	{
+			"_ArrayType_":	"single",
+			"_ArraySize_":	[8, 3],
+			"_ArrayZipType_":	"zlib",
+			"_ArrayZipSize_":	24,
+			"_ArrayZipData_":	"eAFticEJAAAIAp2tidr/FX3qBAWR8ySmy/B4Nzl6ft8BGQcIWQ=="
+		},
+		"MeshElem":	{
+			"_ArrayType_":	"int32",
+			"_ArraySize_":	[6, 5],
+			"_ArrayZipType_":	"zlib",
+			"_ArrayZipSize_":	30,
+			"_ArrayZipData_":	"eAFdi0kKAEAMwuzs/3/xKFgoPeSQoAFgkEcWCTPt6tm0O61tu3r9qt22k+f3AxocAHM="
+		},
+		"InitElem":	2
+	}
+}
