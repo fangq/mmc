@@ -4443,7 +4443,7 @@ void mcx_prep(mcconfig* cfg) {
             cfg->srcdata[is].srcpos.x  = cfg->srcpos.x;
             cfg->srcdata[is].srcpos.y  = cfg->srcpos.y;
             cfg->srcdata[is].srcpos.z  = cfg->srcpos.z;
-            cfg->srcdata[is].srcpos.w  = 1.f / Ns;
+            cfg->srcdata[is].srcpos.w  = 1.f;  /* every slot launches weight-1 photons, as in mmclab/pmmc and mcx */
             cfg->srcdata[is].srcdir.x  = cfg->srcdir.x;
             cfg->srcdata[is].srcdir.y  = cfg->srcdir.y;
             cfg->srcdata[is].srcdir.z  = cfg->srcdir.z;
@@ -4456,7 +4456,7 @@ void mcx_prep(mcconfig* cfg) {
             cfg->srcdata[Ns + id].srcpos.x    = cfg->detpos[id].x;
             cfg->srcdata[Ns + id].srcpos.y    = cfg->detpos[id].y;
             cfg->srcdata[Ns + id].srcpos.z    = cfg->detpos[id].z;
-            cfg->srcdata[Ns + id].srcpos.w    = 1.f / Nd;
+            cfg->srcdata[Ns + id].srcpos.w    = 1.f;
             cfg->srcdata[Ns + id].srcdir.x    = cfg->detdir[id].x;
             cfg->srcdata[Ns + id].srcdir.y    = cfg->detdir[id].y;
             cfg->srcdata[Ns + id].srcdir.z    = cfg->detdir[id].z;

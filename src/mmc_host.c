@@ -164,6 +164,17 @@ int mmc_prep(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
      * points reach this function. */
     mesh_init_srcdata_eid(mesh, cfg);
 
+    /* a source position given without a 4th (weight) element launches photons of
+     * weight 1, as the main source does and as in mcx; a 0 weight launched no
+     * energy, so the outputs of every slot were divided by 0 */
+    if (cfg->srcdata) {
+        for (int slot = 0; slot < cfg->extrasrclen; slot++) {
+            if (cfg->srcdata[slot].srcpos.w == 0.f) {
+                cfg->srcdata[slot].srcpos.w = 1.f;
+            }
+        }
+    }
+
     /* Precompute <grad(phi_i).grad(phi_j)>*Ve for mesh-mode adjoint Jacobian.
      * Required for J_D in elem/node-based mesh adjoint outputs (mcx-style
      * grid adjoint uses finite differences instead and does not need this). */
