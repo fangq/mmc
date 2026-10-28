@@ -116,14 +116,20 @@ MMC v2026 adds the below key features
 
 this release also fixed a list of bugs, including
 
+* the long-standing OpenCL GPU memory leak, first reported in 2020, is finally fixed
+  (#127): on NVIDIA's OpenCL runtime, every simulation lost about 300-400 MB of GPU
+  memory, so repeated mmclab/pmmc calls in one MATLAB/Octave/Python session eventually
+  ran out of GPU memory; an unreleased kernel-launch event kept a reference to the
+  OpenCL context, so the GPU buffers were never freed. AMD, Intel and CPU (POCL)
+  devices were not affected
 * detected photon, trajectory and seed records in `.jdt`/`.jdb` files were tagged
   column-major and were scrambled when loaded by JData readers
 * wide-field sources placed on the mesh surface silently deposited the whole beam
   into one element on the GPU; fourierx/fourierx2d source domains were incorrect
 * low-mua fluence deposition, detector lookup with extra sources, and OpenCL volume
   buffer allocation (contributed by Lorenzo Pattelli, #129-#132)
-* long-standing OpenCL memory leaks (#127), replay with `--optlevel 3` (#122),
-  cone/zgaussian launch direction (#121), immc trajectories and partial paths (#116),
+* replay with `--optlevel 3` (#122), cone/zgaussian launch direction (#121), immc
+  trajectories and partial paths (#116),
   `-F jnii` for detected photons/trajectories (#124), `--maxjumpdebug` (#123),
   unitinmm with `cfg.method='grid'` (#117), faceroi search (#119, #120)
 * no fluence is deposited in non-tissue (label<=0) elements, and the nodal output
