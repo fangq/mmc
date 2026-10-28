@@ -2845,18 +2845,7 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
 
                 for (j = 0; j < cfg->maxgate; j++)
                     for (k = 0; k < 4; k++) {
-                        int node_idx = ee[k] - 1;
-                        float re_val = mesh->weight[(j * mesh->nn + node_idx) * cfg->srcnum + pair];
-
-                        /* RF: deposit is mu_a * |phi| so numerator (Eabsorb from |w|)
-                         * and denominator (energydeposit) share the magnitude convention.
-                         * CW: |phi| = |Re(phi)| reduces to Re(phi) since phi is non-negative. */
-                        if (imag_slot) {
-                            float im_val = imag_slot[j * mesh->nn + node_idx];
-                            energyelem += sqrtf(re_val * re_val + im_val * im_val);
-                        } else {
-                            energyelem += re_val;    /*1/4 factor is absorbed two lines below*/
-                        }
+                        energyelem += mesh->weight[(j * mesh->nn + ee[k] - 1) * cfg->srcnum + pair];    /*1/4 factor is absorbed two lines below*/
                     }
 
                 energydeposit += energyelem * mesh->evol[i] * mesh->med[mesh->type[i]].mua; /**mesh->med[mesh->type[i]].n;*/
@@ -2888,6 +2877,16 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
             }
 
             normalizor = Eabsorb / (Etotal * energydeposit); /*scaling factor*/
+        }
+
+        /* RF: the deposits are complex fluences; in CW the ratio above is the
+           absorbed energy over the integral of mua*phi, which is about 1/Etotal,
+           but the magnitude of a complex fluence integrates to less than the
+           absorbed energy (|sum w*exp(i*theta)| < sum w), so the ratio grew with
+           the frequency (x1.1 at 200 MHz); normalize by the launched energy, as
+           the grid output and mcx do */
+        if (imag_slot) {
+            normalizor = 1.0 / Etotal;
         }
     }
 

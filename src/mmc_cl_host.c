@@ -1087,17 +1087,12 @@ is more than what your have specified (%d), please use the -H option to specify 
 
             for (j = 0; j < cfg->srcnum; j++) {
                 /* with srcid<0, each photon is launched from one of the extrasrclen
-                   slots at random: a grid output is normalized by the energy of
-                   its own slot, as in mcx (the mesh outputs are normalized by the
-                   absorbed energy, which cancels the split) */
-                double slotenergy = cfg->energytot[j];
-
-                if (cfg->method == rtBLBadouelGrid && cfg->extrasrclen > 0 && cfg->srcid < 0) {
-                    slotenergy /= cfg->extrasrclen;
-                }
+                   slots at random: the outputs of a slot are normalized by the
+                   energy launched (and absorbed) in it, as in mcx */
+                double nslot = (cfg->extrasrclen > 0 && cfg->srcid < 0) ? cfg->extrasrclen : 1;
 
                 energyabs =  cfg->energytot[j] - cfg->energyesc[j];
-                cur_normalizer = mesh_normalize(mesh, cfg, energyabs, slotenergy, j);
+                cur_normalizer = mesh_normalize(mesh, cfg, energyabs / nslot, cfg->energytot[j] / nslot, j);
                 sum_normalizer += cur_normalizer;
                 MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: "S_BOLD""S_BLUE"%5.5f%%"S_RESET"\tnormalizor=%g\n",
                                        j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));
