@@ -1,7 +1,9 @@
 %% original mesh
 
 [node, face, c0] = latticegrid([0 60], [0 60], [0 5 10]);
-c0(:, 4) = [2; 3];   % maximum element size for bottom (label 1) and top (label 2) layers
+% maximum element volume of the bottom (label 1) and top (label 2) layers: a coarse
+% mesh (823 nodes), small enough to be distributed with mmc for its unit tests
+c0(:, 4) = [20; 30];
 [node, elem] = surf2mesh(node, face, [], [], 1, [], c0);
 
 figure(1);

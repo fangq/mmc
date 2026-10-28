@@ -4,7 +4,7 @@
 0. 0. -1.           # initial directional vector
 0.0 2e-9 4e-11      # time-gates(s): start, end, step
 widedet             # volume ('uchar' format)
-2033                # initial eid
+0                   # initial eid, 0 to search for the element enclosing the source
 1 0                 # detector number and radius (mm)
 10.0 10.0 -1.0 0.0	# detector 1 position (mm)
 pencil
