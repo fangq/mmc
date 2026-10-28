@@ -626,6 +626,190 @@ static void test_opencl(void) {
 }
 
 /*-----------------------------------------------------------------------------
+ *  features of the CPU and OpenCL paths: RF on the CPU, per-pattern outputs,
+ *  the per-step debug log, buffer limits and per-node optical properties
+ *---------------------------------------------------------------------------*/
+
+static FILE* featlog = NULL;
+
+/** send the log of the next run to utfeat.log */
+static void mut_logfile(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    featlog = fopen("utfeat.log", "w");
+    cfg->flog = featlog ? featlog : devnull;
+}
+
+static void check_closelog(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+
+    if (featlog) {
+        fclose(featlog);
+        featlog = NULL;
+    }
+
+    cfg->flog = devnull;
+}
+
+static void mut_badmethod(mcconfig* cfg, tetmesh* mesh) {
+    (void)mesh;
+    cfg->method = 99;
+}
+
+/** per-node mua and mus equal to those of the medium of the elements */
+static void mut_nodalprop(mcconfig* cfg, tetmesh* mesh) {
+    cfg->nodemua = (float*)malloc(sizeof(float) * mesh->nn);
+    cfg->nodemusp = (float*)malloc(sizeof(float) * mesh->nn);
+
+    for (int i = 0; i < mesh->nn; i++) {
+        cfg->nodemua[i] = mesh->med[1].mua;
+        cfg->nodemusp[i] = mesh->med[1].mus;
+    }
+
+    cfg->isnodalmua = cfg->isnodalmusp = 1;
+}
+
+static double patsum[2];
+
+/** the output of each of the two patterns, interleaved per voxel */
+static void check_patsum(mcconfig* cfg, tetmesh* mesh) {
+    patsum[0] = patsum[1] = 0.;
+
+    for (size_t k = 0; k < (size_t)cfg->crop0.z * cfg->maxgate; k++) {
+        patsum[0] += mesh->weight[k * 2];
+        patsum[1] += mesh->weight[k * 2 + 1];
+    }
+}
+
+static int has_text(const char* fname, const char* key) {
+    FILE* fp = fopen(fname, "rb");
+    char line[4096];
+    int found = 0;
+
+    while (fp && !found && fgets(line, sizeof(line), fp)) {
+        found = (strstr(line, key) != NULL);
+    }
+
+    if (fp) {
+        fclose(fp);
+    }
+
+    return found;
+}
+
+static void test_features(void) {
+    const char* rfjson = "{\"Forward\":{\"Omega\":6.28e8}}";
+    char args[1024], msg[256];
+    RunResult r, rc;
+
+    /* RF on the CPU: the branch-less Badouel tracers in grid (-M G) and mesh (-M s) mode give
+       the imaginary part of the fluence, which agrees with OpenCL; the 8 nodes of this mesh
+       (one cube) give a nodal output that depends on the tracer, so in mesh mode only the
+       phase, the ratio of the imaginary to the real sum, is compared */
+    const char* rfmode[] = {"-M G", "-M s -C 1"};
+
+    for (int i = 0; i < 2; i++) {
+        snprintf(args, sizeof(args), "--bench dmmc-cube60 -G -1 -n 20000 -E 1 %s -O R --json %s -s utcpurf%d", rfmode[i], rfjson, i);
+        r = run_mmc(args, NULL);
+        sprintf(msg, "RF forward on the CPU (%s) gives an imaginary part", rfmode[i]);
+        EXPECT_TRUE(r.ran && r.wsum > 0. && r.imsum != 0. && isfinite(r.imsum), msg);
+
+        if (hasocl) {
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 -G 1 -n 20000 -E 1 %s -O R --json %s -s utclrf%d", rfmode[i], rfjson, i);
+            rc = run_mmc(args, NULL);
+            sprintf(msg, "RF forward on the CPU (%s) agrees with OpenCL within 5%%", rfmode[i]);
+
+            if (i == 0) {
+                EXPECT_TRUE(rc.ran && fabs(r.wsum - rc.wsum) < 0.05 * fabs(rc.wsum) && fabs(r.imsum - rc.imsum) < 0.05 * fabs(rc.imsum), msg);
+            } else {
+                EXPECT_TRUE(rc.ran && rc.wsum > 0. && fabs(r.imsum / r.wsum - rc.imsum / rc.wsum) < 0.05 * fabs(rc.imsum / rc.wsum), msg);
+            }
+        }
+    }
+
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 100 -M H -C 1 -O R --json {\"Forward\":{\"Omega\":6.28e8}}", NULL),
+                "RF on the CPU with the Havel tracer");
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 100 -M G -O R --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Source\":{\"Type\":\"pattern\","
+                        "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,1,1,1,2,2,2,2]}}}}", NULL),
+                "RF on the CPU with two source patterns");
+
+    /* two patterns in grid mode on the CPU: pattern 2 is twice pattern 1, and each output is
+       normalized by its own launched energy, so both give the same fluence */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 5000 -E 1 -M G -s utcpupat --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],"
+                "\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,1,1,1,2,2,2,2]}}}}", check_patsum);
+    EXPECT_TRUE(r.ran && patsum[0] > 0. && fabs(patsum[1] / patsum[0] - 1.) < 1e-3, "two patterns on the CPU are normalized separately");
+
+    /* the per-step debug log (-D S: moves, E: exits, X: edges, R: reflections) of a photon in
+       an implicit-MMC domain with a mismatched boundary */
+    run_premut = mut_logfile;
+    r = run_mmc("--bench nodeimmc -G -1 -n 20 -E 1 -b 1 -D SXCIOERAB --debugphoton 2 -s utfeatlog", check_closelog);
+    run_premut = NULL;
+    EXPECT_TRUE(r.ran && has_text("utfeat.log", "\"move\"") && has_text("utfeat.log", "\"implicit\""), "the per-step debug log records the moves and the ROI steps");
+
+    /* more trajectory points than --maxjumpdebug keeps */
+    r = run_mmc("--bench dmmc-cube60 -G -1 -n 200 -E 1 -M H -C 1 -D M --maxjumpdebug 50 -s utcpujump", NULL);
+    EXPECT_TRUE(r.ran && r.ntraj == 50, "the trajectory is capped at --maxjumpdebug points on the CPU");
+
+    /* invalid settings */
+    run_premut = mut_badmethod;
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 10", NULL), "an undefined ray-tracing method");
+    run_premut = NULL;
+    EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 100 -M H -C 0 -O A --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", NULL),
+                "a mesh-mode adjoint Jacobian with element output (-C 0)");
+
+    if (!hasocl) {
+        return;
+    }
+
+    /* per-node mua and mus (redbird's DOT reconstruction) equal to the medium give the same output */
+    r = run_mmc("--bench dmmc-cube60 -G 1 -n 20000 -E 1 -M H -C 1 -s utclplain", NULL);
+    run_premut = mut_nodalprop;
+    rc = run_mmc("--bench dmmc-cube60 -G 1 -n 20000 -E 1 -M H -C 1 -s utclnodal", NULL);
+    run_premut = NULL;
+    EXPECT_TRUE(rc.ran && fabs(rc.wsum - r.wsum) < 0.02 * r.wsum, "per-node mua and mus equal to the medium give the same fluence on OpenCL");
+
+    /* the OpenCL progress bar, and more detected photons or trajectory points than kept */
+    r = run_mmc("--bench dmmc-cube60 -G 1 -n 20000 -E 1 -M H -C 1 -D P -s utclprog", NULL);
+    EXPECT_TRUE(r.ran && r.wsum > 0., "the progress bar on OpenCL");
+    r = run_mmc("--bench dmmc-cube60 -G 1 -n 20000 -E 1 -M H -C 1 -d 1 -H 10 -s utclmaxdet --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":4}]}}", NULL);
+    EXPECT_TRUE(r.ran && r.detected == 10, "the detected photons are capped at -H on OpenCL");
+    r = run_mmc("--bench dmmc-cube60 -G 1 -n 200 -E 1 -M H -C 1 -D M --maxjumpdebug 50 -s utcljump", NULL);
+    EXPECT_TRUE(r.ran && r.ntraj == 50, "the trajectory is capped at --maxjumpdebug points on OpenCL");
+
+#ifdef USE_CUDA
+    /* the same on CUDA, in this process as the last runs of this group (a forked child can not
+       use the GPU once it is initialized): per-node mua and mus, and the nodal-approximation
+       mesh adjoint (adjointmode 1, set by mmclab/pmmc), alone, dual and dual with RF, which
+       agree with OpenCL */
+    {
+        const char* adj[] = {
+            "-O A --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}",
+            "-O W --json {\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}",
+            "-O W --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}",
+        };
+
+        r = run_mmc("--bench dmmc-cube60 --compute cuda -G 1 -n 20000 -E 1 -M H -C 1 -s utcuplain", NULL);
+        run_premut = mut_nodalprop;
+        rc = run_mmc("--bench dmmc-cube60 --compute cuda -G 1 -n 20000 -E 1 -M H -C 1 -s utcunodal", NULL);
+        EXPECT_TRUE(rc.ran && fabs(rc.wsum - r.wsum) < 0.02 * r.wsum, "per-node mua and mus equal to the medium give the same fluence on CUDA");
+
+        run_premut = mut_adjointnodal;
+
+        for (int i = 0; i < 3; i++) {
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 --compute opencl -G 1 -n 20000 -E 1234 -M H -C 1 %s -s utclna%d", adj[i], i);
+            rc = run_mmc(args, NULL);
+            snprintf(args, sizeof(args), "--bench dmmc-cube60 --compute cuda -G 1 -n 20000 -E 1234 -M H -C 1 %s -s utcuna%d", adj[i], i);
+            r = run_mmc(args, NULL);
+            printf("  nodal mesh adjoint %d: J sum cuda %.6g opencl %.6g, output sum cuda %.6g opencl %.6g\n", i + 1, r.jsum, rc.jsum, r.wsum, rc.wsum);
+            sprintf(msg, "the nodal mesh adjoint %d on CUDA agrees with OpenCL within 5%%", i + 1);
+            EXPECT_TRUE(r.ran && rc.jsum != 0. && fabs(r.jsum - rc.jsum) < 0.05 * fabs(rc.jsum), msg);
+        }
+
+        run_premut = NULL;
+    }
+#endif
+}
+
+/*-----------------------------------------------------------------------------
  *  input files: .inp with text mesh files, JSON examples, ROI files and a
  *  wide-field detector; the example folders are copied to the temporary folder
  *---------------------------------------------------------------------------*/
@@ -2116,6 +2300,69 @@ static void test_utilfuncs(void) {
 
         free(buf);
     }
+
+    /* JData arrays over 4 MB: zlib/gzip deflate them in parallel blocks and save the block
+       index as _ArrayZipOffsets_, which the reader uses to inflate them in parallel; a
+       malformed index falls back to a serial inflate */
+    {
+        const uint len = 3u << 20;  /* 12 MB of float32 */
+        uint dims[1] = {len};
+        float* data = (float*)malloc(len * sizeof(float));
+        const int zips[2] = {zmZlib, zmGzip};
+        const char* bad[] = {"[[0,0],[1,1],[2]]", "[0,0]", "[[0,0],[-1,5],[9,9]]", "[[0,0],[\"a\",1],[9,9]]"};
+        mcconfig cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.flog = devnull;
+        cfg.isdumpjson = 1;
+
+        for (uint i = 0; i < len; i++) {
+            data[i] = (float)((i * 2654435761u) % 1000u) * 0.5f;
+        }
+
+        for (int z = 0; z < 2; z++) {
+            cJSON* obj = cJSON_CreateObject();
+            int ret = mcx_jdataencode(data, 1, dims, (char*)"single", sizeof(float), zips[z], obj, 0, 0, &cfg);
+            cJSON* idx = cJSON_GetObjectItem(obj, "_ArrayZipOffsets_");
+            EXPECT_TRUE(ret == 0 && idx && cJSON_GetArraySize(idx) >= 3, "a 12 MB zlib/gzip array saves _ArrayZipOffsets_");
+
+            void* out = NULL;
+            char* type = NULL;
+            int ndim = 0;
+            uint odims[1] = {0};
+            mcx_jdatadecode(&out, &ndim, odims, 1, &type, obj, &cfg);
+            EXPECT_TRUE(out && odims[0] == len && memcmp(out, data, len * sizeof(float)) == 0, "a 12 MB zlib/gzip array is inflated in parallel blocks");
+            free(out);
+
+            for (int b = 0; b < 4; b++) {
+                cJSON_ReplaceItemInObject(obj, "_ArrayZipOffsets_", cJSON_Parse(bad[b]));
+                out = NULL;
+                mcx_jdatadecode(&out, &ndim, odims, 1, &type, obj, &cfg);
+                EXPECT_TRUE(out && memcmp(out, data, len * sizeof(float)) == 0, "an array with a malformed _ArrayZipOffsets_ is inflated serially");
+                free(out);
+            }
+
+            cJSON_Delete(obj);
+
+            /* binary JSON: the index is written as an array of uint64 pairs */
+            size_t cap = len * sizeof(float) + (1 << 20), n, found = 0;
+            unsigned char* ubj = (unsigned char*)malloc(cap);
+            ubjw_context_t* root = ubjw_open_memory(ubj, ubj + cap);
+            ubjw_begin_object(root, UBJ_MIXED, 0);
+            ret = mcx_jdataencode(data, 1, dims, (char*)"single", sizeof(float), zips[z], root, 1, 0, &cfg);
+            ubjw_end(root);
+            n = ubjw_close_context(root);
+
+            for (size_t i = 0; i + 17 <= n && !found; i++) {
+                found = (memcmp(ubj + i, "_ArrayZipOffsets_", 17) == 0);
+            }
+
+            EXPECT_TRUE(ret == 0 && found, "a 12 MB zlib/gzip BJData array saves _ArrayZipOffsets_");
+            free(ubj);
+        }
+
+        free(data);
+    }
 }
 
 /*-----------------------------------------------------------------------------
@@ -2223,6 +2470,47 @@ static void test_gpubackends(void) {
         {"mesh elem (-M H -C 0)",            "-M H -C 0", 0, 0},
         {"mesh, adjoint J_mua (-C 1 -O A)",  "-M H -C 1 -O A", 1, 0},
         {"mesh, adjoint J_musp (-C 1 -O V)", "-M H -C 1 -O V", 1, 0},
+        {
+            "grid, RF dual adjoint (-O W)",     "-M G -O W --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 2
+        },
+        {
+            "grid, RF adjoint J_musp (-O V)",   "-M G -O V --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 2
+        },
+        {
+            "grid, RF field of each slot",      "-M G -O R --srcid -1 --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 2
+        },
+        {"mesh nodal, RF forward (-O R)",    "-M H -C 1 -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0, 0},
+        {"mesh elem, RF forward (-O R)",     "-M H -C 0 -O R --json {\"Forward\":{\"Omega\":6.28e8}}", 0, 0},
+        {
+            "grid, pattern3d source",           "-M G --json {\"Optode\":{\"Source\":{\"Type\":\"pattern3d\",\"Pos\":[29,44,14],"
+            "\"Param1\":[2,2,2,0],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Nz\":2,\"Data\":[1,1,1,1,1,1,1,1]}}}}", 0, 2
+        },
+        {"grid, respin (-r 2)",              "-M G -r 2", 0, 2},
+        {"grid, manual threads (-A 0)",      "-M G -A 0 -t 4000 -T 64 -g 10 --json {\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":1e-9}}", 0, 2},
+        {"mesh, diffuse reflectance (-X 1)", "-M H -C 1 -X 1", 0, 0},
+        {"mesh, progress bar (-D P)",        "-M H -C 1 -D P", 0, 0},
+        {"grid, more photons than -H",       "-M G -d 1 -H 10", 1, 2},
+        {"grid, more steps than --maxjumpdebug", "-M G -D M --maxjumpdebug 100", 0, 2},
+        {
+            "grid, RF forward, detected photons", "-M G -O R -d 1 --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 2
+        },
+        {"grid, adjoint, detected photons",  "-M G -O A -d 1", 1, 2},
+        {
+            "grid, RF adjoint, detected photons", "-M G -O W -d 1 --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 2
+        },
+        {
+            "mesh, RF dual adjoint (-C 1 -O W)", "-M H -C 1 -O W --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 0
+        },
+        {
+            "mesh nodal, RF field of each slot", "-M H -C 1 -O R --srcid -1 --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Detector\":"
+            "[{\"Pos\":[30,40,0],\"R\":2,\"Dir\":[0,0,1]}]}}", 0, 0
+        },
     };
     const struct {
         const char* name;
@@ -2318,6 +2606,34 @@ static void test_gpubackends(void) {
                 /* OptiX must report an unsupported feature as an error, not crash or run */
                 sprintf(msg, "%s: %s is rejected with an error", backend[b].name, cases[i].name);
                 EXPECT_TRUE(ret > 0, msg);
+            }
+        }
+    }
+
+    /* implicit MMC (edge, node and face ROIs): OpenCL and CUDA agree */
+    {
+        const char* immc[] = {"edgeimmc", "nodeimmc", "faceimmc"};
+        double ref[3] = {0., 0., 0.};
+
+        for (int b = 0; b < 2; b++) {
+            if (!backend[b].available) {
+                continue;
+            }
+
+            for (int i = 0; i < 3; i++) {
+                RunResult r;
+                snprintf(args, sizeof(args), "--bench %s %s -G 1 -n 20000 -E 1234 -s utgbimmc%d%d", immc[i], backend[b].flag, b, i);
+                int ret = run_isolated(args, &r);
+                sprintf(msg, "%s: implicit MMC %s runs", backend[b].name, immc[i]);
+                EXPECT_TRUE(ret == 0 && r.wsum > 0., msg);
+
+                if (b == 0) {
+                    ref[i] = r.wsum;
+                } else if (ref[i] > 0.) {
+                    printf("  implicit MMC %-21s output sum %.6g (%.1f%% from opencl)\n", immc[i], r.wsum, fabs(r.wsum - ref[i]) / ref[i] * 100.);
+                    sprintf(msg, "%s: implicit MMC %s agrees with opencl within 5%%", backend[b].name, immc[i]);
+                    EXPECT_TRUE(fabs(r.wsum - ref[i]) < 0.05 * ref[i], msg);
+                }
             }
         }
     }
@@ -2475,6 +2791,7 @@ int main(int argc, char** argv) {
     test_mmclab_path();
     test_clerrors();
     test_opencl();
+    test_features();
     test_gpubackends();
     test_optixsources();
     test_optixadjoint();
