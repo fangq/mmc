@@ -988,11 +988,19 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
 
                             for (j = 0; j < mesh->ne; j++) {
                                 float ww = field[slot_off_f + f_gate_off + j] * 0.25f;
+                                /* RF: the imaginary part of each slot goes onto the nodes too, or the
+                                   RF mesh adjoint Jacobians see a zero imaginary fluence */
+                                float ww_im = (isrfforward && cfg->exportadjoint)
+                                              ? field[slot_off_f + f_gate_off + j + fieldlen] * 0.25f : 0.f;
                                 int k;
 
                                 for (k = 0; k < mesh->elemlen; k++) {
-                                    cfg->exportfield[slot_off_e + e_gate_off
-                                                                + mesh->elem[j * mesh->elemlen + k] - 1] += ww;
+                                    size_t nidx = slot_off_e + e_gate_off + mesh->elem[j * mesh->elemlen + k] - 1;
+                                    cfg->exportfield[nidx] += ww;
+
+                                    if (isrfforward && cfg->exportadjoint) {
+                                        cfg->exportadjoint[nidx] += ww_im;
+                                    }
                                 }
                             }
                         }
