@@ -2426,8 +2426,15 @@ static void test_optixadjoint(void) {
         EXPECT_TRUE(jo[0][i] != 0. && fabs(jo[1][i] - jo[0][i]) < tol[i] * fabs(jo[0][i]), msg);
     }
 
-    EXPECT_NEAR(jo[1][2] / jo[1][1], jo[0][2] / jo[0][1], 0.01 * fabs(jo[0][2] / jo[0][1]), "optix: J_mus/J_D is the chain-rule factor of opencl");
-    EXPECT_NEAR(jo[1][3] / jo[1][1], jo[0][3] / jo[0][1], 0.01 * fabs(jo[0][3] / jo[0][1]), "optix: J_musp/J_D is the chain-rule factor of opencl");
+    /* the chain-rule factors of the dmmc-cube60 medium (mus=1, g=0.01): 1/(3*(1-g)*mus^2)
+       for J_mus, 1/(3*(1-g)^2*mus^2) for J_musp; an OptiX run traces the same photons for
+       each output, so its ratio is exact, while the photons of two OpenCL runs differ with
+       the dynamic photon dispatch, by ~2% in the ratio */
+    const double fmus = 1. / (3. * 0.99), fmusp = 1. / (3. * 0.99 * 0.99);
+    EXPECT_NEAR(jo[1][2] / jo[1][1], fmus, 0.01 * fmus, "optix: J_mus/J_D is the chain-rule factor");
+    EXPECT_NEAR(jo[1][3] / jo[1][1], fmusp, 0.01 * fmusp, "optix: J_musp/J_D is the chain-rule factor");
+    EXPECT_NEAR(jo[0][2] / jo[0][1], fmus, 0.05 * fmus, "opencl: J_mus/J_D is the chain-rule factor");
+    EXPECT_NEAR(jo[0][3] / jo[0][1], fmusp, 0.05 * fmusp, "opencl: J_musp/J_D is the chain-rule factor");
 #endif
 }
 
