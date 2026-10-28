@@ -99,7 +99,6 @@ add_library(mmc STATIC
     mmc_host.h
     mmc_raytrace.c
     mmc_raytrace.h
-    mmc_rand_xorshift128p.c
     mmc_rand_xorshift128p.h
     mmc_bench.h
     mmc_bench.c
@@ -212,7 +211,6 @@ if(BUILD_PYTHON)
             mmc_host.h
             mmc_raytrace.c
             mmc_raytrace.h
-            mmc_rand_xorshift128p.c
             mmc_rand_xorshift128p.h
             mmc_bench.h
             mmc_bench.c
@@ -267,7 +265,6 @@ if(BUILD_MEX AND Matlab_FOUND)
             mmc_host.h
             mmc_raytrace.c
             mmc_raytrace.h
-            mmc_rand_xorshift128p.c
             mmc_rand_xorshift128p.h
             mmc_bench.h
             mmc_bench.c
@@ -318,7 +315,6 @@ if(BUILD_MEX AND Matlab_FOUND)
                 mmc_host.h
                 mmc_raytrace.c
                 mmc_raytrace.h
-                mmc_rand_xorshift128p.c
                 mmc_rand_xorshift128p.h
                 mmc_bench.h
                 mmc_bench.c

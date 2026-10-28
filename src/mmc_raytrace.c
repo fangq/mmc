@@ -62,6 +62,7 @@ static inline float mmc_fluence_deposit(float w0, float w1, float mua, float len
     return (mua < EPS) ? (w0 * len) : ((w0 - w1) / mua);
 }
 
+#ifdef MMC_USE_SSE  /* only the SSE branchless Badouel tracer makes the RF forward deposit */
 /**
  * RF forward (frequency domain) deposit of one step on the CPU.  The photon's complex
  * weight is |w| e^{-i omega t}: r->weight stays the real, decaying magnitude, so the
@@ -88,6 +89,7 @@ static inline void mmc_rf_deposit(float w0, double phase0, float mua, float a, f
     *re = (float)(w0 * (fr * c + fi * s));
     *im = (float)(w0 * (fi * c - fr * s));
 }
+#endif
 
 /**
  * \brief Tetrahedron face edge indices

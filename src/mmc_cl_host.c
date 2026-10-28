@@ -352,7 +352,10 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             cfg->exportdebugdata = (float*)calloc(sizeof(float), (debuglen * cfg->maxjumpdebug));
         }
 
-        cl_mem (*clCreateBufferNV)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*) = (cl_mem (*)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*)) clGetExtensionFunctionAddressForPlatform(platform, "clCreateBufferNV");
+        /* ISO C/C++ has no cast from an object pointer to a function pointer: copy the address */
+        void* nvaddr = clGetExtensionFunctionAddressForPlatform(platform, "clCreateBufferNV");
+        cl_mem (*clCreateBufferNV)(cl_context, cl_mem_flags, cl_mem_flags_NV, size_t, void*, cl_int*);
+        memcpy(&clCreateBufferNV, &nvaddr, sizeof(nvaddr));
 
         if (clCreateBufferNV == NULL) {
             OCL_TRY(((gprogress[0] = clCreateBuffer(mcxcontext, RW_PTR, sizeof(cl_uint), NULL, &status), status)));
