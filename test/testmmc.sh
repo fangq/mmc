@@ -68,7 +68,7 @@ a=""
 for roig in keep 0; do
     if [ "$roig" = keep ]; then filter=cat; else filter='sed -E /"mua":[[:space:]]*23\.05/{n;n;s/"g":[[:space:]]*[0-9.]+/"g":0/;}'; fi
     a="$a $(cd "$WORKDIR" && "$MMC" --bench edgeimmc -G -1 --dumpjson - 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | $filter |
-            OMP_NUM_THREADS=1 "$MMC" -f - -G -1 -n 1e4 -E 12345 -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'absorbed: *[0-9.]+%' | tr -d ' ')"
+            OMP_NUM_THREADS=1 "$MMC" -f - -G -1 -n 1e4 -E 12345 -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'absorbed: *[0-9.]+%' | head -1 | tr -d ' ')"
 done
 set -- $a
 if [ $# -ne 2 ] || [ "$1" = "$2" ]; then echo "fail: ROI g has no effect ($a)"; fail=$((fail + 1)); else echo "ok"; fi
@@ -77,7 +77,7 @@ echo "test photon replay ... "
 # the baseline saves the detected photons and their seeds (-d 1 -q 1) in an .mch file; the
 # replay must launch exactly the detected photons, i.e. its total launched energy equals their count
 ndet=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -n 1e5 -S 0 -d 1 -q 1 -F mc2 -s replaytest -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'detected [0-9]+ photons' | grep -o -E '[0-9]+')
-nrep=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -E replaytest.mch -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'total simulated energy: *[0-9]+' | grep -o -E '[0-9]+$')
+nrep=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -E replaytest.mch -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'total simulated energy: *[0-9]+' | head -1 | grep -o -E '[0-9]+$')
 if [ -z "$ndet" ] || [ "$ndet" = "0" ] || [ "$ndet" != "$nrep" ]; then echo "fail to replay detected photons (detected ${ndet:-none}, replayed ${nrep:-none})"; fail=$((fail + 1)); else echo "ok"; fi
 
 echo "test step-by-step photon trajectories ... "

@@ -50,6 +50,15 @@ if ! ls "$BUILTIN"/*.json > /dev/null 2>&1; then
     exit 0
 fi
 
+# timeout is gtimeout on macOS with coreutils, and may be missing
+TIMEOUTCMD=""
+if command -v timeout > /dev/null 2>&1; then
+    TIMEOUTCMD="timeout $TIMEOUT"
+elif command -v gtimeout > /dev/null 2>&1; then
+    TIMEOUTCMD="gtimeout $TIMEOUT"
+fi
+ESC=$(printf '\033')  # BSD sed has no \x1b
+
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
 
@@ -63,7 +72,7 @@ skip=0
 
 for json in "$BUILTIN"/*.json; do
     name=$(basename "$json" .json)
-    log=$(cd "$WORKDIR" && timeout "$TIMEOUT" "$BIN" -f "$json" -n "$NPHOTON" -E "$SEED" -s "$name" $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+    log=$(cd "$WORKDIR" && $TIMEOUTCMD "$BIN" -f "$json" -n "$NPHOTON" -E "$SEED" -s "$name" $PARAM 2>&1 | sed "s/${ESC}\[[0-9;]*m//g")
     absorbed=$(echo "$log" | grep -o -E "absorbed: *[0-9.]+%" | grep -o -E "[0-9.]+" | paste -sd, -)
     detected=$(echo "$log" | grep -o -E "detected [0-9]+ photons" | head -1 | grep -o -E "[0-9]+")
     detected=${detected:-0}

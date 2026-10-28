@@ -429,6 +429,19 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         cfg->his.normalizer = sum_normalizer / cfg->srcnum; // average normalizer value for all simulated sources
     }
 
+    /* the summary the GPU backends print, also without -D T */
+    {
+        double etot = 0., eabs = 0.;
+
+        for (j = 0; j < cfg->srcnum; j++) {
+            etot += master.launchweight[j];
+            eabs += master.absorbweight[j];
+        }
+
+        MMC_FPRINTF(cfg->flog, "total simulated energy: %.2f\tabsorbed: %5.5f%%\n(loss due to initial specular reflection is excluded in the total)\n",
+                    etot, (etot > 0.) ? eabs / etot * 100. : 0.);
+    }
+
 #ifndef MCX_CONTAINER
 
     if (cfg->issave2pt && cfg->parentid == mpStandalone) {
