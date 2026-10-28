@@ -223,7 +223,10 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
 
         for (int j = 0; j < cfg->srcnum; j++) {
             double etot = cfg->energytot[j], eabs = cfg->energytot[j] - cfg->energyesc[j];
-            double normalizer = mesh_normalize(mesh, cfg, eabs, etot, j);
+            /* with srcid<0, each photon is launched from one of the extrasrclen slots at
+               random: the grid output of a slot is normalized by its own energy, as in mcx */
+            double slotenergy = (cfg->extrasrclen > 0 && optixcfg.launchParams.srcid < 0) ? etot / cfg->extrasrclen : etot;
+            double normalizer = mesh_normalize(mesh, cfg, eabs, slotenergy, j);
             sum_normalizer += normalizer;
             MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
                                    j + 1, etot, (etot > 0.0) ? 100.f * eabs / etot : 0.f, normalizer));

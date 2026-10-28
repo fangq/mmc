@@ -1030,8 +1030,18 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
             double cur_normalizer, sum_normalizer = 0.0, energyabs = 0.0;
 
             for (j = 0; j < (uint)cfg->srcnum; j++) {
+                /* with srcid<0, each photon is launched from one of the extrasrclen
+                   slots at random: a grid output is normalized by the energy of
+                   its own slot, as in mcx (the mesh outputs are normalized by the
+                   absorbed energy, which cancels the split) */
+                double slotenergy = cfg->energytot[j];
+
+                if (cfg->method == rtBLBadouelGrid && cfg->extrasrclen > 0 && cfg->srcid < 0) {
+                    slotenergy /= cfg->extrasrclen;
+                }
+
                 energyabs =  cfg->energytot[j] - cfg->energyesc[j];
-                cur_normalizer = mesh_normalize(mesh, cfg, energyabs, cfg->energytot[j], j);
+                cur_normalizer = mesh_normalize(mesh, cfg, energyabs, slotenergy, j);
                 sum_normalizer += cur_normalizer;
                 MMCDEBUG(cfg, dlTime, (cfg->flog, "source %d\ttotal simulated energy: %f\tabsorbed: " S_BOLD "" S_BLUE "%5.5f%%" S_RESET "\tnormalizor=%g\n",
                                        j + 1, cfg->energytot[j], 100.f * energyabs / cfg->energytot[j], cur_normalizer));

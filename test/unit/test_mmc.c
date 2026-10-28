@@ -725,6 +725,25 @@ static void test_inputfiles(void) {
     write_file("utms5.json", json, strlen(json));
     EXPECT_EXIT(run_mmc("-f utms5.json -G -1 -s utms5", NULL), "srcid beyond the source count is an error");
 
+    /* OpenCL grid output of two identical sources (srcid -1): the photons are
+       split between the slots, but each slot is normalized to its own share, so
+       it matches a run of one source; it was 1/2 of it, and adjoint Jacobians 1/4 */
+    if (hasocl) {
+        const char* gsjson = "{\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},\"Session\":{\"Photons\":40000,\"RNGSeed\":17182818,\"ID\":\"utgs\"},"
+                             "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-9},\"Optode\":{\"Source\":{\"Pos\":[[2,8,0],[2,8,0]],"
+                             "\"Dir\":[[0,0,1,0],[0,0,1,0]],\"ID\":%d}}}";
+        RunResult rm, r1;
+
+        snprintf(json, sizeof(json), gsjson, -1);
+        write_file("utgsm.json", json, strlen(json));
+        snprintf(json, sizeof(json), gsjson, 1);
+        write_file("utgs1.json", json, strlen(json));
+        rm = run_mmc("-f utgsm.json -G 1 -M G -s utgsm", NULL);
+        r1 = run_mmc("-f utgs1.json -G 1 -M G -s utgs1", NULL);
+        EXPECT_TRUE(rm.ran && r1.ran && r1.wsum > 0., "grid output of two sources and of one");
+        EXPECT_NEAR(rm.wsum / r1.wsum, 1.0, 0.05, "grid output: each source slot is normalized to its own photons");
+    }
+
     /* implicit MMC: node, face and edge ROIs read from roi_onecube.dat */
     write_roi("roi_onecube.dat", 1, 8, 0.5f);
     r = run_mmc("-f onecube.inp -G -1 -n 300 -s utroin", NULL);
