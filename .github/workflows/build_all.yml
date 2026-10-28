@@ -108,7 +108,8 @@ jobs:
             # dead-stripped, so the mex API resolves in the liboctmex that the running Octave (any
             # 10+ version, wherever installed) has loaded (mkoctfile links with -undefined dynamic_lookup)
             mkdir -p octstub && echo "" | clang -dynamiclib -x c - -o "$PWD/octstub/liboctmex.dylib" -install_name @rpath/liboctmex-stub.dylib
-            make oct${{ env.OMPONLY }} CC=gcc-12 CXX=g++-12 MEXLINKOPT="-L$PWD/octstub -Wl,-dead_strip_dylibs" USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-fopenmp -static-libgcc -static-libstdc++'"
+            # libgomp.a comes from OPENMPLIB of the Makefile; -fopenmp here linked it twice
+            make oct${{ env.OMPONLY }} CC=gcc-12 CXX=g++-12 MEXLINKOPT="-L$PWD/octstub -Wl,-dead_strip_dylibs" USEROCTOPT="CXXFLAGS='-pipe -Os -arch x86_64' DL_LD=g++ DL_LDFLAGS='-static-libgcc -static-libstdc++'"
             otool -L ../mmclab/mmc.mex
             if otool -L ../mmclab/mmc.mex | tail -n +2 | grep -E "liboctmex|/opt/homebrew|/usr/local"; then
                 echo "the mex links a library of the build machine"; exit 1

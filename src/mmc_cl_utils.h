@@ -37,7 +37,8 @@
 #define CL_TARGET_OPENCL_VERSION 120
 
 #ifdef __APPLE__
-    #include <OpenCL/cl.h>
+    /* the Khronos headers: the OpenCL framework headers mark every function deprecated */
+    #include "khronos/cl.h"
 #else
     #include <CL/cl.h>
 #endif
