@@ -4614,7 +4614,8 @@ unsigned int* mcx_getsdmap(mcconfig* cfg) {
  */
 
 void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
-    int i = 1, isinteractive = 1, issavelog = 0;
+    int i = 1, isinteractive = 1;
+    char issavelog = -1;  /* -l: 1 the log in <session>.log, 0 no banner; a bare -l is 1 */
     char filename[MAX_PATH_LENGTH] = {0}, *jsoninput = NULL;
     char logfile[MAX_PATH_LENGTH] = {0};
     float np = 0.f;
@@ -4832,7 +4833,7 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                     break;
 
                 case 'l':
-                    issavelog = 1;
+                    i = mcx_readarg(argc, argv, i, &issavelog, "bool");
                     break;
 
                 case 'L':
@@ -5060,8 +5061,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
         i++;
     }
 
-    if (issavelog && cfg->session[0]) {
-        sprintf(logfile, "%s.log", cfg->session);
+    if (issavelog == 0) {
+        cfg->printnum = -1;
+    }
+
+    if (issavelog > 0) {
+        sprintf(logfile, "%s.log", (cfg->session[0] ? cfg->session : "unnamed"));
         cfg->flog = fopen(logfile, "wt");
 
         if (cfg->flog == NULL) {
@@ -5345,7 +5350,8 @@ where possible parameters include (the first item in [] is the default value)\n\
 == User IO options ==\n"S_RESET"\
  -h            (--help)        print this message\n\
  -v            (--version)     print MMC version information\n\
- -l            (--log)         print messages to a log file instead\n\
+ -l [1|0]      (--log)         1 or no value: messages to <session>.log;\n\
+                               0: print them on the screen without the banner\n\
  -i            (--interactive) interactive mode\n\
 \n"S_BOLD S_CYAN"\
 == Debug options ==\n"S_RESET"\

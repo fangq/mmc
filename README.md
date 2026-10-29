@@ -574,6 +574,7 @@ mmc -Q dmmc-cube60 -n 1e7
 | `-G n` or `-G '0110'`, `--gpu` | device n (from 1, see `-L`), several devices as a 0/1 mask, or `-1` for the CPU (`sse`) |
 | `-W '50,50'`, `--workload` | relative share of photons for each device |
 | `-L`, `--listgpu` | list the OpenCL devices |
+| `-l [1\|0]`, `--log` | 1 (or `-l` alone): write the messages to `session.log`; 0: print them without the banner |
 | `-M G`, `--method` | ray tracer: `G` dual-grid (default), `S` branchless Badouel, and on the CPU `P` Plucker, `H` Havel, `B` Badouel |
 | `--gridsize mm` | voxel size of the dual-grid output |
 | `-C 1/0`, `--basisorder` | mesh output at the nodes (1) or in the elements (0) |

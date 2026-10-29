@@ -272,10 +272,14 @@ function varargout = mmclab(varargin)
 %                        'R' reflections            'E' exiting photons
 %      cfg.debugphoton: print the debug information of this photon only [-1: all]
 %      cfg.maxjumpdebug: the most trajectory positions recorded [10000000]
-%      cfg.flog:       where the log goes [2]: 2 the MATLAB/Octave console (in Python,
+%      cfg.flog:       where the simulation log (the banner, timings, progress bar and
+%                      absorbed fraction) goes [2]: 2 the MATLAB/Octave console (in Python,
 %                      sys.stdout), 1 the stdout of the process (the terminal MATLAB/Octave
 %                      was started from), 0 the same without the banner, or a file name
-%                      (appended); '/dev/null' (Linux/macOS) or 'NUL' (Windows) silences it
+%                      (appended); '/dev/null' (Linux/macOS) or 'NUL' (Windows) discards
+%                      the log. The lines printed while reading cfg (the echo of its
+%                      fields) are not part of the log: in MATLAB, use
+%                      evalc('out = mmclab(cfg);') to hide them as well
 %
 %      accepted but without effect: cfg.shapes, cfg.isref3, cfg.outputformat,
 %      cfg.isreoriented (set by mmclab itself)

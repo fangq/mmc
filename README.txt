@@ -662,6 +662,9 @@ mmc -Q dmmc-cube60 -n 1e7
     Meaning: relative share of photons for each device
 `-L`, `--listgpu`
     Meaning: list the OpenCL devices
+`-l [1|0]`, `--log`
+    Meaning: 1 (or `-l` alone): write the messages to `session.log`; 0: print them
+        without the banner
 `-M G`, `--method`
     Meaning: ray tracer: `G` dual-grid (default), `S` branchless Badouel, and on the CPU `P`
         Plucker, `H` Havel, `B` Badouel
