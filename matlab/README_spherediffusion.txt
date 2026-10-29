@@ -26,9 +26,9 @@ The toolbox is compatible with GNU Octave.
 
 1. Download
 
-Please browse the online page of this toolbox to proceed with downloading.
+The toolbox is included in the matlab/ folder of MMC:
 
- http://mcx.sourceforge.net/cgi-bin/index.cgi?SphereDiffusion
+ https://github.com/fangq/mmc/tree/master/matlab
 
 The author of the toolbox is appreciated if you can cite the reference
 [Fang2010] listed at the end of this document if you choose to use

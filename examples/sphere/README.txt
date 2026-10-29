@@ -1,4 +1,4 @@
-= Validation of uniform planar source use a spherical domain =
+= Validation of uniform planar source using a spherical domain =
 
 == Introduction ==
 

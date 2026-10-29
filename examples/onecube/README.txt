@@ -15,11 +15,17 @@ the photon moving from the output of the simulation.
 
 == Steps ==
 
-1. The mesh files for this example has already been generated.
-if you want to regenerate the mesh files, please open matlab
-or octave and run "createmesh"
+1. The mesh files for this example have already been generated.
+If you want to regenerate the mesh files, please open MATLAB
+or Octave and run "createmesh"
 
 2. Run the simulation by typing
   ./run_test.sh
 
-3. Start matlab, run "plotmmcdebug" to see the photon trajectory plot
+3. Start MATLAB or Octave, run "plotmmcdebug" to see the photon trajectory plot
+
+The script runs on the CPU (-G -1) and prints the moves of the photons (-D M).
+The same input is also given as JSON files, which read the same mesh files:
+onecube.json, and onecube_isotropic.json for an isotropic source, e.g.
+
+  ../../bin/mmc -f onecube.json -n 20 -G -1 -D M

@@ -1,25 +1,20 @@
-= Visual debugging of photon migration in a simple mesh =
+= Photon reflection at the boundaries of a simple mesh =
 
 == Introduction ==
 
-In this example, we run photon migration in a toy-problem to show
-the basic steps and behaviors of the simulation code.
-The mesh used in this case is a simple cube, splitted into
-6 tetrahedra. The edge length of the cube is 10mm. 
-A total of 20 photons are simulated starting
-from a source position [2,8,0] along an incident
-vector [0 0 1]. We run the simulation and print out 
-the moving trajectories of the photon, and the exit and 
-accumulation sites. Using a matlab script, one can visualize
-the photon moving from the output of the simulation.
+This example is the same toy problem as examples/onecube - a 10 mm cube split
+into 6 tetrahedra, with 20 photons launched from [2,8,0] along [0 0 1] - but
+with the boundary reflection turned on (-b 1, using the refractive index
+mismatch at the cube surface) and four detectors. It prints the trajectories
+of the photons, with their reflections at the boundary, and the exit and
+accumulation sites, to check the reflection code visually.
 
 == Steps ==
 
-1. The mesh files for this example has already been generated.
-if you want to regenerate the mesh files, please open matlab
-or octave and run "createmesh"
+1. The mesh files for this example have already been generated. If you want
+to regenerate them, open MATLAB or Octave and run "createmesh"
 
 2. Run the simulation by typing
   ./run_test.sh
 
-3. Start matlab, run "plotmmcdebug" to see the photon trajectory plot
+3. Start MATLAB or Octave, and run "plotmmcdebug" to see the photon trajectories
