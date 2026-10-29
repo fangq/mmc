@@ -304,11 +304,13 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         #pragma omp master
         {
+            MMCHostRNG hostrng;
+
             seeds = (unsigned int*)malloc(sizeof(int) * threadnum * RAND_SEED_WORD_LEN);
-            srand(cfg->seed);
+            mmc_hostrng_seed(&hostrng, cfg->seed);
 
             for (i = 0; i < threadnum * RAND_SEED_WORD_LEN; i++) {
-                seeds[i] = mmc_rand_uint32();
+                seeds[i] = mmc_rand_uint32(&hostrng);
             }
         }
         #pragma omp barrier

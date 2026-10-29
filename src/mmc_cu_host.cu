@@ -443,10 +443,12 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     mcblock.x = gpu[gpuid].autoblock;
     fieldlen = meshlen * cfg->maxgate;
 
+    MMCHostRNG hostrng;  /* fills the per-thread RNG seeds */
+
     if (cfg->seed > 0) {
-        srand(cfg->seed);
+        mmc_hostrng_seed(&hostrng, cfg->seed);
     } else {
-        srand(time(0));
+        mmc_hostrng_seed(&hostrng, time(0));
     }
 
     // create gpu pointer
@@ -543,7 +545,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
     energy = (float*)calloc(sizeof(float) * cfg->srcnum, gpu[gpuid].autothread << 1);
 
     for (j = 0; j < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; j++) {
-        Pseed[j] = mmc_rand_uint32();
+        Pseed[j] = mmc_rand_uint32(&hostrng);
     }
 
     CUDA_ASSERT(cudaMalloc((void**)&gseed, sizeof(uint) * gpu[gpuid].autothread*
@@ -932,7 +934,7 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                                       RAND_SEED_WORD_LEN);
 
                 for (i = 0; i < gpu[gpuid].autothread * RAND_SEED_WORD_LEN; i++) {
-                    Pseed[i] = mmc_rand_uint32();
+                    Pseed[i] = mmc_rand_uint32(&hostrng);
                 }
 
                 CUDA_ASSERT(cudaMemcpy(gseed, Pseed,

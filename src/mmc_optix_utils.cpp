@@ -248,6 +248,7 @@ void optix_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUIn
                 }
             }
         }
+
         if (optixverbose) {
             MMC_FPRINTF(cfg->flog, "normalization complete:    %d ms\n",
                         GetTimeMillis() - tic0);
@@ -467,20 +468,22 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
     optixcfg->launchParams.outputbuffer = optixcfg->outputBuffer.d_pointer();
 
     // photon seed buffer
+    MMCHostRNG hostrng;  /* fills the per-thread RNG seeds */
+
     if (cfg->seed > 0) {
-        srand(cfg->seed);
+        mmc_hostrng_seed(&hostrng, cfg->seed);
     } else {
-        srand(time(0));
+        mmc_hostrng_seed(&hostrng, time(0));
     }
 
     uint4* hseed = (uint4*)malloc(sizeof(uint4) * totalthread);
 
     for (int i = 0; i < totalthread; ++i) {
         // separate statements: the evaluation order of function arguments is unspecified
-        hseed[i].x = mmc_rand_uint32();
-        hseed[i].y = mmc_rand_uint32();
-        hseed[i].z = mmc_rand_uint32();
-        hseed[i].w = mmc_rand_uint32();
+        hseed[i].x = mmc_rand_uint32(&hostrng);
+        hseed[i].y = mmc_rand_uint32(&hostrng);
+        hseed[i].z = mmc_rand_uint32(&hostrng);
+        hseed[i].w = mmc_rand_uint32(&hostrng);
     }
 
     optixcfg->seedBuffer.alloc_and_upload(hseed, totalthread);

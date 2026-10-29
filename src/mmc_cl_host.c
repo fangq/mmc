@@ -342,10 +342,12 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         fieldlen = cfg->crop0.w;  /**< total float counts of the output buffer, before double-buffer expansion (x2) for improving saving accuracy */
 
+        MMCHostRNG hostrng;  /* fills the per-thread RNG seeds */
+
         if (cfg->seed > 0) {
-            srand(cfg->seed);
+            mmc_hostrng_seed(&hostrng, cfg->seed);
         } else {
-            srand(time(0));
+            mmc_hostrng_seed(&hostrng, time(0));
         }
 
         if (cfg->debuglevel & dlTraj && cfg->exportdebugdata == NULL) {
@@ -425,7 +427,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
             MMC_ASSERT_ALLOC(energy);
 
             for (j = 0; j < gpu[i].autothread * RAND_SEED_WORD_LEN; j++) {
-                Pseed[j] = mmc_rand_uint32();
+                Pseed[j] = mmc_rand_uint32(&hostrng);
             }
 
             OCL_TRY(((gseed[i] = clCreateBuffer(mcxcontext, RW_MEM, sizeof(cl_uint) * gpu[i].autothread * RAND_SEED_WORD_LEN, Pseed, &status), status)));
@@ -985,7 +987,7 @@ is more than what your have specified (%d), please use the -H option to specify 
                         Pseed = (cl_uint*)malloc(sizeof(cl_uint) * gpu[devid].autothread * RAND_SEED_WORD_LEN);
 
                         for (i = 0; i < gpu[devid].autothread * RAND_SEED_WORD_LEN; i++) {
-                            Pseed[i] = mmc_rand_uint32();
+                            Pseed[i] = mmc_rand_uint32(&hostrng);
                         }
 
                         OCL_ASSERT((clEnqueueWriteBuffer(mcxqueue[devid], gseed[devid], CL_TRUE, 0, sizeof(cl_uint)*gpu[devid].autothread * RAND_SEED_WORD_LEN,
