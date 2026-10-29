@@ -142,6 +142,9 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
     float*     Pdet = NULL;
     RandType*  Pphotonseed = NULL;
     char opt[MAX_JIT_OPT_LEN] = {'\0'};
+#ifdef USE_OS_TIMER
+    cl_event progressevent = NULL;     /**< the kernel of device 0, polled by the progress bar (-D P) */
+#endif
     cl_uint detreclen = (2 + ((cfg->ismomentum) > 0)) * mesh->prop + (cfg->issaveexit > 0) * 6 + 1;
     cl_uint hostdetreclen = detreclen + 1;
     int sharedmemsize = 0;
@@ -826,16 +829,26 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                      * a live event keeps an implicit reference to the queue/context,
                      * so leaking it here prevents clReleaseContext from ever freeing
                      * the GPU allocations -> per-run device-memory leak. */
-                    OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid], mcxkernel[devid], 1, NULL, &gpu[devid].autothread, &gpu[devid].autoblock, 0, NULL, NULL)));
+                    /* except for the progress bar, which polls the kernel of device 0 until it
+                     * completes, and releases the event after the loop */
+                    OCL_ASSERT((clEnqueueNDRangeKernel(mcxqueue[devid], mcxkernel[devid], 1, NULL, &gpu[devid].autothread, &gpu[devid].autoblock, 0, NULL,
+                                                       (devid == 0 && (cfg->debuglevel & MCX_DEBUG_PROGRESS)) ? &progressevent : NULL)));
 #endif
                     OCL_ASSERT((clFlush(mcxqueue[devid])));
                 }
 
                 if ((cfg->debuglevel & MCX_DEBUG_PROGRESS)) {
                     int p0 = 0, ndone = -1;
+                    cl_int kernelstatus = CL_QUEUED;
+#ifndef USE_OS_TIMER
+                    cl_event progressevent = kernelevent;
+#endif
 
                     mcx_progressbar(-0.f);
 
+                    /* stop once the kernel completes: a device may not update the mapped
+                       counter while the kernel runs (the Intel Arc A770 did not, and this
+                       loop never returned), and no counter value is guaranteed then */
                     do {
                         ndone = *progress;
 
@@ -844,9 +857,19 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
                             p0 = ndone;
                         }
 
+                        OCL_ASSERT((clGetEventInfo(progressevent, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(cl_int), &kernelstatus, NULL)));
+
+                        if (kernelstatus == CL_COMPLETE || kernelstatus < 0) {
+                            break;
+                        }
+
                         sleep_ms(100);
                     } while (p0 < gpu[0].autothread);
 
+#ifdef USE_OS_TIMER
+                    clReleaseEvent(progressevent);
+                    progressevent = NULL;
+#endif
                     mcx_progressbar(cfg->nphoton);
                     MMC_FPRINTF(cfg->flog, "\n");
                 }
