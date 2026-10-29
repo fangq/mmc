@@ -1,6 +1,7 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-29 [8f6d14d] [feat] -l none prints nothing, not even the progress bar, as cfg.flog='none'
  2026-10-29 [5047730] [feat] cfg.flog='none' silences the log; 'NUL' and '/dev/null' stay accepted on every OS, refs fangq/mcx#280
  2026-10-29 [6130770]*[bug] cfg.flog: 'NUL' and '/dev/null' are the null device on every OS, refs fangq/mcx#280
  2026-10-29 [e5098a4] [test] binding tests of mesh validation, pattern3d, line sources, mcmethod, multiple sources, source domains
