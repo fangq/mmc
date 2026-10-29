@@ -195,16 +195,39 @@ class TestInterface(unittest.TestCase):
         self.assertGreater(np.abs(jac["flux"]).sum(), 0)
 
     def test_flog_null_device_is_silent(self):
-        script = (
-            "import sys; sys.path[:0] = %r; from test_pmmc import base_cfg; import pmmc; "
-            "c = base_cfg(); c.update(nphoton=200, flog=%r); pmmc.run(c)"
-            % (sys.path, NULLDEV)
-        )
-        out = subprocess.run(
-            [sys.executable, "-c", script], capture_output=True, text=True, timeout=300
-        )
-        self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(out.stdout.strip(), "")
+        """'NUL' and '/dev/null' are the null device on every OS: nothing is printed, not even the
+        progress bar, and no file is written, also from a read-only folder (fangq/mcx#280);
+        without flog, the log is printed"""
+        import tempfile
+
+        def run(flog):
+            script = (
+                "import sys; sys.path[:0] = %r; from test_pmmc import base_cfg; import pmmc; "
+                "c = base_cfg(); c.update(nphoton=200, debuglevel='P'); c.update(%r); pmmc.run(c)"
+                % ([os.path.abspath(d) for d in sys.path], flog)
+            )
+            with tempfile.TemporaryDirectory() as tmp:
+                os.chmod(tmp, 0o555)
+                try:
+                    out = subprocess.run(
+                        [sys.executable, "-c", script],
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                        cwd=tmp,
+                    )
+                    files = os.listdir(tmp)
+                finally:
+                    os.chmod(tmp, 0o755)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            return out.stdout + out.stderr, files
+
+        for name in ("NUL", "nul", "/dev/null"):
+            with self.subTest(flog=name):
+                text, files = run({"flog": name})
+                self.assertEqual(text.strip(), "")
+                self.assertEqual(files, [])
+        self.assertNotEqual(run({})[0].strip(), "")  # the default still prints
 
 
 @unittest.skipIf(pmmc is None or iso2mesh is None, "pmmc.mmclab needs iso2mesh")

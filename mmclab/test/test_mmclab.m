@@ -176,13 +176,17 @@ src{4} = [5 5 0];
 assert_error(@() mmclab(boxcfg(extra, src{:})), 'a planar source on the surface');
 
 function test_flog_silent(extra)
-% flog set to the null device prints nothing, not even the cfg echo
+% 'NUL' and '/dev/null' are the null device on every OS (fangq/mcx#280): nothing is printed,
+% not even the cfg echo or the progress bar, and no file of that name is written
 if (~exist('evalc'))
     return
 end
-cfg = mkcfg(extra, 'nphoton', 200);
-out = evalc('mmclab(cfg);');
-assert(isempty(strtrim(out)), ['unexpected output: ' out]);
+for flog = {'NUL', 'nul', '/dev/null'}
+    cfg = mkcfg(extra, 'nphoton', 200, 'flog', flog{1}, 'debuglevel', 'P');
+    out = evalc('mmclab(cfg);');
+    assert(isempty(strtrim(out)), ['unexpected output with flog=' flog{1} ': ' out]);
+end
+assert(~exist(fullfile(pwd, 'NUL'), 'file') && ~exist(fullfile(pwd, 'nul'), 'file'), 'a file named NUL was written');
 
 function test_end_to_end(extra)
 % the absorbed fraction of the cube: 0.574 (+/-0.005) from mcx with the same medium;

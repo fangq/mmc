@@ -35,6 +35,7 @@
 @brief   mex function for MMCLAB
 *******************************************************************************/
 
+#include <cerrno>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -111,6 +112,26 @@ typedef mwSize dimtype;                                   //! MATLAB type alias 
 /** the number of dimensions and the 1st dimension of cfg.srcpattern, to set srcnum after srctype is read */
 static int mmclab_patndim = 0, mmclab_patdim0 = 1;
 
+/**
+ * 'NUL' (any case) and '/dev/null' name the null device on every OS: cfg.flog='NUL' on Linux
+ * or macOS wrote, or failed to write, a file of that name (fangq/mcx#280)
+ */
+static const char* mcx_logpath(const char* path) {
+#ifdef _WIN32
+    const char* nulldev = "NUL";
+#else
+    const char* nulldev = "/dev/null";
+#endif
+
+    if (strcmp(path, "/dev/null") == 0 || ((path[0] == 'N' || path[0] == 'n') && (path[1] == 'U' || path[1] == 'u')
+                                           && (path[2] == 'L' || path[2] == 'l') && path[3] == '\0')) {
+        return nulldev;
+    }
+
+    return path;
+}
+
+static int mcxlab_lognull = 0;     /**< 1: cfg.flog is the null device, which also silences the progress bar */
 static FILE* mcxlab_logfp = NULL;   /**< where printf() of this unit goes; NULL or stderr: the console */
 
 static int mcxlab_printf(const char* format, ...) {
@@ -297,6 +318,8 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             mcxlab_logfp = stderr;
 
             /** cfg.flog first: the messages below go where it sends the log */
+            mcxlab_lognull = 0;
+
             if (mxGetField(prhs[0], jstruct, "flog") && !mxIsEmpty(mxGetField(prhs[0], jstruct, "flog"))) {
                 mcxlab_setflog(mxGetField(prhs[0], jstruct, "flog"), &cfg);
             }
@@ -323,6 +346,12 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
                 }
 
                 mmc_set_field(prhs[0], tmp, ifield, jstruct, &cfg, &mesh);
+            }
+
+            /** the progress bar is written to the console, not to the log: drop it when the log is the
+                null device, so that cfg.flog='/dev/null' or 'NUL' silences everything */
+            if (mcxlab_lognull) {
+                cfg.debuglevel &= ~dlProgress;
             }
 
             /** a stack of patterns for photon sharing is [srcnum Nx Ny] for 'pattern' and
@@ -843,10 +872,13 @@ static void mcxlab_setflog(const mxArray* item, mcconfig* cfg) {
     if (mxIsChar(item)) {
         if (len > 0) {
             mxGetString(item, logfile, MAX_PATH_LENGTH);
-            cfg->flog = fopen(logfile, "a+");
+            mcxlab_lognull = (mcx_logpath(logfile) != logfile);
+            cfg->flog = fopen(mcx_logpath(logfile), "a+");
 
             if (cfg->flog == NULL) {
-                mexErrMsgTxt("Log output file can not be written");
+                char msg[MAX_PATH_LENGTH + 128];
+                snprintf(msg, sizeof(msg), "the log file '%s' of cfg.flog can not be written: %s", logfile, strerror(errno));
+                mexErrMsgTxt(msg);
             }
         } else {
             cfg->flog = stdout;
