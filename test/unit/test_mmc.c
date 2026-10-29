@@ -2428,6 +2428,10 @@ static void test_utilfuncs(void) {
  *  must run every case and agree on the output, OptiX is only reported
  *---------------------------------------------------------------------------*/
 
+/** this program, re-executed by run_isolated: set in main() from argv[0], before the tests
+    change the folder (macOS has no /proc/self/exe) */
+static char selfexe[4096] = "/proc/self/exe";
+
 /** run one case in a new process (this program re-executed with --runone), so that an
     error exit or a crash is reported instead of ending the test program; a forked child
     can not be used because the GPU drivers do not survive a fork after their initialization.
@@ -2452,7 +2456,7 @@ static int run_isolated(const char* args, RunResult* res) {
             exit(254);
         }
 
-        execl("/proc/self/exe", "mmc_unittest", "--runone", resfile, args, (char*)NULL);
+        execl(selfexe, "mmc_unittest", "--runone", resfile, args, (char*)NULL);
         exit(251);
     }
 
@@ -2841,6 +2845,10 @@ int main(int argc, char** argv) {
 
     devnull = fopen("/dev/null", "w");
     hasocl = (getenv("MMC_UNITTEST_NO_OPENCL") == NULL);
+
+    if (strchr(argv[0], '/') && realpath(argv[0], cwd)) {
+        snprintf(selfexe, sizeof(selfexe), "%s", cwd);
+    }
 
     if (argc == 4 && strcmp(argv[1], "--runone") == 0) {
         return run_one(argv[2], argv[3]);
