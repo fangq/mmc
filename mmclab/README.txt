@@ -263,6 +263,12 @@ the verbose command line options in MMC.
                         'wp'- weighted scattering counts to build mus Jacobian (replay mode)
        cfg.debuglevel:  debug flag string, a subset of [SCBWDIOXATRPEM], no space
        cfg.debugphoton: print the photon movement debug info only for a specified photon ID
+       cfg.flog: [2]  log printing control; if set to a string, it defines a file path
+                      at which location the log will be printed in append mode; on Linux and Mac OS,
+                      one can use special paths such as /dev/null; if set to an integer,
+                      2 (default): the MATLAB/Octave console (stderr; in Python, sys.stdout)
+                      1: stdout of the process (the terminal MATLAB/Octave was started from)
+                      0: stdout but suppress printing the MMC banner
        cfg.maxjumpdebug: [10000000|int] when trajectory is requested in the output,
                       use this parameter to set the maximum position stored. By default,
                       only the first 1e6 positions are stored.

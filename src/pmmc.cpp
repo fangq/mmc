@@ -35,6 +35,8 @@
 @brief   Python interface using Pybind11 for MMC
 *******************************************************************************/
 #define PYBIND11_DETAILED_ERROR_MESSAGES
+#include <vector>
+#include <cstdarg>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <time.h>
@@ -105,6 +107,42 @@ extern const char debugflag[];
 
 extern "C" void mcx_python_flush() {
     std::cout.flush();
+}
+
+/** prints the log of cfg.flog=2 (stderr, the default) to Python's sys.stdout, as mexPrintf does in
+    MATLAB: the log then shows in Jupyter, in order with Python's own output. Called by the thread
+    that holds the GIL (OpenMP thread 0, see MCX_FPRINTF); without a Python stdout it uses stderr */
+extern "C" int mcx_python_printf(const char* format, ...) {
+    va_list args, args2;
+    va_start(args, format);
+    va_copy(args2, args);
+    int len = vsnprintf(NULL, 0, format, args);
+    va_end(args);
+
+    if (len < 0) {
+        va_end(args2);
+        return len;
+    }
+
+    std::vector<char> buf(len + 1);
+    vsnprintf(buf.data(), buf.size(), format, args2);
+    va_end(args2);
+
+    try {
+        py::gil_scoped_acquire gil;
+        py::object out = py::module_::import("sys").attr("stdout");
+
+        if (out.is_none()) {
+            throw std::runtime_error("no sys.stdout");
+        }
+
+        out.attr("write")(py::str(buf.data(), len));
+        out.attr("flush")();
+    } catch (...) {
+        fputs(buf.data(), stderr);
+    }
+
+    return len;
 }
 
 

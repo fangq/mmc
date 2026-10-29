@@ -277,6 +277,7 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->meshtag[0] = '\0';
     cfg->minenergy = 1e-6f;
     cfg->flog = stdout;
+    cfg->printnum = 0;
     cfg->sradius = 0.f;
     cfg->rootpath[0] = '\0';
     cfg->seedfile[0] = '\0';
@@ -5200,6 +5201,10 @@ void mcx_version(mcconfig* cfg) {
  */
 
 void mcx_printheader(mcconfig* cfg) {
+    if (cfg->printnum < 0) {  /* flog=0 (mcxlab, pmcx): the log without the banner */
+        return;
+    }
+
     MMC_FPRINTF(cfg->flog, S_YELLOW "\
 ###############################################################################\n\
 #                     Mesh-based Monte Carlo (MMC) - OpenCL                   #\n\

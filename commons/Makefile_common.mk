@@ -182,7 +182,8 @@ ifeq ($(CC),clang)
         OPENMPLIB:= -lomp
 endif
 
-ifneq (,$(filter $(MAKECMDGOALS),mex cudamex optixmex))
+# the mex and oct C objects print the log of cfg.flog=2 with mexPrintf, to the MATLAB/Octave console
+ifneq (,$(filter $(MAKECMDGOALS),mex cudamex optixmex mexomp oct cudaoct optixoct octomp))
         CCFLAGS+=-DMATLAB_MEX_FILE
 endif
 

@@ -246,6 +246,7 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             /** Initialize cfg with default values first */
             t0 = StartTimer();
             mcx_initcfg(&cfg);
+            cfg.flog = stderr;  /* the MATLAB/Octave console, unless cfg.flog says otherwise */
             MMCDEBUG(&cfg, dlTime, (cfg.flog, "initializing ... "));
             mesh_init(&mesh);
 
@@ -801,7 +802,6 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
         return;
     }
 
-    cfg->flog = stderr;
     GET_1ST_FIELD(cfg, nphoton)
     GET_ONE_FIELD(cfg, nblocksize)
     GET_ONE_FIELD(cfg, nthread)
@@ -1697,6 +1697,30 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
         }
 
         printf("mmc.workload=<<%.0f>>;\n", (double)arraydim[0]*arraydim[1]);
+    } else if (strcmp(name, "flog") == 0) {
+        /* as in mcxlab: 2 the console (default), 1 stdout, 0 stdout without the banner,
+           or a file name (appended); stdout is the terminal MATLAB/Octave runs in */
+        int len = mxGetNumberOfElements(item);
+        char logfile[MAX_PATH_LENGTH] = {'\0'};
+
+        if (mxIsChar(item)) {
+            if (len > 0) {
+                mxGetString(item, logfile, MAX_PATH_LENGTH);
+                cfg->flog = fopen(logfile, "a+");
+
+                if (cfg->flog == NULL) {
+                    mexErrMsgTxt("Log output file can not be written");
+                }
+            } else {
+                cfg->flog = stdout;
+            }
+        } else {
+            double* val = mxGetPr(item);
+
+            if (len > 0 && val[0] <= 2) {
+                cfg->flog = ((int)val[0] == 2 ? stderr : ((int)val[0] == 1 ? stdout : (cfg->printnum = -1, stdout)));
+            }
+        }
     } else if (strcmp(name, "isreoriented") == 0) {
         /*internal flag, don't need to do anything*/
     } else {

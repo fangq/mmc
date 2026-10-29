@@ -412,6 +412,14 @@ void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedb
 #else
 #define MMC_FPRINTF(fp,...) {(fp==stderr) ? mexPrintf(__VA_ARGS__) : fprintf(fp,__VA_ARGS__);} /**< macro to print messages, calls mexPrint in MATLAB */
 #endif
+#elif defined(MCX_CONTAINER) && defined(PYBIND11_VERSION_MAJOR)
+/* in the Python modules, the log of cfg.flog=2 (stderr, the default) goes to Python's sys.stdout, the
+   role mexPrintf plays in MATLAB, so that it shows in Jupyter; only the thread that holds the GIL prints */
+#ifdef _OPENMP
+#define MMC_FPRINTF(fp,...) {if(omp_get_thread_num()==0) {(fp==stderr) ? mcx_python_printf(__VA_ARGS__) : fprintf(fp,__VA_ARGS__);}}
+#else
+#define MMC_FPRINTF(fp,...) {(fp==stderr) ? mcx_python_printf(__VA_ARGS__) : fprintf(fp,__VA_ARGS__);}
+#endif
 #else
 #define MMC_FPRINTF(fp,...) fprintf(fp,__VA_ARGS__) /**< macro to print messages, calls fprintf in command line mode */
 #endif
@@ -437,6 +445,7 @@ extern "C"
 int  mmc_throw_exception(const int id, const char* msg, const char* filename, const int linenum);
 void mcx_matlab_flush(void);
 void mcx_python_flush(void);
+int  mcx_python_printf(const char* format, ...);
 #endif
 
 /**

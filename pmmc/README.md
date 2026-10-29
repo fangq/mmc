@@ -156,6 +156,22 @@ dicts), and is recommended when porting MMCLAB scripts.
 Python ports of all the MMCLAB example scripts can be found in the `example/` folder
 (see `example/README.md`).
 
+### Log output
+
+The simulation log (the banner, timings and the absorbed fraction) is controlled by
+`cfg['flog']`, as in MATLAB: `2` (default) prints it to Python's `sys.stdout`, so it
+shows in Jupyter notebooks; `1` prints it to the stdout of the process, and `0` does the
+same without the banner; a string appends it to that file. To silence the log, set
+`cfg['flog'] = os.devnull`; the echo of the `cfg` values goes to `sys.stdout` and can
+be silenced with `contextlib.redirect_stdout`:
+
+```python3
+import os, io, contextlib
+cfg['flog'] = os.devnull
+with contextlib.redirect_stdout(io.StringIO()):
+    res = pmmc.run(cfg)
+```
+
 ### Reproducible simulations
 
 Photons are scheduled to the CPU threads and GPU threads dynamically for speed, so two runs
