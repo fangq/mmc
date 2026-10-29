@@ -602,7 +602,8 @@ if (exist('OCTAVE_VERSION'))
     fflush(stdout);
 end
 
-if (exist('maxNumCompThreads', 'file'))
+% Octave's maxNumCompThreads only warns that it has no effect
+if (exist('maxNumCompThreads', 'file') && ~exist('OCTAVE_VERSION', 'builtin'))
     warning('off', 'MATLAB:maxNumCompThreads:Deprecated');
     maxNumCompThreads('automatic');
     maxNumCompThreads(maxNumCompThreads * 2);
