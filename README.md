@@ -104,9 +104,9 @@ MMC v2026 adds the below key features
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
   all mmclab example scripts are ported to Python under `pmmc/example`
 * unit tests and coverage: host-side unit tests of the parsers, mesh code, ray tracers
-  and the CUDA/OptiX backends (`make unittest`, 513 checks) raise the line coverage of
-  the host code to about 95%; 68 built-in example tests check every run against golden
-  values; the bugs these tests found were fixed
+  and the CUDA/OptiX backends (`make unittest`, 567 checks, 560 without SSE as on macOS
+  arm64) raise the line coverage of the host code to about 95%; 68 built-in example
+  tests check every run against golden values; the bugs these tests found were fixed
 * fuzzing: rounds of JSON-aware mutation fuzzing of the input files and of the
   command-line options, run on AddressSanitizer builds of mcx, mcxcl and mmc (for mmc,
   `test/fuzz/mmcfuzz.py`, about 8,000 cases on the CPU, OpenCL, CUDA and OptiX backends); every
@@ -155,12 +155,20 @@ this release also fixed a list of bugs, including
   uses the tissue-only nodal volume consistently on all backends
 * the scattering angle and the albedo weight in implicit MMC (edge/node/face ROIs)
   now use the optical properties of the ROI instead of the host element
-* the host-generated RNG seeds were not uniformly random (bit 31 was always 0 with
-  the 31-bit rand() of Linux/macOS, only 15 bits per word with MSVC); seeds are now
-  uniform on all backends, which changes the random streams for a given seed
+* the per-thread RNG seeds are now derived from the seed (`-E`) by the xorshift128+
+  generator of the kernels instead of the C library `rand()`, which is a different
+  generator on Linux, macOS and Windows: a fixed seed now simulates the same photons on
+  every OS (the earlier seeds were also not uniformly random); this changes the random
+  streams for a given seed, and the trajectory golden data were regenerated
 * OptiX: no fluence in the ambient medium, rays that exit the mesh or miss all
   triangles are terminated, and OptiX builds without the SDK's `sutil` headers
-* large meshes are no longer rejected by the CUDA backend (off-by-one MAX_PROP check)
+* large meshes are no longer rejected by the CUDA backend (off-by-one MAX_PROP check);
+  OptiX checks the media count against its 3968-entry launch table
+* mmclab/pmmc GPU runs with `cfg.method` set to 'plucker', 'havel' or 'badouel' returned
+  all-NaN output: the GPU kernels only implement the branchless Badouel tracers, and the
+  switch to 'elem' that the command line makes was missing in mmclab and pmmc
+* the OpenCL progress bar (`-D P`) never returned on an Intel Arc A770, which does not
+  update the mapped progress counter while the kernel runs
 * pmmc macOS wheels are tagged with their actual architecture instead of
   `universal2`, and the Intel macOS module links the OpenMP runtime
 
@@ -209,7 +217,9 @@ lists all of them, with their commit hashes.
   the GPU; fourierx/fourierx2d source domains fixed
 * [a5e9c1f] the GPU lost up to 40% of the diffuse reflectance
 * [ef5bb39] long-standing OpenCL memory leaks (#127)
-* [f6091aa] host RNG seeds were not uniformly random; now uniform on all backends
+* [f6091aa, a996078] per-thread RNG seeds derived with xorshift128+, the same on every OS
+* [f7859d8] mmclab/pmmc GPU runs with the plucker/havel/badouel tracers gave NaN output
+* [bc71b18] the OpenCL progress bar hung on an Intel Arc A770; [d4a7046] OptiX media limit
 * [b64aa2a] no fluence in non-tissue (label<=0) elements; consistent nodal volumes
 * [882054e] implicit MMC uses the ROI's optical properties for scattering and albedo
 * [66f4c90] `cfg.face` is ignored when `cfg.elem` is given (fixing redbird's MMC Jacobians)
@@ -232,6 +242,8 @@ lists all of them, with their commit hashes.
 **Packaging**
 * [73eb9f1] Linux releases built in manylinux2014 (glibc 2.17+); Octave 10 mex files for macOS/Windows
 * [4e581d7] bundled zmat updated to 1.2.0; [b65562c] cJSON updated to 1.7.19
+* [d21fabd] macOS builds use the Khronos OpenCL headers (src/khronos), free of the
+  deprecation warnings of Apple's OpenCL framework headers
 
 Introduction
 ------------
@@ -1009,8 +1021,8 @@ Publications and how to cite
 ----------------------------
 
 If you use MMC in your research, please cite [Fang2010], which introduced MMC,
-[Fang2019], which describes the GPU-accelerated MMC, and the papers of the specific
-features you use. The complete list is maintained at <https://mcx.space/#publications>.
+[Fang2019], which describes the GPU-accelerated MMC, [Yan2026] if you use the OptiX
+backend (RT-MMC), and the papers of the specific features you use. The complete list is maintained at <https://mcx.space/#publications>.
 
 - [Fang2010] Qianqian Fang, "Mesh-based Monte Carlo method using fast ray-tracing in
   Plücker coordinates," Biomed. Opt. Express, 1(1), 165-175 (2010).
@@ -1018,6 +1030,9 @@ features you use. The complete list is maintained at <https://mcx.space/#publica
 - [Fang2019] Qianqian Fang and Shijie Yan, "Graphics processing unit-accelerated mesh-based
   Monte Carlo photon transport simulations," J. Biomed. Opt. 24(11), 115002 (2019).
   <https://doi.org/10.1117/1.JBO.24.11.115002>
+- [Yan2026] Shijie Yan, Douglas Dwyer, David R. Kaeli, Qianqian Fang, "Accelerating
+  mesh-based Monte Carlo simulations using contemporary graphics ray-tracing hardware,"
+  J. Biomed. Opt. 31(3), 035002 (2026). <https://doi.org/10.1117/1.JBO.31.3.035002>
 - [Fang2012] Qianqian Fang and David R. Kaeli, "Accelerating mesh-based Monte Carlo method on
   modern CPU architectures," Biomed. Opt. Express, 3(12), 3223-3230 (2012).
   <https://opg.optica.org/boe/abstract.cfm?uri=boe-3-12-3223>

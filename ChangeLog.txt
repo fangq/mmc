@@ -1,6 +1,40 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-28 [4981657] [test] re-execute the unit test program from argv[0] where there is no /proc/self/exe (macOS)
+ 2026-10-28 [6045d9f] [clean] the host RNG with uint64_t, not long long (C++98 -pedantic warnings)
+ 2026-10-28 [9075fe0] [test] forked unit-test children leave through _exit(), not hang in the Intel runtime
+ 2026-10-28 [bc71b18] [bug] OpenCL progress bar (-D P) never returned on an Intel Arc A770
+ 2026-10-28 [6788a69] [test] unit tests on builds without SSE (macOS arm64) and with macOS fork safety
+ 2026-10-28 [a996078] [feat] derive the per-thread seeds with xorshift128+ instead of the C library rand()
+ 2026-10-28 [3822399] [test] skip the OptiX planar test when the digimouse mesh of examples/planar is not created
+ 2026-10-28 [d4a7046] [bug] OptiX: check the media count against the 3968-entry launch table, not 4000
+ 2026-10-28 [bc327f8] [feat] always use atomic accumulation, drop the non-atomic paths, as mcx 4e2fd41
+ 2026-10-28 [8162b3d] [clean] no LFLAGS for mkoctfile, deprecated by Octave; LDFLAGS has the same libraries
+ 2026-10-28 [f7859d8] [bug] mmclab/pmmc: a GPU run with method plucker/havel/badouel output all NaN
+ 2026-10-28 [30f9b4e] [clean] fix the clang warnings of the macOS arm64 build
+ 2026-10-28 [d21fabd] [clean] macOS Octave build without warnings
+ 2026-10-28 [92442fd] [bug] mmclab/pmmc: an error in an OpenMP thread no longer aborts MATLAB, Octave or Python
+ 2026-10-28 [64cca90] [ci] macOS Octave mex: no path to the build machine's liboctmex or libstdc++
+ 2026-10-28 [0d2d405] [ci] expand the RCS keywords in the mmc-optix build so that it prints its revision
+ 2026-10-28 [036df14] [test] feature tests: RF on the CPU, per-pattern outputs, debug log, GPU paths
+ 2026-10-28 [1cdc328] [bug] CUDA: put the imaginary RF fluence of every slot onto the nodes
+ 2026-10-28 [7fb9b3d] [bug] CUDA: fix -G device selection and multi-GPU outputs
+ 2026-10-28 [1a930ce] [ci] run the built-in golden tests on the CPU (Linux and macOS)
+ 2026-10-28 [3a230ca] [test] add the built-in golden test suite: 20 small cases under test/builtin
+ 2026-10-28 [287bc91] [test] widedet: a coarse mesh distributed with mmc, so that make unittest runs from a clean checkout
+ 2026-10-28 [0bb5e36] [test] check the OptiX and OpenCL J_mus/J_D ratios against the exact chain-rule factor
+ 2026-10-28 [e178096] [bug] RF mesh output: normalize by the launched energy, not by |phi|
+ 2026-10-27 [a3fb79d] [example] mmclab: validate the adjoint and RF outputs against Redbird
+ 2026-10-27 [b639e15] [bug] element-based output in heterogeneous media: do not divide by mua twice
+ 2026-10-27 [d6fd26a] [bug] launch weight-1 photons from every source slot
+ 2026-10-27 [f77be21] [bug] grid output of multi-source and adjoint runs: normalize each slot by its own energy
+ 2026-10-27 [d634ead] [doc] What's New: lead with adjoint Jacobians and FD/RF forward and Jacobians
+ 2026-10-27 [68841e0] [doc] What's New: the long-standing OpenCL memory leak is fixed, refs #127
+ 2026-10-27 [416ea82] [clean] fix gcc warnings
+ 2026-10-27 [cdaf9e9] [build] rebuild the bundled zmat when its sources change, and clean it
+ 2026-10-27 [93761cd] [bug] mmclab: raise errors in MATLAB instead of aborting it, refs fangq/mcx#278
+ 2026-10-27 [9027d8d] [doc] ChangeLog and README: OptiX fuzzing and its fixes; unit-test and fuzzing counts
  2026-10-27 [1c9093a] [test] mmcfuzz.py: fuzz OptiX, report GPU faults and rejection reasons; testmmc.sh found OptiX again
  2026-10-27 [797cccf] [bug] fix OptiX T0>0 deposits and zero-angle cones; reject a non-positive length unit
  2026-10-27 [5369342] [doc] ChangeLog and README: the iMMC port, GPU speedups and the mmc fuzzer
