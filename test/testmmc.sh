@@ -115,6 +115,10 @@ for b in $BACKENDS; do
         case " $BACKENDS " in
             *" opencl "*)
                 echo "test planar source fluence of optix against opencl ... "
+                if [ ! -f "$TESTDIR"/../examples/planar/node_digimouse.dat ]; then
+                    echo "skipped: run examples/planar/addsource_digimouse.m to create the mesh"
+                    continue
+                fi
                 cp "$TESTDIR"/../examples/planar/planar.inp "$TESTDIR"/../examples/planar/*_digimouse.dat "$WORKDIR"/
                 for c in optix opencl; do
                     (cd "$WORKDIR" && "$MMC" -f planar.inp -b 1 -n 1e5 -c $c -G 1 -s planar_$c -F bin $PARAM > planar_$c.log 2>&1)
