@@ -668,6 +668,7 @@ static void mut_nodalprop(mcconfig* cfg, tetmesh* mesh) {
     cfg->isnodalmua = cfg->isnodalmusp = 1;
 }
 
+#ifdef MMC_USE_SSE
 static double patsum[2];
 
 /** the output of each of the two patterns, interleaved per voxel */
@@ -679,6 +680,7 @@ static void check_patsum(mcconfig* cfg, tetmesh* mesh) {
         patsum[1] += mesh->weight[k * 2 + 1];
     }
 }
+#endif
 
 static int has_text(const char* fname, const char* key) {
     FILE* fp = fopen(fname, "rb");
@@ -697,14 +699,17 @@ static int has_text(const char* fname, const char* key) {
 }
 
 static void test_features(void) {
-    const char* rfjson = "{\"Forward\":{\"Omega\":6.28e8}}";
+#if defined(MMC_USE_SSE) || defined(USE_CUDA)
     char args[1024], msg[256];
+#endif
     RunResult r, rc;
 
+#ifdef MMC_USE_SSE  /* without SSE (arm64) the CPU only has the Plucker tracer */
     /* RF on the CPU: the branch-less Badouel tracers in grid (-M G) and mesh (-M s) mode give
        the imaginary part of the fluence, which agrees with OpenCL; the 8 nodes of this mesh
        (one cube) give a nodal output that depends on the tracer, so in mesh mode only the
        phase, the ratio of the imaginary to the real sum, is compared */
+    const char* rfjson = "{\"Forward\":{\"Omega\":6.28e8}}";
     const char* rfmode[] = {"-M G", "-M s -C 1"};
 
     for (int i = 0; i < 2; i++) {
@@ -726,17 +731,21 @@ static void test_features(void) {
         }
     }
 
+#endif
+
     EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 100 -M H -C 1 -O R --json {\"Forward\":{\"Omega\":6.28e8}}", NULL),
                 "RF on the CPU with the Havel tracer");
     EXPECT_EXIT(run_mmc("--bench dmmc-cube60 -G -1 -n 100 -M G -O R --json {\"Forward\":{\"Omega\":6.28e8},\"Optode\":{\"Source\":{\"Type\":\"pattern\","
                         "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,1,1,1,2,2,2,2]}}}}", NULL),
                 "RF on the CPU with two source patterns");
 
+#ifdef MMC_USE_SSE
     /* two patterns in grid mode on the CPU: pattern 2 is twice pattern 1, and each output is
        normalized by its own launched energy, so both give the same fluence */
     r = run_mmc("--bench dmmc-cube60 -G -1 -n 5000 -E 1 -M G -s utcpupat --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\",\"Pos\":[28,43,15],"
                 "\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"SrcNum\":2,\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,1,1,1,2,2,2,2]}}}}", check_patsum);
     EXPECT_TRUE(r.ran && patsum[0] > 0. && fabs(patsum[1] / patsum[0] - 1.) < 1e-3, "two patterns on the CPU are normalized separately");
+#endif
 
     /* the per-step debug log (-D S: moves, E: exits, X: edges, R: reflections) of a photon in
        an implicit-MMC domain with a mismatched boundary */
@@ -1182,7 +1191,9 @@ static void test_mmclab_gpu_method(void) {
 
     cfg.method = rtPlucker;  /* cfg.method='plucker' and cfg.compute='sse' */
     mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+#ifdef MMC_USE_SSE
     int ssemethod = cfg.method;
+#endif
 
     cfg.compute = cbOpenCL;  /* cfg.method='plucker', cfg.compute='opencl', cfg.gpuid=1 */
     cfg.gpuid = 1;
@@ -2008,7 +2019,9 @@ static void test_cmdedge(void) {
     EXPECT_TRUE(1, "a negative seed is replaced by the time");
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 --json {\"Domain\":{\"Media\":[{\"mua\":0,\"mus\":0,\"g\":1,\"n\":1e30},"
                           "{\"mua\":0.005,\"mus\":1,\"g\":0.01,\"n\":1.37}]}}", NULL), "a refractive index whose square overflows a float");
+#ifdef MMC_USE_SSE  /* without SSE, the CPU replaces Havel by Plucker, which has the face normals */
     EXPECT_EXIT(run_mmc("--bench faceimmc -G -1 -n 10 -M H", NULL), "face iMMC with the Havel ray-tracer (no face normals)");
+#endif
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -u -1", NULL), "a negative length unit");
     EXPECT_EXIT(parse_mmc("--bench dmmc-cube60 -u 0", NULL), "a zero length unit");
 

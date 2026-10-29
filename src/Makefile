@@ -39,10 +39,12 @@ unittest: ARFLAGS+= $(OPENMPLIB) $(FASTMATH)
 ifeq ($(.DEFAULT_GOAL),ssemath)
 unittest: CCFLAGS+=$(SSEFLAGS) -DUSE_SSE2 -DMMC_USE_SSE_MATH
 endif
+# the EXPECT_EXIT cases run OpenCL in a fork()ed child, which macOS kills unless
+# its Objective-C runtime (under the OpenCL framework) allows that; ignored elsewhere
 unittest: makedirs $(CLSOURCE) $(ZMATLIB) $(OBJS)
 	$(CC) $(CCFLAGS) $(USERCCFLAGS) -I$(INCLUDEDIR) -DMMC_EXAMPLE_DIR=\"$(abspath ../examples)\" -o $(OBJDIR)/test_mmc$(OBJSUFFIX) ../test/unit/test_mmc.c
 	$(AR) $(ARFLAGS) $(AROUTPUT) $(BINDIR)/mmc_unittest $(OBJDIR)/test_mmc$(OBJSUFFIX) $(filter-out $(OBJDIR)/mmc$(OBJSUFFIX),$(OBJS)) $(USERARFLAGS) $(EXTRALIB)
-	$(BINDIR)/mmc_unittest
+	OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES $(BINDIR)/mmc_unittest
 
 ##  the same unit tests linked with the CUDA (and OptiX) backends, which add their GPU cases ##
 cudaunittest optixunittest: unittest
