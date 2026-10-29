@@ -1,6 +1,9 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-29 [ecdf0c8] [ci] pmmc tests: scipy from pip next to numpy 2; the null-log test ignores the import hint printed without pmcx
+ 2026-10-29 [ae03826] [test] the built-in two-source case runs its first source (srcid 1) on the CPU
+ 2026-10-29 [44b5a7c] [bug] build with MSVC: omp_get_level needs OpenMP 3.0, which MSVC (OpenMP 2.0) lacks
  2026-10-29 [8f6d14d] [feat] -l none prints nothing, not even the progress bar, as cfg.flog='none'
  2026-10-29 [5047730] [feat] cfg.flog='none' silences the log; 'NUL' and '/dev/null' stay accepted on every OS, refs fangq/mcx#280
  2026-10-29 [6130770]*[bug] cfg.flog: 'NUL' and '/dev/null' are the null device on every OS, refs fangq/mcx#280
