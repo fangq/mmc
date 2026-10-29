@@ -1,6 +1,7 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-29 [6145745]*[bug] package the mex files without upx: a packed mex aborted MATLAB/Octave on any error it raised
  2026-10-29 [96ed61a] [bug] mmclab skips maxNumCompThreads on Octave, where it only warns; test_mmclab adds matlab/ (mmcsrcdomain) to the path
  2026-10-29 [ecdf0c8] [ci] pmmc tests: scipy from pip next to numpy 2; the null-log test ignores the import hint printed without pmcx
  2026-10-29 [ae03826] [test] the built-in two-source case runs its first source (srcid 1) on the CPU
