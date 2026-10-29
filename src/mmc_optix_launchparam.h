@@ -21,7 +21,7 @@ typedef struct MCX_ExtraSrc {
 
 /* maximum property number; the launch parameters, mostly this table, must stay within the
    OptiX limit (MMCParam of 64192 bytes works, 16 bytes more fails pipeline creation) */
-#define MAX_PROP           3968
+#define MAX_OPTIX_PROP     3968
 
 #define MCX_SRC_PENCIL     0  /**<  default-Pencil beam src, no param */
 #define MCX_SRC_ISOTROPIC  1  /**<  isotropic source, no param */
@@ -111,7 +111,7 @@ typedef struct __align__(16) MMC_Parameter {
     int savetraj;                  /**< 1 to save the photon trajectories (-D M) */
     int maxjumpdebug;              /**< the number of trajectory records the buffer holds */
 
-    Medium medium[MAX_PROP];
+    Medium medium[MAX_OPTIX_PROP];
 } MMCParam;
 
 struct TriangleMeshSBTData {

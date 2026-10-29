@@ -357,7 +357,7 @@ void prepBoundParams(mcconfig* cfg, tetmesh* mesh, OptixParams* optixcfg) {
     }
 
     // set up optical properties
-    if (mesh->prop + 1 > MAX_PROP) {
+    if (mesh->prop + 1 > MAX_OPTIX_PROP) {
         mcx_error(-1, "Medium type count exceeds limit.", __FILE__, __LINE__);
     }
 
@@ -493,7 +493,7 @@ void prepLaunchParams(mcconfig* cfg, tetmesh* mesh, GPUInfo* gpu,
         size_t reclen = 2 * mesh->prop + 2 + optixcfg->launchParams.issaveexit * 6;
         float4* hdet = (float4*)malloc(sizeof(float4) * cfg->detnum);
 
-        for (uint i = 0; i < cfg->detnum; i++) {
+        for (int i = 0; i < cfg->detnum; i++) {
             hdet[i] = make_float4(cfg->detpos[i].x, cfg->detpos[i].y, cfg->detpos[i].z, cfg->detpos[i].w);
         }
 
