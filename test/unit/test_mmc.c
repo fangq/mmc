@@ -1195,6 +1195,11 @@ static void test_mmclab_gpu_method(void) {
     int ssemethod = cfg.method;
 #endif
 
+    cfg.gpuid = 1;  /* cfg.compute='sse' with the default tracer of the GPU builds */
+    cfg.method = rtBLBadouelGrid;
+    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    int cpumethod = cfg.method;
+
     cfg.compute = cbOpenCL;  /* cfg.method='plucker', cfg.compute='opencl', cfg.gpuid=1 */
     cfg.gpuid = 1;
     cfg.method = rtPlucker;
@@ -1211,6 +1216,9 @@ static void test_mmclab_gpu_method(void) {
 
 #ifdef MMC_USE_SSE
     EXPECT_EQ(rtPlucker, ssemethod, "mmc_validate_config keeps the CPU tracer of an SSE run");
+    EXPECT_EQ(rtBLBadouelGrid, cpumethod, "mmc_validate_config keeps the dual-grid tracer of an SSE run");
+#else
+    EXPECT_EQ(rtPlucker, cpumethod, "without SSE, mmc_validate_config gives cfg.compute='sse' the Plucker tracer");
 #endif
     EXPECT_EQ(rtBLBadouel, gpumethod, "mmc_validate_config gives an OpenCL run the branchless Badouel tracer");
     EXPECT_EQ(rtBLBadouelGrid, gridmethod, "mmc_validate_config keeps the dual-grid tracer of a GPU run");

@@ -4220,7 +4220,8 @@ void mmc_gpu_method(mcconfig* cfg) {
 
 #ifndef MMC_USE_SSE
 
-    if (cfg->gpuid > MAX_DEVICE) {
+    /* without SSE (e.g. arm64), the CPU only has the Plucker tracer, for -c sse as for -G -1 */
+    if (cfg->gpuid > MAX_DEVICE || cfg->compute == cbSSE) {
         cfg->method = rtPlucker;
     }
 
