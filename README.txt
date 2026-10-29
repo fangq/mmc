@@ -701,8 +701,9 @@ mmc -Q dmmc-cube60 -n 1e7
 `-A 1/0`, `--autopilot`
     Meaning: let mmc choose the GPU thread count, with fast math on OpenCL (1), or use
         `-t`/`-T` (0)
-`--atomic 1/0`, `--kernel file.cl`
-    Meaning: atomic accumulation; a custom OpenCL kernel
+`--kernel file.cl`
+    Meaning: a custom OpenCL kernel (`--atomic` is deprecated and ignored:
+        accumulation is always atomic)
 `-D flags`, `--debug`
     Meaning: debug output: `P` progress bar, `T` timing, `M` trajectories, and ray-tracing
         details (`S`, `C`, `B`, `W`, `D`, `I`, `O`, `X`, `A`, `R`, `E`)

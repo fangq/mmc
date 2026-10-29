@@ -136,7 +136,11 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     GET_SCALAR_FIELD(user_cfg, mcx_config, issavedet, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, issaveseed, py::bool_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, optlevel, py::int_);
-    GET_SCALAR_FIELD(user_cfg, mcx_config, isatomic, py::bool_);
+
+    if (user_cfg.contains("isatomic") && !py::bool_(user_cfg["isatomic"])) {
+        std::cout << "WARNING: isatomic=0 is deprecated and ignored; non-atomic accumulation raced and lost part of the deposited energy, at no speed benefit" << std::endl;
+    }
+
     GET_SCALAR_FIELD(user_cfg, mcx_config, basisorder, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, roulettesize, py::float_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, nout, py::float_);

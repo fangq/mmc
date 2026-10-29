@@ -258,7 +258,8 @@ function varargout = mmclab(varargin)
 %      cfg.optlevel:   OpenCL kernel optimization level, 0 (none) to 3 [3]
 %      cfg.compileropt: extra OpenCL JIT compiler options
 %      cfg.kernelfile: an OpenCL kernel file to run instead of the built-in one
-%      cfg.isatomic:   [1]: accumulate the output with atomic operations; 0: not
+%      cfg.isatomic:   deprecated and ignored: the output is always accumulated
+%                      with atomic operations
 %
 % == Debugging ==
 %      cfg.debuglevel: a string of debug flags (case insensitive):

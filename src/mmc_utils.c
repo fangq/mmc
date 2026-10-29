@@ -313,7 +313,6 @@ void mcx_initcfg(mcconfig* cfg) {
     cfg->replaytime = NULL;
     cfg->isextdet = 0;
     cfg->srcdir.w = 0.f;
-    cfg->isatomic = 1;
     cfg->debugphoton = -1;
     cfg->savedetflag = 0x47;
     cfg->mediabyte = 1;
@@ -5009,7 +5008,12 @@ void mcx_parsecmd(int argc, char* argv[], mcconfig* cfg) {
                             cfg->issavedet = 1;
                         }
                     } else if (strcmp(argv[i] + 2, "atomic") == 0) {
-                        i = mcx_readarg(argc, argv, i, &(cfg->isatomic), "bool");
+                        char isatomic = 1;
+                        i = mcx_readarg(argc, argv, i, &isatomic, "bool");
+
+                        if (!isatomic) {
+                            MMC_FPRINTF(cfg->flog, S_RED "WARNING: --atomic 0 is deprecated and ignored; non-atomic accumulation raced and lost part of the deposited energy, at no speed benefit\n" S_RESET);
+                        }
                     } else if (strcmp(argv[i] + 2, "root") == 0) {
                         i = mcx_readstrarg(argc, argv, i, cfg->rootpath, sizeof(cfg->rootpath));
                     } else if (strcmp(argv[i] + 2, "dumpjson") == 0) {
@@ -5267,7 +5271,8 @@ where possible parameters include (the first item in [] is the default value)\n\
       or                       if set to -1, CPU-based SSE mmc will be used\n\
  -G '1101'     (--gpu)         using multiple devices (1 enable, 0 disable)\n\
  -W '50,30,20' (--workload)    workload for active devices; normalized by sum\n\
- --atomic [1|0]                1 use atomic operations, 0 use non-atomic ones\n\
+ --atomic [1|0]                deprecated and ignored; atomic accumulation is\n\
+                               always used, non-atomic mode raced and lost data\n\
  --kernel my_simu.cl           user specified OpenCL kernel source file\n\
 \n"S_BOLD S_CYAN"\
 == Output options ==\n"S_RESET"\

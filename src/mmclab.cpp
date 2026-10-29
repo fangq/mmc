@@ -814,7 +814,12 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
     GET_ONE_FIELD(cfg, issaveexit)
     GET_ONE_FIELD(cfg, issaveseed)
     GET_ONE_FIELD(cfg, optlevel)
-    GET_ONE_FIELD(cfg, isatomic)
+    else if (strcmp(name, "isatomic") == 0) {
+        if (mxGetScalar(item) == 0.0) {
+            printf("WARNING: cfg.isatomic=0 is deprecated and ignored; non-atomic accumulation raced and lost part of the deposited energy, at no speed benefit\n");
+        }
+    }
+
     GET_ONE_FIELD(cfg, basisorder)
     GET_ONE_FIELD(cfg, outputformat)
     GET_ONE_FIELD(cfg, roulettesize)

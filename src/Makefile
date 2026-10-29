@@ -13,7 +13,7 @@ DUMMY:=$(shell mkdir -p built/cjson)
 ifneq (,$(filter $(MAKECMDGOALS),cuda cudamex cudaoct optix optixmex optixoct cudaunittest optixunittest))
     FILES+=mmc_cu_host
     USERCCFLAGS+=-DUSE_CUDA
-    CUCCOPT= -DUSE_ATOMIC -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC $(USERCUCCOPT)
+    CUCCOPT= -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC $(USERCUCCOPT)
     EXTRALIB+=-lcudart
     LIBCUDART=-L$(LIBOPENCLDIR) -lcudart
 endif

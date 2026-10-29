@@ -254,7 +254,7 @@ the verbose command line options in MMC.
                        where 'faceneighbors' can be found in the iso2mesh toolbox.
                        Example: see <demo_mmclab_basic.m>
        cfg.issaveseed:  [0]-save the RNG seed for a detected photon so one can replay
-       cfg.isatomic:    [1]-use atomic operations for saving fluence, 0-no atomic operations
+       cfg.isatomic:    deprecated and ignored: fluence is always saved with atomic operations
        cfg.outputtype:  'flux' - output fluence-rate
                         'fluence' - fluence,
                         'energy' - energy deposit,

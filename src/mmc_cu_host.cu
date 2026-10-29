@@ -268,7 +268,6 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
         (uint)cfg->issavedet,
         (uint)cfg->issaveexit,
         (uint)cfg->ismomentum,
-        (uint)cfg->isatomic,
         (uint)cfg->isspecular,
         1.f / cfg->tstep,
         cfg->minenergy,

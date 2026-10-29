@@ -79,7 +79,7 @@ if(BUILD_CUDA)
   set(
       CUDA_NVCC_FLAGS
       ${CUDA_NVCC_FLAGS};
-      -g -lineinfo -DUSE_ATOMIC -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC -use_fast_math -Xptxas -O3,-v -Xcompiler -Wall -Xcompiler "${OpenMP_CXX_FLAGS}"
+      -g -lineinfo -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC -use_fast_math -Xptxas -O3,-v -Xcompiler -Wall -Xcompiler "${OpenMP_CXX_FLAGS}"
       )
 endif()
 
@@ -180,7 +180,7 @@ if(BUILD_CUDA)
       OpenCL::OpenCL
       )
 
-  target_compile_definitions(mmc-trinity PUBLIC USE_CUDA USE_BLBADOUEL USE_ATOMIC MCX_SAVE_DETECTORS MCX_DO_REFLECTION USE_DMMC)
+  target_compile_definitions(mmc-trinity PUBLIC USE_CUDA USE_BLBADOUEL MCX_SAVE_DETECTORS MCX_DO_REFLECTION USE_DMMC)
   add_dependencies(mmc-trinity mmc mmc-cuda)
 
   # Create mmc library
@@ -190,7 +190,7 @@ if(BUILD_CUDA)
         mmc_utils.c
         mmc_utils.h
         )
-  target_compile_definitions(mmclab-cudahost PUBLIC USE_CUDA USE_BLBADOUEL USE_ATOMIC MCX_SAVE_DETECTORS MCX_DO_REFLECTION USE_DMMC MCX_CONTAINER)
+  target_compile_definitions(mmclab-cudahost PUBLIC USE_CUDA USE_BLBADOUEL MCX_SAVE_DETECTORS MCX_DO_REFLECTION USE_DMMC MCX_CONTAINER)
 
   set_target_properties(mmc-trinity
         PROPERTIES OUTPUT_NAME mmciii)

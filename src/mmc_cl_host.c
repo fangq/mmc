@@ -158,7 +158,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         {{cfg->srcdir.x, cfg->srcdir.y, cfg->srcdir.z}},
         {{mesh->nmin.x, mesh->nmin.y, mesh->nmin.z}},
         cfg->tstart, cfg->tend, (uint)cfg->isreflect, (uint)cfg->issavedet, (uint)cfg->issaveexit,
-        (uint)cfg->ismomentum, (uint)cfg->isatomic, (uint)cfg->isspecular, 1.f / cfg->tstep, cfg->minenergy,
+        (uint)cfg->ismomentum, (uint)cfg->isspecular, 1.f / cfg->tstep, cfg->minenergy,
         cfg->maxdetphoton, mesh->prop, cfg->detnum, (uint)cfg->voidtime, (uint)cfg->srctype,
         cfg->issaveref, cfg->maxgate, (uint)cfg->debuglevel, detreclen, cfg->outputtype, mesh->elemlen,
         cfg->mcmethod, cfg->method, 1.f / cfg->steps.x,
@@ -531,10 +531,6 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
         }
 
         snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), "%s ", cfg->compileropt);
-
-        if (cfg->isatomic) {
-            snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DUSE_ATOMIC");
-        }
 
         if (cfg->issave2pt == 0) {
             snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DMCX_SKIP_VOLUME");

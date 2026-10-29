@@ -586,7 +586,7 @@ mmc -Q dmmc-cube60 -n 1e7
 | `-S 1/0`, `--save2pt` | save the volume output (1) or skip it (0) |
 | `--dumpjson [file]` | print (or save) the complete input, mesh included, as one JSON file |
 | `-A 1/0`, `--autopilot` | let mmc choose the GPU thread count, with fast math on OpenCL (1), or use `-t`/`-T` (0) |
-| `--atomic 1/0`, `--kernel file.cl` | atomic accumulation; a custom OpenCL kernel |
+| `--kernel file.cl` | a custom OpenCL kernel (`--atomic` is deprecated and ignored: accumulation is always atomic) |
 | `-D flags`, `--debug` | debug output: `P` progress bar, `T` timing, `M` trajectories, and ray-tracing details (`S`, `C`, `B`, `W`, `D`, `I`, `O`, `X`, `A`, `R`, `E`) |
 | `--debugphoton n` | print the debug output for photon n only |
 

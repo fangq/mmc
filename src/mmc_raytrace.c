@@ -991,23 +991,15 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
                 if (!cfg->basisorder) {
-                    if (cfg->isatomic)
-                        #pragma omp atomic
-                        tracer->mesh->weight[eid + tshift] += ww;
-                    else {
-                        tracer->mesh->weight[eid + tshift] += ww;
-                    }
+                    #pragma omp atomic
+                    tracer->mesh->weight[eid + tshift] += ww;
                 } else {
                     ww *= 1.f / 3.f;
 
-                    if (cfg->isatomic)
-                        for (i = 0; i < 3; i++)
-                            #pragma omp atomic
-                            tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
-                    else
-                        for (i = 0; i < 3; i++) {
-                            tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
-                        }
+                    for (i = 0; i < 3; i++) {
+                        #pragma omp atomic
+                        tracer->mesh->weight[ee[out[faceidx][i]] - 1 + tshift] += ww;
+                    }
                 }
             }
         }
@@ -2887,21 +2879,13 @@ void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit) {
 
     } else {
         if (!cfg->basisorder) {
-            if (cfg->isatomic)
-                #pragma omp atomic
-                mesh->weight[eid + tshift] += ww;
-            else {
-                mesh->weight[eid + tshift] += ww;
-            }
+            #pragma omp atomic
+            mesh->weight[eid + tshift] += ww;
         } else {
-            if (cfg->isatomic)
-                for (i = 0; i < 4; i++)
-                    #pragma omp atomic
-                    mesh->weight[ee[i] - 1 + tshift] += ww * baryp0[i];
-            else
-                for (i = 0; i < 4; i++) {
-                    mesh->weight[ee[i] - 1 + tshift] += ww * baryp0[i];
-                }
+            for (i = 0; i < 4; i++) {
+                #pragma omp atomic
+                mesh->weight[ee[i] - 1 + tshift] += ww * baryp0[i];
+            }
         }
     }
 }

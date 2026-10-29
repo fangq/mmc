@@ -103,7 +103,7 @@ done
 
 # the CUDA backend: the flags of "make cuda" (CUCCOPT)
 nvcc -c -m64 -use_fast_math -Xptxas -O3 -Xcompiler -MT,-openmp -D_USE_MATH_DEFINES \
-     -DUSE_ATOMIC -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL \
+     -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL \
      -o built/mmc_cu_host.obj mmc_cu_host.cu
 
 # the driver and OpenCL DLLs are delay-loaded: the sse backend then runs (and

@@ -317,7 +317,7 @@ typedef struct MMC_ALIGN(16) MMC_Parameter {
     float3 srcdir;
     float3 nmin;
     float  tstart, tend;
-    uint   isreflect, issavedet, issaveexit, ismomentum, isatomic, isspecular;
+    uint   isreflect, issavedet, issaveexit, ismomentum, isspecular;
     float  Rtstep;
     float  minenergy;
     uint   maxdetphoton;
@@ -488,8 +488,6 @@ __device__ float rand_next_scatlen(__private RandType t[RAND_BUF_LEN]) {
 #define rand_next_reflect(t) rand_uniform01(t)
 #define rand_do_roulette(t)  rand_uniform01(t)
 
-#ifdef USE_ATOMIC
-
 #ifndef __NVCC__
 
 #if defined(USE_NVIDIA_GPU) && !defined(USE_OPENCL_ATOMIC)
@@ -522,7 +520,6 @@ __device__ inline float atomicadd(volatile __global float* address, const float 
 
 #endif
 
-#endif
 
 __device__ void clearpath(__local float* p, int len) {
     int i;
@@ -1304,7 +1301,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
                     if (r->oldweight > 0.f) {
                         if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
-#ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + r->oldidx, r->oldweight);
 
                             if (oldval > MAX_ACCUM) {
@@ -1320,18 +1316,9 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w * 2, r->oldweight_im);
                             }
 
-#else
-                            weight[r->oldidx] += r->oldweight;
-
-                            if (IS_RF) {
-                                weight[r->oldidx + gcfg->crop0.w * 2] += r->oldweight_im;
-                            }
-
-#endif
                         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
 
                             for (int pidx = 0; pidx < GPU_PARAM(gcfg, srcnum); pidx++) {
-#ifdef USE_ATOMIC
                                 float oldval = atomicadd(weight + r->oldidx * GPU_PARAM(gcfg, srcnum) + pidx, r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx]);
 
                                 if (oldval > MAX_ACCUM) {
@@ -1342,9 +1329,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                     }
                                 }
 
-#else
-                                weight[r->oldidx * GPU_PARAM(gcfg, srcnum) + pidx] += r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx];
-#endif
                             }
 
                         }
@@ -1365,7 +1349,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
                     if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1)) {
 
-#ifdef USE_ATOMIC
                         float oldval = atomicadd(weight + newidx, r->oldweight);
 
                         if (oldval > MAX_ACCUM) {
@@ -1380,18 +1363,9 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                             atomicadd(weight + newidx + gcfg->crop0.w * 2, r->oldweight_im);
                         }
 
-#else
-                        weight[newidx] += r->oldweight;
-
-                        if (IS_RF) {
-                            weight[newidx + gcfg->crop0.w * 2] += r->oldweight_im;
-                        }
-
-#endif
                     } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
 
                         for (int pidx = 0; pidx < GPU_PARAM(gcfg, srcnum); pidx++) {
-#ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx, r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx]);
 
                             if (oldval > MAX_ACCUM) {
@@ -1402,9 +1376,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 }
                             }
 
-#else
-                            weight[newidx * GPU_PARAM(gcfg, srcnum) + pidx] += r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx];
-#endif
                         }
 
                     }
@@ -1506,7 +1477,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
                         if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1) || GPU_PARAM(gcfg, srcid) < 0) {
 
-#ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + r->oldidx, r->oldweight);
 
                             if (oldval > MAX_ACCUM) {
@@ -1522,18 +1492,9 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 atomicadd(weight + r->oldidx + gcfg->crop0.w * 2, r->oldweight_im);
                             }
 
-#else
-                            weight[r->oldidx] += r->oldweight;
-
-                            if (IS_RF) {
-                                weight[r->oldidx + gcfg->crop0.w * 2] += r->oldweight_im;
-                            }
-
-#endif
                         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
 
                             for (int pidx = 0; pidx < GPU_PARAM(gcfg, srcnum); pidx++) {
-#ifdef USE_ATOMIC
                                 float oldval = atomicadd(weight + r->oldidx * GPU_PARAM(gcfg, srcnum) + pidx, r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx]);
 
                                 if (oldval > MAX_ACCUM) {
@@ -1544,9 +1505,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                     }
                                 }
 
-#else
-                                weight[r->oldidx * GPU_PARAM(gcfg, srcnum) + pidx] += r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx];
-#endif
                             }
 
                         }
@@ -1566,7 +1524,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
                         if ((GPU_PARAM(gcfg, srctype) != stPattern) + (GPU_PARAM(gcfg, srcnum) == 1) || GPU_PARAM(gcfg, srcid) < 0) {
 
-#ifdef USE_ATOMIC
                             float oldval = atomicadd(weight + newidx, r->oldweight);
 
                             if (oldval > MAX_ACCUM) {
@@ -1582,18 +1539,9 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                 atomicadd(weight + newidx + gcfg->crop0.w * 2, r->oldweight_im);
                             }
 
-#else
-                            weight[newidx] += r->oldweight;
-
-                            if (IS_RF) {
-                                weight[newidx + gcfg->crop0.w * 2] += r->oldweight_im;
-                            }
-
-#endif
                         } else if (GPU_PARAM(gcfg, srctype) == stPattern) {
 
                             for (int pidx = 0; pidx < GPU_PARAM(gcfg, srcnum); pidx++) {
-#ifdef USE_ATOMIC
                                 float oldval = atomicadd(weight + newidx * GPU_PARAM(gcfg, srcnum) + pidx, r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx]);
 
                                 if (oldval > MAX_ACCUM) {
@@ -1604,9 +1552,6 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
                                     }
                                 }
 
-#else
-                                weight[newidx * GPU_PARAM(gcfg, srcnum) + pidx] += r->oldweight * ppath[GPU_PARAM(gcfg, reclen) + pidx];
-#endif
                             }
 
                         }
@@ -2526,11 +2471,7 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
                 if (GPU_PARAM(gcfg, issaveref) && r.eid < 0 && dref) {
                     int tshift = MIN(max((int)((r.photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), (int)GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, nf);
                     /* many threads exit through the same faces near the source; a plain += loses updates */
-#ifdef USE_ATOMIC
                     atomicadd(dref + ((-r.eid) - 1) + tshift, r.weight);
-#else
-                    dref[((-r.eid) - 1) + tshift] += r.weight;
-#endif
                 }
 
 #endif

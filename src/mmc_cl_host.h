@@ -78,7 +78,7 @@ typedef struct PRE_ALIGN(32) GPU_mcconfig {
     cl_float3 srcdir;
     cl_float3 nmin;
     cl_float  tstart, tend;
-    cl_uint   isreflect, issavedet, issaveexit, ismomentum, isatomic, isspecular;
+    cl_uint   isreflect, issavedet, issaveexit, ismomentum, isspecular;
     cl_float  Rtstep;
     cl_float  minenergy;
     cl_uint   maxdetphoton;
