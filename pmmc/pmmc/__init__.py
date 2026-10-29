@@ -13,25 +13,41 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""PMMC - Python bindings for Mesh-based Monte Carlo (MMC) photon transport simulator
+"""PMMC - Python bindings of Mesh-based Monte Carlo (MMC), a photon transport simulator on
+tetrahedral meshes.
 
-Example usage:
+MMC runs on CPUs (SSE/OpenMP) and GPUs (OpenCL; CUDA and OptiX in separate builds).
 
-# To list available GPUs
-import pmmc
-pmmc.gpuinfo()
+Simulator (compiled module ``_pmmc``)
 
-import numpy as np
+* ``run(cfg)`` or ``run(**cfg)``: run a simulation on a prepared mesh; see
+  ``help(pmmc.run)`` for the ``cfg`` keys and the outputs
+* ``gpuinfo()``: list the OpenCL devices
+* ``version()``: the MMC version string
 
-# To generate tetrahedral mesh
-import iso2mesh as i2m
-node, face, elem = i2m.meshabox([0, 0, 0], [60, 60, 60], 10, 100)  # create a mesh
+Mesh front end (needs ``iso2mesh``)
 
-# To run a simulation
-cfg = {'nphoton': 1000000, 'node': node, 'elem': elem, 'elemprop': np.ones(elem.shape[0]),
-       'tstart':0, 'tend':5e-9, 'tstep':5e-9, 'srcpos': [30,30,0], 'srcdir':[0,0,1],
-       'prop':[[0,0,1,1],[0.005,1,0.01,1.37]]}
-res = pmmc.run(cfg)
+* :func:`mmclab`: prepare the mesh and the source, run, and unpack the outputs, as
+  ``mmclab.m`` does
+* :func:`mmcsrcdomain`, :func:`mmcaddsrc`, :func:`mmcadddet`: add wide-field source and
+  detector domains to a mesh
+* :func:`mmcraytrace`: find where a ray enters a mesh
+
+The pure-Python utilities of pmcx (``detweight``, ``meanpath``, ``rfreplay``, the
+diffusion solutions, file I/O and plotting ...) are re-exported when pmcx is installed.
+
+Examples
+--------
+>>> import numpy as np
+>>> import iso2mesh as i2m
+>>> import pmmc
+>>> pmmc.gpuinfo()
+>>> node, face, elem = i2m.meshabox([0, 0, 0], [60, 60, 60], 10, 100)
+>>> cfg = {"nphoton": 1000000, "node": node, "elem": elem,
+...        "elemprop": np.ones(elem.shape[0]), "tstart": 0, "tend": 5e-9, "tstep": 5e-9,
+...        "srcpos": [30, 30, 0], "srcdir": [0, 0, 1],
+...        "prop": [[0, 0, 1, 1], [0.005, 1, 0.01, 1.37]]}
+>>> res = pmmc.mmclab(cfg)
 """
 
 import sys

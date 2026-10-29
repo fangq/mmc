@@ -13,12 +13,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""pmmc.mmclab() and the mesh helpers it uses, ported from mmclab/mmclab.m and matlab/mmc*.m
+"""The mesh front end of pmmc: :func:`mmclab` and its helpers, ported from ``mmclab.m``
+and ``mmcsrcdomain.m``, ``mmcaddsrc.m``, ``mmcadddet.m`` and ``mmcraytrace.m``.
 
-mmclab() prepares the mesh and the source as mmclab.m does (element reorientation, face
-neighbors, element volumes, the initial element, and the source domain of wide-field sources),
-runs pmmc.run(), and unpacks the outputs the same way. The mesh functions need iso2mesh
-(pip install iso2mesh).
+:func:`mmclab` prepares the mesh and the source as ``mmclab.m`` does (element
+reorientation, face neighbors, element volumes, the initial element, and the source domain
+of wide-field sources), runs ``pmmc.run``, and unpacks the outputs the same way. The mesh
+functions need ``iso2mesh`` (``pip install iso2mesh``), which is imported only when they
+are called.
+
+Element and node indices in the inputs and outputs are 1-based, as in MATLAB.
 """
 
 import copy
@@ -30,10 +34,13 @@ WIDEFIELD_SRC = ("planar", "pattern", "fourier", "fourierx", "fourierx2d")
 
 
 def _i2m():
+    """Import and return the ``iso2mesh`` module, with an install hint if it is missing."""
     try:
         import iso2mesh
     except ImportError:  # pragma: no cover
-        raise ImportError('pmmc.mmclab needs iso2mesh to prepare the mesh, please run "pip install iso2mesh"')
+        raise ImportError(
+            'pmmc.mmclab needs iso2mesh to prepare the mesh, please run "pip install iso2mesh"'
+        )
     return iso2mesh
 
 
@@ -43,34 +50,57 @@ def _first(x):
 
 
 def _run(cfg):
+    """Run ``_pmmc.run(cfg)``; imported here so that the mesh helpers work without ``_pmmc``."""
     from _pmmc import run
 
     return run(cfg)
 
 
 def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv=100):
-    """
-    srcnode, srcface = mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0)
+    """Define the source domain of a source outside the mesh, ported from ``mmcsrcdomain.m``.
 
-    Define a source domain (a triangle or a polygon on the source plane) for wide-field sources
-    outside of the mesh, ported from mmcsrcdomain.m
+    The domain is a triangle (or, with ``keepshape``, the source's own polygon) on the source
+    plane, perpendicular to ``srcdir``, that covers the source aperture. :func:`mmcaddsrc`
+    tessellates it into the mesh, so that photons launched anywhere on the aperture start in
+    a known element.
 
-    input:
-        cfg: a dict with at least srctype, srcpos and srcdir, and srcparam1/srcparam2 as needed
-        meshbbx: the bounding box of the mesh, [[xmin, ymin, zmin], [xmax, ymax, zmax]]
-        expansion: the expansion ratio of the source domain, 1.1 by default
-        rotate: the rotation angle (in radian) of the domain around srcdir
-        keepshape: 1 to keep the source shape (planar/disk) instead of a covering triangle
-        circlediv: the number of divisions of a disk source domain when keepshape is 1
+    Parameters
+    ----------
+    cfg : dict
+        The source: ``srctype``, ``srcpos`` and ``srcdir``, and ``srcparam1``/``srcparam2``
+        as the source type needs. Supported types: pencil, cone, zgaussian, isotropic,
+        arcsine, gaussian, line, slit, planar, pattern, fourier, fourierx, fourierx2d and
+        disk.
+    meshbbx : array_like, shape (2, 3)
+        The bounding box of the mesh, ``[[xmin, ymin, zmin], [xmax, ymax, zmax]]``.
+    expansion : float, optional
+        The ratio by which the domain is enlarged beyond the aperture (default 1.1).
+    rotate : float, optional
+        The rotation of the triangle around ``srcdir``, in radians (default 0).
+    keepshape : int, optional
+        1 to use the shape of the aperture (a parallelogram for planar/pattern/fourier
+        sources, a polygon for a disk) instead of a covering triangle (default 0).
+    circlediv : int, optional
+        The number of segments of a disk domain with ``keepshape`` (default 100).
 
-    output:
-        srcnode: the nodes of the source domain, Nx3
-        srcface: the triangles of the source domain, 1-based
+    Returns
+    -------
+    srcnode : ndarray, shape (n, 3)
+        The nodes of the source domain.
+    srcface : ndarray, shape (m, 3)
+        Its triangles, 1-based.
+
+    Raises
+    ------
+    ValueError
+        If ``srcpos``, ``srcdir`` or ``srctype`` is missing, or the type is not supported.
     """
     i2m = _i2m()
     for key in ("srcpos", "srcdir", "srctype"):
         if key not in cfg:
-            raise ValueError("you must at least define cfg['srcpos'], cfg['srcdir'], cfg['srctype']")
+            raise ValueError(
+                "you must at least define cfg['srcpos'], cfg['srcdir'], cfg['srctype']"
+            )
 
     srctype = cfg["srctype"]
     srcpos = np.ravel(np.asarray(cfg["srcpos"], dtype=float))[:3]
@@ -88,14 +118,20 @@ def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv
     param2 = np.ravel(np.asarray(cfg.get("srcparam2", [0, 0, 0, 0]), dtype=float))
 
     if srctype in ("pencil", "cone", "zgaussian", "isotropic", "arcsine"):
-        srcnode = i2m.orthdisk(srcpos, srcpos + srcdir[:3], domainradius, 3, vperp, rotate)
+        srcnode = i2m.orthdisk(
+            srcpos, srcpos + srcdir[:3], domainradius, 3, vperp, rotate
+        )
         srcface = np.array([[1, 2, 3]])
     elif srctype == "gaussian":
-        srcnode = i2m.orthdisk(srcpos, srcpos + srcdir[:3], domaindiagnoal * 0.5, 3, vperp, rotate)
+        srcnode = i2m.orthdisk(
+            srcpos, srcpos + srcdir[:3], domaindiagnoal * 0.5, 3, vperp, rotate
+        )
         srcface = np.array([[1, 2, 3]])
     elif srctype in ("line", "slit"):
         v0 = srcpos + param1[:3] * 0.5
-        srcnode = i2m.orthdisk(v0, v0 + srcdir[:3], np.linalg.norm(param1[:3]) * expansion, 3, param1[:3])
+        srcnode = i2m.orthdisk(
+            v0, v0 + srcdir[:3], np.linalg.norm(param1[:3]) * expansion, 3, param1[:3]
+        )
         srcface = np.array([[1, 2, 3]])
     elif srctype in WIDEFIELD_SRC:
         v0, v1, v2 = srcpos, param1[:3], param2[:3]
@@ -104,20 +140,33 @@ def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv
         voff1 = (v1 + v2) * 0.5
         voff2 = (v1 - v2) * 0.5
         if keepshape:
-            srcnode = np.array([v0, v0 + v1, v0 + v1 + v2, v0 + v2]) + np.array([-voff1, voff2, voff1, -voff2]) * (expansion - 1.0)
+            srcnode = np.array([v0, v0 + v1, v0 + v1 + v2, v0 + v2]) + np.array(
+                [-voff1, voff2, voff1, -voff2]
+            ) * (expansion - 1.0)
             srcface = np.array([[1, 2, 3], [3, 4, 1]])
         else:
             radius = max(np.linalg.norm(voff1), np.linalg.norm(voff2)) * 2.0 * expansion
-            srcnode = i2m.orthdisk(srcpos + voff1, srcpos + voff1 + srcdir[:3], radius, 3, v1 + v2, rotate)
+            srcnode = i2m.orthdisk(
+                srcpos + voff1, srcpos + voff1 + srcdir[:3], radius, 3, v1 + v2, rotate
+            )
             srcface = np.array([[1, 2, 3]])
     elif srctype == "disk":
         if keepshape:
             from scipy.spatial import Delaunay
 
-            srcnode = i2m.orthdisk(srcpos, srcpos + srcdir[:3], param1[0] * expansion, circlediv)
+            srcnode = i2m.orthdisk(
+                srcpos, srcpos + srcdir[:3], param1[0] * expansion, circlediv
+            )
             srcface = Delaunay(srcnode[:, :2]).simplices + 1
         else:
-            srcnode = i2m.orthdisk(srcpos, srcpos + srcdir[:3], param1[0] * 2.0 * expansion, 3, vperp, rotate)
+            srcnode = i2m.orthdisk(
+                srcpos,
+                srcpos + srcdir[:3],
+                param1[0] * 2.0 * expansion,
+                3,
+                vperp,
+                rotate,
+            )
             srcface = np.array([[1, 2, 3]])
     else:
         raise ValueError("source type not supported: " + str(srctype))
@@ -126,21 +175,32 @@ def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv
 
 
 def mmcaddsrc(node, elem, src, **opt):
-    """
-    newnode, newelem = mmcaddsrc(node, elem, src, **opt)
+    """Add a source domain to a mesh, ported from ``mmcaddsrc.m``.
 
-    Add a wide-field source domain to the mesh, ported from mmcaddsrc.m. The space between the
-    mesh and the source domain is tessellated and labeled 0, and the elements attached to the
-    source domain are labeled -1 (extcorelabel)
+    The space between the mesh and the source domain is tessellated with tetgen (through
+    ``iso2mesh.meshrefine``) and labeled ``extlabel`` (0, background), and the elements
+    touching the source domain are labeled ``extcorelabel`` (-1), where photons are launched.
 
-    input:
-        node, elem: the mesh, elem is 1-based, with an optional 5th column of labels
-        src: the nodes of the source domain (Nx3), or a source dict passed to mmcsrcdomain
-        opt: extcmdopt (tetgen options, '-Y' by default), extlabel, extcorelabel, and the
-             mmcsrcdomain options (expansion, rotate, keepshape) when src is a dict
+    Parameters
+    ----------
+    node : array_like, shape (nn, 3)
+        The mesh nodes.
+    elem : array_like, shape (ne, 4) or (ne, 5)
+        The tetrahedra, 1-based, with an optional 5th column of labels (1 if absent).
+    src : array_like or dict
+        The nodes of the source domain (``(n, 3)``), or a source dict, which is passed to
+        :func:`mmcsrcdomain` with the bounding box of the mesh.
+    **opt
+        ``extcmdopt`` (tetgen options, default ``'-Y'``), ``extlabel``, ``extcorelabel``,
+        and, when ``src`` is a dict, the ``expansion``, ``rotate``, ``keepshape`` and
+        ``circlediv`` options of :func:`mmcsrcdomain`.
 
-    output:
-        newnode, newelem: the merged mesh, newelem has 5 columns
+    Returns
+    -------
+    newnode : ndarray
+        The nodes of the merged mesh.
+    newelem : ndarray, shape (ne2, 5)
+        Its tetrahedra and labels, 1-based.
     """
     i2m = _i2m()
     node = np.asarray(node, dtype=float)
@@ -148,8 +208,14 @@ def mmcaddsrc(node, elem, src, **opt):
     opt = {k.lower(): v for k, v in opt.items()}
     opt.setdefault("extcmdopt", "-Y")
     if isinstance(src, dict):
-        domopt = {k: opt[k] for k in ("expansion", "rotate", "keepshape", "circlediv") if k in opt}
-        src = mmcsrcdomain(src, [node[:, :3].min(axis=0), node[:, :3].max(axis=0)], **domopt)[0]
+        domopt = {
+            k: opt[k]
+            for k in ("expansion", "rotate", "keepshape", "circlediv")
+            if k in opt
+        }
+        src = mmcsrcdomain(
+            src, [node[:, :3].min(axis=0), node[:, :3].max(axis=0)], **domopt
+        )[0]
     opt["newnode"] = np.asarray(src, dtype=float)
     if elem.shape[1] == 4:
         elem = np.hstack([elem, np.ones((elem.shape[0], 1), dtype=elem.dtype)])
@@ -160,30 +226,60 @@ def mmcaddsrc(node, elem, src, **opt):
 
 
 def mmcadddet(node, elem, det, **opt):
-    """
-    newnode, newelem = mmcadddet(node, elem, det, **opt)
+    """Add a wide-field detector domain to a mesh, ported from ``mmcadddet.m``.
 
-    Add a wide-field detector domain to the mesh, labeled -2, ported from mmcadddet.m
+    The same as :func:`mmcaddsrc` with ``extcorelabel=-2``, ``keepshape=1`` and
+    ``expansion=1``: the elements touching the detector aperture are labeled -2.
+
+    Parameters
+    ----------
+    node, elem : array_like
+        The mesh, as in :func:`mmcaddsrc`.
+    det : array_like or dict
+        The nodes of the detector domain, or a dict with ``srctype``, ``srcpos``,
+        ``srcdir``, ``srcparam1`` and ``srcparam2`` describing the detector aperture as a
+        source.
+    **opt
+        Other options of :func:`mmcaddsrc`.
+
+    Returns
+    -------
+    newnode, newelem : ndarray
+        The merged mesh, as in :func:`mmcaddsrc`.
     """
     opt = dict(opt, extcorelabel=-2, keepshape=1, expansion=1.0)
     return mmcaddsrc(node, elem, det, **opt)
 
 
 def mmcraytrace(node, elem, p0, v0, e0="-"):
-    """
-    p, e0 = mmcraytrace(node, elem, p0, v0, e0)
+    """Find where a ray meets the mesh surface, and the element there, ported from ``mmcraytrace.m``.
 
-    Find the entry point of a ray on the mesh surface and the element enclosing it, ported from
-    mmcraytrace.m
+    Parameters
+    ----------
+    node : array_like, shape (nn, 3)
+        The mesh nodes.
+    elem : array_like
+        The tetrahedra (``(ne, 4)`` or more columns), or a triangular surface (``(nf, 3)``),
+        1-based.
+    p0 : array_like
+        The origin of the ray.
+    v0 : array_like
+        The direction of the ray.
+    e0 : {'-', '>', '<'} or nan, optional
+        Search along ``v0`` (``'>'``), against it (``'<'``), or both ways (``'-'`` or nan,
+        the default).
 
-    input:
-        node, elem: the mesh (tetrahedra or a triangular surface), 1-based
-        p0, v0: the origin and the direction of the ray
-        e0: '>' searches along v0, '<' against v0, '-' or nan in both directions
+    Returns
+    -------
+    p : ndarray, shape (3,)
+        The intersection closest to ``p0`` in the searched direction.
+    e0 : int
+        The 1-based tetrahedron (or surface triangle) that contains ``p``.
 
-    output:
-        p: the intersection closest to p0 in the searched direction
-        e0: the (1-based) element or surface triangle containing p
+    Raises
+    ------
+    ValueError
+        If the ray misses the mesh, or ``e0`` is not recognized.
     """
     i2m = _i2m()
     node = np.asarray(node, dtype=float)
@@ -199,7 +295,9 @@ def mmcraytrace(node, elem, p0, v0, e0="-"):
         idx1 = np.where(t >= 0)[0]
     elif isinstance(e0, str) and e0 == "<":
         idx1 = np.where(t <= 0)[0]
-    elif (isinstance(e0, str) and e0 == "-") or (not isinstance(e0, str) and np.isnan(e0)):
+    elif (isinstance(e0, str) and e0 == "-") or (
+        not isinstance(e0, str) and np.isnan(e0)
+    ):
         idx1 = np.arange(len(t))
     else:
         raise ValueError("ray direction specifier is not recognized")
@@ -213,14 +311,18 @@ def mmcraytrace(node, elem, p0, v0, e0="-"):
     # the element that has this triangle as one of its faces
     felem = np.sort(face[faceidx - 1, :3])
     tet = elem[:, :4]
-    allface = np.vstack([tet[:, [0, 1, 2]], tet[:, [1, 0, 3]], tet[:, [0, 2, 3]], tet[:, [1, 3, 2]]])
+    allface = np.vstack(
+        [tet[:, [0, 1, 2]], tet[:, [1, 0, 3]], tet[:, [0, 2, 3]], tet[:, [1, 3, 2]]]
+    )
     match = np.where(np.all(np.sort(allface, axis=1) == felem, axis=1))[0]
     loc = (match[0] % tet.shape[0]) + 1
     return p, int(loc)
 
 
 def _reorient(cfg, i2m):
-    """reorient the elements to positive volume, permuting the edge/face ROIs of flipped elements"""
+    """Reorient the elements of ``cfg`` to positive volumes, permuting the ``edgeroi``/``faceroi``
+    of the flipped elements, and set ``cfg['isreoriented']``.
+    """
     elem, _, idx = i2m.meshreorient(cfg["node"][:, :3], np.array(cfg["elem"][:, :4]))
     cfg["elem"] = elem
     if "edgeroi" in cfg:
@@ -233,13 +335,15 @@ def _reorient(cfg, i2m):
 
 
 def _tsearch(node, elem, pos):
-    """the 1-based enclosing element of a point, nan if outside, as tsearchn in MATLAB/Octave"""
+    """Return the 1-based element enclosing a point, or nan if it is outside, as ``tsearchn``."""
     idx = _first(_i2m().tsearchn(node[:, :3], elem[:, :4], np.atleast_2d(pos)[:, :3]))
     return float(np.ravel(idx)[0])
 
 
 def _prepare(cfg):
-    """the mesh and source preparation of mmclab.m for one simulation"""
+    """Prepare the mesh and the source of one simulation as ``mmclab.m`` does; see :func:`mmclab`.
+    Returns a shallow copy of ``cfg``.
+    """
     i2m = _i2m()
     cfg = copy.copy(cfg)
     if "node" not in cfg or "elem" not in cfg:
@@ -274,10 +378,14 @@ def _prepare(cfg):
         # only the first row of a multi-source srcpos is looked up, mmc finds the others
         cfg["e0"] = _tsearch(cfg["node"], cfg["elem"], srcpos[0, :3])
     e0 = cfg["e0"]
-    if (not isinstance(e0, str) and np.isnan(e0) and cfg.get("srctype") == "pencil") or isinstance(e0, str):
+    if (
+        not isinstance(e0, str) and np.isnan(e0) and cfg.get("srctype") == "pencil"
+    ) or isinstance(e0, str):
         print("searching initial element ...")
         srcpos = np.array(srcpos)
-        srcpos[0, :3], cfg["e0"] = mmcraytrace(cfg["node"], cfg["elem"], srcpos[0, :3], srcdir[0, :3], e0)
+        srcpos[0, :3], cfg["e0"] = mmcraytrace(
+            cfg["node"], cfg["elem"], srcpos[0, :3], srcdir[0, :3], e0
+        )
         cfg["srcpos"] = srcpos if np.ndim(cfg["srcpos"]) > 1 else srcpos[0]
     # a 2-D srcpattern is one pattern; a 3-D one is a [srcnum, Nx, Ny] stack (the reshape of a 2-D
     # pattern in mmclab.m to Nx x Ny x 1 is a no-op in MATLAB and must not add an axis here)
@@ -289,17 +397,25 @@ def _prepare(cfg):
     iswidesrc = cfg.get("srctype") in WIDEFIELD_SRC and not isoptix
     if (not isinstance(cfg["e0"], str) and np.isnan(cfg["e0"])) or iswidesrc:
         if "srcparam1" not in cfg or "srcparam2" not in cfg:
-            raise ValueError("for wide-field sources, you must provide srcparam1 and srcparam2")
+            raise ValueError(
+                "for wide-field sources, you must provide srcparam1 and srcparam2"
+            )
         cfg.setdefault("srctype", "pencil")
-        srcdef = {k: cfg[k] for k in ("srctype", "srcpos", "srcdir", "srcparam1", "srcparam2")}
+        srcdef = {
+            k: cfg[k] for k in ("srctype", "srcpos", "srcdir", "srcparam1", "srcparam2")
+        }
         node = cfg["node"]
-        sdom = mmcsrcdomain(srcdef, [node[:, :3].min(axis=0), node[:, :3].max(axis=0)])[0]
+        sdom = mmcsrcdomain(srcdef, [node[:, :3].min(axis=0), node[:, :3].max(axis=0)])[
+            0
+        ]
         rounded = {tuple(r) for r in np.round(node[:, :3] * 1e10) * 1e-10}
         isinside = [tuple(r) in rounded for r in np.round(sdom * 1e10) * 1e-10]
         if not any(isinside) and not isoptix:
             elem = cfg["elem"]
             if elem.shape[1] == 4:
-                elem = np.hstack([elem, np.reshape(cfg["elemprop"], (-1, 1)).astype(elem.dtype)])
+                elem = np.hstack(
+                    [elem, np.reshape(cfg["elemprop"], (-1, 1)).astype(elem.dtype)]
+                )
             cfg["node"], elem = mmcaddsrc(cfg["node"], elem, sdom)
             cfg["elemprop"] = elem[:, 4]
             cfg["elem"] = elem
@@ -328,7 +444,11 @@ def _prepare(cfg):
     if "nphoton" not in cfg:
         raise ValueError("cfg['nphoton'] field is missing")
     elemprop = np.ravel(cfg["elemprop"])
-    if "prop" not in cfg or np.shape(cfg["prop"])[0] < np.max(elemprop) + 1 or np.all(elemprop <= 0):
+    if (
+        "prop" not in cfg
+        or np.shape(cfg["prop"])[0] < np.max(elemprop) + 1
+        or np.all(elemprop <= 0)
+    ):
         raise ValueError("cfg['prop'] field is missing or insufficient")
     if not isinstance(cfg["e0"], str):
         cfg["e0"] = int(cfg["e0"])
@@ -340,10 +460,16 @@ def _unpackdetp(detp, cfg):
     medianum = np.shape(cfg["prop"])[0] - 1
     newdetp = {}
     newdetp["detid"] = detp[0, :].astype(np.int32)
-    newdetp["nscat"] = detp[1 : medianum + 1, :].astype(np.int32).T  # number of scattering events per medium
-    newdetp["ppath"] = detp[medianum + 1 : 2 * medianum + 1, :].T  # partial path lengths per medium
+    newdetp["nscat"] = (
+        detp[1 : medianum + 1, :].astype(np.int32).T
+    )  # number of scattering events per medium
+    newdetp["ppath"] = detp[
+        medianum + 1 : 2 * medianum + 1, :
+    ].T  # partial path lengths per medium
     if cfg.get("ismomentum"):
-        newdetp["mom"] = detp[2 * medianum + 1 : 3 * medianum + 1, :].T  # momentum transfer per medium
+        newdetp["mom"] = detp[
+            2 * medianum + 1 : 3 * medianum + 1, :
+        ].T  # momentum transfer per medium
     if cfg.get("issaveexit"):
         newdetp["p"] = detp[-7:-4, :].T  # exit positions
         newdetp["v"] = detp[-4:-1, :].T  # exit directions
@@ -371,44 +497,73 @@ def _unpacktraj(data):
 
 
 def mmclab(cfg, option=None):
-    """
-    res = pmmc.mmclab(cfg)
-    res = pmmc.mmclab(cfg, 'prep')
-    gpuinfo = pmmc.mmclab('gpuinfo')
+    """Run an MMC simulation with the pre- and post-processing of ``mmclab.m``.
 
-    Run a mesh-based Monte Carlo (MMC) simulation with the same pre- and post-processing as
-    mmclab.m; pmmc.run() only runs the simulation
+    ``pmmc.run`` only runs the simulation on a prepared mesh. Before running, ``mmclab``:
 
-    input:
-        cfg: a dict of simulation settings, or a list of such dicts, see the mmclab documentation;
-             node/elem/elemprop (or elem with a 5th label column), prop, srcpos, srcdir, nphoton,
-             tstart/tend/tstep are needed. Before the simulation, mmclab
-               - reorients elements to a positive volume (unless cfg['isreoriented'] is 1),
-                 and computes cfg['facenb'] and cfg['evol'] if missing
-               - finds the initial element cfg['e0'] (raytracing to the mesh surface for pencil
-                 beams outside the mesh, or when e0 is '>', '<' or '-')
-               - adds a source domain to the mesh for wide-field sources (planar, pattern,
-                 fourier, fourierx, fourierx2d) outside the mesh, see mmcsrcdomain/mmcaddsrc
-             mmclab.m sets the saved outputs from its number of outputs; here they are set by
-             cfg['issavedet'] (detected photons), cfg['issaveseed'] (their seeds) and
-             cfg['debuglevel'] containing 'M' (trajectories)
-        option: 'prep' returns the prepared cfg without simulating
+    * reorients the elements to positive volumes (unless ``cfg['isreoriented']`` is 1), and
+      computes ``cfg['facenb']`` and ``cfg['evol']`` when missing;
+    * takes ``elemprop`` from the 5th column of ``elem`` when present;
+    * finds the initial element ``cfg['e0']``, ray-tracing to the mesh surface for a pencil
+      beam outside the mesh, or when ``e0`` is ``'>'``, ``'<'`` or ``'-'``
+      (see :func:`mmcraytrace`);
+    * for wide-field sources (planar, pattern, fourier, fourierx, fourierx2d; except with
+      OptiX) and for sources outside the mesh, adds a source domain to the mesh
+      (:func:`mmcsrcdomain`, :func:`mmcaddsrc`).
 
-    output:
-        res: a dict (or a list of dicts for a list of cfg) with the outputs of pmmc.run, where
-             res['flux']: the fluence rate (or the output selected by cfg['outputtype']) at the
-                    nodes or elements, a complex array for RF (omega>0) simulations
-             res['dref']: diffuse reflectance on the surface faces, if cfg['issaveref'] is 1
-             res['jmua'], res['jd'], ...: adjoint Jacobians for the adjoint output types,
-                    [nn, Nch] on the mesh (basisorder 1) or [Nx, Ny, Nz, Ngate, Nch] in grid mode,
-                    where Nch = Ns*Nd (all source-detector pairs, detector index varying the
-                    fastest) or the rows of cfg['sdmap'] ([srcid, detid] pairs, 1-based)
-             res['detp']: detected photons, a dict with detid, nscat, ppath, mom, p, v, w0,
-                    prop, unitinmm and data (the raw records), as mmclab.m returns
-             res['seeds']: the RNG seeds of the detected photons, one column per photon
-             res['traj']: photon trajectories sorted by photon id, a dict with id, pos, eid, data
-             res['cfg']: the prepared cfg, whose node/elem include any added source domain;
-                    nodal outputs follow this mesh (the 3rd output of mmclab.m)
+    ``mmclab.m`` chooses the saved outputs from its number of outputs; here they are chosen
+    by ``cfg['issavedet']`` (detected photons), ``cfg['issaveseed']`` (their seeds) and
+    ``cfg['debuglevel']`` containing ``'M'`` (trajectories).
+
+    Parameters
+    ----------
+    cfg : dict, list of dict, or str
+        The simulation settings, with the keys of ``pmmc.run`` (see ``help(pmmc.run)``):
+        at least ``nphoton``, ``node``, ``elem``, ``elemprop`` (or a 5-column ``elem``),
+        ``prop``, ``srcpos``, ``srcdir``, ``tstart``, ``tend`` and ``tstep``. A list runs
+        each one. The strings ``'gpuinfo'`` and ``'version'`` return ``pmmc.gpuinfo()`` and
+        ``pmmc.version()``.
+    option : str, optional
+        ``'prep'`` returns the prepared ``cfg`` without running it.
+
+    Returns
+    -------
+    res : dict or list of dict
+        The outputs of ``pmmc.run``, post-processed:
+
+        * ``flux``: the fluence rate (or the quantity of ``cfg['outputtype']``) on the nodes,
+          elements or grid; complex for RF simulations (``cfg['omega'] > 0``)
+        * ``dref``: the diffuse reflectance on the surface, when ``cfg['issaveref']`` is 1
+        * ``jmua``, ``jd``, ...: adjoint Jacobians, ``(nn, nch)`` on the mesh or
+          ``(nx, ny, nz, ngate, nch)`` in grid mode, where the ``nch`` channels are all
+          source-detector pairs (detector index fastest) or the ``[srcid, detid]`` rows of
+          ``cfg['sdmap']``; complex for RF
+        * ``detp``: the detected photons, a dict with ``detid``, ``nscat``, ``ppath``,
+          ``mom``, ``p``, ``v``, ``w0``, ``prop``, ``unitinmm`` and ``data`` (the raw
+          records)
+        * ``seeds``: the RNG seeds of the detected photons, one column per photon
+        * ``traj``: the trajectories sorted by photon, a dict with ``id``, ``pos``, ``eid``
+          and ``data``
+        * ``cfg``: the prepared ``cfg``; its ``node``/``elem`` include any added source
+          domain, and nodal outputs refer to this mesh
+
+    Raises
+    ------
+    ValueError
+        If a required key is missing, the mesh has degenerate elements, or a wide-field
+        source sits on or inside the mesh surface so that no source domain can be added.
+    ImportError
+        If ``iso2mesh`` is not installed.
+
+    Examples
+    --------
+    >>> import numpy as np, iso2mesh as i2m, pmmc
+    >>> node, face, elem = i2m.meshabox([0, 0, 0], [60, 60, 60], 10, 100)
+    >>> cfg = {"nphoton": 1000000, "node": node, "elem": elem,
+    ...        "elemprop": np.ones(elem.shape[0]), "tstart": 0, "tend": 5e-9, "tstep": 5e-9,
+    ...        "srcpos": [30, 30, 0], "srcdir": [0, 0, 1],
+    ...        "prop": [[0, 0, 1, 1], [0.005, 1, 0.01, 1.37]]}
+    >>> res = pmmc.mmclab(cfg)
     """
     if isinstance(cfg, str):
         from _pmmc import gpuinfo, version
@@ -433,9 +588,15 @@ def mmclab(cfg, option=None):
         cfg["gpuid"] = 1
     res = _run(cfg)
 
-    if "fluximag" in res:  # RF output: return the fluence as a complex array, as mmclab.m does
-        res["flux"] = res["flux"] + 1j * np.asarray(res.pop("fluximag"), dtype=np.float64)
-    for key in [k for k in res if k.endswith("_im") and k[:-3] in res]:  # RF adjoint Jacobians (jmua_im, jd_im, ...)
+    if (
+        "fluximag" in res
+    ):  # RF output: return the fluence as a complex array, as mmclab.m does
+        res["flux"] = res["flux"] + 1j * np.asarray(
+            res.pop("fluximag"), dtype=np.float64
+        )
+    for key in [
+        k for k in res if k.endswith("_im") and k[:-3] in res
+    ]:  # RF adjoint Jacobians (jmua_im, jd_im, ...)
         res[key[:-3]] = res[key[:-3]] + 1j * np.asarray(res.pop(key))
     if "detp" in res and cfg.get("issaveexit", 0) != 2 and np.size(res["detp"]) > 0:
         res["detp"] = _unpackdetp(np.asarray(res["detp"]), cfg)
