@@ -195,7 +195,7 @@ jobs:
           python3 -m pip install --break-system-packages iso2mesh
           git clone --depth 1 https://github.com/fangq/iso2mesh.git ../iso2mesh
           mkdir -p src/pybuild && cd src/pybuild
-          cmake .. -DBUILD_MEX=OFF && make -j4 _pmmc
+          cmake .. -DBUILD_PYTHON=ON -DBUILD_MEX=OFF && make -j4 _pmmc
           cd ../../pmmc
           PYTHONPATH=$PWD/../src/pybuild:$PWD python3 -m unittest discover -s test -v
           cd ../mmclab/test
