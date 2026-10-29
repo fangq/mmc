@@ -59,6 +59,7 @@ static void mcxlab_throw(const char* msg) {
     throw std::runtime_error(msg);
 }
 
+#undef mexErrMsgTxt  /* a macro in the mex.h of newer MATLAB releases */
 #define mexErrMsgTxt mcxlab_throw
 #include "mmc_const.h"
 #include "mmc_mesh.h"
@@ -292,7 +293,7 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             mcxlab_logfp = stderr;
 
             /** cfg.flog first: the messages below go where it sends the log */
-            if (mxGetField(prhs[0], jstruct, "flog")) {
+            if (mxGetField(prhs[0], jstruct, "flog") && !mxIsEmpty(mxGetField(prhs[0], jstruct, "flog"))) {
                 mcxlab_setflog(mxGetField(prhs[0], jstruct, "flog"), &cfg);
             }
 
@@ -308,7 +309,9 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
                 tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
 
-                if (tmp == NULL) {
+                /** an empty field, as a struct array gives the elements that do not set it, keeps
+                    the default; it was read as 0 (e.g. isreflect), or past its end for vectors */
+                if (tmp == NULL || mxIsEmpty(tmp)) {
                     continue;
                 }
 
