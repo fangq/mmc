@@ -2816,8 +2816,28 @@ static void test_optixadjoint(void) {
  *  entry point
  *---------------------------------------------------------------------------*/
 
+#ifdef __GLIBC__
+#include <pthread.h>
+
+/** a forked child leaves through _exit(): exit() would run the destructors of the GPU
+    runtimes the parent loaded, and the Intel OpenCL runtime waits there for its threads,
+    which fork() did not copy, so the child spun forever */
+static void ut_quickexit(int status, void* arg) {
+    (void)arg;
+    _exit(status);
+}
+
+static void ut_child_quickexit(void) {
+    on_exit(ut_quickexit, NULL);
+}
+#endif
+
 int main(int argc, char** argv) {
     char tmpdir[] = "/tmp/mmcunitXXXXXX", cwd[4096];
+
+#ifdef __GLIBC__
+    pthread_atfork(NULL, NULL, ut_child_quickexit);
+#endif
 
     devnull = fopen("/dev/null", "w");
     hasocl = (getenv("MMC_UNITTEST_NO_OPENCL") == NULL);
