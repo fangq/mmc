@@ -76,7 +76,7 @@ the verbose command line options in MMC.
   Please visit our free scientific data sharing portal at https://neurojson.io%
   and consider sharing your public datasets in standardized JSON/JData format %
   #############################################################################%
-  $Rev::10da53$v2026$Date::2024-03-14 16:10:25 -04$by $Author::Qianqian Fang%
+  $Rev::9d33e3$ v2026 $Date::2026-10-28 23:55:50 -04$ by $Author::Qianqian Fang%
   #############################################################################%
  
   Format:

@@ -5186,7 +5186,10 @@ void mcx_savedetphoton(float* ppath, void* seeds, int count, int doappend, mccon
  */
 
 void mcx_version(mcconfig* cfg) {
-    MMC_FPRINTF(stdout, "MMC $Rev::      $" MMC_VERSION "\n");
+    const char ver[] = "$Rev::      $ " MMC_VERSION;
+    unsigned int v = 0;
+    sscanf(ver, "$Rev::%x", &v);
+    MMC_FPRINTF(stdout, "MMC Revision:\t%x\nVersion:\t%s\nMajor:\t\t%d\nMinor:\t\t%d\n", v, MMC_VERSION, MMC_VERSION_MAJOR, MMC_VERSION_MINOR);
     exit(0);
 }
 
