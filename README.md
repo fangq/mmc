@@ -242,6 +242,7 @@ lists all of them, with their commit hashes.
   and carries the message of a failed run; sources outside of the mesh need srcparam2 only when used
 * [51f8b29] mmclab: an empty field of a cfg struct array keeps its default; it was read as 0
 * [90ef502] `cfg.flog` also controls the echo of the cfg fields: '/dev/null' or 'NUL' silences everything
+* [6130770] `cfg.flog='NUL'` and `'/dev/null'` silence the log on every OS; 'NUL' wrote a file on Linux (#280)
 
 **Testing and robustness**
 * [5498290] functional, step-by-step trajectory and pmmc tests that run on the CPU in CI
