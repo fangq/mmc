@@ -45,6 +45,12 @@ echo "test listing devices ... "
 temp=$("$MMC" -L 2>&1 | grep -i -E 'platform|device|SSE')
 if [ -z "$temp" ]; then echo "fail to list devices"; fail=$((fail + 1)); else echo "ok"; fi
 
+echo "test silencing the log with -l none ... "
+logdir=$(mktemp -d)
+temp=$(cd "$logdir" && "$MMC" --bench dmmc-cube60 -n 1e4 -S 0 -l none -D P -G -1 $PARAM 2>&1)
+if [ -n "$temp" ] || [ -n "$(ls -A "$logdir")" ]; then echo "-l none printed output or wrote a file"; fail=$((fail + 1)); else echo "ok"; fi
+rm -rf "$logdir"
+
 echo "test exporting json input ... "
 temp=$("$MMC" --bench dmmc-cube60 --dumpjson 1 2>&1 | grep -E '"MeshNode"')
 if [ -z "$temp" ]; then echo "fail to export json input"; fail=$((fail + 1)); else echo "ok"; fi

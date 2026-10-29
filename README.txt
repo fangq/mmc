@@ -225,7 +225,7 @@ lists all of them, with their commit hashes.
   and carries the message of a failed run; sources outside of the mesh need srcparam2 only when used
 * [51f8b29] mmclab: an empty field of a cfg struct array keeps its default; it was read as 0
 * [90ef502] `cfg.flog` also controls the echo of the cfg fields: 'none' silences everything
-* [6130770] `cfg.flog='none'` silences the log on every OS ('NUL' and '/dev/null' are accepted too; 'NUL' wrote a file on Linux, #280)
+* [6130770] `cfg.flog='none'` and `-l none` silence the log on every OS ('NUL' and '/dev/null' are accepted too; 'NUL' wrote a file on Linux, #280)
 
 '''Testing and robustness'''
 * [5498290] functional, step-by-step trajectory and pmmc tests that run on the CPU in CI
@@ -677,9 +677,9 @@ mmc -Q dmmc-cube60 -n 1e7
     Meaning: relative share of photons for each device
 `-L`, `--listgpu`
     Meaning: list the OpenCL devices
-`-l [1|0]`, `--log`
+`-l [1|0|none]`, `--log`
     Meaning: 1 (or `-l` alone): write the messages to `session.log`; 0: print them
-        without the banner
+        without the banner; none: print nothing, not even the progress bar
 `-M G`, `--method`
     Meaning: ray tracer: `G` dual-grid (default), `S` branchless Badouel, and on the CPU `P`
         Plucker, `H` Havel, `B` Badouel
