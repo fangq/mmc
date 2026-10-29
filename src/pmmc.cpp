@@ -340,6 +340,15 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         parse_multisrc_matrix("srcdir", mcx_config.srcdir, &ExtraSrc::srcdir, true);
     }
 
+    /* without node or elem (or the face of an OptiX surface mesh), the mesh setup dereferenced NULL */
+    if (!user_cfg.contains("node") || user_cfg["node"].is_none()) {
+        throw py::value_error("the 'node' field (the mesh nodes) is missing");
+    }
+
+    if ((!user_cfg.contains("elem") || user_cfg["elem"].is_none()) && !user_cfg.contains("face")) {
+        throw py::value_error("the 'elem' field (the tetrahedra) is missing; an OptiX surface-only mesh gives 'face' instead");
+    }
+
     if (user_cfg.contains("node")) {
         auto f_style_volume = py::array_t < float, py::array::f_style | py::array::forcecast >::ensure(user_cfg["node"]);
 
@@ -1023,6 +1032,13 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         }
     }
 
+
+    /* save the detected photons when detectors are given, as the mmc command line and pmcx do;
+       mmc's default issavedet=0 made cfg['detpos'] alone return no 'detp'. The adjoint outputs
+       launch the detectors as sources instead */
+    if (!user_cfg.contains("issavedet") && mcx_config.detnum > 0 && !MCX_IS_ADJOINT_TYPE(mcx_config.outputtype)) {
+        mcx_config.issavedet = 1;
+    }
 
     if (mesh.ne == 0 && mcx_config.surfnum > 0) {
         return;  /* a surface-only mesh for OptiX: no element data to derive */
@@ -1750,7 +1766,8 @@ static const char* pmmc_run_doc_lines[] = {
     "    maxdetphoton : int\n",
     "        The most detected photons kept [1000000].\n",
     "    issavedet : int\n",
-    "        [1]: save the detected photons (when detpos is given); 0: do not.\n",
+    "        1: save the detected photons; 0: do not. [1 when detpos is given, except with the\n",
+    "        adjoint outputs; 0 otherwise]\n",
     "    issaveexit : int\n",
     "        1: also save the exit position and direction [0]; 2: instead, add up the\n",
     "        exiting weight on the wide-field detector.\n",
