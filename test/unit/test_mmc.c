@@ -1160,6 +1160,51 @@ static void mut_replaycount(mcconfig* cfg, tetmesh* mesh) {
     cfg->nphoton = mlab_dims[1] + 1;  /* more seeds than detected photons */
 }
 
+/** mmclab/pmmc skip mcx_validatecfg: mmc_validate_config must also give a GPU run a tracer its kernel has */
+static void test_mmclab_gpu_method(void) {
+    char buf[] = "mmc --bench dmmc-cube60 -c sse -M P -s utmlm";
+    char* argv[16];
+    int argc = 0;
+    mcconfig cfg;
+    tetmesh mesh;
+    raytracer tracer;
+
+    for (char* tok = strtok(buf, " "); tok && argc < 15; tok = strtok(NULL, " ")) {
+        argv[argc++] = tok;
+    }
+
+    argv[argc] = NULL;
+    memset(flagset, 0, sizeof(flagset));
+    memset(&tracer, 0, sizeof(tracer));
+    quiet_begin();
+    mmc_init_from_cmd(&cfg, &mesh, &tracer, argc, argv);
+    cfg.flog = devnull;
+
+    cfg.method = rtPlucker;  /* cfg.method='plucker' and cfg.compute='sse' */
+    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    int ssemethod = cfg.method;
+
+    cfg.compute = cbOpenCL;  /* cfg.method='plucker', cfg.compute='opencl', cfg.gpuid=1 */
+    cfg.gpuid = 1;
+    cfg.method = rtPlucker;
+    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    int gpumethod = cfg.method;
+
+    cfg.method = rtBLBadouelGrid;  /* the GPU dual-grid tracer is kept */
+    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    int gridmethod = cfg.method;
+    quiet_end();
+    cfg.flog = stdout;
+    cfg.compute = cbSSE;
+    mmc_cleanup(&cfg, &mesh, &tracer);
+
+#ifdef MMC_USE_SSE
+    EXPECT_EQ(rtPlucker, ssemethod, "mmc_validate_config keeps the CPU tracer of an SSE run");
+#endif
+    EXPECT_EQ(rtBLBadouel, gpumethod, "mmc_validate_config gives an OpenCL run the branchless Badouel tracer");
+    EXPECT_EQ(rtBLBadouelGrid, gridmethod, "mmc_validate_config keeps the dual-grid tracer of a GPU run");
+}
+
 static void test_mmclab_path(void) {
     run_mmclab_path("--bench dmmc-cube60 -G -1 -n 200 -E 1 -M H -C 1 -s utml1", NULL);
     EXPECT_TRUE(1, "mmc_validate_config and mesh_validate accept a benchmark mesh");
@@ -1192,7 +1237,7 @@ static void test_mmclab_path(void) {
 }
 
 #ifdef USE_OPENCL
-char* print_cl_errstring(cl_int err);
+    char* print_cl_errstring(cl_int err);
 #endif
 
 static void test_clerrors(void) {
@@ -2789,6 +2834,7 @@ int main(int argc, char** argv) {
     test_utilfuncs();
     test_cmdopts();
     test_mmclab_path();
+    test_mmclab_gpu_method();
     test_clerrors();
     test_opencl();
     test_features();

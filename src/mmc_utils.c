@@ -4165,6 +4165,29 @@ void  mcx_convertrow2col(float* vol, uint3* dim) {
 }
 
 /**
+ * @brief Select a ray-tracer that the chosen backend implements
+ *
+ * The GPU backends only implement the branchless Badouel tracers; -G -1 (gpuid > MAX_DEVICE)
+ * runs on the CPU, as -c sse does, which supports all tracers. Called by both the command
+ * line (mcx_validatecfg) and mmclab/pmmc (mmc_validate_config): a GPU kernel compiled for
+ * any other tracer moves the photons but deposits nothing, and the normalized output is NaN.
+ */
+
+void mmc_gpu_method(mcconfig* cfg) {
+    if (cfg->compute != cbSSE && cfg->gpuid <= MAX_DEVICE && (cfg->method != rtBLBadouelGrid && cfg->method != rtBLBadouel)) {
+        cfg->method = rtBLBadouel;
+    }
+
+#ifndef MMC_USE_SSE
+
+    if (cfg->gpuid > MAX_DEVICE) {
+        cfg->method = rtPlucker;
+    }
+
+#endif
+}
+
+/**
  * @brief Validate all input fields, and warn incompatible inputs
  *
  * Perform self-checking and raise exceptions or warnings when input error is detected
@@ -4280,19 +4303,7 @@ void mcx_validatecfg(mcconfig* cfg) {
         cfg->seed = time(NULL);
     }
 
-    /* the GPU backends only implement the branchless Badouel tracers; -G -1 (gpuid > MAX_DEVICE)
-       runs on the CPU, as -c sse does, which supports all tracers */
-    if (cfg->compute != cbSSE && cfg->gpuid <= MAX_DEVICE && (cfg->method != rtBLBadouelGrid && cfg->method != rtBLBadouel)) {
-        cfg->method = rtBLBadouel;
-    }
-
-#ifndef MMC_USE_SSE
-
-    if (cfg->gpuid > MAX_DEVICE) {
-        cfg->method = rtPlucker;
-    }
-
-#endif
+    mmc_gpu_method(cfg);
 
     if (cfg->method == rtBLBadouelGrid) {
         cfg->basisorder = 0;
@@ -4416,6 +4427,8 @@ void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedb
 
     cfg->maxgate = (int)((cfg->tend - cfg->tstart) / cfg->tstep + 0.5);
     cfg->tend = cfg->tstart + cfg->tstep * cfg->maxgate;
+
+    mmc_gpu_method(cfg);
 
     if (cfg->srctype == stPattern && cfg->srcpattern == NULL) {
         MMC_ERROR(999, "the 'srcpattern' field can not be empty when your 'srctype' is 'pattern'");
