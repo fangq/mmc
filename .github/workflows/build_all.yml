@@ -222,16 +222,15 @@ jobs:
         run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
       - name: Zip mmclab
         run: |
-          # strip, then compress, so the packages are as small as they can be (not on macOS)
+          # strip, so the packages are as small as they can be (not on macOS);
+          # no upx on mex files: a packed mex aborts MATLAB/Octave when it raises an error (C++ exceptions can not unwind)
           if [[ "$RUNNER_OS" != "macOS" ]]; then
             strip --strip-unneeded mmclab/mmc.mex* || true
-            upx -9 mmclab/mmc.mex* || true
           fi
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp "$PWD/octave/octave-10.3.0-w64/mingw64/bin/libgomp-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
             cp "$PWD/octave/octave-10.3.0-w64/mingw64/bin/libwinpthread-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
-            upx -9 mmclab/octave/${{ env.OCTAVE_ARCH }}/* || true
             7z a -tzip packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab
           else
             zip -FSr --symlink packages/mmclab-${{ env.RELEASE_TAG }}.zip mmclab

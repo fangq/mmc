@@ -18,7 +18,9 @@ function test_mmclab(varargin)
 %
 
 addpath(fullfile(fileparts(mfilename('fullpath')), '..'));
-addpath(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'matlab')); % mmcsrcdomain ...
+if (exist(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'matlab'), 'dir')) % mmcsrcdomain ...
+    addpath(fullfile(fileparts(mfilename('fullpath')), '..', '..', 'matlab'));
+end
 if (~exist('meshabox', 'file') || ~exist('faceneighbors', 'file'))
     error('test_mmclab needs iso2mesh (https://iso2mesh.sf.net) on the path');
 end
