@@ -99,7 +99,52 @@ static void mcxlab_throw(const char* msg) {
 
 typedef mwSize dimtype;                                   //! MATLAB type alias for integer type to use for array sizes and dimensions
 
+#include <stdarg.h>
+
+/**
+ * The messages mmclab prints while it reads cfg (the echo of the fields, the progress lines and
+ * the warnings) go where cfg.flog sends the simulation log: the MATLAB/Octave console (mexPrintf)
+ * for 2 (default), the stdout of the process for 1 and 0, or the log file; '/dev/null' or 'NUL'
+ * silences everything. The errors and the usage are always printed to the console.
+ */
+static FILE* mcxlab_logfp = NULL;   /**< where printf() of this unit goes; NULL or stderr: the console */
+
+static int mcxlab_printf(const char* format, ...) {
+    va_list args;
+    int len;
+
+    va_start(args, format);
+
+    if (mcxlab_logfp == NULL || mcxlab_logfp == stderr) {
+        va_list args2;
+        va_copy(args2, args);
+        len = vsnprintf(NULL, 0, format, args2);
+        va_end(args2);
+
+        if (len >= 0) {
+            char* buf = (char*)malloc(len + 1);
+
+            if (buf) {
+                vsnprintf(buf, len + 1, format, args);
+                mexPrintf("%s", buf);
+                free(buf);
+            }
+        }
+    } else {
+        len = vfprintf(mcxlab_logfp, format, args);
+    }
+
+    va_end(args);
+    return len;
+}
+
+#ifdef printf
+    #undef printf
+#endif
+#define printf mcxlab_printf
+
 void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruct, mcconfig* cfg, tetmesh* mesh);
+static void mcxlab_setflog(const mxArray* item, mcconfig* cfg);
 void mmclab_usage();
 static int mmclab_task_guard(void (*task)(void*), void* arg);
 mxArray* mmclab_assert(mxArray* arr);
@@ -203,8 +248,6 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
     /**
      * If a structure is passed to this function, a simulation will be launched.
      */
-    printf("Launching MMCLAB - Mesh-based Monte Carlo for MATLAB & GNU Octave ...\n");
-
     if (!mxIsStruct(prhs[0])) {
         MEXERROR("Input must be a structure.");
     }
@@ -241,12 +284,23 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
 
         /** Enclose all simulation calls inside a try/catch construct for exception handling */
         try {
-            printf("Running simulations for configuration #%d ...\n", jstruct + 1);
 
             /** Initialize cfg with default values first */
             t0 = StartTimer();
             mcx_initcfg(&cfg);
             cfg.flog = stderr;  /* the MATLAB/Octave console, unless cfg.flog says otherwise */
+            mcxlab_logfp = stderr;
+
+            /** cfg.flog first: the messages below go where it sends the log */
+            if (mxGetField(prhs[0], jstruct, "flog")) {
+                mcxlab_setflog(mxGetField(prhs[0], jstruct, "flog"), &cfg);
+            }
+
+            if (jstruct == 0) {
+                printf("Launching MMCLAB - Mesh-based Monte Carlo for MATLAB & GNU Octave ...\n");
+            }
+
+            printf("Running simulations for configuration #%d ...\n", jstruct + 1);
             MMCDEBUG(&cfg, dlTime, (cfg.flog, "initializing ... "));
             mesh_init(&mesh);
 
@@ -746,7 +800,8 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
 
         /** \subsection sclean End the simulation */
         mesh_clear(&mesh, &cfg);
-        mcx_clearcfg(&cfg);
+        mcx_clearcfg(&cfg);  /* closes the log file */
+        mcxlab_logfp = NULL;
 
         /** report the error to MATLAB after the clean-up */
         if (cfgerr[0]) {
@@ -755,6 +810,37 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
     }
 
     return;
+}
+
+/**
+ * @brief Set cfg.flog (2 console, 1 stdout, 0 stdout without the banner, or a file name), and send
+ * the messages of mmclab there too; called for each configuration before its other fields
+ */
+
+static void mcxlab_setflog(const mxArray* item, mcconfig* cfg) {
+    int len = mxGetNumberOfElements(item);
+    char logfile[MAX_PATH_LENGTH] = {'\0'};
+
+    if (mxIsChar(item)) {
+        if (len > 0) {
+            mxGetString(item, logfile, MAX_PATH_LENGTH);
+            cfg->flog = fopen(logfile, "a+");
+
+            if (cfg->flog == NULL) {
+                mexErrMsgTxt("Log output file can not be written");
+            }
+        } else {
+            cfg->flog = stdout;
+        }
+    } else {
+        double* val = mxGetPr(item);
+
+        if (len > 0 && val[0] <= 2) {
+            cfg->flog = ((int)val[0] == 2 ? stderr : ((int)val[0] == 1 ? stdout : (cfg->printnum = -1, stdout)));
+        }
+    }
+
+    mcxlab_logfp = cfg->flog;
 }
 
 /**
@@ -1698,29 +1784,8 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
 
         printf("mmc.workload=<<%.0f>>;\n", (double)arraydim[0]*arraydim[1]);
     } else if (strcmp(name, "flog") == 0) {
-        /* as in mcxlab: 2 the console (default), 1 stdout, 0 stdout without the banner,
-           or a file name (appended); stdout is the terminal MATLAB/Octave runs in */
-        int len = mxGetNumberOfElements(item);
-        char logfile[MAX_PATH_LENGTH] = {'\0'};
-
-        if (mxIsChar(item)) {
-            if (len > 0) {
-                mxGetString(item, logfile, MAX_PATH_LENGTH);
-                cfg->flog = fopen(logfile, "a+");
-
-                if (cfg->flog == NULL) {
-                    mexErrMsgTxt("Log output file can not be written");
-                }
-            } else {
-                cfg->flog = stdout;
-            }
-        } else {
-            double* val = mxGetPr(item);
-
-            if (len > 0 && val[0] <= 2) {
-                cfg->flog = ((int)val[0] == 2 ? stderr : ((int)val[0] == 1 ? stdout : (cfg->printnum = -1, stdout)));
-            }
-        }
+        /* read by mcxlab_setflog before the other fields, so that their echo follows it */
+        printf("mmc.flog=%d;\n", (cfg->flog == stderr) ? 2 : (cfg->printnum < 0 ? 0 : 1));
     } else if (strcmp(name, "isreoriented") == 0) {
         /*internal flag, don't need to do anything*/
     } else {
@@ -1774,7 +1839,7 @@ static int mmclab_task_guard(void (*task)(void*), void* arg) {
  */
 
 extern "C" int mmc_throw_exception(const int id, const char* msg, const char* filename, const int linenum) {
-    printf("MMCLAB ERROR (%d): %s in unit %s:%d\n", id, msg, filename, linenum);
+    mexPrintf("MMCLAB ERROR (%d): %s in unit %s:%d\n", id, msg, filename, linenum);
     throw std::runtime_error(msg);  /* a copy: msg may be on the stack of the caller */
     return id;
 }
@@ -1784,7 +1849,7 @@ extern "C" int mmc_throw_exception(const int id, const char* msg, const char* fi
  */
 
 void mmclab_usage() {
-    printf("MMCLAB " MMC_VERSION "\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
+    mexPrintf("MMCLAB " MMC_VERSION "\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
 }
 
 /**

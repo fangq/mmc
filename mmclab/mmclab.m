@@ -272,14 +272,13 @@ function varargout = mmclab(varargin)
 %                        'R' reflections            'E' exiting photons
 %      cfg.debugphoton: print the debug information of this photon only [-1: all]
 %      cfg.maxjumpdebug: the most trajectory positions recorded [10000000]
-%      cfg.flog:       where the simulation log (the banner, timings, progress bar and
-%                      absorbed fraction) goes [2]: 2 the MATLAB/Octave console (in Python,
-%                      sys.stdout), 1 the stdout of the process (the terminal MATLAB/Octave
-%                      was started from), 0 the same without the banner, or a file name
-%                      (appended); '/dev/null' (Linux/macOS) or 'NUL' (Windows) discards
-%                      the log. The lines printed while reading cfg (the echo of its
-%                      fields) are not part of the log: in MATLAB, use
-%                      evalc('out = mmclab(cfg);') to hide them as well
+%      cfg.flog:       where the messages go - the echo of the cfg fields and the
+%                      simulation log (banner, timings, progress bar, absorbed fraction)
+%                      [2]: 2 the MATLAB/Octave console (in Python, sys.stdout), 1 the
+%                      stdout of the process (the terminal MATLAB/Octave was started from),
+%                      0 the same without the banner, or a file name (appended);
+%                      '/dev/null' (Linux/macOS) or 'NUL' (Windows) silences everything;
+%                      errors are always shown
 %
 %      accepted but without effect: cfg.shapes, cfg.isref3, cfg.outputformat,
 %      cfg.isreoriented (set by mmclab itself)
@@ -465,7 +464,9 @@ for i = 1:len
         cfg(i).e0 = tsearchn(cfg(i).node, cfg(i).elem, cfg(i).srcpos(1, 1:3));
     end
     if ((isnan(cfg(i).e0) && (isfield(cfg(i), 'srctype') && strcmp(cfg(i).srctype, 'pencil'))) || ischar(cfg(i).e0))
-        disp('searching initial element ...');
+        if (~isfield(cfg(i), 'flog') || isempty(cfg(i).flog) || isequal(cfg(i).flog, 2))
+            disp('searching initial element ...');  % shown when cfg.flog sends the log to the console
+        end
         [cfg(i).srcpos(1, 1:3), cfg(i).e0] = mmcraytrace(cfg(i).node, cfg(i).elem, cfg(i).srcpos(1, 1:3), cfg(i).srcdir(1, 1:3), cfg(i).e0);
     end
     if ((isfield(cfg(i), 'srctype') && strcmp(cfg(i).srctype, 'pattern')) && (ndims(cfg(i).srcpattern) == 2))

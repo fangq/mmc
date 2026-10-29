@@ -37,6 +37,8 @@
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 #include <vector>
 #include <cstdarg>
+#include <streambuf>
+#include <ostream>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <time.h>
@@ -76,24 +78,24 @@ int seed_byte = 0;
  */
 #define GET_SCALAR_FIELD(src_pydict, dst_mcx_config, property, py_type) if ((src_pydict).contains(#property))\
     {try {(dst_mcx_config).property = py_type((src_pydict)[#property]);\
-            std::cout << #property << ": " << (float) (dst_mcx_config).property << std::endl;} \
+            pyecho() << #property << ": " << (float) (dst_mcx_config).property << std::endl;} \
         catch (const std::runtime_error &err)\
         {throw py::type_error(std::string("Failed to assign MCX property " + std::string(#property) + ". Reason: " + err.what()));}\
     }
 
 #define GET_VEC3_FIELD(src, dst, prop, type) if (src.contains(#prop)) {try {auto list = py::list(src[#prop]);\
             dst.prop = {list[0].cast<type>(), list[1].cast<type>(), list[2].cast<type>()};\
-            std::cout << #prop << ": [" << dst.prop.x << ", " << dst.prop.y << ", " << dst.prop.z << "]\n";} \
+            pyecho() << #prop << ": [" << dst.prop.x << ", " << dst.prop.y << ", " << dst.prop.z << "]\n";} \
         catch (const std::runtime_error &err ) {throw py::type_error(std::string("Failed to assign MCX property " + std::string(#prop) + ". Reason: " + err.what()));}}
 
 #define GET_VEC4_FIELD(src, dst, prop, type) if (src.contains(#prop)) {try {auto list = py::list(src[#prop]);\
             dst.prop = {list[0].cast<type>(), list[1].cast<type>(), list[2].cast<type>(), list[3].cast<type>()}; \
-            std::cout << #prop << ": [" << dst.prop.x << ", " << dst.prop.y << ", " << dst.prop.z << ", " << dst.prop.w << "]\n";} \
+            pyecho() << #prop << ": [" << dst.prop.x << ", " << dst.prop.y << ", " << dst.prop.z << ", " << dst.prop.w << "]\n";} \
         catch (const std::runtime_error &err ) {throw py::type_error(std::string("Failed to assign MCX property " + std::string(#prop) + ". Reason: " + err.what()));}}
 
 #define GET_VEC34_FIELD(src, dst, prop, type) if (src.contains(#prop)) {try {auto list = py::list(src[#prop]);\
             dst.prop = {list[0].cast<type>(), list[1].cast<type>(), list[2].cast<type>(), list.size() == 4 ? list[3].cast<type>() : dst.prop.w}; \
-            std::cout << #prop << ": [" << dst.prop.x << ", " << dst.prop.y << ", " << dst.prop.z << ", " << dst.prop.w << "]\n";} \
+            pyecho() << #prop << ": [" << dst.prop.x << ", " << dst.prop.y << ", " << dst.prop.z << ", " << dst.prop.w << "]\n";} \
         catch (const std::runtime_error &err ) {throw py::type_error(std::string("Failed to assign MCX property " + std::string(#prop) + ". Reason: " + err.what()));}                                                                 \
     }
 
@@ -147,6 +149,37 @@ extern "C" int mcx_python_printf(const char* format, ...) {
 
 
 /**
+ * The echo of the cfg fields (and the warnings printed while reading them) goes where cfg.flog sends
+ * the simulation log: Python's sys.stdout (std::cout, redirected by pybind11) for 2 (default), or
+ * the stdout of the process for 1 and 0, the log file, or nowhere for os.devnull
+ */
+static FILE* pyecho_logfp = NULL;   /**< NULL or stderr: std::cout, i.e. sys.stdout */
+
+class PyEchoFileBuf : public std::streambuf {
+  public:
+    FILE* fp = NULL;
+  protected:
+    int overflow(int c) override {
+        return (c == EOF || fputc(c, fp) == EOF) ? EOF : c;
+    }
+    std::streamsize xsputn(const char* s, std::streamsize n) override {
+        return (std::streamsize)fwrite(s, 1, (size_t)n, fp);
+    }
+};
+
+static std::ostream& pyecho() {
+    static PyEchoFileBuf filebuf;
+    static std::ostream fileout(&filebuf);
+
+    if (pyecho_logfp == NULL || pyecho_logfp == stderr) {
+        return std::cout;
+    }
+
+    filebuf.fp = pyecho_logfp;
+    return fileout;
+}
+
+/**
  * Parse user input cfg object and convert to to MMC's mcconfig object.
  * @param user_cfg
  * @param mcx_config
@@ -158,6 +191,30 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     mesh_init(&mesh);
 
     mcx_config.flog = stderr;
+
+    /* cfg.flog first: the echo of the other fields goes where it sends the log */
+    if (user_cfg.contains("flog")) {
+        auto logfile_id_value = user_cfg["flog"];
+
+        if (py::int_::check_(logfile_id_value)) {
+            int logid = py::int_(logfile_id_value);
+            mcx_config.flog = (logid >= 2 ? stderr : (logid == 1 ? stdout : (mcx_config.printnum = -1, stdout)));
+        } else if (py::str::check_(logfile_id_value)) {
+            std::string logfile_id_string_value = py::str(logfile_id_value);
+
+            if (logfile_id_string_value.empty()) {
+                throw py::value_error("the 'flog' field must be an integer or non-empty string");
+            }
+
+            mcx_config.flog = fopen(logfile_id_string_value.c_str(), "a+");
+
+            if (mcx_config.flog == NULL) {
+                throw py::value_error("Log output file can not be written");
+            }
+        }
+    }
+
+    pyecho_logfp = mcx_config.flog;
 
     GET_SCALAR_FIELD(user_cfg, mcx_config, nphoton, py::int_);
     GET_SCALAR_FIELD(user_cfg, mcx_config, nblocksize, py::int_);
@@ -176,7 +233,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     GET_SCALAR_FIELD(user_cfg, mcx_config, optlevel, py::int_);
 
     if (user_cfg.contains("isatomic") && !py::bool_(user_cfg["isatomic"])) {
-        std::cout << "WARNING: isatomic=0 is deprecated and ignored; non-atomic accumulation raced and lost part of the deposited energy, at no speed benefit" << std::endl;
+        pyecho() << "WARNING: isatomic=0 is deprecated and ignored; non-atomic accumulation raced and lost part of the deposited energy, at no speed benefit" << std::endl;
     }
 
     GET_SCALAR_FIELD(user_cfg, mcx_config, basisorder, py::int_);
@@ -253,7 +310,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
                 ((float*)(&dst_single))[c] = val[c * nrows + 0];
             }
 
-            std::cout << name << ": [" << dst_single.x << ", " << dst_single.y << ", "
+            pyecho() << name << ": [" << dst_single.x << ", " << dst_single.y << ", "
                       << dst_single.z << ", " << dst_single.w << "]" << std::endl;
 
             if (nrows == 1 && mcx_config.extrasrclen == 0) {
@@ -276,7 +333,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
                     ((float*)(&(mcx_config.srcdata[r].*dst_field)))[c] = val[c * nrows + r];
                 }
 
-            std::cout << name << " multi-source rows=" << nrows << std::endl;
+            pyecho() << name << " multi-source rows=" << nrows << std::endl;
         };
 
         parse_multisrc_matrix("srcpos", mcx_config.srcpos, &ExtraSrc::srcpos, false);
@@ -676,7 +733,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
     if (user_cfg.contains("omega")) {
         mcx_config.omega = py::float_(user_cfg["omega"]);
-        std::cout << "omega: " << mcx_config.omega << std::endl;
+        pyecho() << "omega: " << mcx_config.omega << std::endl;
     }
 
     if (user_cfg.contains("detdir")) {
@@ -706,7 +763,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
                 ((float*) (&mcx_config.detdir[i]))[j] = val[j * nd + i];
             }
 
-        std::cout << "detdir: [" << nd << ",4]" << std::endl;
+        pyecho() << "detdir: [" << nd << ",4]" << std::endl;
     }
 
     if (user_cfg.contains("sdmap")) {
@@ -766,7 +823,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         mcx_config.nodemua = (float*) malloc(nn * sizeof(float));
         memcpy(mcx_config.nodemua, buffer_info.ptr, nn * sizeof(float));
         mcx_config.isnodalmua = 1;
-        std::cout << "nodemua: [" << nn << "]" << std::endl;
+        pyecho() << "nodemua: [" << nn << "]" << std::endl;
     }
 
     if (user_cfg.contains("nodemusp")) {
@@ -786,7 +843,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         mcx_config.nodemusp = (float*) malloc(nn * sizeof(float));
         memcpy(mcx_config.nodemusp, buffer_info.ptr, nn * sizeof(float));
         mcx_config.isnodalmusp = 1;
-        std::cout << "nodemusp: [" << nn << "]" << std::endl;
+        pyecho() << "nodemusp: [" << nn << "]" << std::endl;
     }
 
 
@@ -966,27 +1023,6 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         }
     }
 
-    //
-    if (user_cfg.contains("flog")) {
-        auto logfile_id_value = user_cfg["flog"];
-
-        if (py::int_::check_(logfile_id_value)) {
-            int logid = py::int_(logfile_id_value);
-            mcx_config.flog = (logid >= 2 ? stderr : (logid == 1 ? stdout : (mcx_config.printnum = -1, stdout)));
-        } else if (py::str::check_(logfile_id_value)) {
-            std::string logfile_id_string_value = py::str(logfile_id_value);
-
-            if (logfile_id_string_value.empty()) {
-                throw py::value_error("the 'flog' field must be an integer or non-empty string");
-            }
-
-            mcx_config.flog = fopen(logfile_id_string_value.c_str(), "a+");
-
-            if (mcx_config.flog == NULL) {
-                throw py::value_error("Log output file can not be written");
-            }
-        }
-    }
 
     if (mesh.ne == 0 && mcx_config.surfnum > 0) {
         return;  /* a surface-only mesh for OptiX: no element data to derive */
@@ -1022,11 +1058,13 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 inline void cleanup_configs(MCXGPUInfo*& gpu_info, mcconfig& mcx_config) {
     mcx_cleargpuinfo(&gpu_info);
     mcx_clearcfg(&mcx_config);
+    pyecho_logfp = NULL;  /* mcx_clearcfg closed the log file */
 }
 
 inline void cleanup_mesh(mcconfig& mcx_config, tetmesh& mesh) {
     mesh_clear(&mesh, &mcx_config);
     mcx_clearcfg(&mcx_config);
+    pyecho_logfp = NULL;  /* mcx_clearcfg closed the log file */
 }
 
 

@@ -265,8 +265,8 @@ the verbose command line options in MMC.
        cfg.debugphoton: print the photon movement debug info only for a specified photon ID
        cfg.flog: [2]  log printing control; if set to a string, it defines a file path
                       at which location the log will be printed in append mode; on Linux and Mac OS,
-                      one can use special paths such as /dev/null (NUL on Windows) to discard
-                      the log; the echo of the cfg fields is not part of the log; if set to an integer,
+                      one can use special paths such as /dev/null (NUL on Windows) to silence
+                      everything, including the echo of the cfg fields; if set to an integer,
                       2 (default): the MATLAB/Octave console (stderr; in Python, sys.stdout)
                       1: stdout of the process (the terminal MATLAB/Octave was started from)
                       0: stdout but suppress printing the MMC banner
