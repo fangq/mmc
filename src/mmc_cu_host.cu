@@ -698,7 +698,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
              * peak register pressure). 8 instantiations enumerated below.
              *
              *   IS_RF          - cfg.omega>0 and not replay
-             *   IS_MULTISRC    - cfg.srcnum>1 or (extrasrclen>0 && srcid<=0)
+             *   IS_MULTISRC    - cfg.srcnum>1 or extrasrclen>0 (several sources, any srcid)
              *   SAVE_DETPHOTON - cfg.issavedet
              *   IMMC_MODE      - cfg.implicit (0, 1 edge/node, 2 face), 3 x 8 instantiations */
             const int is_rf = (cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE) ? 1 : 0;
@@ -706,7 +706,7 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
              * alongside pattern-multi-source (srcnum>1) and adjoint multi-source. */
             const int is_ms = (cfg->srctype == stPattern || cfg->srctype == stPattern3D
                                || cfg->srcnum > 1
-                               || (cfg->extrasrclen > 0 && cfg->srcid <= 0)) ? 1 : 0;
+                               || cfg->extrasrclen > 0)  /* srcid>0 picks srcdata[srcid-1] in the multi-source code; without it, the first source was launched */ ? 1 : 0;
             const int save_dp = cfg->issavedet ? 1 : 0;
             const int variant = (is_rf << 2) | (is_ms << 1) | save_dp;
 
@@ -1125,6 +1125,12 @@ are more than what your have specified (%d), please use the --maxjumpdebug optio
                     }
                 }
             }
+        }
+
+        /* srcid=0 with several sources: all of them in one output, as documented and as in mcx;
+           the kernel deposited each source in its own slot */
+        if (cfg->issave2pt) {
+            mesh_mergesrcslots(mesh, cfg);
         }
 
         /* Mesh-mode adjoint Jacobian post-processing: FEM/nodal formulas on tet mesh.

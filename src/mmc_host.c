@@ -225,6 +225,28 @@ int mmc_run_mp(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
     t0 = StartTimer();
 
+    /* the CPU tracers launch from one source only: run the source srcid selects, and refuse
+       what needs several sources at once (srcid 0 or <0, the adjoint outputs, which also launch
+       the detectors), whose other slots were left empty, without the adjoint Jacobians */
+    if (cfg->extrasrclen > 0 && cfg->srcdata) {
+        if (cfg->srcid > 0 && cfg->srcid <= cfg->extrasrclen && !MCX_IS_ADJOINT_TYPE(cfg->outputtype)) {
+            ExtraSrc* src = cfg->srcdata + (cfg->srcid - 1);
+            float param2w = cfg->srcparam2.w;
+
+            cfg->srcpos = src->srcpos;
+            cfg->srcdir = src->srcdir;
+            cfg->srcparam1 = src->srcparam1;
+            cfg->srcparam2 = src->srcparam2;
+            cfg->srcparam2.w = param2w;  /* srcparam2.w of srcdata holds the source element */
+
+            if (src->srcparam2.w > 0.f) {
+                cfg->e0 = (int)src->srcparam2.w;
+            }
+        } else if (cfg->extrasrclen > 1 || MCX_IS_ADJOINT_TYPE(cfg->outputtype) || cfg->srcid < 0) {
+            MMC_ERROR(-4, "several sources at once (srcid 0 or -1), srcid=-2 and the adjoint outputs need a GPU backend (OpenCL or CUDA); on the CPU, select one source with srcid");
+        }
+    }
+
     /* RF forward (frequency domain) on the CPU: the branchless Badouel tracer deposits
        the imaginary part of the complex fluence into cfg->exportadjoint, laid out as
        mesh->weight, for its element- and node-based (-M s) and dual-grid (-M g) output */

@@ -58,7 +58,7 @@
  *
  *   IS_RF          - cfg.omega > 0 and not replay: track r.weight_im /
  *                    oldweight_im / complex deposit (saves ~8 regs when off).
- *   IS_MULTISRC    - cfg.srcnum > 1 (pattern source) or extrasrclen>0/srcid<=0
+ *   IS_MULTISRC    - cfg.srcnum > 1 (pattern source) or extrasrclen>0 (several sources, any srcid)
  *                    (adjoint multi-source): track r.posidx / per-slot ppath
  *                    (saves ~12 regs when off).
  *   SAVE_DETPHOTON - cfg.issavedet: maintain ppath partial-path-length array,
@@ -2090,16 +2090,40 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 
         if (GPU_PARAM(gcfg, srctype) == MCX_SRC_LINE) {
 #endif
-            float s, p;
-            t = 1.f - 2.f * rand_uniform01(ran);
-            s = 1.f - 2.f * rand_uniform01(ran);
-            p = MCX_MATHFUN(sqrt)(1.f - r->vec.x * r->vec.x - r->vec.y * r->vec.y) * (rand_uniform01(ran) > 0.5f ? 1.f : -1.f);
-            float3 vv;
-            vv.x = r->vec.y * p - r->vec.z * s;
-            vv.y = r->vec.z * t - r->vec.x * p;
-            vv.z = r->vec.x * s - r->vec.y * t;
-            r->vec = vv;
-            //*((float3*)&(r->vec))=(float3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
+            /* emit normal to the line, uniformly around it, as mcx: the direction was the cross
+               product of srcdir and a random, non-normalized vector, which was not of unit length
+               and lost a component when srcdir was along the line */
+            float ax = gcfg->srcparam1.x, ay = gcfg->srcparam1.y, az = gcfg->srcparam1.z, len;
+            float ux, uy, uz, wx, wy, wz, sphi, cphi;
+
+            len = rsqrt(ax * ax + ay * ay + az * az);
+            ax *= len;
+            ay *= len;
+            az *= len;
+
+            if (fabs(ax) < 0.9f) { /* u = normalize(a x (1,0,0)) */
+                ux = 0.f;
+                uy = az;
+                uz = -ay;
+            } else {               /* u = normalize(a x (0,1,0)) */
+                ux = -az;
+                uy = 0.f;
+                uz = ax;
+            }
+
+            len = rsqrt(ux * ux + uy * uy + uz * uz);
+            ux *= len;
+            uy *= len;
+            uz *= len;
+            wx = ay * uz - az * uy; /* w = a x u */
+            wy = az * ux - ax * uz;
+            wz = ax * uy - ay * ux;
+            t = TWO_PI * rand_uniform01(ran);
+            sphi = sin(t);
+            cphi = cos(t);
+            r->vec.x = cphi * ux + sphi * wx;
+            r->vec.y = cphi * uy + sphi * wy;
+            r->vec.z = cphi * uz + sphi * wz;
 #ifdef __NVCC__
         }
 

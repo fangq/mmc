@@ -181,6 +181,8 @@ double mesh_getreff(double n_in, double n_out);
 int mesh_barycentric(int e0, float* bary, FLOAT3* srcpos, tetmesh* mesh);
 int mesh_initelem(tetmesh* mesh, mcconfig* cfg);
 void mesh_init_srcdata_eid(tetmesh* mesh, mcconfig* cfg);
+int mesh_outputslots(const mcconfig* cfg);
+void mesh_mergesrcslots(tetmesh* mesh, mcconfig* cfg);
 void mesh_validate(tetmesh* mesh, mcconfig* cfg);
 void mesh_getvolume(tetmesh* mesh, mcconfig* cfg);
 void mesh_deldotdel(tetmesh* mesh);

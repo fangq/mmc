@@ -1494,7 +1494,9 @@ static int mmc_deferred_line = 0;
 void mmc_defer_error(const int id, const char* msg, const char* file, const int linenum) {
 #ifdef _OPENMP
 
-    if (!omp_in_parallel()) {
+    /* omp_in_parallel() is false in a region of one thread (OMP_NUM_THREADS=1), where the
+       error was then dropped and the photon went on with a NaN position */
+    if (omp_get_level() == 0) {
         return;
     }
 

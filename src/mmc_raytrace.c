@@ -2723,16 +2723,30 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         r->p0.z += t * cfg->srcparam1.z;
 
         if (cfg->srctype == stLine) {
-            float s, p;
-            t = 1.f - 2.f * rand_uniform01(ran);
-            s = 1.f - 2.f * rand_uniform01(ran);
-            p = sqrtf(1.f - r->vec.x * r->vec.x - r->vec.y * r->vec.y) * (rand_uniform01(ran) > 0.5f ? 1.f : -1.f);
-            float4 vv;
-            vv.x = r->vec.y * p - r->vec.z * s;
-            vv.y = r->vec.z * t - r->vec.x * p;
-            vv.z = r->vec.x * s - r->vec.y * t;
-            r->vec = vv;
-            //*((float3*)&(r->vec))=(float3)(r->vec.y*p-r->vec.z*s,r->vec.z*t-r->vec.x*p,r->vec.x*s-r->vec.y*t);
+            /* emit normal to the line, uniformly around it, as mcx: the direction was the cross
+               product of srcdir and a random, non-normalized vector, which was not of unit length
+               and lost a component when srcdir was along the line */
+            float ax = cfg->srcparam1.x, ay = cfg->srcparam1.y, az = cfg->srcparam1.z, len;
+            float ux, uy, uz, wx, wy, wz, sphi, cphi;
+
+            len = sqrtf(ax * ax + ay * ay + az * az);
+            ax /= len, ay /= len, az /= len;
+
+            if (fabsf(ax) < 0.9f) { /* u = normalize(a x (1,0,0)) */
+                ux = 0.f, uy = az, uz = -ay;
+            } else {                /* u = normalize(a x (0,1,0)) */
+                ux = -az, uy = 0.f, uz = ax;
+            }
+
+            len = sqrtf(ux * ux + uy * uy + uz * uz);
+            ux /= len, uy /= len, uz /= len;
+            wx = ay * uz - az * uy, wy = az * ux - ax * uz, wz = ax * uy - ay * ux;  /* w = a x u */
+            t = TWO_PI * rand_uniform01(ran);
+            sphi = sinf(t);
+            cphi = cosf(t);
+            r->vec.x = cphi * ux + sphi * wx;
+            r->vec.y = cphi * uy + sphi * wy;
+            r->vec.z = cphi * uz + sphi * wz;
         }
 
         origin.x += (cfg->srcparam1.x) * 0.5f;
@@ -2837,9 +2851,11 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
                 MMC_FPRINTF(cfg->flog, "source position [%e %e %e] \n", r->p0.x, r->p0.y, r->p0.z);
                 MMC_FPRINTF(cfg->flog, "bary centric volume [%e %e %e %e] \n", bary[0], bary[1], bary[2], bary[3]);
             }
-
-            MESH_ERROR("initial element does not enclose the source!");
         }
+
+        /* raised after the critical section: the error is an exception in the mex and pybind
+           builds, and leaving the section with it kept the lock, deadlocking the next photon */
+        MESH_ERROR("initial element does not enclose the source!");
     }
 }
 
@@ -2873,10 +2889,28 @@ void albedoweight(ray* r, tetmesh* mesh, mcconfig* cfg, visitor* visit) {
         return;
     }
 
+    /* deposit what the tracers of mcmethod=0 do, which the normalization expects: the fluence-
+       like ww/mua for the fluence outputs, the absorbed weight ww for 'energy'; ww alone made
+       media of different mua off by their mua ratio, and the grid output 1/mua off */
+    if (mmc_is_fluence_like(cfg->outputtype)) {
+        ww = (prop->mua > 0.f) ? ww / prop->mua : 0.f;
+    }
+
     tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * datalen;
 
     if (cfg->method == rtBLBadouelGrid) {
+        /* deposit in the voxel of the scattering site; this branch was empty, so the dual-grid
+           output of mcmethod=1 was all zeros */
+        int ix = (int)((r->p0.x - mesh->nmin.x) / cfg->steps.x);
+        int iy = (int)((r->p0.y - mesh->nmin.y) / cfg->steps.y);
+        int iz = (int)((r->p0.z - mesh->nmin.z) / cfg->steps.z);
 
+        ix = MIN(MAX(ix, 0), (int)cfg->dim.x - 1);
+        iy = MIN(MAX(iy, 0), (int)cfg->dim.y - 1);
+        iz = MIN(MAX(iz, 0), (int)cfg->dim.z - 1);
+
+        #pragma omp atomic
+        mesh->weight[iz * cfg->crop0.y + iy * cfg->crop0.x + ix + tshift] += ww;
     } else {
         if (!cfg->basisorder) {
             #pragma omp atomic

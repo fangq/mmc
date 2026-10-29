@@ -595,7 +595,7 @@ void mmc_run_cl(mcconfig* cfg, tetmesh* mesh, raytracer* tracer) {
 
         if (cfg->srctype == stPattern || cfg->srctype == stPattern3D
                 || cfg->srcnum > 1
-                || (cfg->extrasrclen > 0 && cfg->srcid <= 0)) {
+                || cfg->extrasrclen > 0) { /* srcid>0 picks srcdata[srcid-1] in the multi-source code; without it, the first source was launched */
             snprintf(opt + strlen(opt), MAX_JIT_OPT_LEN - strlen(opt), " -DIS_MULTISRC=1");
         }
 
@@ -1192,6 +1192,12 @@ is more than what your have specified (%d), please use the -H option to specify 
                     }
                 }
             }
+        }
+
+        /* srcid=0 with several sources: all of them in one output, as documented and as in mcx;
+           the kernel deposited each source in its own slot */
+        if (savevolume) {
+            mesh_mergesrcslots(mesh, cfg);
         }
 
         /* Mesh-mode adjoint Jacobian post-processing (OpenCL): FEM/nodal formulas on a tet mesh. */

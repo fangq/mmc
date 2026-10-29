@@ -901,15 +901,15 @@ static void test_inputfiles(void) {
     EXPECT_TRUE(r.ran, "onecube.json runs");
     r = run_mmc("-f onecube_isotropic.json -G -1 -n 500 -s utiso", NULL);
     EXPECT_TRUE(r.ran, "onecube_isotropic.json runs");
-    /* two sources on onecube: each simulated separately (srcid -1), or only the first (srcid 1) */
+    /* two sources on onecube: the CPU runs only one of them (srcid 1), and refuses to run them
+       together (srcid -1), which it did by leaving the second slot empty */
     const char* msjson = "{\"Mesh\":{\"MeshID\":\"onecube\",\"InitElem\":3},\"Session\":{\"Photons\":200,\"RNGSeed\":17182818,\"ID\":\"utms\"},"
                          "\"Forward\":{\"T0\":0,\"T1\":5e-9,\"Dt\":5e-10},\"Optode\":{\"Source\":{\"Pos\":[[2,8,0,0.5],[8,2,0,0.5]],"
                          "\"Dir\":[[0,0,1,0],[0,0,1,0]],\"ID\":%d},\"Detector\":[{\"Pos\":[2,6,0],\"R\":1},{\"Pos\":[2,2,0],\"R\":1}]}}";
     char json[1024];
     snprintf(json, sizeof(json), msjson, -1);
     write_file("utms.json", json, strlen(json));
-    r = run_mmc("-f utms.json -G -1 -s utms", NULL);
-    EXPECT_TRUE(r.ran, "two sources simulated separately (srcid -1)");
+    EXPECT_EXIT(run_mmc("-f utms.json -G -1 -s utms", NULL), "two sources at once on the CPU (srcid -1) is an error");
     snprintf(json, sizeof(json), msjson, 1);
     write_file("utms1.json", json, strlen(json));
     r = run_mmc("-f utms1.json -G -1 -s utms1", NULL);
@@ -1335,8 +1335,9 @@ static void test_moreio(void) {
             EXPECT_TRUE(r.ran && r.detected > 0, msg);
         }
 
-        /* two sources: the detected photons carry the source ID in the upper bits of the detector ID */
-        snprintf(args, sizeof(args), "-f utms.json -G -1 -d 1 -F %s -s utmsdet%d", fmt[i], i);
+        /* two sources: the detected photons carry the source ID in the upper bits of the detector ID
+           (the CPU runs the one srcid selects) */
+        snprintf(args, sizeof(args), "-f utms1.json -G -1 -d 1 -F %s -s utmsdet%d", fmt[i], i);
         r = run_mmc(args, NULL);
         sprintf(msg, "detected photons of two sources saved by -F %s", fmt[i]);
         EXPECT_TRUE(r.ran, msg);
@@ -1345,8 +1346,14 @@ static void test_moreio(void) {
     /* --dumpjson of multiple sources and of pattern sources, to a file, then read back */
     EXPECT_EXIT_OK(run_mmc("-f utms.json -G -1 --dumpjson utmsdump.json", NULL), "--dumpjson of two sources");
     EXPECT_TRUE(file_size("utmsdump.json") > 0, "--dumpjson writes the named file");
-    r = run_mmc("-f utmsdump.json -G -1 -n 100 -s utmsre", NULL);
-    EXPECT_TRUE(r.ran, "the dumped two-source JSON runs");
+
+    if (hasocl) {  /* both sources at once (srcid -1) need a GPU */
+        r = run_mmc("-f utmsdump.json -G 1 -n 100 -s utmsre", NULL);
+        EXPECT_TRUE(r.ran, "the dumped two-source JSON runs");
+    } else {
+        EXPECT_EXIT(run_mmc("-f utmsdump.json -G -1 -n 100 -s utmsre", NULL), "the dumped two-source JSON needs a GPU");
+    }
+
     EXPECT_EXIT_OK(run_mmc("--bench dmmc-cube60 -G -1 --dumpjson utpatdump.json --json {\"Optode\":{\"Source\":{\"Type\":\"pattern\","
                            "\"Pos\":[28,43,15],\"Param1\":[4,0,0,2],\"Param2\":[0,4,0,2],\"Pattern\":{\"Nx\":2,\"Ny\":2,\"Data\":[1,0.5,0.5,1]}}}}", NULL),
                    "--dumpjson of a pattern source");

@@ -574,8 +574,47 @@ void mesh_createdualmesh(tetmesh* mesh, mcconfig* cfg) {
  * @param[in] cfg: the simulation configuration structure
  */
 
+/* 1 if the bounding box of element i overlaps the box lo-hi */
+static int mesh_inbox(tetmesh* mesh, int i, const float lo[3], const float hi[3]) {
+    int* ee = mesh->elem + i * mesh->elemlen;
+    int j, k;
+
+    for (k = 0; k < 3; k++) {
+        float emin = (&mesh->node[ee[0] - 1].x)[k], emax = emin;
+
+        for (j = 1; j < 4; j++) {
+            float v = (&mesh->node[ee[j] - 1].x)[k];
+            emin = MIN(emin, v);
+            emax = MAX(emax, v);
+        }
+
+        if (emax < lo[k] || emin > hi[k]) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
     int i;
+
+    /* a pattern3d, line or slit source launches photons anywhere in its box or along its segment,
+       but the launch searched only the initial element and the -1 elements, so a source larger
+       than one element failed (CPU) or crashed (GPU); the elements overlapping its bounding box
+       are added to the search list, keeping their labels */
+    int isextended = ((cfg->srctype == stPattern3D || cfg->srctype == stLine || cfg->srctype == stSlit) && mesh->node && mesh->elem);
+    float lo[3], hi[3];
+
+    if (isextended) {
+        float p0[3] = {cfg->srcpos.x, cfg->srcpos.y, cfg->srcpos.z};
+        float dp[3] = {cfg->srcparam1.x, cfg->srcparam1.y, cfg->srcparam1.z};
+
+        for (i = 0; i < 3; i++) {
+            lo[i] = MIN(p0[i], p0[i] + dp[i]);
+            hi[i] = MAX(p0[i], p0[i] + dp[i]);
+        }
+    }
 
     mesh->srcelemlen = 0;
     mesh->detelemlen = 0;
@@ -584,6 +623,8 @@ void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
         if (mesh->type[i] == -1) { /*number of elements in the initial candidate list*/
             mesh->srcelemlen++;
             cfg->e0 = (cfg->e0 == 0) ? i + 1 : cfg->e0;
+        } else if (isextended && mesh->type[i] > 0 && mesh_inbox(mesh, i, lo, hi)) {
+            mesh->srcelemlen++;
         }
 
         if (mesh->type[i] == -2) { /*number of elements in the initial candidate list*/
@@ -608,6 +649,8 @@ void mesh_srcdetelem(tetmesh* mesh, mcconfig* cfg) {
                 } else if (mesh->type[i] == -2) { /*keep -2, will be replaced to medianum+1 in loadmedia*/
                     mesh->detelem[id++] = i + 1;
                 }
+            } else if (isextended && mesh->type[i] > 0 && mesh_inbox(mesh, i, lo, hi)) {
+                mesh->srcelem[is++] = i + 1;
             }
         }
     }
@@ -1383,7 +1426,9 @@ int mesh_initelem(tetmesh* mesh, mcconfig* cfg) {
  * is launched. It is a no-op when extrasrclen == 0 or srcid > 0.
  */
 void mesh_init_srcdata_eid(tetmesh* mesh, mcconfig* cfg) {
-    if (cfg->extrasrclen <= 0 || cfg->srcdata == NULL || cfg->srcid > 0) {
+    /* also for srcid>0: the single selected source launches from its own element, it
+       launched from the element of the first source */
+    if (cfg->extrasrclen <= 0 || cfg->srcdata == NULL) {
         return;
     }
 
@@ -2313,8 +2358,7 @@ static void mesh_saveweightdata(tetmesh* mesh, mcconfig* cfg, int isref, double*
     int i, j, datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
     char fweight[MAX_FULL_PATH];
     double* data = (field) ? field : mesh->weight;
-    /* multi-source / adjoint slot count; >1 only when cfg->extrasrclen > cfg->srcnum */
-    int nslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
+    int nslots = mesh_outputslots(cfg);
 
     if (isref) {
         data = mesh->dref;
@@ -2404,7 +2448,7 @@ void mesh_saveweight(tetmesh* mesh, mcconfig* cfg, int isref) {
 
     if (!isref && cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE && cfg->exportadjoint != NULL) {
         int datalen = (cfg->method == rtBLBadouelGrid) ? cfg->crop0.z : ( (cfg->basisorder) ? mesh->nn : mesh->ne);
-        int nslots = (cfg->extrasrclen > cfg->srcnum) ? cfg->extrasrclen : cfg->srcnum;
+        int nslots = mesh_outputslots(cfg);
         size_t len = (size_t)datalen * cfg->maxgate * nslots, k;
         double* imag = (double*)malloc(sizeof(double) * len);
         char session[MAX_SESSION_LENGTH];
@@ -3080,6 +3124,58 @@ void mesh_validate(tetmesh* mesh, mcconfig* cfg) {
         for (i = 0; i < mesh->ne; i++) {
             if (mesh->type[i] == -2) {
                 mesh->type[i] = mesh->prop + 1;
+            }
+        }
+    }
+}
+
+/**
+ * @brief The number of output slots: one per source (srcid<0, which the adjoint outputs also set)
+ * or one per pattern
+ *
+ * With several sources, srcid=0 gives all of them in one output, as documented and as in mcx,
+ * and srcid>0 only the selected one; the buffers are sized for every source.
+ *
+ * @param[in] cfg: the simulation configuration
+ */
+
+int mesh_outputslots(const mcconfig* cfg) {
+    return (cfg->extrasrclen > cfg->srcnum && cfg->srcid < 0) ? cfg->extrasrclen : cfg->srcnum;
+}
+
+/**
+ * @brief Add up the per-source slots of a srcid=0 multi-source run into the first slot
+ *
+ * The GPU kernels launch each photon from a random source and deposit it in that source's slot;
+ * every slot is normalized by the total launched energy, so their sum is the output of all the
+ * sources together, as mcx gives for srcid=0. The slots are [slot][gate][datalen].
+ *
+ * @param[in,out] mesh: the mesh object
+ * @param[in,out] cfg: the simulation configuration; its exportfield (or mesh->weight) and, for RF,
+ *                     exportadjoint are merged
+ */
+
+void mesh_mergesrcslots(tetmesh* mesh, mcconfig* cfg) {
+    size_t datalen, slotlen, k;
+    int slot;
+
+    double* field = (cfg->exportfield) ? cfg->exportfield : mesh->weight;
+
+    if (cfg->srcid != 0 || cfg->extrasrclen <= 1 || cfg->srcnum != 1 || MCX_IS_ADJOINT_TYPE(cfg->outputtype) || field == NULL) {
+        return;
+    }
+
+    datalen = (cfg->method == rtBLBadouelGrid) ? (size_t)cfg->crop0.z : (size_t)((cfg->basisorder) ? mesh->nn : mesh->ne);
+    slotlen = datalen * cfg->maxgate;
+
+    for (slot = 1; slot < cfg->extrasrclen; slot++) {
+        for (k = 0; k < slotlen; k++) {
+            field[k] += field[slot * slotlen + k];
+            field[slot * slotlen + k] = 0.0;
+
+            if (cfg->exportadjoint && cfg->omega > 0.f && cfg->seed != SEED_FROM_FILE) {
+                cfg->exportadjoint[k] += cfg->exportadjoint[slot * slotlen + k];
+                cfg->exportadjoint[slot * slotlen + k] = 0.f;
             }
         }
     }
