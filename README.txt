@@ -207,12 +207,24 @@ lists all of them, with their commit hashes.
 * [882054e] implicit MMC uses the ROI's optical properties for scattering and albedo
 * [66f4c90] `cfg.face` is ignored when `cfg.elem` is given (fixing redbird's MMC Jacobians)
 * [816f671] `Session.OutputType` names read in full, not just their first letter
+* [8f5836d] pattern3d, line and slit sources larger than one element failed (CPU), hung or crashed
+  (GPU); the line source emitted in non-unit directions and now emits normal to the line, as MCX;
+  mcmethod=1 gave a zero dual-grid output; multiple sources: srcid=N ran the first source, srcid=0
+  returned one slot per source instead of their sum, and the CPU silently ran only the first source
+  (it now raises an error for several sources at once and the adjoint outputs, which need a GPU)
+* [8f5836d] an error of one photon deadlocked the mex/pybind run, or was dropped with one thread
 
 '''MMCLAB and PMMC'''
 * [5ecd5ac] `pmmc.mmclab()`: the mmclab.m pre/post-processing around `pmmc.run()`; [d820fb5] all
   mmclab examples ported to Python under `pmmc/example`
 * [a6d4f42] the mmclab help rewritten to document every cfg field; [0feb5bb] `cfg.issave2pt`,
   and an error for backends the mex was not built with
+* [aed7609, 8074c2c] pmmc validates the mesh (out-of-range elem crashed, labels beyond prop and
+  degenerate elements gave silent results), saves the detected photons when `detpos` is given, and a
+  3-D srcpattern of pattern3d is one volume; mmclab accepts any numeric class (an int32 elem crashed)
+  and carries the message of a failed run; sources outside of the mesh need srcparam2 only when used
+* [51f8b29] mmclab: an empty field of a cfg struct array keeps its default; it was read as 0
+* [90ef502] `cfg.flog` also controls the echo of the cfg fields: '/dev/null' or 'NUL' silences everything
 
 '''Testing and robustness'''
 * [5498290] functional, step-by-step trajectory and pmmc tests that run on the CPU in CI
@@ -221,6 +233,8 @@ lists all of them, with their commit hashes.
   fixed [bcdfbb0, 7494228]; embedded meshes and input values validated
 * [6cc7990, 1c9093a] `test/fuzz/mmcfuzz.py`, an mmc fuzzer including the iMMC inputs, run on all four
   backends; the bugs it found were fixed [07c6fa5, 85f7ed9, 797cccf]
+* [0c57549, e5098a4] unit tests of the mmclab and pmmc interfaces, on the CPU: mesh preparation, every
+  output, source types, multiple sources and short absorbed-fraction checks
 
 '''Packaging'''
 * [73eb9f1] Linux releases built in manylinux2014 (glibc 2.17+); Octave 10 mex files for macOS/Windows

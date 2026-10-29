@@ -1,6 +1,21 @@
 Change Log
 
 == MMC 3.0.0 (v2026, Egg Tart), Qianqian Fang <q.fang at neu.edu> ==
+ 2026-10-29 [e5098a4] [test] binding tests of mesh validation, pattern3d, line sources, mcmethod, multiple sources, source domains
+ 2026-10-29 [aed7609]*[bug] mmclab/pmmc: validate the mesh, srcpattern of pattern3d, source domains, input types, errors
+ 2026-10-29 [8f5836d]*[bug] mmc: pattern3d and line sources, mcmethod=1 grid output, multiple sources, errors of photons
+ 2026-10-29 [0c57549]*[test] unit tests of the pmmc and mmclab interfaces, with short end-to-end checks
+ 2026-10-29 [51f8b29] [bug] mmclab: an empty cfg field keeps its default, instead of being read as 0
+ 2026-10-29 [8074c2c]*[bug] pmmc: raise for a missing node/elem, and save detected photons with detpos
+ 2026-10-29 [f45e258] [bug] pmmc: mmclab(cfg, option) runs on the backend the option names
+ 2026-10-29 [e0f2389] [doc] pmmc: NumPy-style docstrings for mmclab and the mesh helpers, and a full help of run()
+ 2026-10-29 [90ef502]*[feat] mmclab/pmmc: cfg.flog also controls the echo of the cfg fields, so it can silence everything
+ 2026-10-29 [360a882] [feat] -l 0 prints the log without the banner and -l writes unnamed.log without a session name, as in mcx
+ 2026-10-29 [220455e] [feat] cfg.flog in mmclab; flog=0 hides the banner; pmmc prints the flog=2 log to sys.stdout
+ 2026-10-29 [8f865a4] [clean] mmc --version prints the revision, version, major and minor numbers as mcx does
+ 2026-10-28 [9d33e34] [clean] one space between the fields of the $Rev line of the help banner
+ 2026-10-28 [7d62479] [doc] example READMEs: reftest described, onecube JSON inputs, typos
+ 2026-10-28 [285063b] [doc] v2026 docs: RT-MMC citation, the final What's New items and ChangeLog
  2026-10-28 [4981657] [test] re-execute the unit test program from argv[0] where there is no /proc/self/exe (macOS)
  2026-10-28 [6045d9f] [clean] the host RNG with uint64_t, not long long (C++98 -pedantic warnings)
  2026-10-28 [9075fe0] [test] forked unit-test children leave through _exit(), not hang in the Intel runtime
