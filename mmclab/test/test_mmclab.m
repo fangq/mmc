@@ -26,7 +26,8 @@ extra = struct(varargin{:});
 tests = {@test_info, @test_errors, @test_prep, @test_outputs, ...
          @test_detected_photons, @test_struct_array, @test_rf, @test_replay, ...
          @test_option_sets_compute, @test_widefield_source, @test_flog_silent, ...
-         @test_end_to_end};
+         @test_end_to_end, @test_input_types, @test_error_messages, @test_pattern3d, ...
+         @test_mcmethod, @test_line_source, @test_multiple_sources, @test_widefield_domains};
 failed = {};
 for i = 1:numel(tests)
     name = func2str(tests{i});
@@ -190,3 +191,66 @@ grid = energy(mmclab(mkcfg(extra, 'outputtype', 'energy', 'nphoton', 2e4)));
 elem = energy(mmclab(mkcfg(extra, 'outputtype', 'energy', 'nphoton', 2e4, 'method', 'elem', 'basisorder', 0)));
 assert(grid > 0.54 && grid < 0.60, sprintf('absorbed fraction %.4f', grid));
 assert(abs(grid - elem) < 0.005, sprintf('grid %.4f vs elements %.4f', grid, elem));
+
+function test_input_types(extra)
+% any numeric class and column vectors are accepted (an int32 elem crashed the mex)
+ref = energy(mmclab(boxcfg(extra, 'outputtype', 'energy', 'nphoton', 2e4)));
+cfg = boxcfg(extra, 'outputtype', 'energy', 'nphoton', 2e4);
+cases = {'elem', int32(cfg.elem); 'node', single(cfg.node); 'elemprop', int8(cfg.elemprop); ...
+         'srcpos', [10; 10; 0]; 'nphoton', int32(2e4)};
+for i = 1:size(cases, 1)
+    c = cfg;
+    c.(cases{i, 1}) = cases{i, 2};
+    e = energy(mmclab(c));
+    assert(abs(e - ref) < 0.01, sprintf('%s as %s: %.4f vs %.4f', cases{i, 1}, class(cases{i, 2}), e, ref));
+end
+
+function test_error_messages(extra)
+% the message of an error raised in the simulation reaches MATLAB, whatever cfg.flog is
+try
+    mmclab(boxcfg(extra, 'srcpos', [6 10 0; 14 10 0], 'srcdir', [0 0 1; 0 0 1]));
+    error('no error raised for several sources on the CPU');
+catch err
+    assert(~isempty(strfind(err.message, 'GPU')), ['the message: ' err.message]);
+end
+assert_error(@() mmclab(boxcfg(extra, 'elemprop', 3 * ones(size(boxcfg(extra).elem, 1), 1))), 'labels beyond prop');
+
+function test_pattern3d(extra)
+% a pattern volume spanning many elements (it hung on the CPU and crashed on the GPU)
+pat = ones(19, 19, 5);
+flux = mmclab(boxcfg(extra, 'srctype', 'pattern3d', 'srcpos', [0.5 0.5 0.5], 'srcparam1', [19 19 5 0], 'srcpattern', pat));
+assert(all(isfinite(flux.data(:))) && sum(flux.data(:)) > 0, 'pattern3d output');
+
+function test_mcmethod(extra)
+% MCML-style weights give the same fluence as the default (the grid output was zero)
+f0 = mmclab(boxcfg(extra, 'nphoton', 5e4));
+f1 = mmclab(boxcfg(extra, 'nphoton', 5e4, 'mcmethod', 1));
+r = sum(f1.data(isfinite(f1.data))) / sum(f0.data(isfinite(f0.data)));
+assert(abs(r - 1) < 0.03, sprintf('mcmethod=1 / mcmethod=0: %.3f', r));
+
+function test_line_source(extra)
+% a line emits normal to itself, whatever srcdir is, as mcx (absorbed fraction 0.1987)
+for srcdir = {[1 0 0], [0 0 1]}
+    e = energy(mmclab(boxcfg(extra, 'srctype', 'line', 'srcpos', [5 10 10], 'srcparam1', [10 0 0 0], ...
+                             'srcparam2', [0 0 0 0], 'srcdir', srcdir{1}, 'outputtype', 'energy', 'nphoton', 5e4, ...
+                             'prop', [0 0 1 1; 0.01 1 0.9 1.37])));
+    assert(abs(e - 0.1987) < 0.01, sprintf('line source, srcdir %s: %.4f', mat2str(srcdir{1}), e));
+end
+
+function test_multiple_sources(extra)
+% on the CPU, srcid selects one of several sources (the first one was always run)
+flux = mmclab(boxcfg(extra, 'srcpos', [6 10 0; 14 10 0], 'srcdir', [0 0 1; 0 0 1], 'srcid', 2, 'nphoton', 2e4));
+d = flux.data;
+d(~isfinite(d)) = 0;
+left = sum(sum(sum(d(1:10, :, :)))) / sum(d(:));
+assert(left < 0.35, sprintf('srcid=2 deposits on the side of source 2: %.2f left', left));
+
+function test_widefield_domains(extra)
+% sources outside of the mesh, with srcparam2 left out where it is unused
+cases = {'disk', [3 0 0 0], [10 10 -1]; 'gaussian', [3 0 0 0], [10 10 -1]; ...
+         'hyperboloid', [2 10 5 0], [10 10 -1]; 'ring', [4 2 0 0], [10 10 -1]; 'slit', [10 0 0 0], [5 10 -1]};
+for i = 1:size(cases, 1)
+    cfg = boxcfg(extra, 'srctype', cases{i, 1}, 'srcparam1', cases{i, 2}, 'srcpos', cases{i, 3});
+    [flux, detp, ncfg] = mmclab(cfg);
+    assert(any(ncfg.elemprop < 0) && sum(flux.data(isfinite(flux.data))) > 0, [cases{i, 1} ' source outside of the mesh']);
+end

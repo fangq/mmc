@@ -289,6 +289,166 @@ class TestMmclab(unittest.TestCase):
         self.assertTrue(pmmc.mmclab("version").startswith("v"))
 
 
+def has_opencl():
+    try:
+        return "flux" in pmmc.run(cfg(nphoton=100, compute="opencl"))
+    except Exception:
+        return False
+
+
+@unittest.skipIf(pmmc is None or iso2mesh is None, "needs pmmc and iso2mesh")
+class TestFeatures(unittest.TestCase):
+    """source types, multiple sources, mcmethod and invalid meshes, on a finer cube mesh"""
+
+    @classmethod
+    def setUpClass(cls):
+        node, face, elem = iso2mesh.meshabox([0, 0, 0], [20, 20, 20], 10)
+        cls.mesh = dict(node=node, elem=elem[:, :4], elemprop=np.ones(elem.shape[0]))
+        cls.opencl = has_opencl()
+
+    def mcfg(self, **kw):
+        c = dict(
+            nphoton=5000,
+            srcpos=[10, 10, 0],
+            srcdir=[0, 0, 1],
+            tstart=0,
+            tend=5e-9,
+            tstep=5e-9,
+            prop=[[0, 0, 1, 1], [0.01, 1, 0.9, 1.37]],
+            compute="sse",
+            seed=1,
+            flog=NULLDEV,
+        )
+        c.update(self.mesh)
+        c.update(kw)
+        return c
+
+    def backends(self):
+        return ("sse", "opencl") if self.opencl else ("sse",)
+
+    def energy(self, **kw):
+        return np.nansum(pmmc.run(self.mcfg(outputtype="energy", **kw))["flux"])
+
+    def test_invalid_meshes(self):
+        """a 0-based elem crashed, labels beyond prop and zero-volume elements gave silent results"""
+        elem = self.mesh["elem"]
+        with self.assertRaises(ValueError):
+            pmmc.run(self.mcfg(elem=elem - 1))
+        with self.assertRaises(ValueError):
+            pmmc.run(self.mcfg(elemprop=np.full(elem.shape[0], 3)))
+        with self.assertRaises(ValueError):
+            pmmc.run(
+                self.mcfg(node=np.round(self.mesh["node"] / 10) * 10)
+            )  # collapses elements
+        with self.assertRaises(ValueError):
+            pmmc.run(self.mcfg(compute="cuda"))  # this module is built without CUDA
+
+    def test_launch_errors_are_raised(self):
+        """an error of a photon is raised, also with one thread (it was dropped, giving NaN)"""
+        with self.assertRaises(RuntimeError):
+            pmmc.run(
+                self.mcfg(srcpos=[10, 10, -5])
+            )  # outside of the mesh, without a source domain
+
+    def test_pattern3d(self):
+        """a pattern volume spanning many elements (it hung on the CPU and crashed on the GPU)"""
+        kw = dict(
+            srctype="pattern3d",
+            srcpos=[0.5, 0.5, 0.5],
+            srcparam1=[19, 19, 5, 0],
+            srcpattern=np.ones((19, 19, 5)),
+        )
+        for comp in self.backends():
+            with self.subTest(compute=comp):
+                f = pmmc.run(self.mcfg(compute=comp, **kw))["flux"]
+                self.assertEqual(np.isnan(f).sum(), 0)
+                self.assertGreater(f.sum(), 0)
+
+    def test_line_source(self):
+        """a line emits normal to itself, whatever srcdir is, matching mcx (0.1987)"""
+        kw = dict(
+            srctype="line", srcpos=[5, 10, 10], srcparam1=[10, 0, 0, 0], nphoton=50000
+        )
+        for comp in self.backends():
+            for srcdir in ([1, 0, 0], [0, 0, 1]):
+                with self.subTest(compute=comp, srcdir=srcdir):
+                    self.assertAlmostEqual(
+                        self.energy(compute=comp, srcdir=srcdir, **kw),
+                        0.1987,
+                        delta=0.01,
+                    )
+
+    def test_mcmethod(self):
+        """MCML-style weights give the same fluence as the default (the grid output was zero)"""
+        for method, basisorder in (("grid", 1), ("elem", 0)):
+            with self.subTest(method=method):
+                kw = dict(method=method, basisorder=basisorder, nphoton=50000)
+                f0 = np.nansum(pmmc.run(self.mcfg(**kw))["flux"])
+                f1 = np.nansum(pmmc.run(self.mcfg(mcmethod=1, **kw))["flux"])
+                self.assertAlmostEqual(f1 / f0, 1, delta=0.03)
+                self.assertAlmostEqual(
+                    self.energy(mcmethod=1, **kw), self.energy(**kw), delta=0.01
+                )
+
+    def test_multiple_sources(self):
+        two = dict(
+            srcpos=[[6, 10, 0], [14, 10, 0]],
+            srcdir=[[0, 0, 1], [0, 0, 1]],
+            nphoton=20000,
+        )
+
+        def left(f):
+            f = np.nan_to_num(f)
+            return f[:10].sum() / f.sum()
+
+        # the CPU runs one source: the one srcid selects, and refuses several at once
+        self.assertLess(left(pmmc.run(self.mcfg(srcid=2, **two))["flux"]), 0.35)
+        with self.assertRaises(RuntimeError):
+            pmmc.run(self.mcfg(**two))
+        if not self.opencl:
+            return
+        f = pmmc.run(self.mcfg(compute="opencl", **two))["flux"]
+        self.assertEqual(f.ndim, 4)  # srcid=0: all sources in one output
+        self.assertAlmostEqual(left(f), 0.5, delta=0.05)
+        f = pmmc.run(self.mcfg(compute="opencl", srcid=-1, **two))["flux"]
+        self.assertEqual(f.shape[-1], 2)
+        self.assertGreater(left(f[..., 0]), 0.65)
+        self.assertLess(left(f[..., 1]), 0.35)
+        self.assertLess(
+            left(pmmc.run(self.mcfg(compute="opencl", srcid=2, **two))["flux"]), 0.35
+        )
+
+    def test_adjoint(self):
+        det = dict(
+            detpos=[[10, 6, 0, 1], [10, 14, 0, 1]],
+            detdir=[[0, 0, 1, 0], [0, 0, 1, 0]],
+            outputtype="adjoint",
+        )
+        with self.assertRaises(RuntimeError):
+            pmmc.run(self.mcfg(**det))  # the CPU can not launch the detectors
+        if self.opencl:
+            res = pmmc.run(self.mcfg(compute="opencl", **det))
+            self.assertEqual(res["jmua"].shape, (21, 21, 21, 1, 2))
+
+    def test_widefield_source_domains(self):
+        """sources outside of the mesh, with srcparam2 left out where it is unused"""
+        cases = {
+            "disk": dict(srcparam1=[3, 0, 0, 0], srcpos=[10, 10, -1]),
+            "gaussian": dict(srcparam1=[3, 0, 0, 0], srcpos=[10, 10, -1]),
+            "hyperboloid": dict(srcparam1=[2, 10, 5, 0], srcpos=[10, 10, -1]),
+            "ring": dict(srcparam1=[4, 2, 0, 0], srcpos=[10, 10, -1]),
+            "slit": dict(srcparam1=[10, 0, 0, 0], srcpos=[5, 10, -1]),
+            "pencilarray": dict(
+                srcparam1=[10, 0, 0, 4], srcparam2=[0, 10, 0, 4], srcpos=[5, 5, -2]
+            ),
+        }
+        for srctype, kw in cases.items():
+            with self.subTest(srctype=srctype):
+                res = pmmc.mmclab(self.mcfg(srctype=srctype, **kw))
+                self.assertGreater(np.nansum(res["flux"]), 0)
+                self.assertTrue(np.any(np.ravel(res["cfg"]["elemprop"]) < 0))
+
+
 @unittest.skipIf(pmmc is None, "pmmc is not installed")
 class TestEndToEnd(unittest.TestCase):
     """short absorbed-fraction checks (the cube itself is checked in test_pmmc)"""
