@@ -21,7 +21,13 @@ except ImportError:
 
 def box_mesh(size=20.0):
     """a cube [0,size]^3 split into 6 Kuhn tetrahedra"""
-    node = np.array([[i, j, k] for i in (0, 1) for j in (0, 1) for k in (0, 1)], dtype=np.float32) * size
+    node = (
+        np.array(
+            [[i, j, k] for i in (0, 1) for j in (0, 1) for k in (0, 1)],
+            dtype=np.float32,
+        )
+        * size
+    )
     elem = []
 
     for perm in permutations(range(3)):
@@ -76,6 +82,38 @@ class TestPMMC(unittest.TestCase):
         self.assertLess(absorbed, 0.60)
 
 
+@unittest.skipIf(pmmc is None, "pmmc is not installed")
+class TestMMCLAB(unittest.TestCase):
+    def test_option_sets_compute(self):
+        """mmclab(cfg, 'sse'/'omp'/'opencl'/...) runs on that backend, as cfg['compute'] (mmclab.m)"""
+        try:
+            import iso2mesh  # noqa: F401
+        except ImportError:
+            self.skipTest("pmmc.mmclab needs iso2mesh")
+
+        import sys
+        from unittest.mock import patch
+
+        mod = sys.modules["pmmc.mmclab"]  # pmmc.mmclab is the function
+        seen = []
+
+        def fakerun(cfg):
+            seen.append(cfg["compute"])
+            return {"flux": np.zeros(1)}
+
+        cfg = base_cfg()
+        cfg.update({"compute": "opencl", "nphoton": 100})
+        with patch.object(mod, "_run", fakerun):
+            for option in ("sse", "omp", "cuda"):
+                pmmc.mmclab(cfg, option)
+            pmmc.mmclab(cfg)
+
+        self.assertEqual(seen, ["sse", "sse", "cuda", "opencl"])
+        self.assertEqual(cfg["compute"], "opencl")  # the caller's cfg is unchanged
+        with self.assertRaises(ValueError):
+            pmmc.mmclab(cfg, "gpu")
+
+
 def has_backend(name):
     """True if pmmc can run on the given GPU backend on device 1"""
     if pmmc is None:
@@ -96,7 +134,9 @@ class TestPMMCGPU(unittest.TestCase):
             self.skipTest("pmmc %s backend is not available" % backend)
 
         cfg = base_cfg()
-        cfg.update({"outputtype": "energy", "compute": backend, "gpuid": 1, "nphoton": 100000})
+        cfg.update(
+            {"outputtype": "energy", "compute": backend, "gpuid": 1, "nphoton": 100000}
+        )
         absorbed = pmmc.run(cfg)["flux"].sum()
         self.assertGreater(absorbed, 0.56)
         self.assertLess(absorbed, 0.59)

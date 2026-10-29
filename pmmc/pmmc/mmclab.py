@@ -524,7 +524,9 @@ def mmclab(cfg, option=None):
         each one. The strings ``'gpuinfo'`` and ``'version'`` return ``pmmc.gpuinfo()`` and
         ``pmmc.version()``.
     option : str, optional
-        ``'prep'`` returns the prepared ``cfg`` without running it.
+        ``'prep'`` returns the prepared ``cfg`` without running it; ``'sse'`` (or ``'omp'``),
+        ``'opencl'``, ``'cuda'`` or ``'optix'`` runs on that backend, the same as setting
+        ``cfg['compute']``.
 
     Returns
     -------
@@ -578,11 +580,16 @@ def mmclab(cfg, option=None):
     if not isinstance(cfg, dict):
         raise ValueError("cfg must be a dict or a list of dicts")
 
+    if option not in (None, "prep", "omp", "sse", "opencl", "cuda", "optix"):
+        raise ValueError("option is not recognized: " + str(option))
+    if option not in (None, "prep"):
+        # option='sse'/'opencl'/'cuda'/'optix' picks the backend, as cfg['compute'] (mmclab.m);
+        # set before _prepare, which skips the source domain for optix
+        cfg = dict(cfg, compute=option.replace("omp", "sse"))
+
     cfg = _prepare(cfg)
     if option == "prep":
         return cfg
-    if option not in (None, "omp", "sse", "opencl", "cuda"):
-        raise ValueError("option is not recognized: " + str(option))
 
     if isinstance(cfg.get("gpuid"), (int, np.integer)) and cfg["gpuid"] < -1:
         cfg["gpuid"] = 1
