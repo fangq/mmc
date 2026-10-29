@@ -68,14 +68,22 @@ if (strcmp(cfg.srctype, 'pencil') || strcmp(cfg.srctype, 'cone') || ...
     strcmp(cfg.srctype, 'zgaussian') || strcmp(cfg.srctype, 'isotropic') || strcmp(cfg.srctype, 'arcsine'))
     srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), domainradius, 3, vperp, rotateangle);
     srcface = [1 2 3];
-elseif (strcmp(cfg.srctype, 'gaussian'))
-    srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), domaindiagnoal * 0.5, 3, vperp, rotateangle);
+elseif (strcmp(cfg.srctype, 'gaussian') || strcmp(cfg.srctype, 'hyperboloid'))
+    % the beam radius at the source plane: the waist srcparam1(1), widened for a hyperboloid
+    % srcparam1(2) from its focus (Rayleigh range srcparam1(3)); the triangle, of circumradius
+    % at least 8 beam radii, holds 4 of them, so the Gaussian tails, which launched photons
+    % outside of the domain (a fatal error), have a chance of about 1e-14
+    beamradius = cfg.srcparam1(1);
+    if (strcmp(cfg.srctype, 'hyperboloid') && cfg.srcparam1(3) > 0)
+        beamradius = beamradius * sqrt(1 + (cfg.srcparam1(2) / cfg.srcparam1(3))^2);
+    end
+    srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), max(domaindiagnoal, 8 * beamradius), 3, vperp, rotateangle);
     srcface = [1 2 3];
 elseif (strcmp(cfg.srctype, 'line') || strcmp(cfg.srctype, 'slit'))
     v0 = cfg.srcpos + cfg.srcparam1(1:3) * 0.5;
     srcnode = orthdisk(v0, v0 + cfg.srcdir(1:3), norm(cfg.srcparam1(1:3)) * expansion, 3, cfg.srcparam1(1:3));
     srcface = [1 2 3];
-elseif (strcmp(cfg.srctype, 'planar') || strcmp(cfg.srctype, 'pattern') || ...
+elseif (strcmp(cfg.srctype, 'planar') || strcmp(cfg.srctype, 'pattern') || strcmp(cfg.srctype, 'pencilarray') || ...
         strcmp(cfg.srctype, 'fourier') || strcmp(cfg.srctype, 'fourierx') || strcmp(cfg.srctype, 'fourierx2d'))
     v0 = cfg.srcpos(1:3);
     v1 = cfg.srcparam1(1:3);
@@ -94,12 +102,13 @@ elseif (strcmp(cfg.srctype, 'planar') || strcmp(cfg.srctype, 'pattern') || ...
         srcnode = orthdisk(cfg.srcpos + voff1, cfg.srcpos + voff1 + cfg.srcdir(1:3), (max(norm(voff1), norm(voff2))) * 2.0 * expansion, 3, v1 + v2, rotateangle);
         srcface = [1 2 3];
     end
-elseif (strcmp(cfg.srctype, 'disk'))
+elseif (strcmp(cfg.srctype, 'disk') || strcmp(cfg.srctype, 'ring'))
+    radius = cfg.srcparam1(1);  % the outer radius
     if (jsonopt('KeepShape', 0, opt))
-        srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), cfg.srcparam1(1) * expansion, jsonopt('CircleDiv', 100, opt));
+        srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), radius * expansion, jsonopt('CircleDiv', 100, opt));
         srcface = delaunay(srcnode(:, 1), srcnode(:, 2));
     else
-        srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), (cfg.srcparam1(1) * 2.0) * expansion, 3, vperp, rotateangle);
+        srcnode = orthdisk(cfg.srcpos, cfg.srcpos + cfg.srcdir(1:3), (radius * 2.0) * expansion, 3, vperp, rotateangle);
         srcface = [1 2 3];
     end
 else

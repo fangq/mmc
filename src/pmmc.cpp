@@ -187,6 +187,8 @@ static std::ostream& pyecho() {
 
 
 void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh) {
+    int patndim = 0, patdim0 = 1;  /* the shape of srcpattern, read before srctype may be known */
+
     mcx_initcfg(&mcx_config);
     mesh_init(&mesh);
 
@@ -907,9 +909,8 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             free(mcx_config.srcpattern);
         }
 
-        if (buffer_info.ndim == 3) { /* a stack of patterns for photon sharing, [srcnum, Nx, Ny], as in mmclab */
-            mcx_config.srcnum = buffer_info.shape[0];
-        }
+        patndim = buffer_info.ndim;
+        patdim0 = buffer_info.shape[0];
 
         mcx_config.srcpattern = (float*) malloc(buffer_info.size * sizeof(float));
         auto val = static_cast<float*>(buffer_info.ptr);
@@ -1033,6 +1034,13 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
     }
 
 
+    /* a stack of patterns for photon sharing is [srcnum, Nx, Ny] for 'pattern' and
+       [srcnum, Nx, Ny, Nz] for 'pattern3d', whose 3-D srcpattern is one volume; srcnum was
+       taken from any 3-D srcpattern, which broke pattern3d */
+    if (patndim == (mcx_config.srctype == stPattern3D ? 4 : 3)) {
+        mcx_config.srcnum = patdim0;
+    }
+
     /* save the detected photons when detectors are given, as the mmc command line and pmcx do;
        mmc's default issavedet=0 made cfg['detpos'] alone return no 'detp'. The adjoint outputs
        launch the detectors as sources instead */
@@ -1048,8 +1056,33 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
         throw py::value_error("the 'elemprop' field is missing");  /* mesh_getvolume reads it */
     }
 
+    /* an out-of-range (e.g. 0-based) elem aborted the process, and labels beyond the rows of
+       prop silently gave a zero fluence */
+    for (int i = 0; i < mesh.ne * mesh.elemlen; i++) {
+        if (mesh.elem[i] < 1 || mesh.elem[i] > mesh.nn) {
+            throw py::value_error("the 'elem' field must hold 1-based node indices, between 1 and the number of nodes");
+        }
+    }
+
+    if (mesh.med != NULL) {
+        for (int i = 0; i < mesh.ne; i++) {
+            if (mesh.type[i] > mesh.prop) {
+                throw py::value_error("the 'elemprop' field has labels beyond the media of 'prop' (its rows minus 1)");
+            }
+        }
+    }
+
     if (mesh.evol == NULL) {
         mesh_getvolume(&mesh, &mcx_config);
+    }
+
+    /* a zero-volume element made the ray-tracer loop forever; mmclab rejects them too */
+    if (mcx_config.compute != cbOptiX) {
+        for (int i = 0; i < mesh.ne; i++) {
+            if (!(mesh.evol[i] > 0.f)) {
+                throw py::value_error("the mesh contains degenerated (zero-volume) elements, e.g. element " + std::to_string(i + 1));
+            }
+        }
     }
 
     if (mesh.facenb == NULL) {
@@ -1112,6 +1145,8 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             memcpy(deviceid0, mcx_config.deviceid, MAX_DEVICE);
             active_dev = mcx_list_cu_gpu(&mcx_config, &gpu_info);
             memcpy(mcx_config.deviceid, deviceid0, MAX_DEVICE);
+#else
+            throw py::value_error("compute='cuda' needs a pmmc built with CUDA (CMAKE_ARGS=\"-DBUILD_CUDA=ON\"); use 'opencl' or 'sse'");
 #endif
         } else {
 #ifdef USE_OPENCL
@@ -1354,7 +1389,7 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
             /* When extrasrclen exceeds srcnum, the kernel runs nsrcslots = extrasrclen
              * slots in the weight buffer regardless of whether outputtype is adjoint
              * (e.g. cfg.srcid = -2 forward-only multi-source mode). */
-            int nsrcslots = (mcx_config.extrasrclen > mcx_config.srcnum) ? mcx_config.extrasrclen : mcx_config.srcnum;
+            int nsrcslots = mesh_outputslots(&mcx_config);  /* one per source only for srcid<0 (also set by the adjoint outputs) */
             int ismultislot = (nsrcslots > mcx_config.srcnum);
 
             size_t datalen = (mcx_config.method == rtBLBadouelGrid) ? mcx_config.crop0.z : ( (mcx_config.basisorder) ? mesh.nn : mesh.ne);

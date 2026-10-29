@@ -108,6 +108,9 @@ typedef mwSize dimtype;                                   //! MATLAB type alias 
  * for 2 (default), the stdout of the process for 1 and 0, or the log file; '/dev/null' or 'NUL'
  * silences everything. The errors and the usage are always printed to the console.
  */
+/** the number of dimensions and the 1st dimension of cfg.srcpattern, to set srcnum after srctype is read */
+static int mmclab_patndim = 0, mmclab_patdim0 = 1;
+
 static FILE* mcxlab_logfp = NULL;   /**< where printf() of this unit goes; NULL or stderr: the console */
 
 static int mcxlab_printf(const char* format, ...) {
@@ -175,6 +178,7 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
     char       cfgerr[MAX_PATH_LENGTH] = "";  /** the error of a simulation, raised after its clean-up */
     dimtype     fielddim[6];
     int        errorflag = 0;
+    char       errmsg[MAX_FULL_PATH + 64] = "MMCLAB terminated due to an exception";  /* copied by the exception mexErrMsgTxt throws */
     cl_uint    workdev;
 
     const char*       outputtag[] = {"data"};
@@ -305,6 +309,9 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             MMCDEBUG(&cfg, dlTime, (cfg.flog, "initializing ... "));
             mesh_init(&mesh);
 
+            mmclab_patndim = 0;
+            mmclab_patdim0 = 1;
+
             /** Read each struct element from input and set value to the cfg configuration */
             for (ifield = 0; ifield < nfields; ifield++) { /* how many input struct fields */
                 tmp = mxGetFieldByNumber(prhs[0], jstruct, ifield);
@@ -316,6 +323,13 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
                 }
 
                 mmc_set_field(prhs[0], tmp, ifield, jstruct, &cfg, &mesh);
+            }
+
+            /** a stack of patterns for photon sharing is [srcnum Nx Ny] for 'pattern' and
+                [srcnum Nx Ny Nz] for 'pattern3d', whose 3-D srcpattern is one volume; srcnum was
+                taken from any 3-D srcpattern, which broke pattern3d */
+            if (mmclab_patndim == (cfg.srctype == stPattern3D ? 4 : 3)) {
+                cfg.srcnum = mmclab_patdim0;
             }
 
             mexEvalString("pause(.001);");
@@ -463,9 +477,11 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
 #endif
             } catch (const char* err) {
                 mexPrintf("Error from thread (%d): %s\n", threadid, err);
+                snprintf(errmsg, sizeof(errmsg), "MMCLAB terminated due to an exception: %s", err);
                 errorflag++;
             } catch (const std::exception& err) {
                 mexPrintf("C++ Error from thread (%d): %s\n", threadid, err.what());
+                snprintf(errmsg, sizeof(errmsg), "MMCLAB terminated due to an exception: %s", err.what());
                 errorflag++;
             } catch (...) {
                 mexPrintf("Unknown Exception from thread (%d)", threadid);
@@ -552,7 +568,7 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
                 /* When extrasrclen exceeds srcnum, the kernel runs nsrcslots = extrasrclen
                  * slots in the weight buffer regardless of whether outputtype is adjoint
                  * (e.g. cfg.srcid = -2 forward-only multi-source mode). */
-                int nsrcslots = (cfg.extrasrclen > cfg.srcnum) ? cfg.extrasrclen : cfg.srcnum;
+                int nsrcslots = mesh_outputslots(&cfg);  /* one per source only for srcid<0 (also set by the adjoint outputs) */
 
                 int datalen = (cfg.method == rtBLBadouelGrid) ? cfg.crop0.z : ( (cfg.basisorder) ? mesh.nn : mesh.ne);
                 fielddim[0] = nsrcslots;
@@ -791,7 +807,7 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             }
 
             if (errorflag) {
-                mexErrMsgTxt("MMCLAB Terminated due to exception!");
+                mexErrMsgTxt(errmsg);  /* with the message: it was only printed, where flog could hide it */
             }
         } catch (const char* err) {
             snprintf(cfgerr, sizeof(cfgerr), "%s", err);
@@ -1440,12 +1456,11 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
         printf("mmc.session='%s';\n", cfg->session);
     } else if (strcmp(name, "srcpattern") == 0) {
         arraydim = mxGetDimensions(item);
-        dimtype dimz = 1, k;
+        dimtype k, len = mxGetNumberOfElements(item);
 
-        if (mxGetNumberOfDimensions(item) == 3) {
-            dimz = arraydim[2];
-            cfg->srcnum = arraydim[0];
-        }
+        /* srcnum is set once srctype is known, see mmclab_patndim */
+        mmclab_patndim = (int)mxGetNumberOfDimensions(item);
+        mmclab_patdim0 = (int)arraydim[0];
 
         double* val = mxGetPr(item);
 
@@ -1453,13 +1468,13 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
             free(cfg->srcpattern);
         }
 
-        cfg->srcpattern = (float*)malloc(arraydim[0] * arraydim[1] * dimz * sizeof(float));
+        cfg->srcpattern = (float*)malloc(len * sizeof(float));
 
-        for (k = 0; k < arraydim[0]*arraydim[1]*dimz; k++) {
+        for (k = 0; k < len; k++) {
             cfg->srcpattern[k] = val[k];
         }
 
-        printf("mmc.srcpattern=[%lld %lld %lld];\n", (long long)arraydim[0], (long long)arraydim[1], (long long)dimz);
+        printf("mmc.srcpattern=[%lld %lld %lld];\n", (long long)arraydim[0], (long long)arraydim[1], (long long)(len / (arraydim[0] * arraydim[1])));
     } else if (strcmp(name, "method") == 0) {
         int len = mxGetNumberOfElements(item);
         const char* methods[] = {"plucker", "havel", "badouel", "elem", "grid", ""};

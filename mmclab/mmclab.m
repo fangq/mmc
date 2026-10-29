@@ -370,11 +370,29 @@ if (isstruct(varargin{1}))
             varargin{1}(i).compute = strrep(type, 'omp', 'sse');
         end
 
-        castlist = {'srcpattern', 'srcpos', 'detpos', 'prop', 'workload', 'srcdir', 'detdir', 'sdmap'};
-        for j = 1:length(castlist)
-            if (isfield(varargin{1}(i), castlist{j}))
-                varargin{1}(i).(castlist{j}) = double(varargin{1}(i).(castlist{j}));
+        % the mex reads the numeric fields as double arrays, except detphotons, replayweight and
+        % replaytime (single) and a replay seed (uint8): convert any other class (int32 elem,
+        % single node, logical ...) and MATLAB string scalars here; an int32 elem crashed it
+        fields = fieldnames(varargin{1}(i));
+        for j = 1:length(fields)
+            val = varargin{1}(i).(fields{j});
+            if (isa(val, 'string'))
+                val = char(val);
+            elseif (any(strcmp(fields{j}, {'detphotons', 'replayweight', 'replaytime'})))
+                if (isnumeric(val))
+                    val = single(val);
+                end
+            elseif (strcmp(fields{j}, 'seed'))
+                if (~isa(val, 'uint8'))
+                    val = double(val);
+                end
+            elseif ((isnumeric(val) || islogical(val)) && ~isa(val, 'double'))
+                val = double(val);
             end
+            if (any(strcmp(fields{j}, {'srcpos', 'srcdir'})) && size(val, 2) == 1 && any(numel(val) == [3 4]))
+                val = val(:)';  % a column vector is one source
+            end
+            varargin{1}(i).(fields{j}) = val;
         end
     end
 end
@@ -501,8 +519,15 @@ for i = 1:len
         any(strcmp(cfg(i).srctype, {'planar', 'pattern', 'fourier', 'fourierx', 'fourierx2d'})) && ...
         ~(isfield(cfg(i), 'compute') && strcmp(cfg(i).compute, 'optix'));
     if (isnan(cfg(i).e0) || iswidesrc)  % widefield source
-        if (~isfield(cfg(i), 'srcparam1') || ~isfield(cfg(i), 'srcparam2'))
-            error('for wide-field sources, you must provide srcparam1 and srcparam2');
+        % srcparam1 and srcparam2 span the area of the planar-type sources; the others (disk,
+        % gaussian, line, ...) use only srcparam1, and those not using it default to zeros
+        for pname = {'srcparam1', 'srcparam2'}
+            if (~isfield(cfg(i), pname{1}) || isempty(cfg(i).(pname{1})))
+                if (iswidesrc)
+                    error('for wide-field sources, you must provide srcparam1 and srcparam2');
+                end
+                cfg(i).(pname{1}) = [0 0 0 0];
+            end
         end
         if (~isfield(cfg(i), 'srctype'))
             cfg(i).srctype = 'pencil';

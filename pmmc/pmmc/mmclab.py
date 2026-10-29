@@ -122,9 +122,21 @@ def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv
             srcpos, srcpos + srcdir[:3], domainradius, 3, vperp, rotate
         )
         srcface = np.array([[1, 2, 3]])
-    elif srctype == "gaussian":
+    elif srctype in ("gaussian", "hyperboloid"):
+        # the beam radius at the source plane: the waist param1[0], widened for a hyperboloid
+        # param1[1] from its focus (Rayleigh range param1[2]); the triangle, of circumradius at
+        # least 8 beam radii, holds 4 of them, so the Gaussian tails, which launched photons
+        # outside of the domain (a fatal error), have a chance of about 1e-14
+        beamradius = param1[0]
+        if srctype == "hyperboloid" and param1[2] > 0:
+            beamradius *= np.sqrt(1 + (param1[1] / param1[2]) ** 2)
         srcnode = i2m.orthdisk(
-            srcpos, srcpos + srcdir[:3], domaindiagnoal * 0.5, 3, vperp, rotate
+            srcpos,
+            srcpos + srcdir[:3],
+            max(domaindiagnoal, 8 * beamradius),
+            3,
+            vperp,
+            rotate,
         )
         srcface = np.array([[1, 2, 3]])
     elif srctype in ("line", "slit"):
@@ -133,7 +145,7 @@ def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv
             v0, v0 + srcdir[:3], np.linalg.norm(param1[:3]) * expansion, 3, param1[:3]
         )
         srcface = np.array([[1, 2, 3]])
-    elif srctype in WIDEFIELD_SRC:
+    elif srctype in WIDEFIELD_SRC or srctype == "pencilarray":
         v0, v1, v2 = srcpos, param1[:3], param2[:3]
         if srctype in ("fourierx", "fourierx2d"):
             v2 = np.cross(srcdir[:3], v1) * (param1[3] / np.linalg.norm(v1))
@@ -150,19 +162,20 @@ def mmcsrcdomain(cfg, meshbbx, expansion=1.1, rotate=0.0, keepshape=0, circlediv
                 srcpos + voff1, srcpos + voff1 + srcdir[:3], radius, 3, v1 + v2, rotate
             )
             srcface = np.array([[1, 2, 3]])
-    elif srctype == "disk":
+    elif srctype in ("disk", "ring"):
+        radius = param1[0]  # the outer radius
         if keepshape:
             from scipy.spatial import Delaunay
 
             srcnode = i2m.orthdisk(
-                srcpos, srcpos + srcdir[:3], param1[0] * expansion, circlediv
+                srcpos, srcpos + srcdir[:3], radius * expansion, circlediv
             )
             srcface = Delaunay(srcnode[:, :2]).simplices + 1
         else:
             srcnode = i2m.orthdisk(
                 srcpos,
                 srcpos + srcdir[:3],
-                param1[0] * 2.0 * expansion,
+                radius * 2.0 * expansion,
                 3,
                 vperp,
                 rotate,
@@ -396,10 +409,15 @@ def _prepare(cfg):
     # (see mmclab.m)
     iswidesrc = cfg.get("srctype") in WIDEFIELD_SRC and not isoptix
     if (not isinstance(cfg["e0"], str) and np.isnan(cfg["e0"])) or iswidesrc:
-        if "srcparam1" not in cfg or "srcparam2" not in cfg:
-            raise ValueError(
-                "for wide-field sources, you must provide srcparam1 and srcparam2"
-            )
+        # srcparam1 and srcparam2 span the area of the planar-type sources; the others (disk,
+        # gaussian, line, ...) use only srcparam1, and those not using it default to zeros
+        for key in ("srcparam1", "srcparam2"):
+            if cfg.get(key) is None or np.size(cfg[key]) == 0:
+                if iswidesrc:
+                    raise ValueError(
+                        "for wide-field sources, you must provide srcparam1 and srcparam2"
+                    )
+                cfg[key] = np.zeros(4)
         cfg.setdefault("srctype", "pencil")
         srcdef = {
             k: cfg[k] for k in ("srctype", "srcpos", "srcdir", "srcparam1", "srcparam2")
@@ -474,7 +492,9 @@ def _unpackdetp(detp, cfg):
         newdetp["p"] = detp[-7:-4, :].T  # exit positions
         newdetp["v"] = detp[-4:-1, :].T  # exit directions
     newdetp["w0"] = detp[-1, :].copy()  # the initial packet weight
-    if np.ndim(cfg.get("srcpattern")) == 3:
+    if np.ndim(cfg.get("srcpattern")) == (
+        4 if cfg.get("srctype") == "pattern3d" else 3
+    ):  # several patterns
         newdetp["w0"] = newdetp["w0"].astype(np.float32).view(np.uint32)
     newdetp["prop"] = cfg["prop"]
     if "unitinmm" in cfg:
