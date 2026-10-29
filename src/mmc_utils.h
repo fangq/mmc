@@ -459,6 +459,8 @@ void mmc_raise_deferred(void);
 
 #include <stdlib.h>
 
+#include <stdint.h>
+
 /**
  * @brief The host random number generator that derives the per-thread seeds of the RNGs
  *
@@ -468,16 +470,16 @@ void mmc_raise_deferred(void);
  * from the seed by splitmix64, so that small or consecutive seeds give unrelated states.
  */
 typedef struct {
-    unsigned long long s[2];
+    uint64_t s[2];
 } MMCHostRNG;
 
-static inline void mmc_hostrng_seed(MMCHostRNG* rng, unsigned long long seed) {
+static inline void mmc_hostrng_seed(MMCHostRNG* rng, uint64_t seed) {
     int i;
 
     for (i = 0; i < 2; i++) {
-        unsigned long long z = (seed += 0x9E3779B97F4A7C15ULL);
-        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
-        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        uint64_t z = (seed += ((uint64_t)0x9E3779B9U << 32 | 0x7F4A7C15U));
+        z = (z ^ (z >> 30)) * ((uint64_t)0xBF58476DU << 32 | 0x1CE4E5B9U);
+        z = (z ^ (z >> 27)) * ((uint64_t)0x94D049BBU << 32 | 0x133111EBU);
         rng->s[i] = z ^ (z >> 31);
     }
 }
@@ -486,8 +488,8 @@ static inline void mmc_hostrng_seed(MMCHostRNG* rng, unsigned long long seed) {
  * @brief Return 32 random bits, the upper half of the next xorshift128+ output
  */
 static inline unsigned int mmc_rand_uint32(MMCHostRNG* rng) {
-    unsigned long long s1 = rng->s[0];
-    const unsigned long long s0 = rng->s[1];
+    uint64_t s1 = rng->s[0];
+    const uint64_t s0 = rng->s[1];
 
     rng->s[0] = s0;
     s1 ^= s1 << 23;
