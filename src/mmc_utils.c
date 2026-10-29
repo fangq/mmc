@@ -1495,10 +1495,17 @@ void mmc_defer_error(const int id, const char* msg, const char* file, const int 
 #ifdef _OPENMP
 
     /* omp_in_parallel() is false in a region of one thread (OMP_NUM_THREADS=1), where the
-       error was then dropped and the photon went on with a NaN position */
+       error was then dropped and the photon went on with a NaN position; omp_get_level()
+       counts such regions, but it needs OpenMP 3.0, which MSVC (OpenMP 2.0) lacks: there the
+       error is always recorded, which is harmless outside a region, as each simulation starts
+       with mmc_error_reset */
+#if _OPENMP >= 200805
+
     if (omp_get_level() == 0) {
         return;
     }
+
+#endif
 
     #pragma omp critical(mmc_deferred_error)
     {
