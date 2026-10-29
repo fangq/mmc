@@ -203,7 +203,8 @@ class TestInterface(unittest.TestCase):
         def run(flog):
             script = (
                 "import sys; sys.path[:0] = %r; from test_pmmc import base_cfg; import pmmc; "
-                "c = base_cfg(); c.update(nphoton=200, debuglevel='P'); c.update(%r); pmmc.run(c)"
+                "c = base_cfg(); c.update(nphoton=200, debuglevel='P'); c.update(%r); "
+                "print('--run--', flush=True); pmmc.run(c)"
                 % ([os.path.abspath(d) for d in sys.path], flog)
             )
             with tempfile.TemporaryDirectory() as tmp:
@@ -220,7 +221,8 @@ class TestInterface(unittest.TestCase):
                 finally:
                     os.chmod(tmp, 0o755)
             self.assertEqual(out.returncode, 0, out.stderr)
-            return out.stdout + out.stderr, files
+            # only what pmmc.run printed: the import may print a hint when pmcx is not installed
+            return out.stdout.split("--run--", 1)[-1] + out.stderr, files
 
         for name in ("none", "None", "NONE", "NUL", "/dev/null"):
             with self.subTest(flog=name):

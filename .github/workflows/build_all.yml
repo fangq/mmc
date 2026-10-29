@@ -191,8 +191,9 @@ jobs:
       - name: Run the pmmc and mmclab unit tests on the CPU (Ubuntu 24.04 only)
         if: ${{ matrix.os == 'ubuntu-24.04' }}
         run: |
-          sudo apt-get install -y python3-dev python3-numpy python3-scipy cmake
-          python3 -m pip install --break-system-packages iso2mesh
+          # scipy from pip: the numpy 2 installed above breaks the Ubuntu python3-scipy
+          sudo apt-get install -y python3-dev cmake
+          python3 -m pip install --break-system-packages scipy iso2mesh
           git clone --depth 1 https://github.com/fangq/iso2mesh.git ../iso2mesh
           mkdir -p src/pybuild && cd src/pybuild
           cmake .. -DBUILD_PYTHON=ON -DBUILD_MEX=OFF && make -j4 _pmmc
