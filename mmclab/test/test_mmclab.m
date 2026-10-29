@@ -53,11 +53,7 @@ elem = [1 2 4 8; 1 3 4 8; 1 2 6 8; 1 5 6 8; 1 3 7 8; 1 5 7 8];
 cfg = struct('nphoton', 2000, 'node', node, 'elem', elem, 'elemprop', ones(6, 1), ...
              'srcpos', [10 10 0], 'srcdir', [0 0 1], 'tstart', 0, 'tend', 5e-9, ...
              'tstep', 5e-9, 'prop', [0 0 1 1; 0.05 2 0.8 1], 'compute', 'sse', 'seed', 12345);
-if (ispc)
-    cfg.flog = 'NUL';  % silence the log
-else
-    cfg.flog = '/dev/null';
-end
+cfg.flog = 'none';  % silence the log
 opt = [fieldnames(extra), struct2cell(extra); reshape(varargin, 2, [])'];
 for i = 1:size(opt, 1)
     cfg.(opt{i, 1}) = opt{i, 2};
@@ -176,17 +172,17 @@ src{4} = [5 5 0];
 assert_error(@() mmclab(boxcfg(extra, src{:})), 'a planar source on the surface');
 
 function test_flog_silent(extra)
-% 'NUL' and '/dev/null' are the null device on every OS (fangq/mcx#280): nothing is printed,
+% flog='none' silences the log on every OS, as 'NUL' and '/dev/null' (fangq/mcx#280): nothing is printed,
 % not even the cfg echo or the progress bar, and no file of that name is written
 if (~exist('evalc'))
     return
 end
-for flog = {'NUL', 'nul', '/dev/null'}
+for flog = {'none', 'None', 'NUL', '/dev/null'}
     cfg = mkcfg(extra, 'nphoton', 200, 'flog', flog{1}, 'debuglevel', 'P');
     out = evalc('mmclab(cfg);');
     assert(isempty(strtrim(out)), ['unexpected output with flog=' flog{1} ': ' out]);
 end
-assert(~exist(fullfile(pwd, 'NUL'), 'file') && ~exist(fullfile(pwd, 'nul'), 'file'), 'a file named NUL was written');
+assert(~exist(fullfile(pwd, 'none'), 'file') && ~exist(fullfile(pwd, 'NUL'), 'file'), 'a log file named none or NUL was written');
 
 function test_end_to_end(extra)
 % the absorbed fraction of the cube: 0.574 (+/-0.005) from mcx with the same medium;

@@ -277,7 +277,7 @@ function varargout = mmclab(varargin)
 %                      [2]: 2 the MATLAB/Octave console (in Python, sys.stdout), 1 the
 %                      stdout of the process (the terminal MATLAB/Octave was started from),
 %                      0 the same without the banner, or a file name (appended);
-%                      '/dev/null' or 'NUL' (either, on any OS) silences everything,
+%                      'none' silences everything,
 %                      the progress bar included;
 %                      errors are always shown
 %

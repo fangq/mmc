@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_pmmc import base_cfg  # noqa: E402  the 20 mm cube of 6 tetrahedra
 
 PROP = np.array([[0, 0, 1, 1], [0.05, 2, 0.8, 1]], np.float32)  # as base_cfg
-NULLDEV = "NUL" if sys.platform.startswith("win") else "/dev/null"
+NULLDEV = "none"  # silences the log
 
 
 def cfg(**kw):
@@ -195,7 +195,7 @@ class TestInterface(unittest.TestCase):
         self.assertGreater(np.abs(jac["flux"]).sum(), 0)
 
     def test_flog_null_device_is_silent(self):
-        """'NUL' and '/dev/null' are the null device on every OS: nothing is printed, not even the
+        """flog='none' silences the log on every OS ('NUL' and '/dev/null' too): nothing is printed, not even the
         progress bar, and no file is written, also from a read-only folder (fangq/mcx#280);
         without flog, the log is printed"""
         import tempfile
@@ -222,7 +222,7 @@ class TestInterface(unittest.TestCase):
             self.assertEqual(out.returncode, 0, out.stderr)
             return out.stdout + out.stderr, files
 
-        for name in ("NUL", "nul", "/dev/null"):
+        for name in ("none", "None", "NONE", "NUL", "/dev/null"):
             with self.subTest(flog=name):
                 text, files = run({"flog": name})
                 self.assertEqual(text.strip(), "")
