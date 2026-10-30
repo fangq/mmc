@@ -1169,6 +1169,44 @@ static void mut_replaycount(mcconfig* cfg, tetmesh* mesh) {
     cfg->nphoton = mlab_dims[1] + 1;  /* more seeds than detected photons */
 }
 
+/*-----------------------------------------------------------------------------
+ *  -G/cfg.gpuid device name patterns "name" and "name:N"
+ *-----------------------------------------------------------------------------*/
+
+static void test_devicename(void) {
+    const char* names[] = {"NVIDIA TITAN V", "NVIDIA GeForce RTX 4070", "NVIDIA TITAN V"};
+    const char* pattern[] = {"titan", "titan:2", "4070", "TiTaN v:2", ":3", "nvidia:2"};
+    const int expect[] = {0, 2, 1, 2, 2, 1};  /* the device each pattern selects */
+    char mask[MAX_DEVICE], selected[3] = {1, 2, 0};
+    int i, j, n = 0;
+
+    EXPECT_TRUE(mcx_isdevicename("4070") && mcx_isdevicename("titan:2"), "a string with characters other than 0/1 is a device name");
+    EXPECT_TRUE(!mcx_isdevicename("0110") && !mcx_isdevicename(""), "a 0/1 mask or an empty string is not a device name");
+    memset(mask, '0', MAX_DEVICE);  /* a full mask has no terminating 0 */
+    mask[1] = '1';
+    EXPECT_TRUE(!mcx_isdevicename(mask), "an unterminated 0/1 mask is not a device name");
+    EXPECT_TRUE(!mcx_isdevicename(selected), "the numbers of the selected devices are not a device name");
+    EXPECT_TRUE(mcx_isdeviceindex("2") && mcx_isdeviceindex("-1") && mcx_isdeviceindex("256"), "-G 2, -G -1 and -G 256 are device numbers");
+    EXPECT_TRUE(!mcx_isdeviceindex("4070") && !mcx_isdeviceindex("titan"), "-G 4070 and -G titan are device names");
+
+    for (i = 0; i < 6; i++) {
+        int nmatched = 0, chosen = -1;
+
+        for (j = 0; j < 3; j++)
+            if (mcx_devicenamematch(pattern[i], names[j], &nmatched)) {
+                chosen = (chosen < 0) ? j : 99;
+            }
+
+        EXPECT_EQ(chosen, expect[i], pattern[i]);
+    }
+
+    EXPECT_EXIT_OK(mcx_devicenamecheck("titan:2", 2), "titan:2 with two matching devices");
+    EXPECT_EXIT(mcx_devicenamecheck("titan:3", 2), "titan:3 with two matching devices is an error");
+    EXPECT_EXIT(mcx_devicenamecheck("4070", 0), "a name that matches no device is an error");
+    EXPECT_EXIT(mcx_devicenamematch("titan:", names[0], &n), "a ':' without a number is an error");
+    EXPECT_EXIT(mcx_devicenamematch("titan:0", names[0], &n), "N after ':' must be positive");
+}
+
 /** mmclab/pmmc skip mcx_validatecfg: mmc_validate_config must also give a GPU run a tracer its kernel has */
 static void test_mmclab_gpu_method(void) {
     char buf[] = "mmc --bench dmmc-cube60 -c sse -M P -s utmlm";
@@ -2891,6 +2929,7 @@ int main(int argc, char** argv) {
     test_cmdopts();
     test_mmclab_path();
     test_mmclab_gpu_method();
+    test_devicename();
     test_clerrors();
     test_opencl();
     test_features();

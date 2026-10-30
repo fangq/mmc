@@ -243,7 +243,8 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
     cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, 0, 0};
     cl_int status = 0;
     size_t deviceListSize;
-    int totaldevice = 0;
+    int totaldevice = 0, nmatched = 0;
+    char devpattern[MAX_DEVICE] = {'\0'};
 
     OCL_ASSERT((clGetPlatformIDs(0, NULL, &numPlatforms)));
 
@@ -252,6 +253,12 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
     }
 
     *info = (GPUInfo*)calloc(MAX_DEVICE, sizeof(GPUInfo));
+
+    /* a device name pattern (-G 4070, cfg.gpuid='titan:2') selects the device by its name below */
+    if (activedevlist != NULL && mcx_isdevicename(cfg->deviceid)) {
+        memcpy(devpattern, cfg->deviceid, MAX_DEVICE - 1);  /* devpattern ends with a 0, a full deviceid may not */
+        memset(cfg->deviceid, '0', MAX_DEVICE);
+    }
 
     if (numPlatforms > 0) {
         cl_platform_id* platforms = (cl_platform_id*)malloc(sizeof(cl_platform_id) * numPlatforms);
@@ -360,6 +367,10 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
                         }
 
                         if (activedevlist != NULL) {
+                            if (devpattern[0] && mcx_devicenamematch(devpattern, cuinfo.name, &nmatched)) {
+                                cfg->deviceid[cuid] = '1';
+                            }
+
                             if (cfg->deviceid[cuid++] == '1') {
                                 memcpy((*info) + (*activedev), &cuinfo, sizeof(GPUInfo));
                                 activedevlist[(*activedev)++] = devices[k];
@@ -394,6 +405,10 @@ cl_platform_id mcx_list_cl_gpu(mcconfig* cfg, unsigned int* activedev, cl_device
         }
 
         free(platforms);
+    }
+
+    if (devpattern[0]) {
+        mcx_devicenamecheck(devpattern, nmatched);
     }
 
     if (cfg->isgpuinfo == 2 && cfg->parentid == mpStandalone) {

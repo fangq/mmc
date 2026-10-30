@@ -1049,10 +1049,13 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
             strncpy(mcx_config.deviceid, gpu_id_string_value.c_str(), MAX_DEVICE);
         }
 
-        for (int i = 0; i < MAX_DEVICE; i++)
-            if (mcx_config.deviceid[i] == '0') {
-                mcx_config.deviceid[i] = '\0';
-            }
+        /* a 0/1 mask: '\0' marks the unused devices; a device name pattern ("4070") stays as is */
+        if (!mcx_isdevicename(mcx_config.deviceid)) {
+            for (int i = 0; i < MAX_DEVICE; i++)
+                if (mcx_config.deviceid[i] == '0') {
+                    mcx_config.deviceid[i] = '\0';
+                }
+        }
     }
 
 
@@ -1911,7 +1914,9 @@ static const char* pmmc_run_doc_lines[] = {
     "        a module built with them.\n",
     "    gpuid : int or str\n",
     "        The device to use, from 1 [1]; -1 runs on the CPU; a string of 0s and 1s\n",
-    "        selects several, e.g. '1101'. pmmc.gpuinfo() lists them.\n",
+    "        selects several, e.g. '1101'; any other string picks a device by its name:\n",
+    "        'name:N' is the N-th device whose name contains 'name', ignoring case,\n",
+    "        and 'name' the first, e.g. '4070' or 'radeon:2'. pmmc.gpuinfo() lists them.\n",
     "    workload : array_like\n",
     "        The relative share of photons for each selected device.\n",
     "    nthread, nblocksize : int\n",

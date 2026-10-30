@@ -250,7 +250,10 @@ function varargout = mmclab(varargin)
 %                      error otherwise. Example: <demo_optix_mmc.m>
 %      cfg.gpuid:      which device to use, from 1 (mmclab('gpuinfo') lists the
 %                      OpenCL devices) [1]; -1 runs on the CPU (sse); a string of
-%                      0s and 1s selects several, e.g. '1101'
+%                      0s and 1s selects several, e.g. '1101'; any other string
+%                      picks a device by its name: 'name:N' is the N-th device
+%                      whose name contains 'name', ignoring case, and 'name' the
+%                      first, e.g. '4070' or 'radeon:2'
 %      cfg.workload:   the relative share of photons for each selected device,
 %                      e.g. [50 20 30]
 %      cfg.nthread:    total GPU thread count [8192]

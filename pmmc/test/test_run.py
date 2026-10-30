@@ -496,5 +496,27 @@ class TestEndToEnd(unittest.TestCase):
         self.assertLess(matched, 0.60)
 
 
+@unittest.skipIf(pmmc is None, "pmmc is not installed")
+class TestGpuName(unittest.TestCase):
+    """a gpuid string with characters other than 0 and 1 picks an OpenCL device by its
+    name, ignoring case: 'name' is the first device whose name contains it, 'name:N' the N-th
+    """
+
+    def test_gpuid_name(self):
+        try:
+            info = pmmc.gpuinfo()
+        except Exception:
+            self.skipTest("no OpenCL runtime")
+        if not info:
+            self.skipTest("no OpenCL device")
+        # AMD's OpenCL device names, such as gfx1030:xnack-, have a ':'
+        name = info[0]["name"].strip().split(":")[0]
+        res = pmmc.run(cfg(compute="opencl", gpuid=name.upper() + ":1"))
+        self.assertGreater(float(np.sum(res["flux"])), 0)
+        for bad in ("no such device", name + ":"):
+            with self.assertRaises(Exception, msg=bad):
+                pmmc.run(cfg(compute="opencl", gpuid=bad))
+
+
 if __name__ == "__main__":
     unittest.main()

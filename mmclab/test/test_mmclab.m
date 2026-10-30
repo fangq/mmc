@@ -30,7 +30,8 @@ tests = {@test_info, @test_errors, @test_prep, @test_outputs, ...
          @test_detected_photons, @test_struct_array, @test_rf, @test_replay, ...
          @test_option_sets_compute, @test_widefield_source, @test_flog_silent, ...
          @test_end_to_end, @test_input_types, @test_error_messages, @test_pattern3d, ...
-         @test_mcmethod, @test_line_source, @test_multiple_sources, @test_widefield_domains};
+         @test_mcmethod, @test_line_source, @test_multiple_sources, @test_widefield_domains, ...
+         @test_gpuname};
 failed = {};
 for i = 1:numel(tests)
     name = func2str(tests{i});
@@ -257,3 +258,25 @@ for i = 1:size(cases, 1)
     [flux, detp, ncfg] = mmclab(cfg);
     assert(any(ncfg.elemprop < 0) && sum(flux.data(isfinite(flux.data))) > 0, [cases{i, 1} ' source outside of the mesh']);
 end
+
+function test_gpuname(extra)
+% a gpuid string with characters other than 0 and 1 picks an OpenCL device by its
+% name, ignoring case: 'name' is the first device whose name contains it, 'name:N' the N-th
+try
+    info = mmclab('gpuinfo');
+catch
+    return  % no OpenCL runtime
+end
+if (isempty(info))
+    return
+end
+gpu = 1;
+if (isfield(extra, 'gpuid') && isnumeric(extra.gpuid) && extra.gpuid > 0)
+    gpu = extra.gpuid;
+end
+name = strtok(info(gpu).name, ':');  % AMD's OpenCL device names, such as gfx1030:xnack-, have a ':'
+nth = sum(~cellfun(@isempty, strfind(lower({info(1:gpu).name}), lower(name))));
+flux = mmclab(mkcfg(extra, 'compute', 'opencl', 'gpuid', sprintf('%s:%d', upper(name), nth)));
+assert(sum(flux.data(:)) > 0, 'gpuid=''NAME:N'' runs on the named device');
+assert_error(@() mmclab(mkcfg(extra, 'compute', 'opencl', 'gpuid', 'no such device')), 'a gpuid name that matches no device');
+assert_error(@() mmclab(mkcfg(extra, 'compute', 'opencl', 'gpuid', [name ':'])), 'a gpuid name with '':'' but no number');

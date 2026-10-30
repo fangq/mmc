@@ -672,9 +672,11 @@ mmc -Q dmmc-cube60 -n 1e7
     Meaning: replay only the photons of detector n
 `-c name`, `--compute`
     Meaning: backend: `sse`, `opencl` (default), `cuda`, `optix`
-`-G n` or `-G '0110'`, `--gpu`
-    Meaning: device n (from 1, see `-L`), several devices as a 0/1 mask, or `-1` for the CPU
-        (`sse`)
+`-G n`, `-G '0110'` or `-G 'name:N'`, `--gpu`
+    Meaning: device n (from 1, see `-L`), several devices as a 0/1 mask, `-1` for the CPU
+        (`sse`),
+        or by name: `-G 'name:N'` is the N-th device whose name contains `name` (ignoring
+        case), `-G name` the first, e.g. `-G 4070`, `-G radeon:2`
 `-W '50,50'`, `--workload`
     Meaning: relative share of photons for each device
 `-L`, `--listgpu`

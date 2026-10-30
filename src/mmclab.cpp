@@ -1827,10 +1827,13 @@ void mmc_set_field(const mxArray* root, const mxArray* item, int idx, int jstruc
             printf("mmc.gpuid=%d;\n", cfg->gpuid);
         }
 
-        for (int i = 0; i < MAX_DEVICE; i++)
-            if (cfg->deviceid[i] == '0') {
-                cfg->deviceid[i] = '\0';
-            }
+        /* a 0/1 mask: '\0' marks the unused devices; a device name pattern ("4070") stays as is */
+        if (!mcx_isdevicename(cfg->deviceid)) {
+            for (int i = 0; i < MAX_DEVICE; i++)
+                if (cfg->deviceid[i] == '0') {
+                    cfg->deviceid[i] = '\0';
+                }
+        }
     } else if (strcmp(name, "workload") == 0) {
         double* val = mxGetPr(item);
         arraydim = mxGetDimensions(item);

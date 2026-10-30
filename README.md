@@ -588,7 +588,7 @@ mmc -Q dmmc-cube60 -n 1e7
 | `-E seed`, `--seed` | RNG seed, or a `.mch` file to replay its detected photons |
 | `-P n`, `--replaydet` | replay only the photons of detector n |
 | `-c name`, `--compute` | backend: `sse`, `opencl` (default), `cuda`, `optix` |
-| `-G n` or `-G '0110'`, `--gpu` | device n (from 1, see `-L`), several devices as a 0/1 mask, or `-1` for the CPU (`sse`) |
+| `-G n`, `-G '0110'` or `-G 'name:N'`, `--gpu` | device n (from 1, see `-L`), several devices as a 0/1 mask, or `-1` for the CPU (`sse`), or by name: `-G 'name:N'` is the N-th device whose name contains `name` (ignoring case), `-G name` the first, e.g. `-G 4070`, `-G radeon:2` |
 | `-W '50,50'`, `--workload` | relative share of photons for each device |
 | `-L`, `--listgpu` | list the OpenCL devices |
 | `-l [1\|0\|none]`, `--log` | 1 (or `-l` alone): write the messages to `session.log`; 0: print them without the banner; none: print nothing, not even the progress bar |
