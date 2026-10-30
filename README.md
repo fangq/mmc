@@ -244,6 +244,7 @@ lists all of them, with their commit hashes.
 * [90ef502] `cfg.flog` also controls the echo of the cfg fields: 'none' silences everything
 * [6130770] `cfg.flog='none'` and `-l none` silence the log on every OS ('NUL' and '/dev/null' are accepted too; 'NUL' wrote a file on Linux, #280)
 * [6145745] the mex files are no longer UPX-packed: a packed mex aborted MATLAB/Octave whenever it raised an error
+* [4554fa9] the device can be picked by name: `-G 4070` or `cfg.gpuid='4070'` uses the first device whose name contains 4070 (ignoring case), `-G titan:2` the 2nd one
 * [a17a63d] mmclab and pmmc run on the CPU of Apple Silicon (arm64) Macs again: cfg.compute='sse' stopped with an SSE4 error
 
 **Testing and robustness**
