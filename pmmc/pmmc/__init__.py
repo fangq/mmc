@@ -107,7 +107,7 @@ except ImportError:  # pragma: no cover
 
 from .mmclab import mmclab, mmcsrcdomain, mmcaddsrc, mmcadddet, mmcraytrace
 
-__version__ = "0.3.12"
+__version__ = "0.6.0"
 
 __all__ = (
     "gpuinfo",
