@@ -1913,7 +1913,7 @@ extern "C" int mmc_throw_exception(const int id, const char* msg, const char* fi
  */
 
 void mmclab_usage() {
-    mexPrintf("MMCLAB " MMC_VERSION "\nUsage:\n    [flux,detphoton]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
+    mexPrintf("MMCLAB (" MMC_VERSION ")\nUsage:\n    [flux,detphoton,ncfg,seeds,traj]=mmclab(cfg);\n\nPlease run 'help mmclab' for more details.\n");
 }
 
 /**
