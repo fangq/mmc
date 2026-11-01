@@ -158,7 +158,15 @@ else
   CUCCOPT+=-g -lineinfo -Xcompiler -Wall#-arch compute_20 #--maxrregcount 32
 endif
 
-CUGENCODE?=-arch=sm_30
+# a fat binary: native code for each GPU generation from Maxwell (sm_52) to Ampere (sm_86), and the
+# PTX of the newest for later GPUs to JIT. PTX targeting a pre-Volta GPU (nvcc's default sm_52,
+# or -arch=sm_35) runs the mmc kernel 2-3x slower on Volta and newer GPUs, even compiled for them;
+# only the architectures this nvcc lists are used
+CUDA_ARCHS ?= 52 60 70 75 80 86
+CUDA_SMS    = $(filter $(CUDA_ARCHS),$(patsubst sm_%,%,$(shell $(CUDACC) --list-gpu-code 2> /dev/null)))
+CUGENCODE  ?= $(foreach sm,$(CUDA_SMS),-gencode=arch=compute_$(sm),code=sm_$(sm)) \
+              $(if $(CUDA_SMS),-gencode=arch=compute_$(lastword $(CUDA_SMS))$(comma)code=compute_$(lastword $(CUDA_SMS)))
+comma      := ,
 
 INCLUDEDIR+=$(INCLUDEDIRS)
 EXTRALIB+=$(LIBOPENCL)
@@ -290,7 +298,7 @@ endif
 
 ##  Compile .cu files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cu
-	$(CUDACC) -c $(CUCCOPT) -o $@  $<
+	$(CUDACC) -c $(CUCCOPT) $(CUGENCODE) -o $@  $<
 
 ##  Compile .cpp files ##
 $(OBJDIR)/%$(OBJSUFFIX): %.cpp
