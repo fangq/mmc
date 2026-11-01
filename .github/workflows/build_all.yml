@@ -230,6 +230,8 @@ jobs:
           fail=0
           for f in bin/mmc mmclab/mmc.mex mmclab/mmc.mexmaci64 mmclab/mmc.mexmaca64; do
             [ -f "$f" ] || continue
+            # a MATLAB mex gets the target MATLAB's mex sets, and loads only in a MATLAB that needs that macOS
+            case "$f" in *.mexmaci64|*.mexmaca64) echo "$f needs macOS $(otool -l "$f" | awk '$1=="minos"{print $2; exit}') (MATLAB's own)"; continue ;; esac
             minos=$(otool -l "$f" | awk '/LC_BUILD_VERSION/{b=1} b && $1=="minos"{print $2; exit} /LC_VERSION_MIN_MACOSX/{v=1} v && $1=="version"{print $2; exit}')
             echo "$f needs macOS $minos"
             if [ -z "$minos" ] || [ "$(printf '%s\n%s\n' "$minos" "$MACOSX_DEPLOYMENT_TARGET" | sort -V | tail -1)" != "$MACOSX_DEPLOYMENT_TARGET" ]; then
