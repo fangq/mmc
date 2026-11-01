@@ -169,8 +169,8 @@ void SetupMillisTimer(void) {
     if (timeBeginPeriod(timeCaps.wPeriodMin) == TIMERR_NOCANDO) {
         fprintf(stderr, "WARNING: Cannot set timer precision.  Not sure what precision we're getting!\n");
     } else {
+        /* silently: StartTimer runs in every simulation, also with cfg.flog='none' */
         timerRes = timeCaps.wPeriodMin;
-        fprintf(stderr, "(* Set timer resolution to %d ms. *)\n", timeCaps.wPeriodMin);
     }
 }
 unsigned int StartTimer (void) {
