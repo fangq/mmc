@@ -59,6 +59,9 @@
     #include "mmc_cu_host.h"
     int mcx_list_cu_gpu(mcconfig* cfg, GPUInfo** info); /* defined in mmc_cu_host.cu; mmc_cuda_query_gpu.h clashes with the vector types */
 #endif
+#ifdef USE_OPTIX
+    #include "mmc_optix_host.h"
+#endif
 #include "mmc_tictoc.h"
 #include "mmc_raytrace.h"
 #include "mmc_highorder.h"
@@ -895,7 +898,7 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
     if (user_cfg.contains("compute")) {
         std::string compute_str = py::str(user_cfg["compute"]);
-        const char* computebackend[] = {"sse", "opencl", "cuda", "optix", ""};  /* as mmclab; without OptiX, "optix" runs OpenCL */
+        const char* computebackend[] = {"sse", "opencl", "cuda", "optix", ""};  /* as mmclab; a pmmc built without OptiX runs "optix" with OpenCL */
 
         if (compute_str.empty()) {
             throw py::value_error("the 'compute' field must be a non-empty string");
@@ -1183,9 +1186,15 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 
         parse_config(user_cfg, mcx_config, mesh);
 
+#ifdef USE_OPTIX
+
+        if (mcx_config.compute == cbCUDA || mcx_config.compute == cbOptiX) {
+#else
+
         if (mcx_config.compute == cbCUDA) {
+#endif
 #ifdef USE_CUDA
-            char deviceid0[MAX_DEVICE];  /* mmc_run_cu lists the devices again, keep the unconverted mask */
+            char deviceid0[MAX_DEVICE];  /* mmc_run_cu and mmc_run_optix list the devices again, keep the unconverted mask */
             memcpy(deviceid0, mcx_config.deviceid, MAX_DEVICE);
             active_dev = mcx_list_cu_gpu(&mcx_config, &gpu_info);
             memcpy(mcx_config.deviceid, deviceid0, MAX_DEVICE);
@@ -1337,6 +1346,12 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
 #ifdef USE_CUDA
             else if (mcx_config.compute == cbCUDA) {
                 mmc_run_cu(&mcx_config, &mesh, &tracer);
+            }
+
+#endif
+#ifdef USE_OPTIX
+            else if (mcx_config.compute == cbOptiX) {
+                mmc_run_optix(&mcx_config, &mesh, &tracer);
             }
 
 #endif
@@ -1996,7 +2011,12 @@ static const char* pmmc_run_doc() {
     return doc.c_str();
 }
 
-PYBIND11_MODULE(_pmmc, m) {
+/* _pmmc (CPU and OpenCL), or _rtmmc, the same module built with the CUDA and OptiX backends */
+#ifndef PMMC_MODULE_NAME
+    #define PMMC_MODULE_NAME _pmmc
+#endif
+
+PYBIND11_MODULE(PMMC_MODULE_NAME, m) {
     m.doc() = "PMMC (" MMC_VERSION "): Python bindings for the Mesh-based Monte Carlo (MMC) photon transport simulator, https://mcx.space/#mmc";
     m.def("run", &pmmc_interface, pmmc_run_doc(), py::call_guard<py::scoped_ostream_redirect,
           py::scoped_estream_redirect>());

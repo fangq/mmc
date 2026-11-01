@@ -68,7 +68,31 @@ try:
 
     from _pmmc import gpuinfo, run, version
 except ImportError:  # pragma: no cover
+    run = None
+
+try:
+    # the CUDA and OptiX backends: _rtmmc is the same module built with them, shipped in the
+    # pmmc wheels of the pmmc-trinity packages (on Windows, alone: it also runs sse and opencl);
+    # on Linux it needs the NVIDIA driver (libcuda) to load
+    import _rtmmc
+except ImportError:
+    _rtmmc = None
+
+if run is None and _rtmmc is None:  # pragma: no cover
     print("the pmmc binary extension (_pmmc) is not compiled! please compile first")
+
+if _rtmmc is not None:
+    if run is None:
+        gpuinfo, version = _rtmmc.gpuinfo, _rtmmc.version
+    _pmmc_run = run or _rtmmc.run
+
+    def run(cfg=None, **kwargs):
+        """Run a simulation: with _pmmc, or with _rtmmc for cfg['compute'] 'cuda' or 'optix'."""
+        compute = (cfg if isinstance(cfg, dict) else kwargs).get("compute", "")
+        sim = _rtmmc.run if str(compute).lower() in ("cuda", "optix") else _pmmc_run
+        return sim(**kwargs) if cfg is None else sim(cfg, **kwargs)
+
+    run.__doc__ = _rtmmc.run.__doc__
 
 try:
     from pmcx import (

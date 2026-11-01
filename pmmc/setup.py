@@ -121,6 +121,11 @@ class CMakeBuild(build_ext):
         )
 
 
+# _rtmmc, pmmc with the CUDA and OptiX backends, is built when CMAKE_ARGS has -DBUILD_OPTIX=ON
+ext_modules = [CMakeExtension("_pmmc", target="_pmmc", source_dir="../src/")]
+if "BUILD_OPTIX=ON" in os.environ.get("CMAKE_ARGS", ""):
+    ext_modules.append(CMakeExtension("_rtmmc", target="_rtmmc", source_dir="../src/"))
+
 # The information here can also be placed in setup.cfg - better separation of
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
@@ -150,7 +155,7 @@ setup(
         "Optics",
         "OpenCL",
     ],
-    ext_modules=[CMakeExtension("_pmmc", target="_pmmc", source_dir="../src/")],
+    ext_modules=ext_modules,
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
     python_requires=">=3.6",

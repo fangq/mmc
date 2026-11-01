@@ -26,6 +26,16 @@ add_subdirectory(zmat)
 
 option(BUILD_MEX "Build mex" ON)
 option(BUILD_CUDA "Build cuda" OFF)
+option(BUILD_OPTIX "Build _rtmmc, pmmc with the CUDA and OptiX backends (needs the OptiX headers in OPTIX_ROOT)" OFF)
+
+if(BUILD_OPTIX)
+    if(NOT OPTIX_ROOT)
+        set(OPTIX_ROOT "$ENV{OPTIX_ROOT}")
+    endif()
+    if(NOT EXISTS "${OPTIX_ROOT}/include/optix.h")
+        message(FATAL_ERROR "BUILD_OPTIX needs OPTIX_ROOT, a folder with include/optix.h")
+    endif()
+endif()
 
 if(BUILD_PYTHON)
     add_subdirectory(pybind11)
@@ -37,7 +47,7 @@ if(BUILD_MEX)
     find_package(Matlab)
 endif()
 
-if(BUILD_CUDA)
+if(BUILD_CUDA OR BUILD_OPTIX)
   find_package(CUDA QUIET REQUIRED)
 endif()
 
@@ -74,13 +84,34 @@ add_custom_target(
     VERBATIM
 )
 
-if(BUILD_CUDA)
+if(BUILD_CUDA OR BUILD_OPTIX)
   # NVC# NVCC Options
+  if(MSVC)
+    set(CUDA_HOST_FLAGS -Xcompiler "${OpenMP_CXX_FLAGS}" -D_USE_MATH_DEFINES)
+  else()
+    set(CUDA_HOST_FLAGS -Xcompiler -fPIC -Xcompiler -Wall -Xcompiler "${OpenMP_CXX_FLAGS}")
+  endif()
   set(
       CUDA_NVCC_FLAGS
       ${CUDA_NVCC_FLAGS};
-      -g -lineinfo -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -Xcompiler -fPIC -use_fast_math -Xptxas -O3,-v -Xcompiler -Wall -Xcompiler "${OpenMP_CXX_FLAGS}"
+      -g -lineinfo -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL -use_fast_math -Xptxas -O3,-v ${CUDA_HOST_FLAGS}
       )
+
+  # a fat binary, as the Makefile builds: native code from Maxwell (sm_52) to Ampere (sm_86) and
+  # the PTX of the newest for later GPUs; PTX of a pre-Volta GPU runs 2-3x slower on newer ones
+  set(CUDA_ARCHS "52;60;70;75;80;86" CACHE STRING "GPU architectures (sm_XX) to build the CUDA backend for")
+  execute_process(COMMAND ${CUDA_NVCC_EXECUTABLE} --list-gpu-code OUTPUT_VARIABLE NVCC_GPU_CODES ERROR_QUIET)
+  set(CUDA_SMS "")
+  foreach(sm ${CUDA_ARCHS})
+    if(NVCC_GPU_CODES MATCHES "sm_${sm}")
+      list(APPEND CUDA_SMS ${sm})
+      list(APPEND CUDA_NVCC_FLAGS -gencode=arch=compute_${sm},code=sm_${sm})
+    endif()
+  endforeach()
+  if(CUDA_SMS)
+    list(GET CUDA_SMS -1 lastsm)
+    list(APPEND CUDA_NVCC_FLAGS -gencode=arch=compute_${lastsm},code=compute_${lastsm})
+  endif()
 endif()
 
 # Add include directories
@@ -202,7 +233,7 @@ endif()
 # Build mex file
 if(BUILD_PYTHON)
     # Create mcx-matlab library
-    add_library(_pmmc MODULE
+    set(PMMC_SOURCES
             mmc_utils.c
             mmc_utils.h
             mmc_mesh.c
@@ -227,6 +258,7 @@ if(BUILD_PYTHON)
             ubj/ubjw.c
             pmmc.cpp
             )
+    add_library(_pmmc MODULE ${PMMC_SOURCES})
 
     target_compile_definitions(_pmmc PUBLIC MCX_CONTAINER PYBIND11_VERSION_MAJOR)
 
@@ -240,14 +272,72 @@ if(BUILD_PYTHON)
 
     # opt-in CUDA backend (compute='cuda'), e.g. CMAKE_ARGS="-DBUILD_CUDA=ON" pip install .
     if(BUILD_CUDA)
+        # FindCUDA hands nvcc no target definitions: MCX_CONTAINER (no output files; mmc_utils.c
+        # leaves out mcx_savedetphoton) goes in by OPTIONS, or the module fails to load
         cuda_add_library(pmmc-cudahost STATIC
             mmc_cu_host.cu
             mmc_cu_host.h
+            OPTIONS -DMCX_CONTAINER -DPYBIND11_VERSION_MAJOR
             )
-        target_compile_definitions(pmmc-cudahost PUBLIC MCX_CONTAINER PYBIND11_VERSION_MAJOR)
         target_compile_definitions(_pmmc PUBLIC USE_CUDA)
         target_link_libraries(_pmmc pmmc-cudahost ${CUDA_LIBRARIES})
         add_dependencies(pmmc-cudahost clheader)
+    endif()
+
+    # _rtmmc: the same module with the CUDA (compute='cuda') and OptiX (compute='optix') backends,
+    # for the mmc-trinity packages, e.g. CMAKE_ARGS="-DBUILD_OPTIX=ON<tab>-DOPTIX_ROOT=/path/to/optix";
+    # _pmmc stays the CPU/OpenCL module of the PyPI wheels, and pmmc.run picks _rtmmc for cuda/optix
+    if(BUILD_OPTIX)
+        # the CUDA code, built for every architecture, does not depend on Python: a wheel build
+        # for each Python version may link the one built first, given by RTMMC_CUDAHOST_LIB
+        if(RTMMC_CUDAHOST_LIB)
+            add_library(rtmmc-cudahost STATIC IMPORTED)
+            set_target_properties(rtmmc-cudahost PROPERTIES IMPORTED_LOCATION ${RTMMC_CUDAHOST_LIB})
+        else()
+            cuda_add_library(rtmmc-cudahost STATIC
+                mmc_cu_host.cu
+                mmc_cu_host.h
+                OPTIONS -DMCX_CONTAINER -DPYBIND11_VERSION_MAJOR
+                )
+            add_dependencies(rtmmc-cudahost clheader)
+        endif()
+
+        # the OptiX programs are PTX that OptiX compiles at run time for the GPU, embedded in
+        # mmc_optix_utils.cpp: by incbin from built/mmc_optix_core.ptx (relative to the build
+        # folder, where the compiler runs), or with MSVC from the char array of xxd -i
+        set(OPTIX_PTX "${CMAKE_BINARY_DIR}/built/mmc_optix_core.ptx")
+        set(OPTIX_PTX_DEFS -DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -DUSE_CUDA -DUSE_OPTIX -DUSE_CUDA_VECTOR_TYPES)
+        add_custom_command(
+            OUTPUT ${OPTIX_PTX} ${CMAKE_BINARY_DIR}/built/mmc_optix_core_ptx.h
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/built
+            COMMAND ${CUDA_NVCC_EXECUTABLE} -O3 -ptx --expt-relaxed-constexpr -use_fast_math -m64 ${OPTIX_PTX_DEFS}
+                    -I${CUDA_INCLUDE_DIRS} -I${OPTIX_ROOT}/include -o ${OPTIX_PTX} ${CMAKE_SOURCE_DIR}/mmc_optix_core.cu
+            COMMAND bash -c "cd ${CMAKE_BINARY_DIR}/built && ${RESOURCE_COMPILER} -i mmc_optix_core.ptx | sed 's/\\([0-9a-f]\\)$/\\0, 0x00/' > mmc_optix_core_ptx.h"
+            DEPENDS ${CMAKE_SOURCE_DIR}/mmc_optix_core.cu
+            VERBATIM
+        )
+        add_custom_target(optixptx DEPENDS ${OPTIX_PTX})
+        add_library(_rtmmc MODULE ${PMMC_SOURCES} mmc_optix_utils.cpp mmc_optix_host.cpp)
+        set_source_files_properties(mmc_optix_utils.cpp PROPERTIES OBJECT_DEPENDS ${OPTIX_PTX})
+        if(NOT MSVC)
+            # the incbin assembly does not survive pybind11's link-time optimization (gas: "leb128
+            # operand is an undefined symbol"), so this file is compiled to a plain object
+            set_source_files_properties(mmc_optix_utils.cpp PROPERTIES COMPILE_OPTIONS -fno-lto)
+        endif()
+        target_compile_definitions(_rtmmc PUBLIC MCX_CONTAINER PYBIND11_VERSION_MAJOR USE_CUDA USE_OPTIX USE_CUDA_VECTOR_TYPES PMMC_MODULE_NAME=_rtmmc)
+        target_include_directories(_rtmmc PRIVATE ${CUDA_INCLUDE_DIRS} ${OPTIX_ROOT}/include ${CMAKE_BINARY_DIR}/built)
+        # the driver, libcuda.so.1: FindCUDA misses it in NVIDIA's redistributable archives, which
+        # hold only the stub (lib/stubs), and CMAKE_FIND_LIBRARY_SUFFIXES above finds only .a files
+        set(CUDA_DRIVER_LIB ${CUDA_CUDA_LIBRARY})
+        if(NOT CUDA_DRIVER_LIB)
+            set(CUDA_DRIVER_LIB -L${CUDA_TOOLKIT_ROOT_DIR}/lib/stubs -L${CUDA_TOOLKIT_ROOT_DIR}/lib64/stubs cuda)
+        endif()
+        target_link_libraries(_rtmmc pybind11::module pybind11::lto pybind11::windows_extras OpenCL::OpenCL
+                              rtmmc-cudahost ${CUDA_LIBRARIES} ${CUDA_DRIVER_LIB} ${CMAKE_DL_LIBS})
+        pybind11_extension(_rtmmc)
+        pybind11_strip(_rtmmc)
+        add_dependencies(_rtmmc clheader optixptx)
+        set_target_properties(_rtmmc PROPERTIES CXX_VISIBILITY_PRESET "hidden")
     endif()
 
 endif()

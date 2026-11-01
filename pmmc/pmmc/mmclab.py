@@ -50,9 +50,14 @@ def _first(x):
 
 
 def _run(cfg):
-    """Run ``_pmmc.run(cfg)``; imported here so that the mesh helpers work without ``_pmmc``."""
-    from _pmmc import run
+    """Run ``pmmc.run(cfg)`` (``_pmmc``, or ``_rtmmc`` for cuda/optix); imported here so that the
+    mesh helpers work without ``_pmmc``."""
+    from . import run
 
+    if run is None:
+        raise ImportError(
+            "the pmmc binary extension (_pmmc) is not compiled! please compile first"
+        )
     return run(cfg)
 
 
