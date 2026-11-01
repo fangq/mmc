@@ -97,9 +97,11 @@ MMC v2026 adds the below key features
   holds a host-built list of all overlapping capsules and spheres, traced as a union,
   and face slabs apply Fresnel reflection on single-sided slabs; the GPU results agree
   with the CPU within 0.1% and pass the analytic iMMC tests
-* mmc-optix packages for Linux and Windows: mmc with the CUDA (`-c cuda`) and OptiX
+* mmc-trinity packages for Linux and Windows: mmc with the CUDA (`-c cuda`) and OptiX
   (`-c optix`) backends next to the CPU and OpenCL ones, for NVIDIA GPUs with driver
-  R515 or newer; mmc now also builds with MSVC
+  R515 or newer, with mmclab-trinity (MATLAB/Octave) and pmmc-trinity (Python, the
+  `_rtmmc` module) to match; the CUDA code is built for every GPU from sm_52 to sm_86
+  and as PTX for newer ones; mmc now also builds with MSVC
 * the adjoint Jacobians of mus/musp apply the same chain rule as MCX
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
   all mmclab example scripts are ported to Python under `pmmc/example`
@@ -202,7 +204,7 @@ lists all of them, with their commit hashes.
   sources; [7ee0a9d] detected photons; [6ac3389] trajectories; [6b92686] adjoint Jacobians;
   [3671f6d] surface-only meshes; [0ec2400] unsupported settings are rejected with a message
 * [f8c8cb7] CUDA kernel down from 122 to 64 registers
-* [24aebad] mmc builds with MSVC, enabling CUDA/OptiX on Windows; [bfff982] mmc-optix packages
+* [24aebad] mmc builds with MSVC, enabling CUDA/OptiX on Windows; [bfff982] mmc-optix (now mmc-trinity) packages
   for Linux and Windows
 
 **Performance**
@@ -316,8 +318,8 @@ line or `cfg.compute` in MMCLAB/PMMC:
 | hardware | any x86_64 CPU (SSE4), and other CPUs | any GPU or CPU with an OpenCL driver | NVIDIA GPUs | NVIDIA GPUs; RTX GPUs use their ray-tracing cores |
 | parallelism | OpenMP threads + SIMD | GPU threads | GPU threads | GPU threads |
 | ray tracers (`-M`) | all: Plucker, Havel, Badouel, branchless Badouel, dual-grid | branchless Badouel (`S`) and dual-grid (`G`) | `S` and `G` | dual-grid (`G`) only |
-| in the release packages | yes | yes (default) | mmc-optix packages | mmc-optix packages |
-| in MMCLAB/PMMC releases | yes | yes (default) | build with `make cudamex/cudaoct`, or PMMC with `CMAKE_ARGS="-DBUILD_CUDA=ON"` | build with `make optixmex/optixoct` |
+| in the release packages | yes | yes (default) | mmc-trinity packages | mmc-trinity packages |
+| in MMCLAB/PMMC releases | yes | yes (default) | mmclab-trinity, pmmc-trinity packages | mmclab-trinity, pmmc-trinity packages |
 
 Feature support differs where noted below; everything else - all output types,
 detectors, replay, adjoint Jacobians, RF, multiple sources, photon sharing - works on
@@ -352,7 +354,9 @@ Installation and configuration
 | Package | Contents | How to get it |
 |---|---|---|
 | MMC (`mmc-<os>-<arch>-<version>.zip`) | the `mmc` binary with the `sse` and `opencl` backends | <https://mcx.space/wiki/?Get>, <https://github.com/fangq/mmc/releases> |
-| MMC-OptiX (`mmc-optix-<linux|windows>-x64-<version>.zip`) | `mmc` with all four backends | the same pages |
+| MMC-Trinity (`mmc-trinity-<linux|windows>-x64-<version>.zip`) | `mmc` with all four backends | the same pages |
+| MMCLAB-Trinity (`mmclab-trinity-<linux|windows>-x64-<version>.zip`) | MATLAB/Octave mex files with all four backends | the same pages |
+| PMMC-Trinity (`pmmc-trinity-<linux|windows>-x64-<version>.zip`) | pmmc wheels with `_rtmmc`, all four backends | the same pages |
 | MMCLAB (`mmclab-<os>-<arch>-<version>.zip`) | MATLAB/Octave mex file (`sse`, `opencl`) and scripts | the same pages |
 | MCX Studio all-in-one package | mcx, mcxcl, mmc, the GUI and all MATLAB/Octave toolboxes | the same pages; on Windows also the installer or `winget install coti.mcxstudio` |
 | PMMC (Python) | `pip install pmmc` (`sse`, `opencl`) | <https://pypi.org/project/pmmc/> |
@@ -382,7 +386,7 @@ the paths for later sessions. On macOS, unzip the package under your home folder
 -   **`opencl`**: an OpenCL runtime, included in the NVIDIA, AMD and Intel graphics
     drivers and in macOS; on Linux, POCL (`pocl-opencl-icd`) adds the CPU as an OpenCL
     device. `mmc -L` lists the devices. See the MCX-CL README for details per vendor.
--   **`cuda`** and **`optix`** (mmc-optix packages): an NVIDIA GPU with driver R515 or
+-   **`cuda`** and **`optix`** (mmc-trinity packages): an NVIDIA GPU with driver R515 or
     newer (CUDA 11.7). OptiX runs on Maxwell and newer GPUs, and uses hardware ray
     tracing on RTX GPUs. The CUDA toolkit and the OptiX SDK are only needed to build MMC.
 
@@ -626,7 +630,7 @@ mmc -Q dmmc-cube60 -n 1e7
 ```
 mmc -f input.json -c opencl -G 1                     # first OpenCL device
 mmc -f input.json -c sse                             # all CPU cores
-mmc -f input.json -c cuda                            # NVIDIA GPU (mmc-optix build)
+mmc -f input.json -c cuda                            # NVIDIA GPU (mmc-trinity build)
 mmc -f input.json -c optix -M G --gridsize 0.5       # RT-MMC, 0.5 mm output voxels
 mmc -f input.json -M S -C 1 -F jnii                  # fluence at the mesh nodes, as JNIfTI
 mmc -f input.json -d 1 -q 1 -s base                  # save detected photons and seeds (base.mch)

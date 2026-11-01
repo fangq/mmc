@@ -80,9 +80,11 @@ MMC v2026 adds the below key features
   holds a host-built list of all overlapping capsules and spheres, traced as a union,
   and face slabs apply Fresnel reflection on single-sided slabs; the GPU results agree
   with the CPU within 0.1% and pass the analytic iMMC tests
-* mmc-optix packages for Linux and Windows: mmc with the CUDA (`-c cuda`) and OptiX
+* mmc-trinity packages for Linux and Windows: mmc with the CUDA (`-c cuda`) and OptiX
   (`-c optix`) backends next to the CPU and OpenCL ones, for NVIDIA GPUs with driver
-  R515 or newer; mmc now also builds with MSVC
+  R515 or newer, with mmclab-trinity (MATLAB/Octave) and pmmc-trinity (Python, the
+  `_rtmmc` module) to match; the CUDA code is built for every GPU from sm_52 to sm_86
+  and as PTX for newer ones; mmc now also builds with MSVC
 * the adjoint Jacobians of mus/musp apply the same chain rule as MCX
 * `pmmc.mmclab()` applies the `mmclab.m` pre/post-processing around `pmmc.run()`, and
   all mmclab example scripts are ported to Python under `pmmc/example`
@@ -185,7 +187,7 @@ lists all of them, with their commit hashes.
   sources; [7ee0a9d] detected photons; [6ac3389] trajectories; [6b92686] adjoint Jacobians;
   [3671f6d] surface-only meshes; [0ec2400] unsupported settings are rejected with a message
 * [f8c8cb7] CUDA kernel down from 122 to 64 registers
-* [24aebad] mmc builds with MSVC, enabling CUDA/OptiX on Windows; [bfff982] mmc-optix packages
+* [24aebad] mmc builds with MSVC, enabling CUDA/OptiX on Windows; [bfff982] mmc-optix (now mmc-trinity) packages
   for Linux and Windows
 
 '''Performance'''
@@ -332,13 +334,13 @@ ray tracers (`-M`)
 in the release packages
     `sse` (CPU): yes
     `opencl`: yes (default)
-    `cuda`: mmc-optix packages
-    `optix`: mmc-optix packages
+    `cuda`: mmc-trinity packages
+    `optix`: mmc-trinity packages
 in MMCLAB/PMMC releases
     `sse` (CPU): yes
     `opencl`: yes (default)
-    `cuda`: build with `make cudamex/cudaoct`, or PMMC with `CMAKE_ARGS="-DBUILD_CUDA=ON"`
-    `optix`: build with `make optixmex/optixoct`
+    `cuda`: mmclab-trinity, pmmc-trinity packages
+    `optix`: mmclab-trinity, pmmc-trinity packages
 </pre>
 
 Feature support differs where noted below; everything else - all output types,
@@ -417,10 +419,15 @@ meshes.
 MMC (`mmc-<os>-<arch>-<version>.zip`)
     Contents: the `mmc` binary with the `sse` and `opencl` backends
     How to get it: https://mcx.space/wiki/?Get, https://github.com/fangq/mmc/releases
-MMC-OptiX (`mmc-optix-<linux
-    Contents: windows>-x64-<version>.zip`)
-    How to get it: `mmc` with all four backends
-    the same pages
+MMC-Trinity (`mmc-trinity-<linux|windows>-x64-<version>.zip`)
+    Contents: `mmc` with all four backends
+    How to get it: the same pages
+MMCLAB-Trinity (`mmclab-trinity-<linux|windows>-x64-<version>.zip`)
+    Contents: MATLAB/Octave mex files with all four backends
+    How to get it: the same pages
+PMMC-Trinity (`pmmc-trinity-<linux|windows>-x64-<version>.zip`)
+    Contents: pmmc wheels with `_rtmmc`, all four backends
+    How to get it: the same pages
 MMCLAB (`mmclab-<os>-<arch>-<version>.zip`)
     Contents: MATLAB/Octave mex file (`sse`, `opencl`) and scripts
     How to get it: the same pages
@@ -460,7 +467,7 @@ the paths for later sessions. On macOS, unzip the package under your home folder
 * '''`opencl`''': an OpenCL runtime, included in the NVIDIA, AMD and Intel graphics
     drivers and in macOS; on Linux, POCL (`pocl-opencl-icd`) adds the CPU as an OpenCL
     device. `mmc -L` lists the devices. See the MCX-CL README for details per vendor.
-* '''`cuda`''' and '''`optix`''' (mmc-optix packages): an NVIDIA GPU with driver R515 or
+* '''`cuda`''' and '''`optix`''' (mmc-trinity packages): an NVIDIA GPU with driver R515 or
     newer (CUDA 11.7). OptiX runs on Maxwell and newer GPUs, and uses hardware ray
     tracing on RTX GPUs. The CUDA toolkit and the OptiX SDK are only needed to build MMC.
 
@@ -751,7 +758,7 @@ mmc -Q dmmc-cube60 -n 1e7
 <pre>
 mmc -f input.json -c opencl -G 1                     # first OpenCL device
 mmc -f input.json -c sse                             # all CPU cores
-mmc -f input.json -c cuda                            # NVIDIA GPU (mmc-optix build)
+mmc -f input.json -c cuda                            # NVIDIA GPU (mmc-trinity build)
 mmc -f input.json -c optix -M G --gridsize 0.5       # RT-MMC, 0.5 mm output voxels
 mmc -f input.json -M S -C 1 -F jnii                  # fluence at the mesh nodes, as JNIfTI
 mmc -f input.json -d 1 -q 1 -s base                  # save detected photons and seeds (base.mch)

@@ -266,8 +266,8 @@ jobs:
           name: all-mmc-packages-${{ env.RELEASE_TAG }}
           path: packages/mmc-${{ env.RELEASE_TAG }}.zip
 
-  build_mmc_optix:
-    name: Build+Upload mmc with CUDA and OptiX
+  build_mmc_trinity:
+    name: Build+Upload mmc-trinity (CUDA and OptiX), mmclab-trinity and pmmc-trinity
     strategy:
       fail-fast: false
       matrix:
@@ -279,6 +279,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
       - name: Update RCS keywords
         run: |
           printf '\n[filter "rcs-keywords"]\n\tclean  = .git_filters/rcs-keywords.clean\n\tsmudge = .git_filters/rcs-keywords.smudge %f\n' >> .git/config
@@ -287,48 +289,90 @@ jobs:
       - name: Fetch the OptiX headers
         run: |
           git clone --depth 1 --branch v7.5.0 https://github.com/NVIDIA/optix-dev.git ../optix
+      - name: Install Octave (Linux only)
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y liboctave-dev upx-ucl
+      - name: Install Octave 10 (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          curl --retry 3 -kL https://ftpmirror.gnu.org/octave/windows/octave-10.3.0-w64.7z --output octave_10.3.7z
+          7z x octave_10.3.7z -o../octave -y > /dev/null
+          rm -f octave_10.3.7z
+          echo "OCTAVE_HOME=$(cd ../octave/octave-10.3.0-w64/mingw64 && pwd)" >> $GITHUB_ENV
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v1
+      - name: Set up Python (Windows only)
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.8
+            3.9
+            3.10
+            3.11
+            3.12
+            3.13
       - name: Set up MSVC (Windows only)
         if: ${{ runner.os == 'Windows' }}
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
           toolset: '14.29'
-      - name: Build mmc with the CUDA and OptiX backends (Linux)
+      - name: Build mmc-trinity (Linux)
         if: ${{ runner.os == 'Linux' }}
         run: |
           # in the manylinux2014 image, as the other Linux release builds: GLIBC_2.17 at most
           docker build --build-arg WITH_CUDA=0 -t mcx-linux-release-builder .github/linux_release_builder
+          MLROOT=$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")
+          OCTINC=$(dirname "$(dirname "$(find /usr/include -path '*/octave/mex.h' | head -1)")")
           docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -v "$(cd ../optix && pwd):/optix:ro" \
-              mcx-linux-release-builder bash .github/linux_release_builder/build_mmc_optix.sh
-      - name: Build mmc with the CUDA and OptiX backends (Windows)
+              -v "$MLROOT:$MLROOT:ro" -e MATLAB_ROOT="$MLROOT" \
+              -v "$OCTINC:/octinc:ro" -e OCTAVE_INCDIR=/octinc \
+              mcx-linux-release-builder bash .github/linux_release_builder/build_mmc_trinity.sh
+          echo "OCTAVE_ARCH=$(octave-cli --eval "fprintf(1,computer('arch'))")" >> $GITHUB_ENV
+      - name: Build mmc-trinity (Windows)
         if: ${{ runner.os == 'Windows' }}
         run: |
-          OPTIXHOME="$(cd ../optix && pwd)" bash .github/windows_release_builder/build_mmc_optix.sh
+          MLROOT=$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")
+          PYTHONS=$(ls -d /c/hostedtoolcache/windows/Python/3.*/x64/python.exe | sort -V | tr '\n' ' ')
+          echo "Pythons: $PYTHONS"
+          OPTIXHOME="$(cd ../optix && pwd)" MATLAB_ROOT="$MLROOT" PYTHONS="$PYTHONS" \
+              bash .github/windows_release_builder/build_mmc_trinity.sh
           # no GPU here: run the CPU backend (the driver and OpenCL DLLs are delay-loaded)
-          bin/mmc.exe --bench dmmc-cube60 -n 1e5 -c sse -D T -s optixtest > optixtest.log
-          grep "absorbed" optixtest.log
-          rm -f optixtest*
+          bin/mmc.exe --bench dmmc-cube60 -n 1e5 -c sse -D T -s trinitytest > trinitytest.log
+          grep "absorbed" trinitytest.log
+          rm -f trinitytest*
+          echo "OCTAVE_ARCH=$("$OCTAVE_HOME/bin/octave-cli.exe" --eval "fprintf(1,computer('arch'))")" >> $GITHUB_ENV
       - name: Create release tag
         run: perl -e "print 'RELEASE_TAG='. lc('${{ runner.os }}-${{ runner.arch }}-github-latest')" >> $GITHUB_ENV
-      - name: Zip mmc-optix
+      - name: Zip mmc-trinity, mmclab-trinity and pmmc-trinity
         run: |
-          # strip (Linux; MSVC keeps no symbols in the .exe), then compress
+          mkdir -p packages
+          zipit() {   # zipit <folder> <zip>
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              (cd "$(dirname "$1")" && 7z a -tzip "$2" "$(basename "$1")")
+            else
+              (cd "$(dirname "$1")" && zip -FSr --symlink "$2" "$(basename "$1")")
+            fi
+          }
+          PKG=$(mktemp -d)
+          # mmc-trinity: the standalone mmc package, with this binary; strip (Linux; MSVC
+          # keeps no symbols in the .exe), then compress
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             choco install upx --no-progress
             upx -9 bin/mmc.exe
           else
-            sudo apt-get install -y upx-ucl
             strip bin/mmc
             upx -9 bin/mmc
           fi
-          # a standalone mmc package, as the standard one, with this binary
-          PKG=$(mktemp -d)/mmc-optix
-          mkdir -p "$PKG" packages
-          cp -a bin examples matlab README.md README.txt LICENSE.txt AUTHORS.txt ChangeLog.txt "$PKG"/ 2>/dev/null || true
-          cat > "$PKG/README_OPTIX.txt" << 'EOF'
-          This build of MMC adds the NVIDIA CUDA (-c cuda) and OptiX (-c optix)
-          backends to the CPU (-c sse) and OpenCL (-c opencl) backends of the
-          standard mmc package.
+          mkdir -p "$PKG/mmc-trinity"
+          cp -a bin examples matlab README.md README.txt LICENSE.txt AUTHORS.txt ChangeLog.txt "$PKG/mmc-trinity"/ 2>/dev/null || true
+          cat > "$PKG/mmc-trinity/README_TRINITY.txt" << 'EOF'
+          This build of MMC (mmc-trinity) adds the NVIDIA CUDA (-c cuda) and OptiX
+          (-c optix) backends to the CPU (-c sse) and OpenCL (-c opencl) backends of
+          the standard mmc package.  The CUDA code is compiled for every GPU from
+          Maxwell (sm_52) to Ampere (sm_86), and as PTX for newer ones.
 
           It needs an NVIDIA GPU with driver R515 (Linux) or R516 (Windows) or
           newer.  OptiX ray-traces with the RT cores of RTX GPUs; it runs the
@@ -338,23 +382,47 @@ jobs:
             mmc --bench dmmc-cube60 -c cuda        # the CUDA backend
             mmc -L                                 # list the GPUs
 
-          See README.txt for everything else.
+          mmclab-trinity (MATLAB/Octave: cfg.compute='cuda' or 'optix') and
+          pmmc-trinity (Python: cfg['compute']='cuda' or 'optix') are separate
+          packages.  See README.txt for everything else.
           EOF
+          zipit "$PKG/mmc-trinity" "$GITHUB_WORKSPACE/packages/mmc-trinity-${{ env.RELEASE_TAG }}.zip"
+          # mmclab-trinity: the mmclab folder with the CUDA/OptiX mex files, a drop-in for mmclab
+          rm -rf "$PKG/mmclab" && cp -a mmclab "$PKG/mmclab"
+          rm -rf "$PKG/mmclab/test" "$PKG/mmclab/mmc.mex"
+          mkdir -p "$PKG/mmclab/octave/${{ env.OCTAVE_ARCH }}"
+          [ -f mmclab/mmc.mex ] && cp mmclab/mmc.mex "$PKG/mmclab/octave/${{ env.OCTAVE_ARCH }}/"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            (cd "$PKG/.." && 7z a -tzip "$GITHUB_WORKSPACE/packages/mmc-optix-${{ env.RELEASE_TAG }}.zip" mmc-optix)
-          else
-            (cd "$PKG/.." && zip -FSr --symlink "$GITHUB_WORKSPACE/packages/mmc-optix-${{ env.RELEASE_TAG }}.zip" mmc-optix)
+            cp bin/vcomp140.dll bin/vcruntime140.dll "$PKG/mmclab/"
+            cp bin/vcomp140.dll bin/vcruntime140.dll "$PKG/mmclab/octave/${{ env.OCTAVE_ARCH }}/"
           fi
+          ls -lR "$PKG/mmclab" | grep -E "mmc\.mex|\.dll"
+          zipit "$PKG/mmclab" "$GITHUB_WORKSPACE/packages/mmclab-trinity-${{ env.RELEASE_TAG }}.zip"
+          # pmmc-trinity: the pmmc wheels with _rtmmc
+          mkdir -p "$PKG/pmmc-trinity"
+          cp pmmc/dist/*.whl "$PKG/pmmc-trinity/"
+          cat > "$PKG/pmmc-trinity/README.txt" << 'EOF'
+          pmmc-trinity: pmmc wheels with _rtmmc, the CUDA and OptiX backends of mmc
+          (cfg['compute']='cuda' or 'optix', also in pmmc.mmclab(cfg, 'cuda')),
+          next to its CPU and OpenCL backends.  Install the wheel of your Python
+          version in place of the pmmc from PyPI:
+
+            pip install --force-reinstall pmmc-<version>-cp3XX-*.whl
+
+          It needs an NVIDIA GPU with driver R515 (Linux) or R516 (Windows) or newer.
+          EOF
+          ls -l "$PKG/pmmc-trinity"
+          zipit "$PKG/pmmc-trinity" "$GITHUB_WORKSPACE/packages/pmmc-trinity-${{ env.RELEASE_TAG }}.zip"
           ls -l packages
-      - name: Upload mmc-optix package
+      - name: Upload mmc-trinity packages
         uses: actions/upload-artifact@v4
         with:
-          name: all-mmc-optix-packages-${{ env.RELEASE_TAG }}
-          path: packages/mmc-optix-${{ env.RELEASE_TAG }}.zip
+          name: all-mmc-trinity-packages-${{ env.RELEASE_TAG }}
+          path: packages/*-trinity-${{ env.RELEASE_TAG }}.zip
 
   upload_package:
     name: Upload Packages
-    needs: [build_all, build_mmc_optix]
+    needs: [build_all, build_mmc_trinity]
     runs-on: ubuntu-22.04
     if: ${{ github.repository_owner == 'fangq' && github.actor == 'fangq' && github.event_name != 'pull_request'}}
     steps:
@@ -367,7 +435,10 @@ jobs:
       - name: Create all-in-one octave mmclab
         run: |
           cd packages
-          unzip -n 'mmclab*.zip'
+          # not the mmclab-trinity packages (the CUDA/OptiX mex files), which also hold an mmclab folder
+          for z in mmclab-*.zip; do
+            [[ "$z" == *trinity* ]] || unzip -n "$z"
+          done
           tree .
           zip -FSr --symlink mmclab-allinone-github-latest.zip mmclab
           rm -rf mmclab
