@@ -17,14 +17,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-14]
+        os: [macos-15-intel, macos-15]
         python_version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', 'pypy3.7', 'pypy3.8', 'pypy3.9', 'pypy3.10' ]
         exclude:
-          - os: macos-14
+          - os: macos-15
             python_version: 3.6
-          - os: macos-14
+          - os: macos-15
             python_version: 3.7
-          - os: macos-14
+          - os: macos-15
             python_version: pypy3.7
     outputs:
       perform_pypi_upload: ${{ steps.perform_pypi_upload_check.outputs.perform_pypi_upload }}
@@ -56,12 +56,12 @@ jobs:
           brew install libomp
           brew link --force libomp
       - name: Link libgomp.a (MacOS only)
-        if: ${{ runner.os == 'macOS' && matrix.os != 'macos-14' }}
+        if: ${{ runner.os == 'macOS' && matrix.os != 'macos-15' }}
         run: |
           sudo ln -s /usr/local/lib/gcc/11/libgomp.a /usr/local/lib/libgomp.a
           ln -sf /usr/local/opt/libomp/include/*.h src/pybind11/include
       - name: Link libgomp headers (MacOS only)
-        if: ${{ runner.os == 'macOS' && matrix.os == 'macos-14' }}
+        if: ${{ runner.os == 'macOS' && matrix.os == 'macos-15' }}
         run: |
           ln -sf /opt/homebrew/opt/libomp/include/*.h src/pybind11/include
       - name: Tag wheels with the runner architecture
@@ -138,7 +138,7 @@ jobs:
       - name: Download Wheels from Build Job
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-wheels-macos-14-*
+          pattern: macos-wheels-macos-15-*
           merge-multiple: true
           path: dist/
       - name: Upload packages to PyPI
