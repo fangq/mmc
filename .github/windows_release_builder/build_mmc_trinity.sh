@@ -61,6 +61,8 @@ export PATH="$CUDAHOME/bin:$PATH"
 export MSYS2_ARG_CONV_EXCL='*'
 
 command -v cl > /dev/null || { echo "cl.exe is not on the PATH: set up the MSVC environment first" >&2; exit 1; }
+# nvcc --use-local-env: the MSVC environment is set up already; without it nvcc
+# runs vcvars64.bat again, which fails once MATLAB and Python are set up as well
 # Git's own link.exe (coreutils) may come first on the PATH
 MSBIN="$(dirname "$(command -v cl)")"
 MSLINK="$MSBIN/link.exe"
@@ -84,7 +86,7 @@ USERDEFS="-DUSE_OS_TIMER -DUSE_OPENCL -DMMC_XORSHIFT -DUSE_CUDA -DUSE_OPTIX -DUS
 GPUINC="-I$CUDAW/include -I$OPTIXW/include"
 
 # the OptiX programs stay PTX of nvcc's default target: OptiX compiles them for the GPU
-nvcc -O3 -ptx --expt-relaxed-constexpr -use_fast_math -m64 $USERDEFS $GPUINC -o built/mmc_optix_core.ptx mmc_optix_core.cu
+nvcc --use-local-env -O3 -ptx --expt-relaxed-constexpr -use_fast_math -m64 $USERDEFS $GPUINC -o built/mmc_optix_core.ptx mmc_optix_core.cu
 (cd built && xxd -i mmc_optix_core.ptx | sed 's/\([0-9a-f]\)$/\0, 0x00/' > mmc_optix_core_ptx.h)
 
 # native code from Maxwell (sm_52) to Ampere (sm_86), and the sm_86 PTX for newer GPUs to JIT;
@@ -112,7 +114,7 @@ objects() {
         [[ "$f" == *.cpp ]] && std="-std:c++14"
         cl $CLOPT $rt $std $MMCDEFS $defs $MMCINC -Fo"$out/$(basename "${f%.*}").obj" "$f"
     done
-    nvcc -c -m64 -use_fast_math -Xptxas -O3 -Xcompiler $rt,-openmp -D_USE_MATH_DEFINES $GENCODE \
+    nvcc --use-local-env -c -m64 -use_fast_math -Xptxas -O3 -Xcompiler $rt,-openmp -D_USE_MATH_DEFINES $GENCODE \
          -DMCX_SAVE_DETECTORS -DMCX_DO_REFLECTION -DUSE_DMMC -DUSE_BLBADOUEL $defs \
          -o "$out/mmc_cu_host.obj" mmc_cu_host.cu
 }
