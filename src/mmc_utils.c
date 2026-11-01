@@ -4344,8 +4344,9 @@ void mmc_gpu_method(mcconfig* cfg) {
     /* without SSE (e.g. arm64), the CPU only has the Plucker tracer, for -c sse as for -G -1 */
     if (cfg->gpuid > MAX_DEVICE || cfg->compute == cbSSE) {
         /* the dual-grid output (the default of the GPU builds) needs the SSE tracer: say that the
-           output is on the mesh instead, which was returned silently in place of the grid */
-        if (cfg->method == rtBLBadouelGrid) {
+           output is on the mesh instead, which was returned silently in place of the grid; not
+           when only dumping the input, which --dumpjson - writes to the stdout the log shares */
+        if (cfg->method == rtBLBadouelGrid && !cfg->isdumpjson) {
             MMC_FPRINTF(cfg->flog, S_RED "WARNING: this CPU build has no dual-grid ray-tracer (it needs SSE): the CPU uses the Plucker tracer, and the output is on the mesh, not the grid; use the OpenCL backend for the grid output\n" S_RESET);
         }
 
