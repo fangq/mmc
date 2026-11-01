@@ -188,8 +188,14 @@ if [ -n "$OCTAVE_HOME" ]; then
     mkdir -p built/oct
     cl $CLOPT -MD -std:c++14 $MMCDEFS -DMCX_CONTAINER -DMATLAB_MEX_FILE -I"$OCTINC" -I"$OCTINC/.." $MMCINC \
        -Fo"built/oct/mmclab.obj" mmclab.cpp
-    "$MSLINK" -nologo -DLL -EXPORT:mexFunction -OUT:../mmclab/mmc.mex built/oct/mmclab.obj built/mex/*.obj \
-              built/liboctmex.lib $LIBPATHS $GPULIBS
+    # Octave 10 refuses a mex file without __octave_mex_soversion__ ("No SOVERSION found in .mex
+    # file"), the version of liboctmex it was built for: the const int mkoctfile adds, here taken
+    # from the DLL's name (liboctmex-1.dll)
+    SOVER=$(basename "$OCTMEX" .dll | sed -n 's/^liboctmex-\([0-9]*\)$/\1/p')
+    echo "__declspec(dllexport) const int __octave_mex_soversion__ = ${SOVER:-1};" > built/oct/soversion.c
+    cl $CLOPT -MD -Fo"built/oct/soversion.obj" built/oct/soversion.c
+    "$MSLINK" -nologo -DLL -EXPORT:mexFunction -OUT:../mmclab/mmc.mex built/oct/mmclab.obj built/oct/soversion.obj \
+              built/mex/*.obj built/liboctmex.lib $LIBPATHS $GPULIBS
     rm -f ../mmclab/mmc.lib ../mmclab/mmc.exp
 fi
 
