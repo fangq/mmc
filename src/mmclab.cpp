@@ -185,7 +185,7 @@ void mmclab_usage();
 static int mmclab_task_guard(void (*task)(void*), void* arg);
 mxArray* mmclab_assert(mxArray* arr);
 
-extern const char debugflag[];
+extern "C" const char debugflag[];  /* defined in mmc_utils.c: MSVC, unlike GCC, mangles C++ variable names */
 
 float* detps = NULL;       //! buffer to receive data from cfg.detphotons field
 int    dimdetps[2] = {0, 0}; //! dimensions of the cfg.detphotons array

@@ -106,7 +106,7 @@ int seed_byte = 0;
 
 #define MEXERROR(a)  mcx_error(999,a,__FILE__,__LINE__)   //! Macro to add unit name and line number in error printing
 
-extern const char debugflag[];
+extern "C" const char debugflag[];  /* defined in mmc_utils.c: MSVC, unlike GCC, mangles C++ variable names */
 
 /**
  * @brief Force matlab refresh the command window to print all buffered messages
