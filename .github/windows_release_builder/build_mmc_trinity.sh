@@ -157,9 +157,11 @@ fi
 
 if [ -n "$MATLAB_ROOT" ]; then
     echo "== mmclab-trinity for MATLAB ($MATLAB_ROOT)"
-    MLW=$(cygpath -m "$MATLAB_ROOT")
-    "$MLW/bin/mex.bat" -setup C++
-    "$MLW/bin/mex.bat" -R2017b -output ../mmclab/mmc "COMPFLAGS=\$COMPFLAGS -openmp -std:c++14" \
+    # mex.bat by name, from the PATH: cmd strips the quotes of a command line that starts
+    # with a quoted path (C:/Program Files/...) and has more quoted arguments, and fails
+    export PATH="$(cygpath -u "$MATLAB_ROOT")/bin:$PATH"
+    mex.bat -setup C++
+    mex.bat -R2017b -output ../mmclab/mmc "COMPFLAGS=\$COMPFLAGS -openmp -std:c++14" \
         "LINKFLAGS=\$LINKFLAGS -LIBPATH:$CUDAW/lib/x64 -DELAYLOAD:nvcuda.dll -DELAYLOAD:OpenCL.dll" \
         $MMCDEFS -DMCX_CONTAINER -DMATLAB_MEX_FILE -D_USE_MATH_DEFINES -I. -Ibuilt -Izmat -Iubj -I$CUDAW/include -I$OPTIXW/include \
         mmclab.cpp built/mex/*.obj -lcudart_static -lcuda -lOpenCL -ldelayimp
