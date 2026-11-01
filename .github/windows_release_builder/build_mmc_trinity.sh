@@ -157,14 +157,19 @@ fi
 
 if [ -n "$MATLAB_ROOT" ]; then
     echo "== mmclab-trinity for MATLAB ($MATLAB_ROOT)"
-    # mex.bat by name, from the PATH: cmd strips the quotes of a command line that starts
-    # with a quoted path (C:/Program Files/...) and has more quoted arguments, and fails
-    export PATH="$(cygpath -u "$MATLAB_ROOT")/bin:$PATH"
-    mex.bat -setup C++
-    mex.bat -R2017b -output ../mmclab/mmc "COMPFLAGS=\$COMPFLAGS -openmp -std:c++14" \
-        "LINKFLAGS=\$LINKFLAGS -LIBPATH:$CUDAW/lib/x64 -DELAYLOAD:nvcuda.dll -DELAYLOAD:OpenCL.dll" \
-        $MMCDEFS -DMCX_CONTAINER -DMATLAB_MEX_FILE -D_USE_MATH_DEFINES -I. -Ibuilt -Izmat -Iubj -I$CUDAW/include -I$OPTIXW/include \
-        mmclab.cpp built/mex/*.obj -lcudart_static -lcuda -lOpenCL -ldelayimp
+    # built with cl and link as mex does, not by mex.bat: Git Bash runs a .bat by cmd with
+    # its full path, and cmd splits a quoted "C:/Program Files/..." when more arguments are
+    # quoted; c_mexapi_version exports the API version (R2017b, separate complex) MATLAB checks
+    MLW=$(cygpath -m "$MATLAB_ROOT")
+    mkdir -p built/mat
+    cl $CLOPT -MD -std:c++14 $MMCDEFS -DMCX_CONTAINER -DMATLAB_MEX_FILE -DMATLAB_DEFAULT_RELEASE=R2017b -DUSE_MEX_CMD \
+       -I"$MLW/extern/include" $MMCINC -Fo"built/mat/mmclab.obj" mmclab.cpp
+    cl -nologo -c -O2 -MD -DMATLAB_MEX_FILE -DMATLAB_DEFAULT_RELEASE=R2017b -I"$MLW/extern/include" \
+       -Fo"built/mat/c_mexapi_version.obj" "$MLW/extern/version/c_mexapi_version.c"
+    "$MSLINK" -nologo -DLL -EXPORT:mexFunction -EXPORT:mexfilerequiredapiversion -OUT:../mmclab/mmc.mexw64 \
+              built/mat/*.obj built/mex/*.obj -LIBPATH:"$MLW/extern/lib/win64/microsoft" libmx.lib libmex.lib libmat.lib \
+              $LIBPATHS $GPULIBS
+    rm -f ../mmclab/mmc.lib ../mmclab/mmc.exp
 fi
 
 if [ -n "$OCTAVE_HOME" ]; then
