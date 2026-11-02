@@ -253,6 +253,9 @@ jobs:
             strip --strip-unneeded mmclab/mmc.mex* || true
           fi
           mv mmclab/mmc.mex mmclab/octave/${{ env.OCTAVE_ARCH }}
+          # the helper functions of matlab/ as mmclab's private folder: mmclab.m calls mmcraytrace,
+          # mmcsrcdomain and mmcaddsrc, so the package works without matlab/ on the path
+          rm -rf mmclab/private && cp -a matlab mmclab/private
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp "$PWD/octave/octave-10.3.0-w64/mingw64/bin/libgomp-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
             cp "$PWD/octave/octave-10.3.0-w64/mingw64/bin/libwinpthread-1.dll" mmclab/octave/${{ env.OCTAVE_ARCH }}
@@ -415,6 +418,7 @@ jobs:
           # mmclab-trinity: the mmclab folder with the CUDA/OptiX mex files, a drop-in for mmclab
           rm -rf "$PKG/mmclab" && cp -a mmclab "$PKG/mmclab"
           rm -rf "$PKG/mmclab/test" "$PKG/mmclab/mmc.mex"
+          rm -rf "$PKG/mmclab/private" && cp -a matlab "$PKG/mmclab/private"
           mkdir -p "$PKG/mmclab/octave/${{ env.OCTAVE_ARCH }}"
           [ -f mmclab/mmc.mex ] && cp mmclab/mmc.mex "$PKG/mmclab/octave/${{ env.OCTAVE_ARCH }}/"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
