@@ -780,6 +780,9 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
             #pragma omp master
             {
                 if ((cfg->debuglevel & MCX_DEBUG_PROGRESS)) {
+                    /* each thread of this device's kernel counts itself once: compare with this
+                       device's thread count (device 0's left the bar waiting forever when the
+                       selected GPU runs fewer threads), and stop when the kernel ends or fails */
                     int p0 = 0, ndone = -1;
 
                     mcx_progressbar(-0.f);
@@ -788,12 +791,16 @@ void mmc_run_simulation(mcconfig* cfg, tetmesh* mesh, raytracer* tracer, GPUInfo
                         ndone = *progress;
 
                         if (ndone > p0) {
-                            mcx_progressbar((float)ndone / gpu[0].autothread);
+                            mcx_progressbar((float)ndone / gpu[gpuid].autothread);
                             p0 = ndone;
                         }
 
+                        if (cudaStreamQuery(0) != cudaErrorNotReady) {
+                            break;
+                        }
+
                         sleep_ms(100);
-                    } while (p0 < (int)gpu[0].autothread);
+                    } while (p0 < (int)gpu[gpuid].autothread);
 
                     mcx_progressbar(1.f);
                     MMC_FPRINTF(cfg->flog, "\n");
