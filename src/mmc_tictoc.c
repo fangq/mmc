@@ -175,7 +175,9 @@ void SetupMillisTimer(void) {
 }
 unsigned int StartTimer (void) {
     SetupMillisTimer();
-    return 0;
+    /* the start time: callers print GetTimeMillis()-tic, and timeGetTime() counts from
+       the boot of Windows, so returning 0 printed the uptime as the elapsed time */
+    return GetTimeMillis();
 }
 void CleanupMillisTimer(void) {
     if (timeEndPeriod(timerRes) == TIMERR_NOCANDO) {
