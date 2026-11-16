@@ -439,9 +439,9 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
 
                     /* Slots 0..Ns-1: forward sources (replicate the single main source).
                      * Uniform unit weight per slot (MCX parity); preserve cfg.srcdir.w
-                     * (focal length / lens parameter) so users can control beam profiles
-                     * (e.g., planar wavefront via srcdir(4)=-inf) for the source slots;
-                     * the detector slots below honor cfg.detdir.w. */
+                     * (focal length, or nan: isotropic, -inf: Lambertian) so users can
+                     * control the beam profile of the source slots; the detector slots
+                     * below honor cfg.detdir.w the same way. */
                     for (int is = 0; is < Ns; is++) {
                         cfg.srcdata[is].srcpos    = {cfg.srcpos.x, cfg.srcpos.y,
                                                      cfg.srcpos.z, 1.f

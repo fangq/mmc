@@ -122,16 +122,25 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
             }
         }
 
-        /* focal point focusing: srcdir.w stores focal length */
-        if (src.srcdir.w != 0.f) {
-            float3 focal = make_float3(r.p0.x + src.srcdir.w * r.dir.x,
-                                       r.p0.y + src.srcdir.w * r.dir.y,
-                                       r.p0.z + src.srcdir.w * r.dir.z);
-            float3 newdir = make_float3(focal.x - r.p0.x,
-                                        focal.y - r.p0.y,
-                                        focal.z - r.p0.z);
-            float len = rsqrtf(dot(newdir, newdir));
-            r.dir = newdir * len;
+        /* the launch angle from the focal length srcdir.w (an adjoint detector slot takes
+           detdir.w), as the main source: isotropic (nan), Lambertian (-inf), or converging
+           to (>0) or diverging from (<0) a focus srcdir.w away from the slot center; the
+           focus used to be taken from the sampled point, which left the direction unchanged
+           for a finite value and made it nan for an infinite one */
+        if (isnan(src.srcdir.w)) {
+            float ang, stheta, ctheta, sphi, cphi;
+            sincosf(TWO_PI * rng.uniform(0.0f, 1.0f), &sphi, &cphi);
+            ang = acosf(2.f * rng.uniform(0.0f, 1.0f) - 1.f); //sine distribution
+            sincosf(ang, &stheta, &ctheta);
+            r.dir = rotateVector(r.dir, make_float2(stheta, ctheta), make_float2(sphi, cphi));
+        } else if (isinf(src.srcdir.w) && src.srcdir.w < 0.f) { // Lambertian (cosine distribution)
+            float stheta, sphi, cphi;
+            sincosf(TWO_PI * rng.uniform(0.0f, 1.0f), &sphi, &cphi);
+            stheta = sqrtf(rng.uniform(0.0f, 1.0f));
+            r.dir = rotateVector(r.dir, make_float2(stheta, sqrtf(1.f - stheta * stheta)), make_float2(sphi, cphi));
+        } else if (src.srcdir.w != 0.f) {
+            float3 focal = make_float3(src.srcpos.x, src.srcpos.y, src.srcpos.z) + src.srcdir.w * r.dir;
+            r.dir = unitVec((src.srcdir.w < 0.f) ? (r.p0 - focal) : (focal - r.p0)); // diverging or converging beam
         }
 
         r.slen = rng.rand_next_scatlen();
@@ -217,7 +226,7 @@ __device__ __forceinline__ void launchPhoton(optixray& r, mcx::Random& rng) {
             /* a disk of radius srcparam1.x, or a ring between the radii srcparam1.x and srcparam1.y */
             r0 = sqrtf(rng.uniform(0.0f, 1.0f) * fabsf(gcfg.srcparam1.x * gcfg.srcparam1.x - gcfg.srcparam1.y * gcfg.srcparam1.y)
                        + gcfg.srcparam1.y * gcfg.srcparam1.y);
-        } else if (fabsf(gcfg.focus) < 1e-5f || fabsf(gcfg.srcparam1.y) < 1e-5f) {
+        } else if (fabsf(gcfg.focus) < 1e-5f || !isfinite(gcfg.focus) || fabsf(gcfg.srcparam1.y) < 1e-5f) { // an isotropic or Lambertian launch has no waist
             r0 = sqrtf(-logf((rng.uniform(0.0f, 1.0f)))) * gcfg.srcparam1.x;
         } else {
             float z0 = gcfg.srcparam1.x * gcfg.srcparam1.x * M_PIf / gcfg.srcparam1.y; //Rayleigh range

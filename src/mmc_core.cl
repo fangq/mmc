@@ -1706,6 +1706,52 @@ __device__ void rotatevector(float3* dir, float stheta, float ctheta, float sphi
 }
 
 /**
+ * @brief Set the launch direction from the focal length of a source (srcdir.w), as mcx
+ *
+ * nan launches isotropically, -inf with a Lambertian (cosine-weighted) profile around dir,
+ * and a finite value converges to (>0) or diverges from (<0) the point focus*dir away
+ * from origin, the center of the source; 0 keeps dir
+ */
+
+__device__ void focuslaunch(float focus, float3* dir, float3 p0, float3 origin, __private RandType* ran) {
+    if (isnan(focus)) { // isotropic
+        float ang, stheta, ctheta, sphi, cphi;
+        ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
+        MCX_SINCOS(ang, sphi, cphi);
+        ang = acos(2.f * rand_uniform01(ran) - 1.f); //sine distribution
+        MCX_SINCOS(ang, stheta, ctheta);
+        rotatevector(dir, stheta, ctheta, sphi, cphi);
+    } else if ((focus < 0.f) * (isinf(focus))) { // Lambertian (cosine distribution)
+        float ang, stheta, ctheta, sphi, cphi;
+        ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
+        MCX_SINCOS(ang, sphi, cphi);
+        stheta = MCX_MATHFUN(sqrt)(rand_uniform01(ran));
+        ctheta = MCX_MATHFUN(sqrt)(1.f - stheta * stheta);
+        rotatevector(dir, stheta, ctheta, sphi, cphi);
+    } else if (focus != 0.f) { // converging or diverging beam
+        float Rn2;
+        origin.x += focus * dir->x;
+        origin.y += focus * dir->y;
+        origin.z += focus * dir->z;
+
+        if (focus < 0.f) { // diverging beam
+            dir->x = p0.x - origin.x;
+            dir->y = p0.y - origin.y;
+            dir->z = p0.z - origin.z;
+        } else {            // converging beam
+            dir->x = origin.x - p0.x;
+            dir->y = origin.y - p0.y;
+            dir->z = origin.z - p0.z;
+        }
+
+        Rn2 = MCX_MATHFUN(rsqrt)(dir->x * dir->x + dir->y * dir->y + dir->z * dir->z); // normalize
+        dir->x *= Rn2;
+        dir->y *= Rn2;
+        dir->z *= Rn2;
+    }
+}
+
+/**
  * @brief Performing one scattering event of the photon
  *
  * This function updates the direction of the photon by performing a scattering calculation
@@ -1870,13 +1916,10 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
             }
         }
 
-        /* focal-point focusing (srcdir.w = focal length) */
-        float focallen = srcs[slot].srcdir.w;
-
-        if (focallen != 0.f) {
-            canfocus = 0;
-            origin = r->p0 + FL3(focallen) * r->vec;
-        }
+        /* the launch angle from the slot's focal length srcdir.w (an adjoint detector slot
+           takes detdir.w): isotropic (nan), Lambertian (-inf), or focused about the slot
+           center, origin; it used to be computed here but never applied */
+        focuslaunch(srcs[slot].srcdir.w, &(r->vec), r->p0, origin, ran);
 
         r->weight = srcs[slot].srcpos.w; /* importance weight */
         /* Per-slot initial tet from srcdata[slot].srcparam2.w (pre-computed
@@ -1898,6 +1941,8 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 #endif
 
         if (r->eid > 0) {
+            /* a pencil beam also takes an isotropic (nan) or Lambertian (-inf) launch */
+            focuslaunch(GPU_PARAM(gcfg, focus), &(r->vec), r->p0, origin, ran);
             return;
         }
 
@@ -1987,7 +2032,7 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
         } else {
 #endif
 
-            if (fabs(GPU_PARAM(gcfg, focus)) < 1e-5f || fabs(gcfg->srcparam1.y) < 1e-5f) {
+            if (fabs(GPU_PARAM(gcfg, focus)) < 1e-5f || !isfinite(GPU_PARAM(gcfg, focus)) || fabs(gcfg->srcparam1.y) < 1e-5f) { // an isotropic or Lambertian launch has no waist
                 r0 = MCX_MATHFUN(sqrt)(-MCX_MATHFUN(log)((rand_uniform01(ran)))) * gcfg->srcparam1.x;
             } else {
                 float z0 = gcfg->srcparam1.x * gcfg->srcparam1.x * M_PI / gcfg->srcparam1.y; //Rayleigh range
@@ -2139,40 +2184,8 @@ __device__ void launchnewphoton(__constant MCXParam* gcfg, ray* r, __global FLOA
 #endif
 #endif
 
-    if (canfocus) {
-        if (isnan(GPU_PARAM(gcfg, focus))) { // if beam focus is set, determine the incident angle
-            float ang, stheta, ctheta, sphi, cphi;
-            ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
-            MCX_SINCOS(ang, sphi, cphi);
-            ang = acos(2.f * rand_uniform01(ran) - 1.f); //sine distribution
-            MCX_SINCOS(ang, stheta, ctheta);
-            rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
-        } else if ((GPU_PARAM(gcfg, focus) < 0.f) * (isinf(GPU_PARAM(gcfg, focus)))) { // lambertian (cosine distribution) if focal length is -inf
-            float ang, stheta, ctheta, sphi, cphi;
-            ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
-            MCX_SINCOS(ang, sphi, cphi);
-            stheta = MCX_MATHFUN(sqrt)(rand_uniform01(ran));
-            ctheta = MCX_MATHFUN(sqrt)(1.f - stheta * stheta);
-            rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
-        } else if (GPU_PARAM(gcfg, focus) != 0.f) { // if beam focus is set, determine the incident angle
-            float Rn2;
-            origin.x += GPU_PARAM(gcfg, focus) * r->vec.x;
-            origin.y += GPU_PARAM(gcfg, focus) * r->vec.y;
-            origin.z += GPU_PARAM(gcfg, focus) * r->vec.z;
-
-            if (GPU_PARAM(gcfg, focus) < 0.f) { // diverging beam
-                r->vec.x = r->p0.x - origin.x;
-                r->vec.y = r->p0.y - origin.y;
-                r->vec.z = r->p0.z - origin.z;
-            } else {            // converging beam
-                r->vec.x = origin.x - r->p0.x;
-                r->vec.y = origin.y - r->p0.y;
-                r->vec.z = origin.z - r->p0.z;
-            }
-
-            Rn2 = MCX_MATHFUN(rsqrt)(dot(r->vec, r->vec)); // normalize
-            r->vec = r->vec * Rn2;
-        }
+    if (canfocus) { // isotropic (nan), Lambertian (-inf), converging or diverging beam
+        focuslaunch(GPU_PARAM(gcfg, focus), &(r->vec), r->p0, origin, ran);
     }
 
     r->p0 += r->vec * EPS;

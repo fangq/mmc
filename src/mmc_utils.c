@@ -1710,6 +1710,27 @@ static void mcx_json_needrow(cJSON* row, int minlen, const char* path) {
 }
 
 /**
+ * The value of a JSON number, or of the JData strings "_NaN_", "_Inf_" and "-_Inf_" that
+ * stand for nan, inf and -inf (JSON has no literal for them), e.g. the focal length in the
+ * 4th element of a source or detector Dir, where nan is isotropic and -inf Lambertian
+ */
+static float mcx_json_float(cJSON* item) {
+    if (cJSON_IsString(item)) {
+        if (strcmp(item->valuestring, "_NaN_") == 0) {
+            return NAN;
+        } else if (strcmp(item->valuestring, "_Inf_") == 0) {
+            return INFINITY;
+        } else if (strcmp(item->valuestring, "-_Inf_") == 0) {
+            return -INFINITY;
+        }
+
+        return 0.f;
+    }
+
+    return (float)item->valuedouble;
+}
+
+/**
  * @brief Load user inputs from a .json input file
  *
  * This function loads user input from a JSON format in a .json extension
@@ -2711,7 +2732,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                     }
 
                     if (d->child->next && d->child->next->next && d->child->next->next->next) {
-                        cfg->detdir[di].w = d->child->next->next->next->valuedouble;
+                        cfg->detdir[di].w = mcx_json_float(d->child->next->next->next); /* nan: isotropic, "-_Inf_": Lambertian */
                     }
                 }
             }
@@ -2732,7 +2753,7 @@ int mcx_loadjson(cJSON* root, mcconfig* cfg) {
                     cfg->detdir[di].z = d->child->next->next->valuedouble;
 
                     if (d->child->next->next->next) {
-                        cfg->detdir[di].w = d->child->next->next->next->valuedouble;
+                        cfg->detdir[di].w = mcx_json_float(d->child->next->next->next); /* nan: isotropic, "-_Inf_": Lambertian */
                     }
                 }
             }
@@ -4704,7 +4725,7 @@ void mcx_prep(mcconfig* cfg) {
             cfg->srcdata[is].srcdir.x  = cfg->srcdir.x;
             cfg->srcdata[is].srcdir.y  = cfg->srcdir.y;
             cfg->srcdata[is].srcdir.z  = cfg->srcdir.z;
-            cfg->srcdata[is].srcdir.w  = 0.f;
+            cfg->srcdata[is].srcdir.w  = cfg->srcdir.w;  /* keep the focal length, isotropic (nan) or Lambertian (-inf) launch, as mmclab/pmmc */
             cfg->srcdata[is].srcparam1 = cfg->srcparam1;
             cfg->srcdata[is].srcparam2 = cfg->srcparam2;
         }

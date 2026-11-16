@@ -2506,6 +2506,59 @@ float reflectray_n(mcconfig* cfg, float3* c0, raytracer* tracer, int* oldeid, in
 }
 
 /**
+ * @brief Set the launch direction from the focal length of the source (srcdir.w), as mcx
+ *
+ * nan launches isotropically, -inf with a Lambertian (cosine-weighted) profile around
+ * r->vec, and a finite value converges to (>0) or diverges from (<0) the point focus*vec
+ * away from origin, the center of the source; 0 keeps r->vec
+ *
+ * \param[in,out] r: the current ray, r->focus holds the focal length
+ * \param[in] origin: the center of the source
+ * \param[in,out] ran: the random number generator states
+ */
+
+static void focuslaunch(ray* r, float3* origin, RandType* ran) {
+    if (isnan(r->focus)) { // isotropic
+        float ang, stheta, ctheta, sphi, cphi;
+        ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
+        sphi = sinf(ang);
+        cphi = cosf(ang);
+        ang = acosf(2.f * rand_uniform01(ran) - 1.f); //sine distribution
+        stheta = sinf(ang);
+        ctheta = cosf(ang);
+        rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
+    } else if (isinf(r->focus) && r->focus < 0.f) { // Lambertian (cosine distribution)
+        float ang, stheta, ctheta, sphi, cphi;
+        ang = TWO_PI * rand_uniform01(ran); //next arimuth angle
+        sphi = sinf(ang);
+        cphi = cosf(ang);
+        stheta = sqrtf(rand_uniform01(ran));
+        ctheta = sqrtf(1.f - stheta * stheta);
+        rotatevector(&(r->vec), stheta, ctheta, sphi, cphi);
+    } else if (r->focus != 0.f) { // converging or diverging beam
+        float Rn2, f = r->focus;
+        float3 focal;
+
+        focal.x = origin->x + f * r->vec.x;
+        focal.y = origin->y + f * r->vec.y;
+        focal.z = origin->z + f * r->vec.z;
+
+        if (r->focus < 0.f) { // diverging beam
+            r->vec.x = r->p0.x - focal.x;
+            r->vec.y = r->p0.y - focal.y;
+            r->vec.z = r->p0.z - focal.z;
+        } else {            // converging beam
+            r->vec.x = focal.x - r->p0.x;
+            r->vec.y = focal.y - r->p0.y;
+            r->vec.z = focal.z - r->p0.z;
+        }
+
+        Rn2 = 1.f / sqrtf(vec_dot(&r->vec, &r->vec)); // normalize
+        vec_mult(&r->vec, Rn2, &r->vec);
+    }
+}
+
+/**
  * @brief Launch a new photon
  *
  * This function launch a new photon using one of the dozen supported source forms.
@@ -2526,6 +2579,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
 
     if (cfg->srctype == stPencil) { // pencil beam, use the old workflow, except when eid is not given
         if (r->eid > 0) {
+            focuslaunch(r, &origin, ran); // an isotropic (nan) or Lambertian (-inf) pencil beam
             return;
         }
     } else if (cfg->srctype == stPlanar || cfg->srctype == stPattern || cfg->srctype == stPattern3D || cfg->srctype == stFourier || cfg->srctype == stPencilArray) {
@@ -2615,7 +2669,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
 
         if (cfg->srctype == stDisk || cfg->srctype == stRing) {
             r0 = sqrtf(rand_uniform01(ran) * fabsf(cfg->srcparam1.x * cfg->srcparam1.x - cfg->srcparam1.y * cfg->srcparam1.y) + cfg->srcparam1.y * cfg->srcparam1.y);
-        } else if (fabs(r->focus) < 1e-5f || fabs(cfg->srcparam1.y) < 1e-5f) {
+        } else if (fabs(r->focus) < 1e-5f || !isfinite(r->focus) || fabs(cfg->srcparam1.y) < 1e-5f) { // an isotropic or Lambertian launch has no waist
             r0 = sqrtf(-log(rand_uniform01(ran))) * cfg->srcparam1.x;
         } else {
             float z0 = cfg->srcparam1.x * cfg->srcparam1.x * M_PI / cfg->srcparam1.y; //Rayleigh range
@@ -2755,24 +2809,8 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
         canfocus = (cfg->srctype == stSlit);
     }
 
-    if (canfocus && r->focus != 0.f) { // if beam focus is set, determine the incident angle
-        float Rn2;
-        origin.x += r->focus * r->vec.x;
-        origin.y += r->focus * r->vec.y;
-        origin.z += r->focus * r->vec.z;
-
-        if (r->focus < 0.f) { // diverging beam
-            r->vec.x = r->p0.x - origin.x;
-            r->vec.y = r->p0.y - origin.y;
-            r->vec.z = r->p0.z - origin.z;
-        } else {            // converging beam
-            r->vec.x = origin.x - r->p0.x;
-            r->vec.y = origin.y - r->p0.y;
-            r->vec.z = origin.z - r->p0.z;
-        }
-
-        Rn2 = 1.f / sqrtf(vec_dot(&r->vec, &r->vec)); // normalize
-        vec_mult(&r->vec, Rn2, &r->vec);
+    if (canfocus) { // isotropic (nan), Lambertian (-inf), converging or diverging beam
+        focuslaunch(r, &origin, ran);
     }
 
     vec_mult_add(&(r->p0), &(r->vec), 1.f, EPS, &(r->p0));

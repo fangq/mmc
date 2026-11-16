@@ -90,7 +90,11 @@ function varargout = mmclab(varargin)
 %                      the focal length: 0 collimated, >0 converging to a focus at
 %                      that distance along srcdir, <0 diverging from a virtual
 %                      point behind the source (no effect on pencil, isotropic
-%                      and cone sources)
+%                      and cone sources), or, as in mcx:
+%                        nan: isotropic launch, regardless of srcdir
+%                        -inf: Lambertian (cosine-weighted) launch around srcdir
+%                      (nan and -inf also apply to pencil sources, not to
+%                      isotropic, cone, arcsine, zgaussian, line or hyperboloid)
 %                      several sources: give srcpos/srcdir (and srcparam1/2) one
 %                      row per source
 %      cfg.srctype:    source type ['pencil']; cfg.srcparam1/srcparam2 hold the
@@ -156,7 +160,11 @@ function varargout = mmclab(varargin)
 %      cfg.detpos:     an Nx4 array, one row per disk detector: [x y z radius]
 %      cfg.detdir:     an Nx4 array, one row per detector: [vx vy vz focal length],
 %                      the inward direction of each detector, required by the
-%                      adjoint outputs (the detectors are launched as sources)
+%                      adjoint outputs (the detectors are launched as sources);
+%                      the 4th value is read as in srcdir: -inf launches the
+%                      detector disk with a Lambertian profile, the adjoint of a
+%                      detector that collects all light leaving through its area,
+%                      nan isotropically, and 0 as a collimated beam
 %      cfg.sdmap:      an Nch x 2 (or wider) array selecting the channels of the
 %                      adjoint Jacobians: each row is [srcid detid], both 1-based
 %                      (srcid counts the forward sources, detid the rows of
