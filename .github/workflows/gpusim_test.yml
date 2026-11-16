@@ -1,0 +1,55 @@
+name: Simulated GPU tests (PantheonSim)
+# the hosted runners have no GPU: PantheonSim (https://github.com/pantheongpu/pantheonsim)
+# runs the unmodified CUDA build on the CPU as a simulated NVIDIA H100, so the CUDA kernel
+# is tested on every push; it checks what the kernel computes, not its speed, and does
+# not replace the tests on physical GPUs
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  gpusim_test:
+    name: mmc CUDA tests on a simulated H100
+    runs-on: ubuntu-24.04
+    env:
+      VGPU_QUIET: 1  # no simulator banner in the mmc output
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Set up PantheonSim and the CUDA toolkit
+        # pinned to a reviewed commit of the action (v0.1.7) and the simulator
+        uses: pantheongpu/setup-pantheonsim@68edfd58c091361dd6baf060b63de412e544d858
+        with:
+          gpu: nvidia/h100
+      - name: Install the OpenCL library and python modules
+        run: |
+          sudo apt-get update && sudo apt-get install -y ocl-icd-libopencl1 opencl-headers ocl-icd-opencl-dev
+          python3 -m pip install numpy || python3 -m pip install --break-system-packages numpy
+      - name: Build mmc with the CUDA backend
+        # the CUDA runtime is linked as a shared library, which the simulator supplies
+        run: |
+          cd src
+          make cuda CUDART="-lcudart -ldl -lrt" CUGENCODE="-arch=sm_90"
+          ldd ../bin/mmc
+          ../bin/mmc -L -c cuda
+      - name: Run unit tests, including the CUDA backend cases
+        # no OpenCL device: POCL can not build the kernel of some unit test cases
+        run: |
+          cd src
+          MMC_UNITTEST_NO_OPENCL=1 make cudaunittest CUDART="-lcudart -ldl -lrt" CUGENCODE="-arch=sm_90"
+      - name: Run step-by-step trajectory tests on CUDA against the OpenCL golden files
+        # CUDA replays the random numbers of OpenCL; as on POCL, a few photons may fork
+        # at a reflect/escape decision, every step before the fork must still match
+        run: |
+          cd test
+          MMCOPT="-G 1 -c cuda" GOLDENTAG=_opencl MAXFORK=0.1 ./testtraj.sh -t 4000 -T 1
+      - name: Run the built-in examples on CUDA against the golden absorbed fractions
+        # 1e3 photons per example: the tolerance is scaled by the photon number
+        run: |
+          cd test
+          NPHOTON=1e3 ./testbuiltin.sh -c cuda -G 1
