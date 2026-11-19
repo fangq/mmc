@@ -1177,13 +1177,13 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
                 }
 
                 for (j = 2; j < his.maxmedia + 2; j++) {
-                    cfg->replayweight[cfg->nphoton] *= expf(-mesh->med[j - 1].mua * ppath[i * his.colcount + j] * his.unitinmm);
+                    cfg->replayweight[cfg->nphoton] *= expf(-mesh->med[j - 1].mua * ppath[i * his.colcount + his.maxmedia + j - 1]);
                 }
 
                 cfg->replaytime[cfg->nphoton] = 0.f;
 
                 for (j = 2; j < his.maxmedia + 2; j++) {
-                    cfg->replaytime[cfg->nphoton] += mesh->med[j - 1].n * ppath[i * his.colcount + j] * R_C0;
+                    cfg->replaytime[cfg->nphoton] += mesh->med[j - 1].n * ppath[i * his.colcount + his.maxmedia + j - 1] * his.unitinmm * R_C0;
                 }
 
                 cfg->nphoton++;

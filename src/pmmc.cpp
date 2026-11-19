@@ -1220,7 +1220,28 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         mesh_srcdetelem(&mesh, &mcx_config);
 
         /** Validate all input fields, and warn incompatible inputs */
-        mmc_validate_config(&mcx_config, det_ps, dim_det_ps, seed_byte);
+        /* the replay weights (mcx_replayinit) need the media, which are in mesh.med while mcx_config.medianum is 0:
+           expose them for this call only, also if it throws (mcx_clearcfg frees mcx_config.prop when mcx_config.medianum > 0) */
+        {
+            int medianum_saved = mcx_config.medianum;
+            medium* prop_saved = mcx_config.prop;
+
+            if (mcx_config.medianum == 0 && mesh.med) {
+                mcx_config.medianum = mesh.prop + 1;
+                mcx_config.prop = mesh.med;
+            }
+
+            try {
+                mmc_validate_config(&mcx_config, det_ps, dim_det_ps, seed_byte);
+            } catch (...) {
+                mcx_config.medianum = medianum_saved;
+                mcx_config.prop = prop_saved;
+                throw;
+            }
+
+            mcx_config.medianum = medianum_saved;
+            mcx_config.prop = prop_saved;
+        }
 
         /** Build srcdata from detectors for adjoint / srcid=-2 mode BEFORE
          *  mesh_validate runs.  mesh_validate allocates mesh.weight sized by

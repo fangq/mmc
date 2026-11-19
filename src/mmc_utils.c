@@ -4548,6 +4548,10 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
         MMC_ERROR(-6, "please rerun the baseline simulation and save detector ID (D) and partial-path (P) using cfg.savedetflag='dp' ");
     }
 
+    if (dimdetps[0] < hasdetid + offset + cfg->medianum - 1) {
+        MMC_ERROR(-6, "cfg.detphotons has fewer rows than detector ID, scattering counts and partial paths of all media; was the baseline run made with the same media?");
+    }
+
     cfg->replayweight = (float*) malloc(cfg->nphoton * sizeof(float));
     cfg->replaytime = (float*) calloc(cfg->nphoton, sizeof(float));
 
@@ -4565,9 +4569,8 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
             cfg->replaytime[cfg->nphoton] = 0.f;
 
             for (j = hasdetid; j < cfg->medianum - 1 + hasdetid; j++) {
-                plen = detps[i * dimdetps[0] + offset + j];
+                plen = detps[i * dimdetps[0] + offset + j] * cfg->unitinmm;   /* in mm: mua is in 1/mm here */
                 cfg->replayweight[cfg->nphoton] *= expf(-cfg->prop[j - hasdetid + 1].mua * plen);
-                plen *= cfg->unitinmm;
                 cfg->replaytime[cfg->nphoton] += plen * R_C0 * cfg->prop[j - hasdetid + 1].n;
             }
 
