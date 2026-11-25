@@ -17,7 +17,7 @@
 # environment variables:
 #    MMC:  path to the mmc binary (default ../bin/mmc)
 #    BACKENDS: GPU backends to test (default: probe opencl, cuda and optix)
-#    PYTHON: python with numpy, used by the optix planar test (default python3)
+#    PYTHON: python with numpy, used by the optix planar and the replay tests (default python3)
 
 MMC=${MMC:-$(dirname "$0")/../bin/mmc}
 PYTHON=${PYTHON:-python3}
@@ -146,6 +146,18 @@ for b in $BACKENDS; do
         temp=$(cd "$WORKDIR" && "$MMC" --bench "$name" -c $b -G 1 -n 1e5 -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E "absorbed: *$expect\.[0-9]+%")
         if [ -z "$temp" ]; then echo "fail to match the absorbed fraction of $name with $b"; fail=$((fail + 1)); else echo "ok"; fi
     done
+
+    # the weights of the replayed photons (fangq/mmc#137): the total of the replayed wl and jacobian
+    # maps must equal sum(w*L) of the detected photons in the .mch file, at LengthUnit 1 and 2; not
+    # on the CPU (-G -1), whose SSE-math RNG buffers random numbers across photons, so a replayed
+    # photon does not follow the path of the detected one
+    echo "test the weights of the replayed photons with $b ... "
+    if ! "$PYTHON" "$TESTDIR/replaycheck.py" "$MMC" "$WORKDIR" -c $b -G 1 $PARAM > "$WORKDIR/replay_$b.log" 2>&1; then
+        cat "$WORKDIR/replay_$b.log"
+        fail=$((fail + 1))
+    else
+        echo "ok"
+    fi
 
     if [ "$b" = "cuda" ]; then
         echo "test step-by-step photon trajectories with cuda against the opencl golden data ... "

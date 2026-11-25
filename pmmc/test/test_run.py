@@ -26,7 +26,7 @@ except ImportError:
     iso2mesh = None
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from test_pmmc import base_cfg  # noqa: E402  the 20 mm cube of 6 tetrahedra
+from test_pmmc import base_cfg, has_backend  # noqa: E402  the 20 mm cube of 6 tetrahedra
 
 PROP = np.array([[0, 0, 1, 1], [0.05, 2, 0.8, 1]], np.float32)  # as base_cfg
 NULLDEV = "none"  # silences the log
@@ -516,6 +516,84 @@ class TestGpuName(unittest.TestCase):
         for bad in ("no such device", name + ":"):
             with self.assertRaises(Exception, msg=bad):
                 pmmc.run(cfg(compute="opencl", gpuid=bad))
+
+
+@unittest.skipIf(pmmc is None or iso2mesh is None, "pmmc.mmclab needs iso2mesh")
+class TestReplay(unittest.TestCase):
+    """the weights of the replayed photons (fangq/mmc#137): every replayed photon i deposits
+    w_i*L along its path, w_i = exp(-sum_m mua_m*L_im) its detected weight from its partial
+    paths L_im, so the unnormalized 'wl' map summed over the elements of medium m equals
+    sum_i w_i*L_im; 'jacobian' is the same weighted path length (as in mcx), normalized in mm"""
+
+    MUA = np.array([0.01, 0.03])  # 1/mm, top and bottom layer
+
+    @classmethod
+    def setUpClass(cls):
+        node, elem = iso2mesh.meshgrid6(
+            np.arange(0, 41, 4), np.arange(0, 41, 4), np.arange(0, 25, 4)
+        )[:2]
+        cls.node, cls.elem = node, elem
+        cls.label = np.where(node[elem - 1].mean(1)[:, 2] < 8, 1, 2)
+
+    def run_replay(self, unit, compute="sse", **kw):
+        """the baseline (in mesh units of unit mm), its detected photons, and the replays"""
+        prop = [[0, 0, 1, 1], [self.MUA[0], 1, 0.01, 1.37], [self.MUA[1], 1, 0.01, 1]]
+        c = dict(
+            nphoton=50000, seed=1234, node=self.node / unit, elem=self.elem, elemprop=self.label,
+            unitinmm=unit, prop=prop, srcpos=[20.1 / unit, 14.2 / unit, 0], srcdir=[0, 0, 1],
+            detpos=[[20 / unit, 26 / unit, 0, 2 / unit]], tstart=0, tend=5e-9, tstep=5e-9,
+            method="elem", basisorder=0, issaveseed=1, flog=NULLDEV, compute=compute, gpuid=1,
+        )
+        c = pmmc.mmclab(c, "prep")
+        base = pmmc.mmclab(c)
+        det = base["detp"]["data"]
+        self.assertGreater(det.shape[1], 20, "too few detected photons")
+        rep = dict(c, seed=base["seeds"], detphotons=det, replaydet=1, issaveseed=0, **kw)
+        return det, rep
+
+    def check_weights(self, compute):
+        for unit in (1, 2):
+            with self.subTest(unitinmm=unit, compute=compute):
+                det, rep = self.run_replay(unit, compute)
+                plen = det[3:5].T.astype(float)  # rows: detid, nscat x 2, ppath x 2 (mesh units)
+                w = np.exp(-(plen * unit) @ self.MUA)
+                expected = (w[:, None] * plen).sum(0)
+                out = {}
+
+                for otype in ("wl", "jacobian"):
+                    for norm in (0, 1):
+                        flux = pmmc.mmclab(dict(rep, outputtype=otype, isnormalized=norm))["flux"]
+                        flux = flux.reshape(len(self.elem), -1).sum(1)
+                        out[otype, norm] = np.array(
+                            [flux[self.label == 1].sum(), flux[self.label == 2].sum()]
+                        )
+
+                np.testing.assert_allclose(out["wl", 0], expected, rtol=1e-4)
+                np.testing.assert_allclose(out["jacobian", 0], out["wl", 0], rtol=1e-4)
+                # normalized by the total detected weight; jacobian in mm (unitinmm/sum(w), as mcx)
+                np.testing.assert_allclose(out["wl", 1] * w.sum(), expected, rtol=1e-4)
+                np.testing.assert_allclose(out["jacobian", 1] * w.sum(), expected * unit, rtol=1e-4)
+
+    def test_weights(self):
+        self.check_weights("sse")
+
+    def test_weights_opencl(self):
+        if not has_backend("opencl"):
+            self.skipTest("pmmc opencl backend is not available")
+        self.check_weights("opencl")
+
+    def test_weights_cuda(self):
+        if not has_backend("cuda"):
+            self.skipTest("pmmc cuda backend is not available")
+        self.check_weights("cuda")
+
+    def test_detphotons_without_all_media(self):
+        """detphotons without the partial paths of all media raise an error, which leaves
+        pmmc usable"""
+        det, rep = self.run_replay(1, outputtype="wl")
+        with self.assertRaises(Exception):
+            pmmc.mmclab(dict(rep, detphotons=np.asfortranarray(det[:4])))
+        self.assertIn("flux", pmmc.mmclab(rep))
 
 
 if __name__ == "__main__":

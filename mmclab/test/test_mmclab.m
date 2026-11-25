@@ -156,6 +156,51 @@ cfg.outputtype = 'jacobian';
 jac = mmclab(cfg);
 assert(all(isfinite(jac.data(:))) && sum(abs(jac.data(:))) > 0, 'Jacobian values');
 
+% the weights of the replayed photons (fangq/mmc#137): each replayed photon i deposits
+% w_i*L along its path, w_i = exp(-sum_m mua_m*L_im) its detected weight, so the unnormalized
+% 'wl' map summed over the elements of medium m is sum_i w_i*L_im; 'jacobian' is the same
+% weighted path length (as in mcx), normalized in mm; the mesh is in 2 mm units
+mua = [0.01 0.03];  % 1/mm, top and bottom layer
+[node, elem] = meshgrid6(0:4:40, 0:4:40, 0:4:24);
+c = (node(elem(:, 1), :) + node(elem(:, 2), :) + node(elem(:, 3), :) + node(elem(:, 4), :)) / 4;
+label = 1 + (c(:, 3) >= 8);
+for unit = [1 2]
+    cfg = mkcfg(extra, 'node', node / unit, 'elem', elem, 'elemprop', label, 'unitinmm', unit, ...
+                'prop', [0 0 1 1; mua(1) 1 0.01 1.37; mua(2) 1 0.01 1], 'srcpos', [20.1 14.2 0] / unit, ...
+                'detpos', [[20 26 0] / unit, 2 / unit], 'method', 'elem', 'basisorder', 0, ...
+                'nphoton', 5e4, 'seed', 1234, 'issaveseed', 1);
+    [flux, detp, ncfg, seeds] = mmclab(cfg);
+    assert(numel(detp.detid) > 20, 'too few detected photons');
+    w = exp(-(double(detp.ppath) * unit) * mua(:));
+    expected = sum(bsxfun(@times, w, double(detp.ppath)), 1);
+    cfg.seed = seeds.data;
+    cfg.detphotons = detp.data;
+    cfg.replaydet = 1;
+    cfg.issaveseed = 0;
+    for otype = {'wl', 'jacobian'}
+        for norm = [0 1]
+            cfg.outputtype = otype{1};
+            cfg.isnormalized = norm;
+            out = mmclab(cfg);
+            v = sum(reshape(out.data, numel(label), []), 2);
+            got = [sum(v(label == 1)) sum(v(label == 2))];
+            if (norm)
+                got = got * sum(w) / (strcmp(otype{1}, 'jacobian') * (unit - 1) + 1);
+            end
+            assert(max(abs(got ./ expected - 1)) < 1e-4, sprintf('unitinmm %d, %s (normalized %d): map [%g %g], sum w*L [%g %g]', ...
+                                                               unit, otype{1}, norm, got, expected));
+        end
+    end
+end
+% detphotons without the partial paths of all media raise an error, which leaves mmclab usable
+cfg.outputtype = 'wl';
+dp = cfg.detphotons;
+cfg.detphotons = dp(1:4, :);
+assert_error(@() mmclab(cfg), 'detphotons without the partial paths of all media');
+cfg.detphotons = dp;
+out = mmclab(cfg);
+assert(sum(out.data(:)) > 0, 'mmclab runs after a replay error');
+
 function test_option_sets_compute(extra)
 % mmclab(cfg, 'sse') runs on the CPU, overriding cfg.compute
 cfg = mkcfg(extra, 'outputtype', 'energy', 'compute', 'xyz');
