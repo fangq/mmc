@@ -17,9 +17,12 @@ This catches the replay reading the scattering-count columns of the .mch file as
 partial paths (it needs 2 or more media), and applying unitinmm twice to the weights;
 the case is run at LengthUnit 1 and 2 (the mesh in 2 mm units).
 
-Run it on a GPU backend: on the CPU (-G -1), the SSE-math random number functions buffer
-random numbers across photons, so a replayed photon does not follow the path of the
-detected one.
+A time-resolved wl replay with a time window starting after 0 (4 gates) must put
+every photon in the gate of its time of flight t_i = sum_m n_m*L_im*unitinmm/c minus
+the start of the window, and drop the photons detected outside of the window.
+
+On the CPU (-G -1), this also catches a replayed photon not following the path of the
+detected one, e.g. when it uses random numbers buffered by the previous photon.
 
 The exit code is the number of failed checks.
 """
@@ -41,6 +44,7 @@ HEADER = np.dtype(
     ]
 )
 RTOL = 1e-3  # float32 accumulation over a few hundred photons
+C0 = 299792458e3  # speed of light in vacuum, mm/s
 
 
 def loadmch(fname):
@@ -98,8 +102,10 @@ def main():
         # columns: detid, nscat x nmed, ppath x nmed, ..., w0
         ppath = det[:, 1 + nmed:1 + 2 * nmed].astype(float)
         mua = np.array([m["mua"] for m in cfg["Domain"]["Media"][1:]])
+        nidx = np.array([m["n"] for m in cfg["Domain"]["Media"][1:]])
         weight = det[:, -1] * np.exp(-(ppath * unit) @ mua)
         expected = (weight[:, None] * ppath).sum()
+        tof = (ppath * unit) @ nidx / C0
 
         total = {}
 
@@ -114,6 +120,30 @@ def main():
             print("unitinmm %d, %s: total of the replay map %.6g, sum of w*L %.6g (%d photons) ... %s"
                   % (unit, name, total[otype], expected, len(weight), "ok" if ok else "FAIL"))
             fail += not ok
+
+        # time-resolved: the window starts at the 30th percentile of the times of flight
+        ngate = 4
+        t0 = float(np.quantile(tof, 0.3))
+        dt = (float(np.quantile(tof, 0.95)) - t0) / ngate
+        gate = np.minimum(np.floor((tof - t0) / dt), ngate - 1)
+        inwin = (tof >= t0) & (tof <= t0 + ngate * dt)
+        wl = (weight[:, None] * ppath).sum(1)
+        gexpected = np.array([wl[inwin & (gate == g)].sum() for g in range(ngate)])
+        cfg["Forward"] = {"T0": t0, "T1": t0 + ngate * dt, "Dt": dt}
+        tinp = "%s_u%d_t.json" % (tag, unit)
+
+        with open(os.path.join(workdir, tinp), "w") as f:
+            json.dump(cfg, f)
+
+        out = "%s_Lt" % sess
+        run(mmc, workdir, ["-f", tinp, "-E", sess + "_base.mch", "-O", "L", "-U", "0",
+                           "-F", "bin", "-s", out] + extra)
+        gtotal = np.fromfile(os.path.join(workdir, out + ".bin")).reshape(ngate, -1).sum(1)
+        ok = np.allclose(gtotal, gexpected, rtol=RTOL, atol=RTOL * gexpected.max())
+        print("unitinmm %d, wl in %d gates from %.3g ns: %s, expected %s ... %s"
+              % (unit, ngate, t0 * 1e9, np.array2string(gtotal, precision=5),
+                 np.array2string(gexpected, precision=5), "ok" if ok else "FAIL"))
+        fail += not ok
 
     return fail
 

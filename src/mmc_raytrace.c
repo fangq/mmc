@@ -54,6 +54,12 @@
     #define JUST_BELOW_ONE  0.9998f          /**<  used to clamp pattern index to avoid overflow */
 #endif
 
+/* a replay deposits the whole path of a photon in the time gate of its detection (the Jacobian of
+   the measurement in that gate), also the part before the time window */
+static inline int mmc_is_replay_map(const mcconfig* cfg) {
+    return cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian);
+}
+
 static inline int mmc_is_fluence_like(char outputtype) {
     return outputtype != otEnergy && outputtype != otWP && outputtype != otWL && outputtype != otJacobian;
 }
@@ -457,12 +463,12 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->photontimer += r->Lmove * rc;
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
-                tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->ne;
+                tshift = MIN(MAX((int)((cfg->replaytime[r->photonid] - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->ne;
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->ne;
             }
 
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) { /* no fluence in non-tissue (label<=0) elements, as mcx never deposits in label-0 voxels, nor before the time window */
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && (r->photontimer >= cfg->tstart || mmc_is_replay_map(cfg))) { /* no fluence in non-tissue (label<=0) elements, as mcx never deposits in label-0 voxels, nor before the time window except in a replay */
                 if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                     #pragma omp atomic
                     tracer->mesh->weight[eid + tshift] += ww;
@@ -497,7 +503,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                     }
 
                     if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
-                        tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->nn;
+                        tshift = MIN(MAX((int)((cfg->replaytime[r->photonid] - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->nn;
                     } else {
                         tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->nn;
                     }
@@ -515,7 +521,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                         }
                     }
 
-                    if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
+                    if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && (r->photontimer >= cfg->tstart || mmc_is_replay_map(cfg))) {
                         if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                             for (i = 0; i < 4; i++) {
                                 #pragma omp atomic
@@ -730,7 +736,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             }
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
-                tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
+                tshift = MIN(MAX((int)((cfg->replaytime[r->photonid] - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             }
@@ -797,7 +803,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             //if(cfg->debuglevel&dlBary)
             //    MMC_FPRINTF(cfg->flog,"new bary0=[%f %f %f %f]\n",r->bary0.x,r->bary0.y,r->bary0.z,r->bary0.w);
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && (r->photontimer >= cfg->tstart || mmc_is_replay_map(cfg))) {
                 if (!cfg->basisorder) {
                     if (cfg->srctype != stPattern || cfg->srcnum == 1) {
                         #pragma omp atomic
@@ -966,7 +972,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->photontimer += r->Lmove * rc;
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
-                tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
+                tshift = MIN(MAX((int)((cfg->replaytime[r->photonid] - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             }
@@ -980,7 +986,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->p0.y += r->Lmove * r->vec.y;
             r->p0.z += r->Lmove * r->vec.z;
 
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && (r->photontimer >= cfg->tstart || mmc_is_replay_map(cfg))) {
                 if (!cfg->basisorder) {
                     #pragma omp atomic
                     tracer->mesh->weight[eid + tshift] += ww;
@@ -1615,7 +1621,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
             r->photontimer += r->Lmove * rc;
 
             if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
-                tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * framelen;
+                tshift = MIN(MAX((int)((cfg->replaytime[r->photonid] - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * framelen;
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * framelen;
             }
@@ -1646,7 +1652,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
             T = _mm_add_ps(S, _mm_mul_ps(O, T));
             _mm_store_ps(&(r->p0.x), T);
 
-            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && r->photontimer >= cfg->tstart) {
+            if (cfg->mcmethod == mmMCX && tracer->mesh->type[eid] > 0 && (r->photontimer >= cfg->tstart || mmc_is_replay_map(cfg))) {
                 if (!cfg->basisorder) {
                     if (cfg->method == rtBLBadouel) {
                         unsigned int newidx = eid + tshift;
@@ -1922,6 +1928,10 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
     } else {
         MMC_ERROR(-6, "specified ray-tracing algorithm is not defined");
     }
+
+#ifdef MMC_USE_SSE_MATH
+    mc_reset_math_rng();   /* the photon (and its replay) must not use values buffered by the previous one */
+#endif
 
     /*initialize the photon parameters*/
     launchphoton(cfg, &r, mesh, ran, ran0);

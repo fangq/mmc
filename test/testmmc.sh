@@ -86,6 +86,18 @@ ndet=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -n 1e5 -S 0 -d 1 -q 1 -
 nrep=$(cd "$WORKDIR" && "$MMC" --bench dmmc-cube60 -G -1 -E replaytest.mch -S 0 -D T $PARAM 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -o -E 'total simulated energy: *[0-9]+' | head -1 | grep -o -E '[0-9]+$')
 if [ -z "$ndet" ] || [ "$ndet" = "0" ] || [ "$ndet" != "$nrep" ]; then echo "fail to replay detected photons (detected ${ndet:-none}, replayed ${nrep:-none})"; fail=$((fail + 1)); else echo "ok"; fi
 
+# the weights of the replayed photons (fangq/mmc#137): the total of the replayed wl and jacobian
+# maps must equal sum(w*L) of the detected photons in the .mch file, at LengthUnit 1 and 2, and a
+# time-resolved replay must put each photon in the gate of its time of flight minus the start
+# of the time window; the replayed photons must follow the paths of the detected ones
+echo "test the weights of the replayed photons ... "
+if ! "$PYTHON" "$TESTDIR/replaycheck.py" "$MMC" "$WORKDIR" -G -1 $PARAM > "$WORKDIR/replay_cpu.log" 2>&1; then
+    cat "$WORKDIR/replay_cpu.log"
+    fail=$((fail + 1))
+else
+    echo "ok"
+fi
+
 echo "test step-by-step photon trajectories ... "
 if ! MMC="$MMC" sh "$TESTDIR/testtraj.sh" > "$WORKDIR/traj.log" 2>&1; then
     cat "$WORKDIR/traj.log"
@@ -147,10 +159,7 @@ for b in $BACKENDS; do
         if [ -z "$temp" ]; then echo "fail to match the absorbed fraction of $name with $b"; fail=$((fail + 1)); else echo "ok"; fi
     done
 
-    # the weights of the replayed photons (fangq/mmc#137): the total of the replayed wl and jacobian
-    # maps must equal sum(w*L) of the detected photons in the .mch file, at LengthUnit 1 and 2; not
-    # on the CPU (-G -1), whose SSE-math RNG buffers random numbers across photons, so a replayed
-    # photon does not follow the path of the detected one
+    # the weights and time gates of the replayed photons, as on the CPU above
     echo "test the weights of the replayed photons with $b ... "
     if ! "$PYTHON" "$TESTDIR/replaycheck.py" "$MMC" "$WORKDIR" -c $b -G 1 $PARAM > "$WORKDIR/replay_$b.log" 2>&1; then
         cat "$WORKDIR/replay_$b.log"

@@ -76,10 +76,19 @@ inlinefun float rand_do_roulette(RandType t[RAND_BUF_LEN]) {
 
 #define MATH_BLOCK 8
 
+static MMC_TLS int sincos_pos = (MATH_BLOCK << 2);   /* next unused value in the sin/cos buffer */
+static MMC_TLS int scatlen_pos = (MATH_BLOCK << 2);  /* next unused value in the log buffer */
+
+//! drop the buffered values, so that a photon only uses random numbers from its own seed
+inlinefun void rand_reset_math_buf(void) {
+    sincos_pos = (MATH_BLOCK << 2);
+    scatlen_pos = (MATH_BLOCK << 2);
+}
+
 //! generate [0,1] random number for the sin/cos of arimuthal angles
 inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN], float* si, float* co) {
     static MMC_TLS V4SF sine[MATH_BLOCK], cosine[MATH_BLOCK];
-    static MMC_TLS int pos = (MATH_BLOCK << 2);
+    int pos = sincos_pos;
 
     if (pos >= (MATH_BLOCK << 2)) {
         V4SF ran[MATH_BLOCK];
@@ -99,13 +108,13 @@ inlinefun void rand_next_aangle_sincos(RandType t[RAND_BUF_LEN], float* si, floa
 
     *si = sine[pos >> 2].f[pos & 3];    /* element pos of the buffer, not past sine[0] */
     *co = cosine[pos >> 2].f[pos & 3];
-    pos++;
+    sincos_pos = pos + 1;
 }
 
 //! generate [0,1] random number for the next scattering length
 inlinefun float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]) {
     static MMC_TLS V4SF logval[MATH_BLOCK];
-    static MMC_TLS int pos = (MATH_BLOCK << 2);
+    int pos = scatlen_pos;
     float res;
 
     if (pos >= (MATH_BLOCK << 2)) {
@@ -126,7 +135,7 @@ inlinefun float rand_next_scatlen_ps(RandType t[RAND_BUF_LEN]) {
 
     res = logval[pos >> 2].f[pos & 3];
     res = ((res != res) ? LOG_RNG_MAX : (-res));
-    pos++;
+    scatlen_pos = pos + 1;
     return res;
 }
 #endif

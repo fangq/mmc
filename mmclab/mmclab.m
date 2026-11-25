@@ -214,6 +214,9 @@ function varargout = mmclab(varargin)
 %                      'jacobian' or 'wl'  replay: mua Jacobian (weighted path length)
 %                                  sum of w*L of the replayed photons; normalized by
 %                                  their total weight w, 'jacobian' in mm, 'wl' in mesh units
+%                                  ('wl','wp','jacobian': the whole path of each photon is in the
+%                                  time gate of its detection; photons detected outside of
+%                                  [tstart,tend] are not replayed)
 %                      'wp'        replay: weighted scattering counts (mus Jacobian)
 %                      'rf'        with cfg.omega>0 and no replay: the complex
 %                                  fluence rate

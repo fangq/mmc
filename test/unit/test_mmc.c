@@ -2912,6 +2912,62 @@ static void test_replay(void) {
         tof[i] = (plen[i][0] * med[1].n + plen[i][1] * med[2].n) * unit * R_C0;
     }
 
+#ifdef MMC_USE_SSE_MATH
+    /* a photon draws its scattering lengths and angles from buffers of SSE-computed values;
+       they are dropped at the start of each photon, otherwise a replayed photon uses the
+       values left over by the previous one and does not follow the path of its seed */
+    {
+        mcconfig cfg;
+        RandType seed[RAND_BUF_LEN], ran[RAND_BUF_LEN];
+        float slen[2][40], dirx[2][40];
+        int k, same = 1, sameold = 1;
+
+        mcx_initcfg(&cfg);
+        cfg.flog = devnull;
+
+        for (i = 0; i < RAND_BUF_LEN; i++) {
+            seed[i] = 0x9E3779B97F4A7C15ULL * (i + 1);
+        }
+
+        for (k = 0; k < 3; k++) {   /* k=1: after another photon used part of the buffers */
+            float3 dir = {0.f, 0.f, 1.f};
+
+            if (k == 1) {
+                for (i = 0; i < 13; i++) {
+                    mc_next_scatter(0.9f, &dir, ran, ran, &cfg, NULL);
+                }
+
+                dir.x = dir.y = 0.f, dir.z = 1.f;
+            }
+
+            memcpy(ran, seed, sizeof(ran));
+
+            if (k < 2) {
+                mc_reset_math_rng();    /* as onephoton */
+            }
+
+            for (i = 0; i < 40; i++) {  /* more than one buffer of 32 values */
+                float v = mc_next_scatter(0.9f, &dir, ran, ran, &cfg, NULL);
+
+                if (k < 2) {
+                    slen[k][i] = v, dirx[k][i] = dir.x;
+                } else {
+                    sameold &= (v == slen[0][i] && dir.x == dirx[0][i]);
+                }
+            }
+        }
+
+        for (i = 0; i < 40; i++) {
+            same &= (slen[0][i] == slen[1][i] && dirx[0][i] == dirx[1][i]);
+        }
+
+        EXPECT_TRUE(same, "a photon scatters the same from its seed after mc_reset_math_rng");
+        EXPECT_TRUE(!sameold, "without mc_reset_math_rng, the buffered values of the previous photon are used");
+        cfg.flog = stdout;  /* mcx_clearcfg closes the log file */
+        mcx_clearcfg(&cfg);
+    }
+#endif
+
     /* mcx_replayinit (mmclab/pmmc): rows of detphotons are detid, nscat x 2, ppath x 2, w0 */
     {
         mcconfig cfg;
@@ -2955,6 +3011,19 @@ static void test_replay(void) {
         free(cfg.replaytime);
         cfg.replayweight = cfg.replaytime = NULL;
         cfg.replaydet = 0;
+
+        /* photon times of flight: 1.18e-10, 1.61e-10 and 1.11e-10 s */
+        cfg.tstart = 1.15e-10f;
+        cfg.tend = 1.5e-10f;
+        cfg.nphoton = 3;
+        mcx_replayinit(&cfg, med, 3, detps, dim, 16);
+        EXPECT_EQ(cfg.nphoton, 1, "mcx_replayinit keeps only the photons detected in the time window");
+        EXPECT_NEAR(cfg.replayweight[0], weight[0], 1e-6, "mcx_replayinit: weight of the photon in the time window");
+        free(cfg.replayweight);
+        free(cfg.replaytime);
+        cfg.replayweight = cfg.replaytime = NULL;
+        cfg.tstart = 0.f;
+        cfg.tend = 5e-9f;
         cfg.nphoton = 3;
 
         dim[0] = 4;
@@ -2998,6 +3067,8 @@ static void test_replay(void) {
         cfg.flog = devnull;
         cfg.outputtype = otWL;
         cfg.unitinmm = unit;
+        cfg.tstart = 0.f;
+        cfg.tend = 5e-9f;
         snprintf(cfg.seedfile, sizeof(cfg.seedfile), "replayunit.mch");
         mesh.prop = 2;
         mesh.med = med;
@@ -3009,6 +3080,18 @@ static void test_replay(void) {
             EXPECT_NEAR(cfg.replaytime[i] / tof[i], 1.f, 1e-6, "mesh_loadseedfile: time of flight of the partial paths in mm");
         }
 
+        free(cfg.photonseed);
+        free(cfg.replayweight);
+        free(cfg.replaytime);
+        cfg.photonseed = NULL, cfg.replayweight = cfg.replaytime = NULL;
+
+        /* as mcx_replayinit: a photon detected outside of the time window has no time gate, and
+           replaying it would write before the output (the gate index subtracts tstart) */
+        cfg.tstart = 1.15e-10f;
+        cfg.tend = 1.5e-10f;
+        mesh_loadseedfile(&mesh, &cfg);
+        EXPECT_EQ(cfg.nphoton, 1, "mesh_loadseedfile keeps only the photons detected in the time window");
+        EXPECT_NEAR(cfg.replaytime[0] / tof[0], 1.f, 1e-6, "mesh_loadseedfile: the photon in the time window");
         free(cfg.photonseed);
         free(cfg.replayweight);
         free(cfg.replaytime);

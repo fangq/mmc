@@ -1228,7 +1228,7 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 
         /* replay outputs (jacobian/wl/wp) are binned by the detected time of flight of the replayed photon */
         if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP) + (GPU_PARAM(gcfg, outputtype) == otJacobian)) {
-            tshift = MIN( ((int)(replaytime[r->photonid] * GPU_PARAM(gcfg, Rtstep))), (int)GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
+            tshift = MIN(max((int)((replaytime[r->photonid] - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), (int)GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, framelen);
         } else {
             tshift = MIN(max((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), (int)GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, framelen);
         }
@@ -1246,7 +1246,10 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
 #endif
             }
 
-            ww = (r->photontimer < gcfg->tstart) ? 0.f : ww;    /* nothing is recorded before the time window */
+            /* nothing is recorded before the time window, except in a replay, which deposits the whole
+               path of a photon in the time gate of its detection */
+            ww = (r->photontimer < gcfg->tstart && !(GPU_PARAM(gcfg, seed) == SEED_FROM_FILE
+                    && (GPU_PARAM(gcfg, outputtype) == otWL || GPU_PARAM(gcfg, outputtype) == otWP || GPU_PARAM(gcfg, outputtype) == otJacobian))) ? 0.f : ww;
 
 #ifdef USE_BLBADOUEL
 #ifdef __NVCC__

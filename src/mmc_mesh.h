@@ -192,6 +192,9 @@ void tracer_prep(raytracer* tracer, mcconfig* cfg);
 void mesh_roilist(tetmesh* mesh, mcconfig* cfg);
 void tracer_clear(raytracer* tracer);
 
+#ifdef MMC_USE_SSE_MATH
+void mc_reset_math_rng(void);
+#endif
 float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom);
 #ifdef MCX_CONTAINER
 #ifdef __cplusplus

@@ -595,6 +595,55 @@ class TestReplay(unittest.TestCase):
             pmmc.mmclab(dict(rep, detphotons=np.asfortranarray(det[:4])))
         self.assertIn("flux", pmmc.mmclab(rep))
 
+    def test_detphotons_layout(self):
+        """a C-ordered or float64 detphotons gives the same replay as the Fortran-ordered float32
+        detp output: pmmc converts it into a temporary copy, which must not be used after it
+        is freed"""
+        det, rep = self.run_replay(1, outputtype="wl", isnormalized=0)
+        ref = pmmc.mmclab(rep)["flux"]
+        self.assertGreater(ref.sum(), 0)
+
+        for arr in (np.ascontiguousarray(det), np.asfortranarray(det, dtype=np.float64),
+                    np.ascontiguousarray(det, dtype=np.float64)):
+            with self.subTest(order="F" if arr.flags.f_contiguous else "C", dtype=arr.dtype.name):
+                np.testing.assert_array_equal(pmmc.mmclab(dict(rep, detphotons=arr))["flux"], ref)
+
+    def check_time_gates(self, compute):
+        """with a time window starting after 0, the replay puts the whole path of each photon
+        in the gate of its time of flight (from its partial paths) minus the start of the
+        window, and drops the photons detected outside of the window"""
+        ngate, dt = 4, 0.1e-9
+        nidx = np.array([1.37, 1.0])
+
+        for unit in (1, 2):
+            with self.subTest(unitinmm=unit, compute=compute):
+                det, rep = self.run_replay(unit, compute)
+                plen = det[3:5].T.astype(float)
+                w = np.exp(-(plen * unit) @ self.MUA)
+                tof = (plen * unit) @ nidx / 299792458e3
+                t0 = float(np.quantile(tof, 0.3))
+                gate = np.minimum(np.floor((tof - t0) / dt), ngate - 1)
+                inwin = (tof >= t0) & (tof <= t0 + ngate * dt)
+                wl = (w[:, None] * plen).sum(1)
+                expected = np.array([wl[inwin & (gate == g)].sum() for g in range(ngate)])
+                flux = pmmc.mmclab(dict(rep, outputtype="wl", isnormalized=0, tstart=t0,
+                                        tend=t0 + ngate * dt, tstep=dt))["flux"]
+                gtotal = flux.reshape(len(self.elem), ngate).sum(0)
+                np.testing.assert_allclose(gtotal, expected, rtol=1e-4, atol=1e-4 * expected.max())
+
+    def test_time_gates(self):
+        self.check_time_gates("sse")
+
+    def test_time_gates_opencl(self):
+        if not has_backend("opencl"):
+            self.skipTest("pmmc opencl backend is not available")
+        self.check_time_gates("opencl")
+
+    def test_time_gates_cuda(self):
+        if not has_backend("cuda"):
+            self.skipTest("pmmc cuda backend is not available")
+        self.check_time_gates("cuda")
+
 
 if __name__ == "__main__":
     unittest.main()

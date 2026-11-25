@@ -1186,6 +1186,11 @@ void mesh_loadseedfile(tetmesh* mesh, mcconfig* cfg) {
                     cfg->replaytime[cfg->nphoton] += mesh->med[j - 1].n * ppath[i * his.colcount + his.maxmedia + j - 1] * his.unitinmm * R_C0;
                 }
 
+                /* as mcx_replayinit: a photon detected outside of the time window has no time gate */
+                if (cfg->replaytime[cfg->nphoton] < cfg->tstart || cfg->replaytime[cfg->nphoton] > cfg->tend) {
+                    continue;
+                }
+
                 cfg->nphoton++;
             }
 
@@ -2270,6 +2275,12 @@ void tracer_clear(raytracer* tracer) {
  * @param[out] cfg: the simulation configuration
  * @param[out] pmom: buffer to store momentum transfer data if needed
  */
+
+#ifdef MMC_USE_SSE_MATH
+void mc_reset_math_rng(void) {
+    rand_reset_math_buf();
+}
+#endif
 
 float mc_next_scatter(float g, float3* dir, RandType* ran, RandType* ran0, mcconfig* cfg, float* pmom) {
 

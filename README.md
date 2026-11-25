@@ -771,6 +771,10 @@ Output quantities, files and formats
 | `A`, `D`, `U`, `V` | `adjoint`, `adjoint_dcoeff`, `adjoint_mus`, `adjoint_musp` | adjoint Jacobians |
 | `W`, `Q` | `adjoint_mua_d`, `adjoint_mua_musp` | two adjoint Jacobians together |
 
+In a replay (`-E <session>.mch`), `jacobian`, `wl` and `wp` put the whole path of each
+replayed photon in the time gate of its detection; photons detected outside of the time
+window are not replayed.
+
 **Files of the command line**: the volume output `<session>.<ext>` in the format set by
 `-F` (`.dat` text by default, or `.bin`, `.mc2`, `.nii`, `.jnii`, `.bnii`; RF runs also
 write the imaginary part to `<session>_imag.<ext>`), the detected photons

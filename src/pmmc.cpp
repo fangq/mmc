@@ -74,6 +74,7 @@ PYBIND11_RUNTIME_EXCEPTION(runtime_error, PyExc_RuntimeError);
 namespace py = pybind11;
 
 float* det_ps = nullptr;     //! buffer to receive data from cfg.detphotons field
+std::vector<float> det_ps_buf;  //! own copy of cfg.detphotons, det_ps points to it
 int dim_det_ps[2] = {0, 0};  //! dimensions of the cfg.detphotons array
 int seed_byte = 0;
 
@@ -986,7 +987,15 @@ void parse_config(const py::dict& user_cfg, mcconfig& mcx_config, tetmesh& mesh)
 
         auto buffer_info = detphotons.request();
 
-        det_ps = static_cast<float*>(buffer_info.ptr);
+        if (buffer_info.ndim != 2) {
+            throw py::value_error("detphotons must be a 2D array");
+        }
+
+        /* copy the data: ensure() converts a C-ordered or non-float32 array into a temporary,
+           which is freed at the end of this block */
+        const float* val = static_cast<const float*>(buffer_info.ptr);
+        det_ps_buf.assign(val, val + buffer_info.size);
+        det_ps = det_ps_buf.data();
         dim_det_ps[0] = buffer_info.shape.at(0);
         dim_det_ps[1] = buffer_info.shape.at(1);
     }
@@ -1155,12 +1164,16 @@ inline void cleanup_configs(MCXGPUInfo*& gpu_info, mcconfig& mcx_config) {
     mcx_cleargpuinfo(&gpu_info);
     mcx_clearcfg(&mcx_config);
     pyecho_logfp = NULL;  /* mcx_clearcfg closed the log file */
+    std::vector<float>().swap(det_ps_buf);
+    det_ps = nullptr;
 }
 
 inline void cleanup_mesh(mcconfig& mcx_config, tetmesh& mesh) {
     mesh_clear(&mesh, &mcx_config);
     mcx_clearcfg(&mcx_config);
     pyecho_logfp = NULL;  /* mcx_clearcfg closed the log file */
+    std::vector<float>().swap(det_ps_buf);
+    det_ps = nullptr;
 }
 
 
@@ -1182,7 +1195,9 @@ py::dict pmmc_interface(const py::dict& user_cfg) {
         /*
          * To start an MCX simulation, we first create a simulation configuration and set all elements to its default settings.
          */
+        std::vector<float>().swap(det_ps_buf);
         det_ps = nullptr;
+        dim_det_ps[0] = dim_det_ps[1] = 0;
 
         parse_config(user_cfg, mcx_config, mesh);
 
