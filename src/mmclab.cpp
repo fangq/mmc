@@ -474,29 +474,10 @@ static void mcxlab_main(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs
             }
 
             /** Validate all input fields, and warn incompatible inputs */
-            /* the replay weights (mcx_replayinit) need the media, which are in mesh.med while cfg.medianum is 0:
-               expose them for this call only, also if it throws (mcx_clearcfg frees cfg.prop when cfg.medianum > 0) */
-            {
-                int medianum_saved = cfg.medianum;
-                medium* prop_saved = cfg.prop;
-
-                if (cfg.medianum == 0 && mesh.med) {
-                    cfg.medianum = mesh.prop + 1;
-                    cfg.prop = mesh.med;
-                }
-
-                try {
-                    mmc_validate_config(&cfg, detps, dimdetps, seedbyte);
-                } catch (...) {
-                    cfg.medianum = medianum_saved;
-                    cfg.prop = prop_saved;
-                    throw;
-                }
-
-                cfg.medianum = medianum_saved;
-                cfg.prop = prop_saved;
-            }
+            mmc_validate_config(&cfg, detps);
             mesh_validate(&mesh, &cfg);
+            /* after mesh_validate: the replay weights need mesh.med in 1/(mesh unit) */
+            mcx_replayinit(&cfg, mesh.med, mesh.prop + 1, detps, dimdetps, seedbyte);
             /* mmc_prep -> mesh_init_srcdata_eid fills per-slot e0 into
              * cfg.srcdata[].srcparam2.w so the kernel's launchnewphoton can
              * use the correct initial tet for each slot in multi-source mode. */

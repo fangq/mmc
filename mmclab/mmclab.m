@@ -212,6 +212,8 @@ function varargout = mmclab(varargin)
 %                      'fluence'   fluence (1/mm^2), integrated over each time gate
 %                      'energy'    energy deposited
 %                      'jacobian' or 'wl'  replay: mua Jacobian (weighted path length)
+%                                  sum of w*L of the replayed photons; normalized by
+%                                  their total weight w, 'jacobian' in mm, 'wl' in mesh units
 %                      'wp'        replay: weighted scattering counts (mus Jacobian)
 %                      'rf'        with cfg.omega>0 and no replay: the complex
 %                                  fluence rate

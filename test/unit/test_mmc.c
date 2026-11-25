@@ -1098,8 +1098,9 @@ static void run_mmclab_path(const char* args, CfgMutator mutate) {
         mutate(&cfg, &mesh);
     }
 
-    mmc_validate_config(&cfg, mlab_detps, mlab_dims, mlab_seedbyte);
+    mmc_validate_config(&cfg, mlab_detps);
     mesh_validate(&mesh, &cfg);
+    mcx_replayinit(&cfg, mesh.med, mesh.prop + 1, mlab_detps, mlab_dims, mlab_seedbyte);  /* as mmclab/pmmc */
     mmc_prep(&cfg, &mesh, &tracer);
     mmc_run_mp(&cfg, &mesh, &tracer);
     quiet_end();
@@ -1228,24 +1229,24 @@ static void test_mmclab_gpu_method(void) {
     cfg.flog = devnull;
 
     cfg.method = rtPlucker;  /* cfg.method='plucker' and cfg.compute='sse' */
-    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    mmc_validate_config(&cfg, NULL);
 #ifdef MMC_USE_SSE
     int ssemethod = cfg.method;
 #endif
 
     cfg.gpuid = 1;  /* cfg.compute='sse' with the default tracer of the GPU builds */
     cfg.method = rtBLBadouelGrid;
-    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    mmc_validate_config(&cfg, NULL);
     int cpumethod = cfg.method;
 
     cfg.compute = cbOpenCL;  /* cfg.method='plucker', cfg.compute='opencl', cfg.gpuid=1 */
     cfg.gpuid = 1;
     cfg.method = rtPlucker;
-    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    mmc_validate_config(&cfg, NULL);
     int gpumethod = cfg.method;
 
     cfg.method = rtBLBadouelGrid;  /* the GPU dual-grid tracer is kept */
-    mmc_validate_config(&cfg, NULL, mlab_dims, 0);
+    mmc_validate_config(&cfg, NULL);
     int gridmethod = cfg.method;
     quiet_end();
     cfg.flog = stdout;
@@ -2889,6 +2890,211 @@ static void ut_child_quickexit(void) {
 }
 #endif
 
+/*-----------------------------------------------------------------------------
+ *  photon replay: the weights and times of the replayed photons, the replay outputs
+ *  and the wide-field detector image
+ *---------------------------------------------------------------------------*/
+
+static void test_replay(void) {
+    /* 3 detected photons in 2 media: the scattering counts differ from the partial paths
+       (mesh units), so that reading the wrong .mch columns changes the weights */
+    const float nscat[3][2] = {{55.f, 0.f}, {1.f, 90.f}, {30.f, 30.f}};
+    const float plen[3][2] = {{10.f, 4.f}, {3.f, 20.f}, {7.f, 7.f}};
+    const int detid[3] = {1, 2, 1};
+    const float unit = 2.f, w0 = 0.5f;
+    /* mua in 1/(mesh unit), as mesh_loadmedia and mesh_validate leave it: 0.01 and 0.03/mm */
+    medium med[3] = {{0.f, 0.f, 1.f, 1.f}, {0.01f * unit, 1.f, 0.f, 1.37f}, {0.03f * unit, 1.f, 0.f, 1.f}};
+    float weight[3], tof[3];
+    int i;
+
+    for (i = 0; i < 3; i++) {
+        weight[i] = expf(-(med[1].mua * plen[i][0] + med[2].mua * plen[i][1]));
+        tof[i] = (plen[i][0] * med[1].n + plen[i][1] * med[2].n) * unit * R_C0;
+    }
+
+    /* mcx_replayinit (mmclab/pmmc): rows of detphotons are detid, nscat x 2, ppath x 2, w0 */
+    {
+        mcconfig cfg;
+        float detps[3 * 6];
+        int dim[2] = {6, 3};
+
+        for (i = 0; i < 3; i++) {
+            float rec[6] = {(float)detid[i], nscat[i][0], nscat[i][1], plen[i][0], plen[i][1], w0};
+            memcpy(detps + i * 6, rec, sizeof(rec));
+        }
+
+        mcx_initcfg(&cfg);
+        cfg.flog = devnull;
+        cfg.seed = SEED_FROM_FILE;
+        cfg.savedetflag = 0x7; /* detector ID, scattering counts and partial paths */
+        cfg.detnum = 2;
+        cfg.unitinmm = unit;
+        cfg.tstart = 0.f;
+        cfg.tend = 5e-9f;
+        cfg.tstep = 5e-9f;
+        cfg.nphoton = 3;
+        cfg.photonseed = calloc(3, 16);
+        mcx_replayinit(&cfg, med, 3, detps, dim, 16);
+        EXPECT_EQ(cfg.nphoton, 3, "mcx_replayinit replays all detected photons");
+
+        for (i = 0; i < 3; i++) {
+            EXPECT_NEAR(cfg.replayweight[i], weight[i], 1e-6, "mcx_replayinit: weight exp(-sum mua*L) of the partial paths, without unitinmm");
+            EXPECT_NEAR(cfg.replaytime[i] / tof[i], 1.f, 1e-6, "mcx_replayinit: time of flight of the partial paths in mm");
+        }
+
+        free(cfg.replayweight);
+        free(cfg.replaytime);
+        cfg.replayweight = cfg.replaytime = NULL;
+
+        cfg.replaydet = 2;
+        cfg.nphoton = 3;
+        mcx_replayinit(&cfg, med, 3, detps, dim, 16);
+        EXPECT_EQ(cfg.nphoton, 1, "mcx_replayinit keeps only the photons of replaydet");
+        EXPECT_NEAR(cfg.replayweight[0], weight[1], 1e-6, "mcx_replayinit: weight of the photon of replaydet");
+        free(cfg.replayweight);
+        free(cfg.replaytime);
+        cfg.replayweight = cfg.replaytime = NULL;
+        cfg.replaydet = 0;
+        cfg.nphoton = 3;
+
+        dim[0] = 4;
+        EXPECT_EXIT(mcx_replayinit(&cfg, med, 3, detps, dim, 16), "detphotons without the partial paths of all media");
+        dim[0] = 6;
+        EXPECT_EXIT(mcx_replayinit(&cfg, NULL, 0, detps, dim, 16), "a replay without the media");
+        EXPECT_EXIT(mmc_validate_config(&cfg, NULL), "a replay seed without detphotons");
+
+        free(cfg.photonseed);
+        cfg.photonseed = NULL;
+        cfg.flog = stdout;  /* mcx_clearcfg closes the log file */
+        mcx_clearcfg(&cfg);
+    }
+
+    /* mesh_loadseedfile (mmc binary): an .mch file of records detid, nscat x 2, ppath x 2, w0 */
+    {
+        mcconfig cfg;
+        tetmesh mesh;
+        history his;
+        unsigned char seeds[3 * 16] = {0};
+        FILE* fp;
+
+        memset(&his, 0, sizeof(his));
+        memcpy(his.magic, "MCXH", 4);
+        his.version = 1, his.maxmedia = 2, his.detnum = 2, his.colcount = 6, his.totalphoton = 100;
+        his.detected = his.savedphoton = 3, his.unitinmm = unit, his.seedbyte = 16, his.srcnum = 1;
+
+        fp = fopen("replayunit.mch", "wb");
+        fwrite(&his, sizeof(his), 1, fp);
+
+        for (i = 0; i < 3; i++) {
+            float rec[6] = {(float)detid[i], nscat[i][0], nscat[i][1], plen[i][0], plen[i][1], w0};
+            fwrite(rec, sizeof(rec), 1, fp);
+        }
+
+        fwrite(seeds, sizeof(seeds), 1, fp);
+        fclose(fp);
+
+        mcx_initcfg(&cfg);
+        mesh_init(&mesh);
+        cfg.flog = devnull;
+        cfg.outputtype = otWL;
+        cfg.unitinmm = unit;
+        snprintf(cfg.seedfile, sizeof(cfg.seedfile), "replayunit.mch");
+        mesh.prop = 2;
+        mesh.med = med;
+        mesh_loadseedfile(&mesh, &cfg);
+        EXPECT_EQ(cfg.nphoton, 3, "mesh_loadseedfile replays all detected photons");
+
+        for (i = 0; i < 3; i++) {
+            EXPECT_NEAR(cfg.replayweight[i], w0 * weight[i], 1e-6, "mesh_loadseedfile: weight of the partial path columns, unitinmm applied once");
+            EXPECT_NEAR(cfg.replaytime[i] / tof[i], 1.f, 1e-6, "mesh_loadseedfile: time of flight of the partial paths in mm");
+        }
+
+        free(cfg.photonseed);
+        free(cfg.replayweight);
+        free(cfg.replaytime);
+        cfg.photonseed = NULL, cfg.replayweight = cfg.replaytime = NULL;
+        mesh.med = NULL;
+        cfg.flog = stdout;  /* mcx_clearcfg closes the log file */
+        mcx_clearcfg(&cfg);
+    }
+
+    /* mesh_normalize: jacobian is the weighted path length in mm (as mcx), wl in mesh units,
+       both per unit detected weight */
+    {
+        mcconfig cfg;
+        tetmesh mesh;
+        double w[2];
+
+        mcx_initcfg(&cfg);
+        mesh_init(&mesh);
+        cfg.flog = devnull;
+        cfg.seed = SEED_FROM_FILE;
+        cfg.method = rtBLBadouel;
+        cfg.basisorder = 0;
+        cfg.maxgate = 1;
+        cfg.srcnum = 1;
+        cfg.unitinmm = unit;
+        mesh.ne = 2;
+        mesh.weight = w;
+
+        cfg.outputtype = otJacobian;
+        w[0] = 1., w[1] = 3.;
+        mesh_normalize(&mesh, &cfg, 0.f, 4.f, 0);
+        EXPECT_NEAR(w[0], unit / 4., 1e-6, "normalized replay jacobian: unitinmm / total detected weight");
+        EXPECT_NEAR(w[1], 3. * unit / 4., 1e-6, "normalized replay jacobian: unitinmm / total detected weight");
+
+        cfg.outputtype = otWL;
+        w[0] = 1., w[1] = 3.;
+        mesh_normalize(&mesh, &cfg, 0.f, 4.f, 0);
+        EXPECT_NEAR(w[0], 1. / 4., 1e-6, "normalized replay wl: 1 / total detected weight");
+        mesh.weight = NULL;
+        cfg.flog = stdout;  /* mcx_clearcfg closes the log file */
+        mcx_clearcfg(&cfg);
+    }
+
+    /* mesh_getdetimage: 2x2 pixels over [0,10]^2, 4 time gates of 50 ps; records are
+       detid, nscat x 2, ppath x 2, exit position x 3, exit direction x 3, w0 */
+    {
+        mcconfig cfg;
+        tetmesh mesh;
+        float ppath[2 * 12] = {0}, detmap[4 * 4] = {0};
+        const float exitxy[2][2] = {{2.f, 7.f}, {7.f, 2.f}}; /* pixels (0,1) and (1,0) */
+        int gate[2];
+
+        for (i = 0; i < 2; i++) {
+            float* rec = ppath + i * 12;
+            rec[0] = 1.f;
+            rec[3] = plen[i][0], rec[4] = plen[i][1];
+            rec[5] = exitxy[i][0], rec[6] = exitxy[i][1];
+            rec[11] = w0;
+            gate[i] = (int)(tof[i] / 5e-11f);
+        }
+
+        mcx_initcfg(&cfg);
+        mesh_init(&mesh);
+        cfg.flog = devnull;
+        cfg.his.maxmedia = 2;
+        cfg.his.unitinmm = unit;
+        cfg.ismomentum = 0;
+        cfg.detpos = (float4*)calloc(1, sizeof(float4));
+        cfg.detnum = 1;
+        cfg.detparam1.x = 10.f, cfg.detparam1.w = 2.f;
+        cfg.detparam2.y = 10.f, cfg.detparam2.w = 2.f;
+        cfg.tstart = 0.f;
+        cfg.tstep = 5e-11f;
+        cfg.maxgate = 4;
+        mesh.prop = 2;
+        mesh.med = med;
+        mesh_getdetimage(detmap, ppath, 2, &cfg, &mesh);
+        EXPECT_TRUE(gate[0] == 2 && gate[1] == 3, "the test photons fall in time gates 2 and 3");
+        EXPECT_NEAR(detmap[gate[0] * 4 + 1 * 2 + 0], w0 * weight[0], 1e-6, "mesh_getdetimage: weight and time gate of photon 1");
+        EXPECT_NEAR(detmap[gate[1] * 4 + 0 * 2 + 1], w0 * weight[1], 1e-6, "mesh_getdetimage: weight and time gate of photon 2");
+        mesh.med = NULL;
+        cfg.flog = stdout;  /* mcx_clearcfg closes the log file */
+        mcx_clearcfg(&cfg);
+    }
+}
+
 int main(int argc, char** argv) {
     char tmpdir[] = "/tmp/mmcunitXXXXXX", cwd[4096];
 
@@ -2926,6 +3132,7 @@ int main(int argc, char** argv) {
     test_morecover3();
     test_morecover4();
     test_utilfuncs();
+    test_replay();
     test_cmdopts();
     test_mmclab_path();
     test_mmclab_gpu_method();

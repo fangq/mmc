@@ -764,7 +764,7 @@ Output quantities, files and formats
 | `X` | `flux` | fluence rate, 1/(mm^2 s) per unit source (default) |
 | `F` | `fluence` | fluence, integrated over each time gate |
 | `E` | `energy` | energy deposited |
-| `J` | `jacobian` | replay: mua Jacobian |
+| `J` | `jacobian` | replay: mua Jacobian, the weighted path length as `wl` (normalized: in mm, as in mcx) |
 | `L` | `wl` | replay: weighted path length (mua Jacobian) |
 | `P` | `wp` | replay: weighted scattering count (mus Jacobian) |
 | `R` | `rf` | with a modulation frequency, no replay: complex fluence rate |

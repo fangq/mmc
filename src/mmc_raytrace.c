@@ -55,7 +55,7 @@
 #endif
 
 static inline int mmc_is_fluence_like(char outputtype) {
-    return outputtype != otEnergy && outputtype != otWP && outputtype != otWL;
+    return outputtype != otEnergy && outputtype != otWP && outputtype != otWL && outputtype != otJacobian;
 }
 
 static inline float mmc_fluence_deposit(float w0, float w1, float mua, float len) {
@@ -421,11 +421,8 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->weight *= expf(-prop->mua * r->Lmove);
         }
 
-        if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otJacobian) {
-            currweight = expf(-DELTA_MUA * r->Lmove);
-            currweight *= cfg->replayweight[r->photonid];
-            currweight += r->weight;
-        } else if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otWL) {
+        /* jacobian, like wl, deposits the weighted path length w*L (as MCX does) */
+        if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otJacobian)) {
             currweight = r->Lmove;
             currweight *= cfg->replayweight[r->photonid];
             currweight += r->weight;
@@ -459,7 +456,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             r->photontimer += r->Lmove * rc;
 
-            if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
+            if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->ne;
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->ne;
@@ -499,7 +496,7 @@ float plucker_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                         ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
                     }
 
-                    if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
+                    if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
                         tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * tracer->mesh->nn;
                     } else {
                         tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * tracer->mesh->nn;
@@ -697,11 +694,8 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                 r->weight *= expf(-prop->mua * r->Lmove);
             }
 
-            if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otJacobian) {
-                currweight = expf(-DELTA_MUA * r->Lmove);
-                currweight *= cfg->replayweight[r->photonid];
-                currweight += r->weight;
-            } else if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otWL) {
+            /* jacobian, like wl, deposits the weighted path length w*L (as MCX does) */
+            if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otJacobian)) {
                 currweight = r->Lmove;
                 currweight *= cfg->replayweight[r->photonid];
                 currweight += r->weight;
@@ -735,7 +729,7 @@ float havel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
                 ww = mmc_fluence_deposit(currweight, r->weight, prop->mua, r->Lmove);
             }
 
-            if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
+            if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
@@ -941,11 +935,8 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
             r->weight *= expf(-prop->mua * r->Lmove);
         }
 
-        if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otJacobian) {
-            currweight = expf(-DELTA_MUA * r->Lmove);
-            currweight *= cfg->replayweight[r->photonid];
-            currweight += r->weight;
-        } else if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otWL) {
+        /* jacobian, like wl, deposits the weighted path length w*L (as MCX does) */
+        if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otJacobian)) {
             currweight = r->Lmove;
             currweight *= cfg->replayweight[r->photonid];
             currweight += r->weight;
@@ -974,7 +965,7 @@ float badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visitor* visit) {
 
             r->photontimer += r->Lmove * rc;
 
-            if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
+            if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * (cfg->basisorder ? tracer->mesh->nn : tracer->mesh->ne);
@@ -1593,11 +1584,8 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
 
         totalloss = 1.f - totalloss;
 
-        if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otJacobian) {
-            currweight = expf(-DELTA_MUA * r->Lmove);
-            currweight *= cfg->replayweight[r->photonid];
-            currweight += r->weight;
-        } else if (cfg->seed == SEED_FROM_FILE && cfg->outputtype == otWL) {
+        /* jacobian, like wl, deposits the weighted path length w*L (as MCX does) */
+        if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otJacobian)) {
             currweight = r->Lmove;
             currweight *= cfg->replayweight[r->photonid];
             currweight += r->weight;
@@ -1626,7 +1614,7 @@ float branchless_badouel_raytet(ray* r, raytracer* tracer, mcconfig* cfg, visito
             ww = currweight - r->weight;
             r->photontimer += r->Lmove * rc;
 
-            if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
+            if (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) {
                 tshift = MIN( ((int)(cfg->replaytime[r->photonid] * visit->rtstep)), cfg->maxgate - 1 ) * framelen;
             } else {
                 tshift = MIN(MAX((int)((r->photontimer - cfg->tstart) * visit->rtstep), 0), cfg->maxgate - 1) * framelen;
@@ -1949,7 +1937,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
     if (cfg->srctype != stPattern || cfg->srcnum == 1) {
         r.partialpath[visit->reclen - 2] = r.weight;
 
-        if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) {
+        if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian)) {
             kahany = cfg->replayweight[r.photonid] - visit->kahanc0[0];    /* when replay mode, accumulate detected photon weight */
         } else {
             kahany = r.weight - visit->kahanc0[0];
@@ -1962,7 +1950,7 @@ void onephoton(size_t id, raytracer* tracer, tetmesh* mesh, mcconfig* cfg,
         *((int*)(r.partialpath + visit->reclen - 2)) = r.posidx;
 
         for (pidx = 0; pidx < cfg->srcnum; pidx++) {
-            if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) {
+            if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian)) {
                 kahany = cfg->replayweight[r.photonid] - visit->kahanc0[pidx];    /* when replay mode, accumulate detected photon weight */
             } else {
                 kahany = r.weight * cfg->srcpattern[r.posidx * cfg->srcnum + pidx] - visit->kahanc0[pidx];
@@ -2621,7 +2609,7 @@ void launchphoton(mcconfig* cfg, ray* r, tetmesh* mesh, RandType* ran, RandType*
                 r->posidx = MIN((int)(ry * ysize), ysize - 1) * xsize + MIN((int)(rx * xsize), xsize - 1);
                 r->weight = (cfg->srcnum == 1) ? cfg->srcpattern[r->posidx] : 1.f;
 
-                if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP)) { // replay mode currently doesn't support multiple source patterns
+                if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian)) { // replay mode currently doesn't support multiple source patterns
                     r->weight = cfg->srcpattern[MIN( (int)(ry * cfg->srcparam2.w), (int)cfg->srcparam2.w - 1 ) * (int)(cfg->srcparam1.w) + MIN( (int)(rx * cfg->srcparam1.w), (int)cfg->srcparam1.w - 1 )];
                     cfg->replayweight[r->photonid] *= r->weight;
                 }

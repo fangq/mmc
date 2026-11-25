@@ -70,7 +70,6 @@
 #define EPS        1e-6f
 #define LOG_MT_MAX 22.1807097779182f
 #define R_MIN_MUS  1e9f
-#define DELTA_MUA  1e-4f
 #define VERY_BIG   1e30f
 
 #define MESH_ERROR(a)  mesh_error((a),__FILE__,__LINE__)

@@ -3050,7 +3050,7 @@ void mcx_loadconfig(FILE* in, mcconfig* cfg) {
                 }
 
                 // only load detection pattern under replay mode
-                if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP) && cfg->detparam1.w * cfg->detparam2.w > 0) {
+                if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otWL || cfg->outputtype == otWP || cfg->outputtype == otJacobian) && cfg->detparam1.w * cfg->detparam2.w > 0) {
                     if (in == stdin) {
                         MMC_FPRINTF(stdout, "Please specify the detector pattern file name:\n\t");
                     }
@@ -4515,13 +4515,21 @@ void mcx_validatecfg(mcconfig* cfg) {
 /**
  * @brief Initialize the replay data structure from detected photon data - in embedded mode (MATLAB/Python)
  *
+ * Computes the detected weight w = exp(-sum mua*L) and the time of flight of each replayed
+ * photon from its partial paths L (in mesh units, as saved by the baseline run). It must be
+ * called after mesh_validate, which converts the media of the mesh to 1/(mesh unit), so that
+ * mua*L needs no unitinmm factor, the same as mesh_loadseedfile in the mmc binary and
+ * mcx_replayinit in MCX (called after mcx_preprocess).
+ *
  * @param[in,out] cfg: simulation configuration
+ * @param[in] med: the media, medium 0 (background) first, mua in 1/(mesh unit) (mesh->med after mesh_validate)
+ * @param[in] medianum: the number of media in med, including medium 0 (mesh->prop + 1)
  * @param[in] detps: detected photon data
  * @param[in] dimdetps: the dimension vector of the detected photon data
  * @param[in] seedbyte: the number of bytes per RNG seed
  */
 
-void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
+void mcx_replayinit(mcconfig* cfg, const medium* med, int medianum, float* detps, int dimdetps[2], int seedbyte) {
     int i, j, hasdetid = 0, offset;
     float plen;
 
@@ -4542,13 +4550,17 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
     }
 
     hasdetid = SAVE_DETID(cfg->savedetflag);
-    offset = SAVE_NSCAT(cfg->savedetflag) * (cfg->medianum - 1);
+    offset = SAVE_NSCAT(cfg->savedetflag) * (medianum - 1);
 
     if (((!hasdetid) && cfg->detnum > 1) || !SAVE_PPATH(cfg->savedetflag)) {
         MMC_ERROR(-6, "please rerun the baseline simulation and save detector ID (D) and partial-path (P) using cfg.savedetflag='dp' ");
     }
 
-    if (dimdetps[0] < hasdetid + offset + cfg->medianum - 1) {
+    if (med == NULL || medianum < 2) {
+        MMC_ERROR(-6, "the replay needs the optical properties of the media ('prop')");
+    }
+
+    if (dimdetps[0] < hasdetid + offset + medianum - 1) {
         MMC_ERROR(-6, "cfg.detphotons has fewer rows than detector ID, scattering counts and partial paths of all media; was the baseline run made with the same media?");
     }
 
@@ -4568,10 +4580,10 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
             cfg->replayweight[cfg->nphoton] = 1.f;
             cfg->replaytime[cfg->nphoton] = 0.f;
 
-            for (j = hasdetid; j < cfg->medianum - 1 + hasdetid; j++) {
-                plen = detps[i * dimdetps[0] + offset + j] * cfg->unitinmm;   /* in mm: mua is in 1/mm here */
-                cfg->replayweight[cfg->nphoton] *= expf(-cfg->prop[j - hasdetid + 1].mua * plen);
-                cfg->replaytime[cfg->nphoton] += plen * R_C0 * cfg->prop[j - hasdetid + 1].n;
+            for (j = hasdetid; j < medianum - 1 + hasdetid; j++) {
+                plen = detps[i * dimdetps[0] + offset + j];   /* in mesh units, as is 1/mua */
+                cfg->replayweight[cfg->nphoton] *= expf(-med[j - hasdetid + 1].mua * plen);
+                cfg->replaytime[cfg->nphoton] += plen * cfg->unitinmm * R_C0 * med[j - hasdetid + 1].n;
             }
 
             if (cfg->replaytime[cfg->nphoton] < cfg->tstart
@@ -4592,11 +4604,13 @@ void mcx_replayinit(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) 
  *
  * Perform self-checking and raise exceptions or warnings when input error is detected
  *
+ * The replay data (detphotons) are processed later by mcx_replayinit, after mesh_validate.
+ *
  * @param[in,out] cfg: the simulation configuration structure
- * @param[out] mesh: the mesh data structure
+ * @param[in] detps: detected photon data for replay (cfg.detphotons), or NULL
  */
 
-void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte) {
+void mmc_validate_config(mcconfig* cfg, float* detps) {
     if (cfg->nphoton <= 0) {
         MMC_ERROR(999, "cfg.nphoton must be a positive number");
     }
@@ -4666,7 +4680,11 @@ void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedb
 
     cfg->his.detnum = cfg->detnum;
     cfg->his.colcount = (1 + (cfg->ismomentum > 0)) * cfg->his.maxmedia + (cfg->issaveexit > 0) * 6 + 1;
-    mcx_replayinit(cfg, detps, dimdetps, seedbyte);
+
+    /* the replay weights need the media in 1/(mesh unit): mcx_replayinit runs after mesh_validate */
+    if (cfg->seed == SEED_FROM_FILE && detps == NULL) {
+        MMC_ERROR(-6, "you give cfg.seed for replay, but did not specify cfg.detphotons.\nPlease define it as the detphoton output from the baseline simulation\n");
+    }
 }
 
 /**

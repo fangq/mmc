@@ -408,7 +408,8 @@ void mcx_savefloatbnii(float* vol, int ndim, uint* dims, float* voxelsize, char*
 void mcx_savejdet(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);
 void mcx_savejdb(float* ppath, void* seeds, uint count, int doappend, mcconfig* cfg);
 void mcx_fflush(FILE* out);
-void mmc_validate_config(mcconfig* cfg, float* detps, int dimdetps[2], int seedbyte);
+void mmc_validate_config(mcconfig* cfg, float* detps);
+void mcx_replayinit(mcconfig* cfg, const medium* med, int medianum, float* detps, int dimdetps[2], int seedbyte);
 
 #if defined(MCX_CONTAINER) && (defined(MATLAB_MEX_FILE) || defined(OCTAVE_API_VERSION_NUMBER))
 #ifdef _OPENMP

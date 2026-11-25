@@ -2711,12 +2711,18 @@ void mesh_getdetimage(float* detmap, float* ppath, int count, mcconfig* cfg, tet
         path = 0;
         weight = ppath[(i + 1) * colcount - 1];
 
+        /* the partial paths are in mesh units, and mesh->med (scaled by mesh_loadmedia/mesh_validate)
+           in 1/(mesh unit): mua*L needs no unitinmm, the optical path (for the time gate) does */
         for (j = 1; j <= cfg->his.maxmedia; j++) {
             path += ppath[i * colcount + j + cfg->his.maxmedia] * mesh->med[j].n;
-            weight *= expf(-ppath[i * colcount + j + cfg->his.maxmedia] * mesh->med[j].mua * unitinmm);
+            weight *= expf(-ppath[i * colcount + j + cfg->his.maxmedia] * mesh->med[j].mua);
         }
 
-        ntg = (int) path * R_C0 / cfg->tstep;
+        ntg = (int)((path * unitinmm * R_C0 - cfg->tstart) / cfg->tstep);
+
+        if (ntg < 0) {
+            ntg = 0;
+        }
 
         if (ntg > cfg->maxgate - 1) {
             ntg = cfg->maxgate - 1;
@@ -2835,10 +2841,12 @@ float mesh_normalize(tetmesh* mesh, mcconfig* cfg, float Eabsorb, float Etotal, 
     }
 
     if (cfg->seed == SEED_FROM_FILE && (cfg->outputtype == otJacobian || cfg->outputtype == otWL || cfg->outputtype == otWP)) {
-        float normalizor = 1.f / (DELTA_MUA * cfg->nphoton);
+        float normalizor = 1.f / Etotal;    /*Etotal is total detected photon weight in the replay mode*/
 
-        if (cfg->outputtype == otWL || cfg->outputtype == otWP) {
-            normalizor = 1.f / Etotal;    /*Etotal is total detected photon weight in the replay mode*/
+        /* jacobian: the weighted path length in mm, the same as MCX's jacobian (unitinmm/sum(w));
+           wl keeps the mesh unit */
+        if (cfg->outputtype == otJacobian) {
+            normalizor *= cfg->unitinmm;
         }
 
         for (i = 0; i < cfg->maxgate; i++)

@@ -1226,7 +1226,8 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         ww = currweight.f - r->weight;
         r->photontimer += r->Lmove * (prop.n * R_C0);
 
-        if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP)) {
+        /* replay outputs (jacobian/wl/wp) are binned by the detected time of flight of the replayed photon */
+        if ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP) + (GPU_PARAM(gcfg, outputtype) == otJacobian)) {
             tshift = MIN( ((int)(replaytime[r->photonid] * GPU_PARAM(gcfg, Rtstep))), (int)GPU_PARAM(gcfg, maxgate) - 1 ) * GPU_PARAM(gcfg, framelen);
         } else {
             tshift = MIN(max((int)((r->photontimer - gcfg->tstart) * GPU_PARAM(gcfg, Rtstep)), 0), (int)GPU_PARAM(gcfg, maxgate) - 1) * GPU_PARAM(gcfg, framelen);
@@ -1235,7 +1236,8 @@ __device__ float branchless_badouel_raytet(ray* r, __constant MCXParam* gcfg, __
         {
 #ifndef MCX_SKIP_VOLUME
 
-            if ((GPU_PARAM(gcfg, outputtype) != otEnergy) * (GPU_PARAM(gcfg, outputtype) != otWP) * (GPU_PARAM(gcfg, outputtype) != otWL)) {
+            /* jacobian, like wl, deposits the weighted path length w*L itself (as MCX does), not w*L/mua */
+            if ((GPU_PARAM(gcfg, outputtype) != otEnergy) * (GPU_PARAM(gcfg, outputtype) != otWP) * (GPU_PARAM(gcfg, outputtype) != otWL) * (GPU_PARAM(gcfg, outputtype) != otJacobian)) {
                 ww = (prop.mua < EPS) ? (currweight.f * r->Lmove) :
 #ifdef __NVCC__
                      __fdividef(ww, prop.mua);
@@ -2327,7 +2329,9 @@ __device__ void onephoton(unsigned int id, __local float* ppath, __constant MCXP
 #endif
 
     if (!IS_MULTISRC || GPU_PARAM(gcfg, srcnum) == 1) {
-        *energytot += r.weight;
+        /* replay outputs are normalized by the total detected weight, as in the cpu tracer (mmc_raytrace.c) */
+        *energytot += (GPU_PARAM(gcfg, seed) == SEED_FROM_FILE && ((GPU_PARAM(gcfg, outputtype) == otWL) + (GPU_PARAM(gcfg, outputtype) == otWP) + (GPU_PARAM(gcfg, outputtype) == otJacobian))) ?
+                      replayweight[r.photonid] : r.weight;
     } else {
         for (oldeid = 0; oldeid < GPU_PARAM(gcfg, srcnum); oldeid++) {
             ppath[GPU_PARAM(gcfg, reclen) + oldeid] = srcpattern[r.posidx * GPU_PARAM(gcfg, srcnum) + oldeid];
